@@ -145,6 +145,86 @@ fn real_disc_archives_load_through_cs_assets() {
 }
 
 #[test]
+fn golden_room_mesh_matches_disc_geometry() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc room mesh check");
+        return;
+    };
+    let mesh = clearsleeper::assets::load_room_mesh().expect("room mesh loads from disc");
+    assert_eq!(mesh.positions.len(), 17_840);
+    assert_eq!(mesh.colors.len(), mesh.positions.len());
+    assert_eq!(mesh.indices.len(), 9_458 * 3);
+    assert!(
+        mesh.indices
+            .iter()
+            .all(|&index| (index as usize) < mesh.positions.len())
+    );
+    assert!(mesh.colors.iter().any(|color| *color != [1.0, 1.0, 1.0]));
+
+    let mut minimum = [f32::MAX; 3];
+    let mut maximum = [f32::MIN; 3];
+    for position in &mesh.positions {
+        for axis in 0..3 {
+            minimum[axis] = minimum[axis].min(position[axis]);
+            maximum[axis] = maximum[axis].max(position[axis]);
+        }
+    }
+    assert!((minimum[0] + 250_000.0).abs() < 0.5, "x min {}", minimum[0]);
+    assert!((maximum[0] + 150_000.0).abs() < 0.5, "x max {}", maximum[0]);
+    assert!((minimum[1] + 43.43).abs() < 0.5, "y min {}", minimum[1]);
+    assert!((maximum[1] - 5530.08).abs() < 0.5, "y max {}", maximum[1]);
+    assert!((minimum[2] - 250_000.0).abs() < 0.5, "z min {}", minimum[2]);
+    assert!((maximum[2] - 350_000.0).abs() < 0.5, "z max {}", maximum[2]);
+
+    let stage = clearsleeper::assets::load_stage().expect("stage loads from disc");
+    let spawn = [stage.spawn.x, stage.spawn.z];
+    let mut top: Option<(f32, f32)> = None;
+    for triangle in mesh.indices.chunks_exact(3) {
+        let a = mesh.positions[triangle[0] as usize];
+        let b = mesh.positions[triangle[1] as usize];
+        let c = mesh.positions[triangle[2] as usize];
+        if !inside_xz(a, b, c, spawn) {
+            continue;
+        }
+        let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        let normal = [
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        ];
+        let length = normal.iter().map(|axis| axis * axis).sum::<f32>().sqrt();
+        if length < 1e-9 {
+            continue;
+        }
+        let ny = normal[1] / length;
+        if ny.abs() < 0.9 {
+            continue;
+        }
+        let y = (a[1] + b[1] + c[1]) / 3.0;
+        if top.is_none_or(|(best, _)| y > best) {
+            top = Some((y, ny));
+        }
+    }
+    let (y, ny) = top.expect("horizontal ground under spawn");
+    assert!((y - 143.37).abs() < 1.0, "ground y {y}");
+    assert!(ny > 0.5, "surface normal {ny}");
+}
+
+fn inside_xz(a: [f32; 3], b: [f32; 3], c: [f32; 3], point: [f32; 2]) -> bool {
+    let v0 = [b[0] - a[0], b[2] - a[2]];
+    let v1 = [c[0] - a[0], c[2] - a[2]];
+    let v2 = [point[0] - a[0], point[1] - a[1]];
+    let determinant = v0[0] * v1[1] - v1[0] * v0[1];
+    if determinant.abs() < 1e-6 {
+        return false;
+    }
+    let u = (v2[0] * v1[1] - v1[0] * v2[1]) / determinant;
+    let w = (v0[0] * v2[1] - v2[0] * v0[1]) / determinant;
+    u >= -1e-4 && w >= -1e-4 && u + w <= 1.0 + 1e-4
+}
+
+#[test]
 fn golden_dzr_spawn_selects_entry_by_point() {
     let mut data = Vec::new();
     data.extend_from_slice(&2_u32.to_be_bytes());

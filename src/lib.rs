@@ -12,6 +12,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod assets;
 pub mod audio;
+pub mod bdl;
 pub mod hud;
 pub mod input;
 pub mod save;
@@ -25,6 +26,7 @@ pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
+    pub room: Option<bdl::RoomMesh>,
 }
 
 impl App {
@@ -44,12 +46,13 @@ impl App {
         }
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         sim::build(&mut sim, assets::load_stage());
+        let room = assets::load_room_mesh();
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
         let cam = signal(OrbitCamera {
             target: spawn,
             ..OrbitCamera::default()
         });
-        Self { sim, cam, audio }
+        Self { sim, cam, audio, room }
     }
 
     /// Frame boundary: poll the shell into the sim's intent resources.
@@ -184,7 +187,7 @@ pub fn root_view(
     _sched: &mut repose_core::runtime::Scheduler,
     _ctx: &repose_core::RenderContext,
 ) -> repose_core::View {
-    let frame = view::build_frame(&app.snapshot(), app.cam.get());
+    let frame = view::build_frame(&app.snapshot(), app.cam.get(), app.room.as_ref());
     let cam = app.cam.clone();
     let viewport = Viewport3d(
         frame,

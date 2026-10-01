@@ -5,7 +5,15 @@ pub const ASSETS_ENV: &str = "CS_ASSETS";
 const YAZ0_MAGIC: [u8; 4] = *b"Yaz0";
 const RARC_MAGIC: [u8; 4] = *b"RARC";
 const STAGE_ROOM: &str = "files/res/Stage/sea/Room44.arc";
+const STAGE_MAP: &str = "files/res/Stage/sea/Stage.arc";
 const STAGE_SPAWN_POINT: i32 = 128;
+const STAGE_ROOM_NO: u8 = 44;
+const ROOM_MODELS: [&str; 4] = [
+    "bdl/model.bdl",
+    "bdl/model1.bdl",
+    "bdl/model2.bdl",
+    "bdl/model3.bdl",
+];
 const RAD_PER_UNIT: f32 = std::f32::consts::TAU / 65536.0;
 
 #[derive(Debug)]
@@ -449,6 +457,16 @@ pub fn load_stage() -> Option<crate::sim::collision::StageData> {
     }
 }
 
+pub fn load_room_mesh() -> Option<crate::bdl::RoomMesh> {
+    match room_mesh_from_assets() {
+        Ok(mesh) => Some(mesh),
+        Err(error) => {
+            log::warn!("clearsleeper: room mesh unavailable ({error})");
+            None
+        }
+    }
+}
+
 fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
     let root = AssetRoot::from_env()?;
     let room = root.read_archive(STAGE_ROOM)?;
@@ -465,6 +483,79 @@ fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
         yaw,
         collision,
     })
+}
+
+fn room_mesh_from_assets() -> Result<crate::bdl::RoomMesh, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let (origin, angle) = room_placement(&root)?;
+    let room = root.read_archive(STAGE_ROOM)?;
+    let path = root.root().join(STAGE_ROOM);
+    let mut mesh = crate::bdl::RoomMesh::default();
+    for name in ROOM_MODELS {
+        let model = match room.read(name) {
+            Ok(model) => model,
+            Err(AssetError::MissingEntry { .. }) => continue,
+            Err(error) => return Err(error),
+        };
+        let part = crate::bdl::parse(model, origin, angle).map_err(|error| AssetError::Corrupt {
+            path: path.clone(),
+            detail: error.as_str(),
+        })?;
+        mesh.append(part);
+    }
+    if mesh.positions.is_empty() {
+        return Err(corrupt(&path, "room has no geometry"));
+    }
+    Ok(mesh)
+}
+
+fn room_placement(root: &AssetRoot) -> Result<([f32; 2], f32), AssetError> {
+    let map = root.read_archive(STAGE_MAP)?;
+    let path = root.root().join(STAGE_MAP);
+    let data = map.read("dzs/stage.dzs")?;
+    let corrupt = |detail: &'static str| AssetError::Corrupt {
+        path: path.clone(),
+        detail,
+    };
+    let chunk_count = read_u32(data, 0).ok_or_else(|| corrupt("dzs truncated"))?;
+    let nodes_end = (chunk_count as usize)
+        .checked_mul(12)
+        .and_then(|bytes| bytes.checked_add(4))
+        .ok_or_else(|| corrupt("dzs chunk table overflow"))?;
+    if nodes_end > data.len() {
+        return Err(corrupt("dzs chunk table out of range"));
+    }
+    let mut mult = None;
+    for index in 0..chunk_count as usize {
+        let at = 4 + index * 12;
+        if &data[at..at + 4] == b"MULT" {
+            let count = read_u32(data, at + 4).ok_or_else(|| corrupt("dzs truncated"))?;
+            let offset = read_u32(data, at + 8).ok_or_else(|| corrupt("dzs truncated"))?;
+            mult = Some((count, offset));
+            break;
+        }
+    }
+    let Some((count, offset)) = mult else {
+        return Ok(([0.0, 0.0], 0.0));
+    };
+    let entries_end = (count as usize)
+        .checked_mul(0x0C)
+        .and_then(|bytes| bytes.checked_add(offset as usize))
+        .ok_or_else(|| corrupt("dzs mult table overflow"))?;
+    if entries_end > data.len() {
+        return Err(corrupt("dzs mult table out of range"));
+    }
+    for index in 0..count as usize {
+        let at = offset as usize + index * 0x0C;
+        if data[at + 0x0A] != STAGE_ROOM_NO {
+            continue;
+        }
+        let trans_x = read_f32(data, at).ok_or_else(|| corrupt("dzs truncated"))?;
+        let trans_z = read_f32(data, at + 4).ok_or_else(|| corrupt("dzs truncated"))?;
+        let angle = read_i16(data, at + 8).ok_or_else(|| corrupt("dzs truncated"))?;
+        return Ok(([trans_x, trans_z], f32::from(angle) * RAD_PER_UNIT));
+    }
+    Ok(([0.0, 0.0], 0.0))
 }
 
 pub fn stage_spawn(data: &[u8], path: PathBuf) -> Result<(glam::Vec3, f32), AssetError> {

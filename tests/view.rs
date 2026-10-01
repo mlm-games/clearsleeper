@@ -1,6 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
+use clearsleeper::bdl::RoomMesh;
 use clearsleeper::view::{SceneSnapshot, build_frame, sim_yaw_for_camera};
 use clearsleeper::{App, SIM_HZ};
 use glam::{Vec2, Vec3};
@@ -16,7 +17,7 @@ fn golden_snapshot_builds_world_frame() {
         ground_y: 0.0,
         walls: true,
     };
-    let frame = build_frame(&snapshot, OrbitCamera::default());
+    let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
     assert_eq!(frame.groups.len(), 3);
     assert!(frame.groups.iter().all(|group| group.depth_test));
@@ -81,4 +82,28 @@ fn camera_relative_walk_follows_view_yaw() {
         "no lateral drift: {:?}",
         snapshot.player_pos
     );
+}
+
+#[test]
+fn room_mesh_replaces_placeholder_ground() {
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::new(40.0, 0.0, -25.0),
+        player_yaw: 1.0,
+        bounds_min: Vec2::new(-800.0, -600.0),
+        bounds_max: Vec2::new(800.0, 600.0),
+        ground_y: 0.0,
+        walls: false,
+    };
+    let room = RoomMesh {
+        positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+        colors: vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        indices: vec![0, 2, 1],
+    };
+    let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
+
+    assert_eq!(frame.groups.len(), 2);
+    let ground = &frame.groups[0];
+    assert_eq!(ground.tri_count(), 1);
+    assert_eq!(ground.positions, room.positions);
+    assert_eq!(ground.colors, room.colors);
 }

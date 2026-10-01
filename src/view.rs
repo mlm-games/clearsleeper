@@ -1,6 +1,8 @@
 use glam::{Vec2, Vec3};
 use repame_view3d::{Frame3d, MeshGroup, OrbitCamera, Rgb};
 
+use crate::bdl::RoomMesh;
+
 const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
 const GROUND: Rgb = [0.24, 0.42, 0.22];
 const WALL: Rgb = [0.48, 0.20, 0.20];
@@ -26,7 +28,11 @@ pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
     (-cam_yaw.cos()).atan2(-cam_yaw.sin())
 }
 
-pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera) -> Frame3d {
+pub fn build_frame(
+    snapshot: &SceneSnapshot,
+    cam: OrbitCamera,
+    room: Option<&RoomMesh>,
+) -> Frame3d {
     let cam = OrbitCamera {
         target: Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z),
         ..cam
@@ -37,12 +43,25 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera) -> Frame3d {
         ..Frame3d::default()
     };
     let eye = frame.cam.eye();
-    frame.push(ground_group(snapshot));
+    match room {
+        Some(room) => frame.push(room_group(room)),
+        None => frame.push(ground_group(snapshot)),
+    }
     if snapshot.walls {
         frame.push(walls_group(snapshot, eye));
     }
     frame.push(player_group(snapshot, eye));
     frame
+}
+
+fn room_group(room: &RoomMesh) -> MeshGroup {
+    MeshGroup {
+        positions: room.positions.clone(),
+        colors: room.colors.clone(),
+        indices: room.indices.clone(),
+        depth_test: true,
+        ..MeshGroup::default()
+    }
 }
 
 fn ground_group(snapshot: &SceneSnapshot) -> MeshGroup {
