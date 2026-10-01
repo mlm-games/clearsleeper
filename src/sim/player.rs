@@ -1,0 +1,9 @@
+use bevy_ecs::prelude::*;
+use glam::Vec3;
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Player {
+    pub pos: Vec3,
+    pub yaw: f32,
+    pub speed: f32,
+}
