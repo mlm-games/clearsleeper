@@ -1,6 +1,36 @@
 //! Wind Waker recreation on repame: fixed-step sim + repose views, no bevy.
 
+use std::time::Duration;
+
+use repame_sim::Sim;
 use repame_view3d::{BatchDesc, Frame3d, GeomHandle, Viewport3d};
+
+pub mod sim;
+
+/// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
+pub const SIM_HZ: f64 = 30.0;
+
+pub struct App {
+    pub sim: Sim,
+}
+
+impl App {
+    pub fn new() -> Self {
+        let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
+        sim::build(&mut sim);
+        Self { sim }
+    }
+
+    pub fn advance(&mut self, dt: Duration) -> u32 {
+        self.sim.step(dt)
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 pub fn root_view(
     _sched: &mut repose_core::runtime::Scheduler,
@@ -24,7 +54,17 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
     rlobkit_app_events::android_log::init(env!("CARGO_PKG_NAME"), "warn");
     rlobkit_app_events::system_bars::set_immersive_sticky(true);
     repose_core::locals::set_theme_default(repose_core::locals::Theme::default());
-    if let Err(e) = repame_shell::run_android(android_app, root_view) {
+    let mut app = App::new();
+    let mut last = std::time::Instant::now();
+    if let Err(e) = repame_shell::run_android(android_app, move |sched, ctx| {
+        let now = std::time::Instant::now();
+        let dt = now
+            .duration_since(last)
+            .min(std::time::Duration::from_secs_f32(0.25));
+        last = now;
+        app.advance(dt);
+        root_view(sched, ctx)
+    }) {
         log::error!("clearsleeper: android run failed: {e:?}");
     }
 }
