@@ -5,6 +5,7 @@ use std::f32::consts::TAU;
 use bevy_ecs::prelude::*;
 use glam::Vec2;
 
+use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
 use super::intent::{CameraYaw, MoveIntent};
 use super::player::Player;
 
@@ -113,6 +114,8 @@ pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
     mut players: Query<&mut Player>,
+    mut stride: ResMut<Stride>,
+    mut events: ResMut<SimEvents>,
 ) {
     let stick = intent.axis.length().min(1.0);
     let stick_sq = stick * stick;
@@ -157,6 +160,11 @@ pub fn walk(
         };
         player.pos.x += speed_f * player.yaw.sin();
         player.pos.z += speed_f * player.yaw.cos();
+        stride.0 += speed_f;
+        while stride.0 >= STRIDE_UNITS {
+            stride.0 -= STRIDE_UNITS;
+            events.list.push(SimEvent::Footstep);
+        }
         player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
         player.pos.y += player.speed_y;
     }

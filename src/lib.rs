@@ -4,9 +4,12 @@ use std::time::Duration;
 
 use repame_sim::Sim;
 use repame_view3d::{BatchDesc, GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
-use repose_core::{Signal, signal};
+use repose_core::{Modifier, Signal, signal};
+use repose_ui::{ViewExt, ZStack};
 
 pub mod assets;
+pub mod audio;
+pub mod hud;
 pub mod input;
 pub mod save;
 pub mod sim;
@@ -18,10 +21,24 @@ pub const SIM_HZ: f64 = 30.0;
 pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
+    pub audio: repame_audio::Audio,
 }
 
 impl App {
+    /// Headless construction: silent audio, no device. Tests and tools.
     pub fn new() -> Self {
+        Self::with_audio(repame_audio::Audio::noop())
+    }
+
+    /// Shell construction: opens the output device, silent fallback.
+    pub fn new_live() -> Self {
+        Self::with_audio(audio::open())
+    }
+
+    fn with_audio(mut audio: repame_audio::Audio) -> Self {
+        if let Err(e) = audio::load_cues(&mut audio) {
+            log::warn!("clearsleeper: cue bank failed to load ({e})");
+        }
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         sim::build(&mut sim);
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
@@ -29,12 +46,14 @@ impl App {
             target: spawn,
             ..OrbitCamera::default()
         });
-        Self { sim, cam }
+        Self { sim, cam, audio }
     }
 
-    /// Frame boundary: poll the shell into the sim's intent resource.
+    /// Frame boundary: poll the shell into the sim's intent resources.
     pub fn stage_polled(&mut self, sched: &repose_core::runtime::Scheduler) {
-        self.stage_axis(input::axis_from_keys(&sched.held_keys, sched.window_focused));
+        let held = &sched.held_keys;
+        self.stage_axis(input::axis_from_keys(held, sched.window_focused));
+        self.stage_damage(input::damage_from_keys(held, sched.window_focused));
     }
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
@@ -49,6 +68,32 @@ impl App {
 
     pub fn stage_camera_yaw(&mut self, yaw: f32) {
         self.sim.world.resource_mut::<sim::intent::CameraYaw>().0 = yaw;
+    }
+
+    pub fn stage_damage(&mut self, amount: u8) {
+        self.sim.world.resource_mut::<sim::intent::DamageIntent>().0 = amount;
+    }
+
+    pub fn health(&self) -> sim::health::Health {
+        *self.sim.world.resource::<sim::health::Health>()
+    }
+
+    /// Take every sim event waiting for presentation.
+    pub fn drain_events(&mut self) -> Vec<sim::events::SimEvent> {
+        std::mem::take(&mut self.sim.world.resource_mut::<sim::events::SimEvents>().list)
+    }
+
+    /// Frame boundary for audio: advance voices, realize queued sim events.
+    pub fn pump_audio(&mut self, dt: Duration) {
+        self.audio.update(dt.as_secs_f32());
+        self.audio.take_finished();
+        for event in self.drain_events() {
+            match event {
+                sim::events::SimEvent::Footstep => {
+                    self.audio.play(audio::FOOTSTEP_CUE);
+                }
+            }
+        }
     }
 
     pub fn snapshot(&self) -> view::SceneSnapshot {
@@ -88,7 +133,7 @@ pub fn root_view(
 ) -> repose_core::View {
     let frame = view::build_frame(&app.snapshot(), app.cam.get());
     let cam = app.cam.clone();
-    Viewport3d(
+    let viewport = Viewport3d(
         frame,
         GeomHandle::new(),
         "scene.main",
@@ -98,7 +143,8 @@ pub fn root_view(
             View3dEvent::Zoom { factor } => cam.update(|c| c.zoom(factor)),
             _ => {}
         },
-    )
+    );
+    ZStack(Modifier::new().fill_max_size()).child([viewport, hud::hearts_view(app.health())])
 }
 
 /// Android entry (`cargo rapk`): the lib target owns `android_main` — a bin
@@ -110,7 +156,7 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
     rlobkit_app_events::android_log::init(env!("CARGO_PKG_NAME"), "warn");
     rlobkit_app_events::system_bars::set_immersive_sticky(true);
     repose_core::locals::set_theme_default(repose_core::locals::Theme::default());
-    let mut app = App::new();
+    let mut app = App::new_live();
     let mut last = std::time::Instant::now();
     if let Err(e) = repame_shell::run_android(android_app, move |sched, ctx| {
         let now = std::time::Instant::now();
@@ -121,6 +167,7 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
         app.stage_polled(sched);
         app.stage_camera();
         app.advance(dt);
+        app.pump_audio(dt);
         root_view(&app, sched, ctx)
     }) {
         log::error!("clearsleeper: android run failed: {e:?}");

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
 use crate::sim::frame::CurrentFrame;
+use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
 use crate::sim::player::Player;
 use crate::App;
@@ -18,6 +19,8 @@ pub struct SaveGame {
     pub camera_yaw: f32,
     pub player: SavedPlayer,
     pub area: SavedArea,
+    #[serde(default)]
+    pub health: SavedHealth,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,6 +36,18 @@ pub struct SavedArea {
     pub bounds_min: [f32; 2],
     pub bounds_max: [f32; 2],
     pub spawn: [f32; 3],
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedHealth {
+    pub half_units: u8,
+    pub max: u8,
+}
+
+impl Default for SavedHealth {
+    fn default() -> Self {
+        (&Health::default()).into()
+    }
 }
 
 impl From<&Player> for SavedPlayer {
@@ -77,6 +92,24 @@ impl From<SavedArea> for Area {
     }
 }
 
+impl From<&Health> for SavedHealth {
+    fn from(health: &Health) -> Self {
+        Self {
+            half_units: health.half_units,
+            max: health.max,
+        }
+    }
+}
+
+impl From<SavedHealth> for Health {
+    fn from(saved: SavedHealth) -> Self {
+        Health {
+            half_units: saved.half_units,
+            max: saved.max,
+        }
+    }
+}
+
 impl App {
     pub fn save(&mut self) -> SaveGame {
         let world = &mut self.sim.world;
@@ -88,12 +121,14 @@ impl App {
             .iter(world)
             .next()
             .expect("player exists at boot");
+        let health = *world.resource::<Health>();
         SaveGame {
             version: SAVE_VERSION,
             tick,
             camera_yaw,
             player: (&player).into(),
             area: (&area).into(),
+            health: (&health).into(),
         }
     }
 
@@ -109,6 +144,7 @@ impl App {
         *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
         world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
         *world.resource_mut::<Area>() = save.area.clone().into();
+        *world.resource_mut::<Health>() = save.health.clone().into();
         let mut query = world.query::<&mut Player>();
         let mut player = query
             .iter_mut(world)

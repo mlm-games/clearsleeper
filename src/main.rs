@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
             Some((a.parse().ok()?, b.parse().ok()?))
         })
         .unwrap_or((1280, 720));
-    let mut app = clearsleeper::App::new();
+    let mut app = clearsleeper::App::new_live();
     let mut last = Instant::now();
     repame_shell::run_desktop("clearsleeper", size, move |sched, ctx| {
         let now = Instant::now();
@@ -20,6 +20,7 @@ fn main() -> anyhow::Result<()> {
         app.stage_polled(sched);
         app.stage_camera();
         app.advance(dt);
+        app.pump_audio(dt);
         clearsleeper::root_view(&app, sched, ctx)
     })
 }
