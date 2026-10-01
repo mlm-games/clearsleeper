@@ -6,6 +6,7 @@ use repame_sim::Sim;
 use repame_view3d::{BatchDesc, Frame3d, GeomHandle, Viewport3d};
 
 pub mod input;
+pub mod save;
 pub mod sim;
 
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
