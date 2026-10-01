@@ -5,6 +5,7 @@ use std::time::Duration;
 use repame_sim::Sim;
 use repame_view3d::{BatchDesc, Frame3d, GeomHandle, Viewport3d};
 
+pub mod assets;
 pub mod input;
 pub mod save;
 pub mod sim;

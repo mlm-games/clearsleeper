@@ -1,0 +1,437 @@
+use std::path::{Path, PathBuf};
+
+pub const ASSETS_ENV: &str = "CS_ASSETS";
+
+const YAZ0_MAGIC: [u8; 4] = *b"Yaz0";
+const RARC_MAGIC: [u8; 4] = *b"RARC";
+
+#[derive(Debug)]
+pub enum AssetError {
+    MissingRoot {
+        root: PathBuf,
+    },
+    MissingFile {
+        path: PathBuf,
+    },
+    MissingEntry {
+        path: PathBuf,
+        entry: String,
+    },
+    BadMagic {
+        path: PathBuf,
+        expected: &'static str,
+        actual: [u8; 4],
+    },
+    Corrupt {
+        path: PathBuf,
+        detail: &'static str,
+    },
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+}
+
+impl std::fmt::Display for AssetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingRoot { root } => write!(
+                f,
+                "asset root not set or not a directory: {}",
+                root.display()
+            ),
+            Self::MissingFile { path } => write!(f, "asset file not found: {}", path.display()),
+            Self::MissingEntry { path, entry } => {
+                write!(f, "entry `{entry}` not found in archive {}", path.display())
+            }
+            Self::BadMagic {
+                path,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "bad magic in {}: expected {expected}, found {:?}",
+                path.display(),
+                String::from_utf8_lossy(actual)
+            ),
+            Self::Corrupt { path, detail } => {
+                write!(f, "corrupt asset {}: {detail}", path.display())
+            }
+            Self::Io { path, source } => {
+                write!(f, "failed to read asset {}: {source}", path.display())
+            }
+        }
+    }
+}
+
+impl std::error::Error for AssetError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
+
+pub struct AssetRoot {
+    root: PathBuf,
+}
+
+impl AssetRoot {
+    pub fn from_env() -> Result<Self, AssetError> {
+        match std::env::var_os(ASSETS_ENV) {
+            Some(value) if !value.is_empty() => Ok(Self {
+                root: PathBuf::from(value),
+            }),
+            _ => Err(AssetError::MissingRoot {
+                root: PathBuf::from(format!("<unset {ASSETS_ENV}>")),
+            }),
+        }
+    }
+
+    pub fn at(root: impl Into<PathBuf>) -> Self {
+        Self {
+            root: root.into(),
+        }
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub fn read(&self, rel: &str) -> Result<Vec<u8>, AssetError> {
+        if !self.root.is_dir() {
+            return Err(AssetError::MissingRoot {
+                root: self.root.clone(),
+            });
+        }
+        let path = self.root.join(rel);
+        std::fs::read(&path).map_err(|source| match source.kind() {
+            std::io::ErrorKind::NotFound => AssetError::MissingFile { path },
+            _ => AssetError::Io { path, source },
+        })
+    }
+
+    pub fn read_archive(&self, rel: &str) -> Result<Archive, AssetError> {
+        let path = self.root.join(rel);
+        let bytes = self.read(rel)?;
+        open_archive(bytes, path)
+    }
+}
+
+fn open_archive(bytes: Vec<u8>, path: PathBuf) -> Result<Archive, AssetError> {
+    if bytes.len() >= 4 && bytes[..4] == YAZ0_MAGIC {
+        let raw = yaz0_decode(&bytes, &path)?;
+        Archive::parse(raw, path)
+    } else {
+        Archive::parse(bytes, path)
+    }
+}
+
+pub fn yaz0_decode(src: &[u8], path: impl AsRef<Path>) -> Result<Vec<u8>, AssetError> {
+    let path = path.as_ref();
+    if src.len() < 4 {
+        return Err(corrupt(path, "yaz0 data shorter than magic"));
+    }
+    let magic = [src[0], src[1], src[2], src[3]];
+    if magic != YAZ0_MAGIC {
+        return Err(AssetError::BadMagic {
+            path: path.to_path_buf(),
+            expected: "Yaz0",
+            actual: magic,
+        });
+    }
+    if src.len() < 16 {
+        return Err(corrupt(path, "yaz0 header truncated"));
+    }
+    let raw_size = u32::from_be_bytes([src[4], src[5], src[6], src[7]]) as usize;
+    let mut out = Vec::new();
+    out.try_reserve_exact(raw_size)
+        .map_err(|_| corrupt(path, "yaz0 size too large"))?;
+    let mut cursor = 16;
+    while out.len() < raw_size {
+        let flags = *src
+            .get(cursor)
+            .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?;
+        cursor += 1;
+        for bit in (0..8).rev() {
+            if out.len() >= raw_size {
+                break;
+            }
+            if flags & (1 << bit) != 0 {
+                let byte = *src
+                    .get(cursor)
+                    .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?;
+                cursor += 1;
+                out.push(byte);
+            } else {
+                let b1 = *src
+                    .get(cursor)
+                    .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?;
+                let b2 = *src
+                    .get(cursor + 1)
+                    .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?;
+                cursor += 2;
+                let dist = (usize::from(b1 & 0x0F) << 8) | usize::from(b2);
+                let mut len = usize::from(b1 >> 4);
+                if len == 0 {
+                    len = usize::from(
+                        *src
+                            .get(cursor)
+                            .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?,
+                    ) + 0x12;
+                    cursor += 1;
+                } else {
+                    len += 2;
+                }
+                let start = out
+                    .len()
+                    .checked_sub(dist + 1)
+                    .ok_or_else(|| corrupt(path, "yaz0 back-reference before stream start"))?;
+                for k in 0..len {
+                    let byte = out
+                        .get(start + k)
+                        .copied()
+                        .ok_or_else(|| corrupt(path, "yaz0 back-reference out of range"))?;
+                    out.push(byte);
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn name_hash(name: &str) -> u16 {
+    let mut hash = 0_u32;
+    for byte in name.bytes() {
+        hash = (hash * 3 + u32::from(byte)) & 0xFFFF;
+    }
+    hash as u16
+}
+
+fn corrupt(path: &Path, detail: &'static str) -> AssetError {
+    AssetError::Corrupt {
+        path: path.to_path_buf(),
+        detail,
+    }
+}
+
+#[derive(Debug)]
+pub struct Archive {
+    path: PathBuf,
+    data: Vec<u8>,
+    data_start: usize,
+    dirs: Vec<DirNode>,
+    files: Vec<ArchiveEntry>,
+}
+
+#[derive(Debug)]
+struct DirNode {
+    first: usize,
+    count: usize,
+}
+
+#[derive(Debug)]
+struct ArchiveEntry {
+    name: String,
+    dir: bool,
+    offset: usize,
+    size: usize,
+}
+
+impl Archive {
+    pub fn parse(data: Vec<u8>, path: impl Into<PathBuf>) -> Result<Self, AssetError> {
+        let path = path.into();
+        if data.len() < 4 {
+            return Err(corrupt(&path, "archive shorter than magic"));
+        }
+        let magic = [data[0], data[1], data[2], data[3]];
+        if magic != RARC_MAGIC {
+            return Err(AssetError::BadMagic {
+                path: path.clone(),
+                expected: "RARC",
+                actual: magic,
+            });
+        }
+        let u32_at = |at: usize| -> Result<u32, AssetError> {
+            data.get(at..at + 4)
+                .map(|slice| u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]))
+                .ok_or_else(|| corrupt(&path, "rarc truncated"))
+        };
+        let u16_at = |at: usize| -> Result<u16, AssetError> {
+            data.get(at..at + 2)
+                .map(|slice| u16::from_be_bytes([slice[0], slice[1]]))
+                .ok_or_else(|| corrupt(&path, "rarc truncated"))
+        };
+        let rel = |at: usize| -> Result<usize, AssetError> {
+            0x20_usize
+                .checked_add(u32_at(at)? as usize)
+                .ok_or_else(|| corrupt(&path, "rarc offset overflow"))
+        };
+        if u32_at(0x08)? != 0x20 {
+            return Err(corrupt(&path, "unexpected rarc header size"));
+        }
+        if u32_at(0x04)? as usize != data.len() {
+            return Err(corrupt(&path, "rarc size mismatch"));
+        }
+        let data_start = rel(0x0C)?;
+        let data_len = u32_at(0x10)? as usize;
+        if data_start.checked_add(data_len) != Some(data.len()) {
+            return Err(corrupt(&path, "rarc data region mismatch"));
+        }
+        let dir_count = u32_at(0x20)? as usize;
+        let dir_off = rel(0x24)?;
+        let file_count = u32_at(0x28)? as usize;
+        let file_off = rel(0x2C)?;
+        let str_size = u32_at(0x30)? as usize;
+        let str_off = rel(0x34)?;
+        if str_off.checked_add(str_size) != Some(data_start) {
+            return Err(corrupt(&path, "rarc string table mismatch"));
+        }
+        if dir_count == 0 {
+            return Err(corrupt(&path, "rarc has no root directory"));
+        }
+        let dir_end = dir_off
+            .checked_add(
+                dir_count
+                    .checked_mul(0x10)
+                    .ok_or_else(|| corrupt(&path, "rarc directory table overflow"))?,
+            )
+            .ok_or_else(|| corrupt(&path, "rarc directory table overflow"))?;
+        if dir_end > data.len() {
+            return Err(corrupt(&path, "rarc directory table out of range"));
+        }
+        let file_end = file_off
+            .checked_add(
+                file_count
+                    .checked_mul(0x14)
+                    .ok_or_else(|| corrupt(&path, "rarc entry table overflow"))?,
+            )
+            .ok_or_else(|| corrupt(&path, "rarc entry table overflow"))?;
+        if file_end > data.len() {
+            return Err(corrupt(&path, "rarc entry table out of range"));
+        }
+        let string_at = |at: usize| -> Result<String, AssetError> {
+            let start = str_off
+                .checked_add(at)
+                .filter(|&start| start < data_start)
+                .ok_or_else(|| corrupt(&path, "rarc name offset out of range"))?;
+            let end = data[start..data_start]
+                .iter()
+                .position(|&byte| byte == 0)
+                .map(|rel| start + rel)
+                .ok_or_else(|| corrupt(&path, "rarc name not terminated"))?;
+            std::str::from_utf8(&data[start..end])
+                .map(str::to_owned)
+                .map_err(|_| corrupt(&path, "rarc name not utf-8"))
+        };
+        let mut dirs = Vec::with_capacity(dir_count);
+        for index in 0..dir_count {
+            let at = dir_off + index * 0x10;
+            let tag = [data[at], data[at + 1], data[at + 2], data[at + 3]];
+            if index == 0 && tag != *b"ROOT" {
+                return Err(corrupt(&path, "rarc root marker missing"));
+            }
+            let name = string_at(u32_at(at + 4)? as usize)?;
+            let hash = u16_at(at + 8)?;
+            if name_hash(&name) != hash {
+                return Err(corrupt(&path, "rarc directory hash mismatch"));
+            }
+            let count = usize::from(u16_at(at + 10)?);
+            let first = u32_at(at + 12)? as usize;
+            let end = first
+                .checked_add(count)
+                .ok_or_else(|| corrupt(&path, "rarc directory range overflow"))?;
+            if end > file_count {
+                return Err(corrupt(&path, "rarc directory range out of bounds"));
+            }
+            dirs.push(DirNode { first, count });
+        }
+        let mut files = Vec::with_capacity(file_count);
+        for index in 0..file_count {
+            let at = file_off + index * 0x14;
+            let hash = u16_at(at + 2)?;
+            let kind = data[at + 4];
+            let pad = data[at + 5];
+            let name = string_at(usize::from(u16_at(at + 6)?))?;
+            if name_hash(&name) != hash {
+                return Err(corrupt(&path, "rarc entry hash mismatch"));
+            }
+            let offset = u32_at(at + 8)? as usize;
+            let size = u32_at(at + 12)? as usize;
+            if pad != 0 || u32_at(at + 16)? != 0 {
+                return Err(corrupt(&path, "rarc entry padding not zero"));
+            }
+            let dir = match kind {
+                0x02 => true,
+                0x11 | 0x95 | 0xA5 => false,
+                _ => return Err(corrupt(&path, "rarc entry has unknown kind")),
+            };
+            if dir {
+                if offset != 0xFFFF_FFFF && offset >= dir_count {
+                    return Err(corrupt(&path, "rarc directory index out of range"));
+                }
+            } else if data_start
+                .checked_add(offset)
+                .and_then(|start| start.checked_add(size))
+                .map(|end| end <= data.len())
+                != Some(true)
+            {
+                return Err(corrupt(&path, "rarc entry data out of range"));
+            }
+            files.push(ArchiveEntry {
+                name,
+                dir,
+                offset,
+                size,
+            });
+        }
+        Ok(Self {
+            path,
+            data,
+            data_start,
+            dirs,
+            files,
+        })
+    }
+
+    pub fn read(&self, entry: &str) -> Result<&[u8], AssetError> {
+        let mut dir_index = 0_usize;
+        let mut parts = entry.split('/').peekable();
+        loop {
+            let part = parts
+                .next()
+                .ok_or_else(|| self.missing_entry(entry))?;
+            let dir = &self.dirs[dir_index];
+            let found = (dir.first..dir.first + dir.count)
+                .map(|index| &self.files[index])
+                .find(|candidate| candidate.name == part)
+                .ok_or_else(|| self.missing_entry(entry))?;
+            if parts.peek().is_none() {
+                if found.dir {
+                    return Err(self.missing_entry(entry));
+                }
+                let start = self.data_start + found.offset;
+                return Ok(&self.data[start..start + found.size]);
+            }
+            if !found.dir {
+                return Err(self.missing_entry(entry));
+            }
+            dir_index = if found.offset == 0xFFFF_FFFF {
+                0
+            } else {
+                found.offset
+            };
+            if dir_index >= self.dirs.len() {
+                return Err(corrupt(&self.path, "rarc directory index out of range"));
+            }
+        }
+    }
+
+    fn missing_entry(&self, entry: &str) -> AssetError {
+        AssetError::MissingEntry {
+            path: self.path.clone(),
+            entry: entry.to_owned(),
+        }
+    }
+}
