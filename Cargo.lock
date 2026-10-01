@@ -3386,9 +3386,9 @@ dependencies = [
 
 [[package]]
 name = "repame-view3d"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d8facc6c5fc8e0dda5fbd70123c39b5df40e83230209a908956dd630a7bf8be"
+checksum = "41355602b5680cce4300f94ff73d996e7d5b2d81158a490e4b033d8cc41f07c9"
 dependencies = [
  "bytemuck",
  "glam 0.33.11",
