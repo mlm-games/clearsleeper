@@ -24,6 +24,8 @@ const REVERSAL_LIMIT: u16 = 0x7800;
 const REVERSAL_PARAM: i16 = 3000;
 const REVERSAL_RATE: i16 = 100;
 const SPEED_F_EPS: f32 = 0.05;
+const GRAVITY: f32 = -2.5;
+const MAX_FALL_SPEED: f32 = -100.0;
 const UNITS_PER_RAD: f32 = 65536.0 / TAU;
 const RAD_PER_UNIT: f32 = TAU / 65536.0;
 
@@ -155,5 +157,7 @@ pub fn walk(
         };
         player.pos.x += speed_f * player.yaw.sin();
         player.pos.z += speed_f * player.yaw.cos();
+        player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
+        player.pos.y += player.speed_y;
     }
 }

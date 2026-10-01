@@ -1,5 +1,6 @@
 pub mod area;
 pub mod frame;
+pub mod ground;
 pub mod intent;
 pub mod player;
 pub mod walk;
@@ -25,9 +26,15 @@ pub fn build(sim: &mut Sim) {
         pos: spawn,
         yaw: 0.0,
         speed: 0.0,
+        speed_y: 0.0,
     },));
-    sim.add_chained_systems((
-        walk::walk.in_set(WwSimSet::Execute),
-        frame::advance.in_set(WwSimSet::After),
-    ));
+    sim.add_chained_systems(
+        (
+            ground::ground_check.in_set(WwSimSet::Execute),
+            walk::walk.in_set(WwSimSet::Execute),
+            area::clamp_to_area.in_set(WwSimSet::Execute),
+            frame::advance.in_set(WwSimSet::After),
+        )
+            .chain(),
+    );
 }
