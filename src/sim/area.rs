@@ -13,8 +13,8 @@ pub struct Area {
 impl Default for Area {
     fn default() -> Self {
         Self {
-            bounds_min: Vec2::new(-50.0, -50.0),
-            bounds_max: Vec2::new(50.0, 50.0),
+            bounds_min: Vec2::new(-1000.0, -1000.0),
+            bounds_max: Vec2::new(1000.0, 1000.0),
             spawn: Vec3::ZERO,
         }
     }
