@@ -17,6 +17,7 @@ fn main() -> anyhow::Result<()> {
         let now = Instant::now();
         let dt = now.duration_since(last).min(Duration::from_secs_f32(0.25));
         last = now;
+        app.stage_polled(sched);
         app.advance(dt);
         clearsleeper::root_view(sched, ctx)
     })

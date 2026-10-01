@@ -5,6 +5,7 @@ use std::time::Duration;
 use repame_sim::Sim;
 use repame_view3d::{BatchDesc, Frame3d, GeomHandle, Viewport3d};
 
+pub mod input;
 pub mod sim;
 
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
@@ -19,6 +20,15 @@ impl App {
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         sim::build(&mut sim);
         Self { sim }
+    }
+
+    /// Frame boundary: poll the shell into the sim's intent resource.
+    pub fn stage_polled(&mut self, sched: &repose_core::runtime::Scheduler) {
+        self.stage_axis(input::axis_from_keys(&sched.held_keys, sched.window_focused));
+    }
+
+    pub fn stage_axis(&mut self, axis: glam::Vec2) {
+        self.sim.world.resource_mut::<sim::intent::MoveIntent>().axis = axis;
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
@@ -62,6 +72,7 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
             .duration_since(last)
             .min(std::time::Duration::from_secs_f32(0.25));
         last = now;
+        app.stage_polled(sched);
         app.advance(dt);
         root_view(sched, ctx)
     }) {
