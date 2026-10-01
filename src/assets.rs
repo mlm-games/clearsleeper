@@ -4,6 +4,9 @@ pub const ASSETS_ENV: &str = "CS_ASSETS";
 
 const YAZ0_MAGIC: [u8; 4] = *b"Yaz0";
 const RARC_MAGIC: [u8; 4] = *b"RARC";
+const STAGE_ROOM: &str = "files/res/Stage/sea/Room44.arc";
+const STAGE_SPAWN_POINT: i32 = 128;
+const RAD_PER_UNIT: f32 = std::f32::consts::TAU / 65536.0;
 
 #[derive(Debug)]
 pub enum AssetError {
@@ -434,4 +437,95 @@ impl Archive {
             entry: entry.to_owned(),
         }
     }
+}
+
+pub fn load_stage() -> Option<crate::sim::collision::StageData> {
+    match stage_from_assets() {
+        Ok(stage) => Some(stage),
+        Err(error) => {
+            log::warn!("clearsleeper: stage assets unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let room = root.read_archive(STAGE_ROOM)?;
+    let path = root.root().join(STAGE_ROOM);
+    let collision = crate::sim::collision::Collision::parse(room.read("dzb/room.dzb")?).map_err(
+        |error| AssetError::Corrupt {
+            path: path.clone(),
+            detail: error.as_str(),
+        },
+    )?;
+    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path)?;
+    Ok(crate::sim::collision::StageData {
+        spawn,
+        yaw,
+        collision,
+    })
+}
+
+pub fn stage_spawn(data: &[u8], path: PathBuf) -> Result<(glam::Vec3, f32), AssetError> {
+    let corrupt = |detail: &'static str| AssetError::Corrupt {
+        path: path.clone(),
+        detail,
+    };
+    let chunk_count = read_u32(data, 0).ok_or_else(|| corrupt("dzr truncated"))?;
+    let nodes_end = (chunk_count as usize)
+        .checked_mul(12)
+        .and_then(|bytes| bytes.checked_add(4))
+        .ok_or_else(|| corrupt("dzr chunk table overflow"))?;
+    if nodes_end > data.len() {
+        return Err(corrupt("dzr chunk table out of range"));
+    }
+    let mut plyr = None;
+    for index in 0..chunk_count as usize {
+        let at = 4 + index * 12;
+        if &data[at..at + 4] == b"PLYR" {
+            let count = read_u32(data, at + 4).ok_or_else(|| corrupt("dzr truncated"))?;
+            let offset = read_u32(data, at + 8).ok_or_else(|| corrupt("dzr truncated"))?;
+            plyr = Some((count, offset));
+            break;
+        }
+    }
+    let (count, offset) = plyr.ok_or_else(|| corrupt("dzr has no spawn chunk"))?;
+    let entries_end = (count as usize)
+        .checked_mul(0x20)
+        .and_then(|bytes| bytes.checked_add(offset as usize))
+        .ok_or_else(|| corrupt("dzr spawn table overflow"))?;
+    if entries_end > data.len() {
+        return Err(corrupt("dzr spawn table out of range"));
+    }
+    for index in 0..count as usize {
+        let at = offset as usize + index * 0x20;
+        let angle_z = read_i16(data, at + 0x1C).ok_or_else(|| corrupt("dzr truncated"))?;
+        if i32::from(angle_z as u8) != STAGE_SPAWN_POINT {
+            continue;
+        }
+        let spawn = glam::Vec3::new(
+            read_f32(data, at + 0x0C).ok_or_else(|| corrupt("dzr truncated"))?,
+            read_f32(data, at + 0x10).ok_or_else(|| corrupt("dzr truncated"))?,
+            read_f32(data, at + 0x14).ok_or_else(|| corrupt("dzr truncated"))?,
+        );
+        let angle_y = read_i16(data, at + 0x1A).ok_or_else(|| corrupt("dzr truncated"))?;
+        return Ok((spawn, f32::from(angle_y) * RAD_PER_UNIT));
+    }
+    Err(corrupt("dzr spawn point missing"))
+}
+
+fn read_u32(data: &[u8], at: usize) -> Option<u32> {
+    let bytes = data.get(at..at + 4)?;
+    Some(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn read_f32(data: &[u8], at: usize) -> Option<f32> {
+    let bytes = data.get(at..at + 4)?;
+    Some(f32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn read_i16(data: &[u8], at: usize) -> Option<i16> {
+    let bytes = data.get(at..at + 2)?;
+    Some(i16::from_be_bytes([bytes[0], bytes[1]]))
 }

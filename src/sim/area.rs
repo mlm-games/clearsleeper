@@ -1,10 +1,9 @@
 use bevy_ecs::prelude::*;
 use glam::{Vec2, Vec3};
 
+use super::collision::{Collision, MoveFrom};
 use super::player::Player;
 
-/// First walkable yard: XZ bounds plus the spawn point. Placeholder extents
-/// until island layout arrives with the asset slice.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct Area {
     pub bounds_min: Vec2,
@@ -22,9 +21,19 @@ impl Default for Area {
     }
 }
 
-pub fn clamp_to_area(area: Res<Area>, mut players: Query<&mut Player>) {
+pub fn clamp_to_area(
+    collision: Option<Res<Collision>>,
+    from: Res<MoveFrom>,
+    area: Res<Area>,
+    mut players: Query<&mut Player>,
+) {
     for mut player in &mut players {
-        player.pos.x = player.pos.x.clamp(area.bounds_min.x, area.bounds_max.x);
-        player.pos.z = player.pos.z.clamp(area.bounds_min.y, area.bounds_max.y);
+        match &collision {
+            Some(collision) => player.pos = collision.slide(from.0, player.pos),
+            None => {
+                player.pos.x = player.pos.x.clamp(area.bounds_min.x, area.bounds_max.x);
+                player.pos.z = player.pos.z.clamp(area.bounds_min.y, area.bounds_max.y);
+            }
+        }
     }
 }

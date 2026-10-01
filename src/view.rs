@@ -18,6 +18,8 @@ pub struct SceneSnapshot {
     pub player_yaw: f32,
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
+    pub ground_y: f32,
+    pub walls: bool,
 }
 
 pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
@@ -26,7 +28,7 @@ pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
 
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera) -> Frame3d {
     let cam = OrbitCamera {
-        target: Vec3::new(snapshot.player_pos.x, 0.0, snapshot.player_pos.z),
+        target: Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z),
         ..cam
     };
     let mut frame = Frame3d {
@@ -36,7 +38,9 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera) -> Frame3d {
     };
     let eye = frame.cam.eye();
     frame.push(ground_group(snapshot));
-    frame.push(walls_group(snapshot, eye));
+    if snapshot.walls {
+        frame.push(walls_group(snapshot, eye));
+    }
     frame.push(player_group(snapshot, eye));
     frame
 }
@@ -45,7 +49,8 @@ fn ground_group(snapshot: &SceneSnapshot) -> MeshGroup {
     let mut group = MeshGroup::default();
     let (x0, z0) = (snapshot.bounds_min.x, snapshot.bounds_min.y);
     let (x1, z1) = (snapshot.bounds_max.x, snapshot.bounds_max.y);
-    group.push_quad([x0, 0.0, z1], [x1, 0.0, z1], [x1, 0.0, z0], [x0, 0.0, z0], GROUND);
+    let y = snapshot.ground_y;
+    group.push_quad([x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0], GROUND);
     group.depth_test = true;
     group
 }
@@ -56,9 +61,10 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let (x1, z1) = (snapshot.bounds_max.x, snapshot.bounds_max.y);
     let (cx, cz) = ((x0 + x1) * 0.5, (z0 + z1) * 0.5);
     let (width, depth) = (x1 - x0, z1 - z0);
+    let y = snapshot.ground_y;
     group.push_box(
         cx,
-        0.0,
+        y,
         z0,
         width + WALL_THICKNESS,
         WALL_HEIGHT,
@@ -68,7 +74,7 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     );
     group.push_box(
         cx,
-        0.0,
+        y,
         z1,
         width + WALL_THICKNESS,
         WALL_HEIGHT,
@@ -78,7 +84,7 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     );
     group.push_box(
         x0,
-        0.0,
+        y,
         cz,
         WALL_THICKNESS,
         WALL_HEIGHT,
@@ -88,7 +94,7 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     );
     group.push_box(
         x1,
-        0.0,
+        y,
         cz,
         WALL_THICKNESS,
         WALL_HEIGHT,
@@ -105,7 +111,7 @@ fn player_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let (px, pz) = (snapshot.player_pos.x, snapshot.player_pos.z);
     group.push_box(
         px,
-        0.0,
+        snapshot.ground_y,
         pz,
         PLAYER_HALF * 2.0,
         PLAYER_HEIGHT,
@@ -117,7 +123,7 @@ fn player_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let nose = PLAYER_HALF + 2.0;
     group.push_box(
         px + sin * nose,
-        8.0,
+        snapshot.ground_y + 8.0,
         pz + cos * nose,
         6.0,
         12.0,

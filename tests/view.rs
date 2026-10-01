@@ -13,6 +13,8 @@ fn golden_snapshot_builds_world_frame() {
         player_yaw: 1.0,
         bounds_min: Vec2::new(-800.0, -600.0),
         bounds_max: Vec2::new(800.0, 600.0),
+        ground_y: 0.0,
+        walls: true,
     };
     let frame = build_frame(&snapshot, OrbitCamera::default());
 

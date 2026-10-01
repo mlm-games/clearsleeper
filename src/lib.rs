@@ -43,7 +43,7 @@ impl App {
             log::warn!("clearsleeper: cue bank failed to load ({e})");
         }
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        sim::build(&mut sim);
+        sim::build(&mut sim, assets::load_stage());
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
         let cam = signal(OrbitCamera {
             target: spawn,
@@ -110,11 +110,23 @@ impl App {
             Some(player) => (player.pos, player.yaw),
             None => (area.spawn, 0.0),
         };
+        let collision = self.sim.world.get_resource::<sim::collision::Collision>();
+        let (ground_y, walls) = match collision {
+            Some(collision) => (
+                collision
+                    .ground_at(player_pos.x, player_pos.z)
+                    .unwrap_or(player_pos.y),
+                false,
+            ),
+            None => (0.0, true),
+        };
         view::SceneSnapshot {
             player_pos,
             player_yaw,
             bounds_min: area.bounds_min,
             bounds_max: area.bounds_max,
+            ground_y,
+            walls,
         }
     }
 

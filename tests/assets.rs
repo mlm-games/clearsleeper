@@ -1,6 +1,7 @@
 use std::io::Write as _;
 
-use clearsleeper::assets::{AssetError, AssetRoot, Archive, yaz0_decode};
+use clearsleeper::assets::{AssetError, AssetRoot, Archive, stage_spawn, yaz0_decode};
+use glam::Vec3;
 
 #[test]
 fn golden_yaz0_literal_and_backreference_streams() {
@@ -122,6 +123,89 @@ fn real_disc_archives_load_through_cs_assets() {
     let packed = root.read_archive("files/res/Stage/Abesso/Stage.arc").unwrap();
     assert_eq!(packed.read("dat/event_list.dat").unwrap().len(), 130_352);
     assert_eq!(packed.read("dzs/stage.dzs").unwrap().len(), 864);
+
+    let room = root
+        .read_archive("files/res/Stage/sea/Room44.arc")
+        .unwrap();
+    assert_eq!(room.read("dzb/room.dzb").unwrap().len(), 124_416);
+
+    let stage = clearsleeper::assets::load_stage().expect("stage loads from disc");
+    assert!(
+        (stage.spawn - Vec3::new(-194_845.4, 145.0, 314_242.8)).length() < 1.0,
+        "unexpected spawn {:?}",
+        stage.spawn
+    );
+    let expected_yaw = 4187.0 * std::f32::consts::TAU / 65_536.0;
+    assert!((stage.yaw - expected_yaw).abs() < 1e-4, "yaw {}", stage.yaw);
+    let ground = stage
+        .collision
+        .ground_at(stage.spawn.x, stage.spawn.z)
+        .expect("ground under spawn");
+    assert!(ground <= stage.spawn.y, "ground {ground} above spawn");
+}
+
+#[test]
+fn golden_dzr_spawn_selects_entry_by_point() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&2_u32.to_be_bytes());
+    data.extend_from_slice(b"PLYR");
+    data.extend_from_slice(&2_u32.to_be_bytes());
+    data.extend_from_slice(&16_u32.to_be_bytes());
+    data.extend_from_slice(b"OOOO");
+    data.extend_from_slice(&0_u32.to_be_bytes());
+    data.extend_from_slice(&64_u32.to_be_bytes());
+
+    push_spawn_entry(&mut data, 100.0, 200.0, 300.0, 0, 0);
+    push_spawn_entry(&mut data, -194_845.4, 145.0, 314_242.8, 4187, -128);
+
+    let (spawn, yaw) = stage_spawn(&data, "golden.dzr".into()).unwrap();
+    assert_eq!(spawn, Vec3::new(-194_845.4, 145.0, 314_242.8));
+    let expected_yaw = 4187.0 * std::f32::consts::TAU / 65_536.0;
+    assert!((yaw - expected_yaw).abs() < 1e-6);
+
+    let mut no_plyr = Vec::new();
+    no_plyr.extend_from_slice(&0_u32.to_be_bytes());
+    assert!(
+        matches!(
+            stage_spawn(&no_plyr, "golden.dzr".into()),
+            Err(AssetError::Corrupt { .. })
+        ),
+        "expected corrupt without spawn chunk"
+    );
+
+    let mut wrong_point = Vec::new();
+    wrong_point.extend_from_slice(&1_u32.to_be_bytes());
+    wrong_point.extend_from_slice(b"PLYR");
+    wrong_point.extend_from_slice(&1_u32.to_be_bytes());
+    wrong_point.extend_from_slice(&16_u32.to_be_bytes());
+    push_spawn_entry(&mut wrong_point, 1.0, 2.0, 3.0, 7, 0);
+    assert!(
+        matches!(
+            stage_spawn(&wrong_point, "golden.dzr".into()),
+            Err(AssetError::Corrupt { detail, .. })
+                if detail == "dzr spawn point missing"
+        ),
+        "expected missing spawn point"
+    );
+}
+
+fn push_spawn_entry(
+    out: &mut Vec<u8>,
+    x: f32,
+    y: f32,
+    z: f32,
+    angle_y: i16,
+    angle_z: i16,
+) {
+    out.extend_from_slice(b"Link\0\0\0\0");
+    out.extend_from_slice(&0xffff_002c_u32.to_be_bytes());
+    out.extend_from_slice(&x.to_be_bytes());
+    out.extend_from_slice(&y.to_be_bytes());
+    out.extend_from_slice(&z.to_be_bytes());
+    out.extend_from_slice(&0_i16.to_be_bytes());
+    out.extend_from_slice(&angle_y.to_be_bytes());
+    out.extend_from_slice(&angle_z.to_be_bytes());
+    out.extend_from_slice(&0xffff_u16.to_be_bytes());
 }
 
 fn synthetic_archive() -> Vec<u8> {
