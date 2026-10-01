@@ -1,28 +1,9 @@
-//! Entry: desktop window plus Android NativeActivity (`cargo rapk`).
+//! Entry: desktop bin; web boots from the lib (`wasm_bindgen(start)`),
+//! Android NativeActivity uses `android_main` (`cargo rapk`).
 
 #[cfg(not(target_os = "android"))]
-fn main() -> anyhow::Result<()> {
-    use std::time::{Duration, Instant};
-
-    let size = std::env::var("CS_WINDOW")
-        .ok()
-        .and_then(|v| {
-            let (a, b) = v.split_once('x')?;
-            Some((a.parse().ok()?, b.parse().ok()?))
-        })
-        .unwrap_or((1280, 720));
-    let mut app = clearsleeper::App::new_live();
-    let mut last = Instant::now();
-    repame_shell::run_desktop("clearsleeper", size, move |sched, ctx| {
-        let now = Instant::now();
-        let dt = now.duration_since(last).min(Duration::from_secs_f32(0.25));
-        last = now;
-        app.stage_polled(sched);
-        app.stage_camera();
-        app.advance(dt);
-        app.pump_audio(dt);
-        clearsleeper::root_view(&app, sched, ctx)
-    })
+fn main() {
+    clearsleeper::run();
 }
 
 #[cfg(target_os = "android")]

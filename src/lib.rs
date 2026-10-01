@@ -7,6 +7,9 @@ use repame_view3d::{BatchDesc, GeomHandle, OrbitCamera, View3dEvent, Viewport3d}
 use repose_core::{Modifier, Signal, signal};
 use repose_ui::{ViewExt, ZStack};
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 pub mod assets;
 pub mod audio;
 pub mod hud;
@@ -123,6 +126,44 @@ impl App {
 impl Default for App {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Platform entry: desktop window or, on the web, the `wasm_bindgen(start)`
+/// hook; the shell loop stages input, steps the sim, pumps audio, composes.
+#[cfg(not(target_os = "android"))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+pub fn run() {
+    use std::time::Duration;
+    use web_time::Instant;
+
+    let mut app = App::new_live();
+    let mut last = Instant::now();
+    let root = move
+    |sched: &mut repose_core::runtime::Scheduler, ctx: &repose_core::RenderContext| {
+        let now = Instant::now();
+        let dt = now.duration_since(last).min(Duration::from_secs_f32(0.25));
+        last = now;
+        app.stage_polled(sched);
+        app.stage_camera();
+        app.advance(dt);
+        app.pump_audio(dt);
+        root_view(&app, sched, ctx)
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let size = std::env::var("CS_WINDOW")
+            .ok()
+            .and_then(|v| {
+                let (a, b) = v.split_once('x')?;
+                Some((a.parse().ok()?, b.parse().ok()?))
+            })
+            .unwrap_or((1280, 720));
+        repame_shell::run_desktop("clearsleeper", size, root).expect("clearsleeper failed to start");
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = repame_shell::run_web(root);
     }
 }
 

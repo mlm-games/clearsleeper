@@ -798,6 +798,8 @@ dependencies = [
  "rlobkit-app-events",
  "serde",
  "serde_json",
+ "wasm-bindgen",
+ "web-time",
  "winit",
 ]
 
