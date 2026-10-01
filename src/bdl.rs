@@ -11,12 +11,29 @@ const COLOR_STRIDE: usize = 4;
 const ATTRIBUTE_TERM: u32 = 0xFF;
 const ATTRIBUTE_POSITION: u32 = 9;
 const ATTRIBUTE_COLOR0: u32 = 11;
+const ATTRIBUTE_TEX0: u32 = 13;
 const TYPE_INDEX16: u32 = 3;
+const TYPE_S16: u32 = 3;
 const TYPE_F32: u32 = 4;
 const TYPE_RGBA8: u32 = 5;
 const COMPONENT_ONE: u32 = 1;
 const POSITION_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_F32);
 const COLOR_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_RGBA8);
+const TEXCOORD_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_S16);
+const TEXCOORD_STRIDE: usize = 4;
+const TEXTURE_STRIDE: usize = 0x20;
+const TEXTURE_IMAGE_OFFSET: usize = 0x1C;
+const MATERIAL_INIT_STRIDE: usize = 0x14C;
+const MATERIAL_TEX_NO: usize = 0x084;
+const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
+const FORMAT_I4: u8 = 0;
+const FORMAT_IA4: u8 = 2;
+const FORMAT_CMPR: u8 = 0xE;
+const WRAP_CLAMP: u8 = 0;
+const WRAP_REPEAT: u8 = 1;
+const WRAP_MIRROR: u8 = 2;
+const BOX_SAMPLES: usize = 16;
+pub const LAYER_SIZE: u32 = 512;
 const HIERARCHY_END: u16 = 0;
 const HIERARCHY_BEGIN_CHILD: u16 = 1;
 const HIERARCHY_END_CHILD: u16 = 2;
@@ -52,6 +69,7 @@ pub enum BdlError {
     Shape,
     Command,
     Range,
+    Texture,
 }
 
 impl BdlError {
@@ -67,32 +85,53 @@ impl BdlError {
             Self::Shape => "bdl shape matrix unsupported",
             Self::Command => "bdl display list command unsupported",
             Self::Range => "bdl index out of range",
+            Self::Texture => "bdl texture format unsupported",
         }
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct RoomMesh {
+    pub groups: Vec<RoomGroup>,
+    pub textures: Vec<RoomTexture>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RoomGroup {
     pub positions: Vec<[f32; 3]>,
     pub colors: Vec<[f32; 3]>,
+    pub uvs: Vec<[f32; 2]>,
     pub indices: Vec<u32>,
+    pub texture_page: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoomTexture {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
 }
 
 impl RoomMesh {
     pub fn append(&mut self, mut part: RoomMesh) {
-        let base = self.positions.len() as u32;
-        self.positions.append(&mut part.positions);
-        self.colors.append(&mut part.colors);
-        self.indices
-            .extend(part.indices.iter().map(|index| index + base));
+        let page_base = self.textures.len() as u32;
+        for group in &mut part.groups {
+            if let Some(page) = group.texture_page.as_mut() {
+                *page += page_base;
+            }
+        }
+        self.groups.append(&mut part.groups);
+        self.textures.append(&mut part.textures);
     }
 }
 
 pub fn parse(data: &[u8], origin: [f32; 2], angle: f32) -> Result<RoomMesh, BdlError> {
     let blocks = Blocks::parse(data)?;
-    let worlds = read_joints(data, &blocks)?;
+    let (worlds, material_nodes) = read_joints(data, &blocks)?;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
     let vertices = read_vertex_arrays(data, &blocks)?;
+    let materials = read_materials(data, &blocks)?;
+    let textures = read_textures(data, &blocks)?;
     let (sin, cos) = angle.sin_cos();
     let context = ShapeContext {
         data,
@@ -102,7 +141,17 @@ pub fn parse(data: &[u8], origin: [f32; 2], angle: f32) -> Result<RoomMesh, BdlE
         cos,
     };
     let mut mesh = RoomMesh::default();
-    read_shapes(&context, &blocks, &worlds, &draw_joints, &mut mesh)?;
+    read_shapes(
+        &context,
+        &blocks,
+        &worlds,
+        &draw_joints,
+        &material_nodes,
+        &materials,
+        textures.len(),
+        &mut mesh,
+    )?;
+    bake_textures(&mut mesh, &textures);
     Ok(mesh)
 }
 
@@ -170,16 +219,22 @@ impl Blocks {
         Ok(Self { entries })
     }
 
-    fn find(&self, tag: &[u8; 4]) -> Result<(usize, usize), BdlError> {
+    fn get(&self, tag: &[u8; 4]) -> Option<(usize, usize)> {
         self.entries
             .iter()
             .find(|(candidate, _, _)| candidate == tag)
             .map(|&(_, start, end)| (start, end))
-            .ok_or(BdlError::Block)
+    }
+
+    fn find(&self, tag: &[u8; 4]) -> Result<(usize, usize), BdlError> {
+        self.get(tag).ok_or(BdlError::Block)
     }
 }
 
-fn read_joints(data: &[u8], blocks: &Blocks) -> Result<Vec<[f32; 3]>, BdlError> {
+fn read_joints(
+    data: &[u8],
+    blocks: &Blocks,
+) -> Result<(Vec<[f32; 3]>, Vec<(u16, Option<u16>)>), BdlError> {
     let (joint_start, _) = blocks.find(b"JNT1")?;
     let joint_count = usize::from(read_u16(data, joint_start + 8)?);
     let init_start = at(joint_start, read_u32(data, at(joint_start, 0x0C)?)? as usize)?;
@@ -225,6 +280,8 @@ fn read_joints(data: &[u8], blocks: &Blocks) -> Result<Vec<[f32; 3]>, BdlError> 
     }
     let mut parents = vec![PARENT_UNSET; joint_count];
     let mut stack = vec![(PARENT_ROOT, PARENT_ROOT)];
+    let mut material_nodes = Vec::new();
+    let mut current_material = None;
     loop {
         if cursor + 4 > hierarchy_end {
             return Err(BdlError::Hierarchy);
@@ -254,7 +311,8 @@ fn read_joints(data: &[u8], blocks: &Blocks) -> Result<Vec<[f32; 3]>, BdlError> 
                 let top = stack.last_mut().ok_or(BdlError::Hierarchy)?;
                 top.1 = joint as i32;
             }
-            HIERARCHY_MATERIAL | HIERARCHY_SHAPE => {}
+            HIERARCHY_MATERIAL => current_material = Some(value),
+            HIERARCHY_SHAPE => material_nodes.push((value, current_material)),
             _ => return Err(BdlError::Hierarchy),
         }
     }
@@ -295,10 +353,13 @@ fn read_joints(data: &[u8], blocks: &Blocks) -> Result<Vec<[f32; 3]>, BdlError> 
             worlds[*member] = Some(world);
         }
     }
-    worlds
-        .into_iter()
-        .map(|world| world.ok_or(BdlError::Hierarchy))
-        .collect()
+    Ok((
+        worlds
+            .into_iter()
+            .map(|world| world.ok_or(BdlError::Hierarchy))
+            .collect::<Result<Vec<_>, BdlError>>()?,
+        material_nodes,
+    ))
 }
 
 fn read_draw_joints(
@@ -330,6 +391,9 @@ struct VertexArrays {
     position_count: usize,
     color_at: usize,
     color_count: usize,
+    texcoord_at: usize,
+    texcoord_count: usize,
+    texcoord_frac: u32,
 }
 
 fn next_relative(data: &[u8], start: usize, after: u32) -> Result<Option<u32>, BdlError> {
@@ -349,6 +413,7 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
     let (start, end) = blocks.find(b"VTX1")?;
     let position_rel = read_u32(data, at(start, 0x0C)?)?;
     let color_rel = read_u32(data, at(start, 0x18)?)?;
+    let texcoord_rel = read_u32(data, at(start, 0x20)?)?;
     if position_rel == 0 {
         return Err(BdlError::Descriptor);
     }
@@ -374,13 +439,31 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
         (color_at, color_bytes / COLOR_STRIDE)
     };
 
+    let (texcoord_at, texcoord_count) = if texcoord_rel == 0 {
+        (0, 0)
+    } else {
+        let texcoord_end = match next_relative(data, start, 0x20)? {
+            Some(rel) => at(start, rel as usize)?,
+            None => end,
+        };
+        let texcoord_at = at(start, texcoord_rel as usize)?;
+        let texcoord_bytes = texcoord_end.checked_sub(texcoord_at).ok_or(BdlError::Block)?;
+        (texcoord_at, texcoord_bytes / TEXCOORD_STRIDE)
+    };
+
     let mut position_form = None;
     let mut color_form = None;
+    let mut texcoord_form = None;
+    let mut texcoord_frac = 0_u32;
     let mut cursor = at(start, read_u32(data, at(start, 0x08)?)? as usize)?;
     loop {
         let attribute = read_u32(data, cursor)?;
         let components = read_u32(data, at(cursor, 4)?)?;
         let kind = read_u32(data, at(cursor, 8)?)?;
+        if attribute == ATTRIBUTE_TEX0 {
+            texcoord_form = Some((components, kind));
+            texcoord_frac = u32::from(*data.get(at(cursor, 12)?).ok_or(BdlError::Truncated)?);
+        }
         cursor += FORM_STRIDE;
         if attribute == ATTRIBUTE_TERM {
             break;
@@ -398,13 +481,414 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
     if color_rel != 0 && color_form != Some(COLOR_FORM) {
         return Err(BdlError::Descriptor);
     }
+    if texcoord_rel != 0 && texcoord_form != Some(TEXCOORD_FORM) {
+        return Err(BdlError::Descriptor);
+    }
+    if texcoord_rel != 0 && texcoord_frac > 31 {
+        return Err(BdlError::Descriptor);
+    }
 
     Ok(VertexArrays {
         position_at,
         position_count,
         color_at,
         color_count,
+        texcoord_at,
+        texcoord_count,
+        texcoord_frac,
     })
+}
+
+fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<Option<u16>>, BdlError> {
+    let Some((start, end)) = blocks.get(b"MAT3") else {
+        return Ok(Vec::new());
+    };
+    let count = usize::from(read_u16(data, at(start, 8)?)?);
+    let init_table = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
+    let index_table = at(start, read_u32(data, at(start, 0x10)?)? as usize)?;
+    let texno_table = at(start, read_u32(data, at(start, 0x48)?)? as usize)?;
+    let mut materials = Vec::with_capacity(count);
+    for material in 0..count {
+        let slot = usize::from(read_u16(data, at(index_table, material * 2)?)?);
+        let init = at(init_table, slot * MATERIAL_INIT_STRIDE)?;
+        if at(init, MATERIAL_TEX_NO + 2)? > end {
+            return Err(BdlError::Block);
+        }
+        let texno = read_u16(data, at(init, MATERIAL_TEX_NO)?)?;
+        if texno == MATERIAL_UNTEXTURED {
+            materials.push(None);
+            continue;
+        }
+        let binding = at(texno_table, usize::from(texno) * 2)?;
+        if at(binding, 2)? > end {
+            return Err(BdlError::Block);
+        }
+        materials.push(Some(read_u16(data, binding)?));
+    }
+    Ok(materials)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wrap {
+    Clamp,
+    Repeat,
+    Mirror,
+}
+
+struct NativeTexture {
+    width: usize,
+    height: usize,
+    wrap_s: Wrap,
+    wrap_t: Wrap,
+    rgba: Vec<u8>,
+}
+
+fn read_wrap(value: u8) -> Result<Wrap, BdlError> {
+    match value {
+        WRAP_CLAMP => Ok(Wrap::Clamp),
+        WRAP_REPEAT => Ok(Wrap::Repeat),
+        WRAP_MIRROR => Ok(Wrap::Mirror),
+        _ => Err(BdlError::Texture),
+    }
+}
+
+fn texture_size(format: u8, width: usize, height: usize) -> Result<usize, BdlError> {
+    if width == 0 || height == 0 {
+        return Err(BdlError::Texture);
+    }
+    let blocks_wide = width.div_ceil(8);
+    match format {
+        FORMAT_I4 | FORMAT_CMPR => Ok(blocks_wide * height.div_ceil(8) * 32),
+        FORMAT_IA4 => Ok(blocks_wide * height.div_ceil(4) * 32),
+        _ => Err(BdlError::Texture),
+    }
+}
+
+fn read_textures(data: &[u8], blocks: &Blocks) -> Result<Vec<NativeTexture>, BdlError> {
+    let Some((start, end)) = blocks.get(b"TEX1") else {
+        return Ok(Vec::new());
+    };
+    let count = usize::from(read_u16(data, at(start, 8)?)?);
+    let entries = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
+    let mut textures = Vec::with_capacity(count);
+    for index in 0..count {
+        let entry = at(entries, index * TEXTURE_STRIDE)?;
+        if at(entry, TEXTURE_STRIDE)? > end {
+            return Err(BdlError::Block);
+        }
+        let format = *data.get(entry).ok_or(BdlError::Truncated)?;
+        let width = usize::from(read_u16(data, at(entry, 2)?)?);
+        let height = usize::from(read_u16(data, at(entry, 4)?)?);
+        let wrap_s = read_wrap(*data.get(at(entry, 6)?).ok_or(BdlError::Truncated)?)?;
+        let wrap_t = read_wrap(*data.get(at(entry, 7)?).ok_or(BdlError::Truncated)?)?;
+        let image = read_u32(data, at(entry, TEXTURE_IMAGE_OFFSET)?)?;
+        let size = texture_size(format, width, height)?;
+        let image_at = at(entry, if image == 0 { TEXTURE_STRIDE } else { image as usize })?;
+        let image_end = at(image_at, size)?;
+        if image_end > data.len() {
+            return Err(BdlError::Truncated);
+        }
+        if image_end > end {
+            return Err(BdlError::Block);
+        }
+        textures.push(NativeTexture {
+            width,
+            height,
+            wrap_s,
+            wrap_t,
+            rgba: decode_texture(format, width, height, &data[image_at..image_end])?,
+        });
+    }
+    Ok(textures)
+}
+
+fn decode_texture(
+    format: u8,
+    width: usize,
+    height: usize,
+    source: &[u8],
+) -> Result<Vec<u8>, BdlError> {
+    let mut rgba = vec![0_u8; width * height * 4];
+    match format {
+        FORMAT_I4 => decode_i4(width, height, source, &mut rgba)?,
+        FORMAT_IA4 => decode_ia4(width, height, source, &mut rgba)?,
+        FORMAT_CMPR => decode_cmpr(width, height, source, &mut rgba)?,
+        _ => return Err(BdlError::Texture),
+    }
+    Ok(rgba)
+}
+
+fn decode_i4(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
+    let mut cursor = 0_usize;
+    for block_y in (0..height).step_by(8) {
+        for block_x in (0..width).step_by(8) {
+            for row in 0..8 {
+                let y = block_y + row;
+                for pair in 0..4 {
+                    let value = *source.get(cursor).ok_or(BdlError::Truncated)?;
+                    cursor += 1;
+                    if y >= height {
+                        continue;
+                    }
+                    for half in 0..2 {
+                        let x = block_x + pair * 2 + half;
+                        if x >= width {
+                            continue;
+                        }
+                        let level = if half == 0 { value >> 4 } else { value & 0xF };
+                        let level = (level << 4) | level;
+                        let at = (y * width + x) * 4;
+                        rgba[at..at + 4].copy_from_slice(&[level, level, level, level]);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_ia4(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
+    let mut cursor = 0_usize;
+    for block_y in (0..height).step_by(4) {
+        for block_x in (0..width).step_by(8) {
+            for row in 0..4 {
+                let y = block_y + row;
+                for column in 0..8 {
+                    let value = *source.get(cursor).ok_or(BdlError::Truncated)?;
+                    cursor += 1;
+                    if y >= height {
+                        continue;
+                    }
+                    let x = block_x + column;
+                    if x >= width {
+                        continue;
+                    }
+                    let alpha = value >> 4;
+                    let level = value & 0xF;
+                    let alpha = (alpha << 4) | alpha;
+                    let level = (level << 4) | level;
+                    let at = (y * width + x) * 4;
+                    rgba[at..at + 4].copy_from_slice(&[level, level, level, alpha]);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_cmpr(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
+    let mut cursor = 0_usize;
+    for block_y in (0..height).step_by(8) {
+        for block_x in (0..width).step_by(8) {
+            for sub in [[0, 0], [4, 0], [0, 4], [4, 4]] {
+                let block = source
+                    .get(cursor..cursor + 8)
+                    .ok_or(BdlError::Truncated)?;
+                cursor += 8;
+                decode_dxt(
+                    block,
+                    block_x + sub[0],
+                    block_y + sub[1],
+                    width,
+                    height,
+                    rgba,
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_dxt(
+    block: &[u8],
+    origin_x: usize,
+    origin_y: usize,
+    width: usize,
+    height: usize,
+    rgba: &mut [u8],
+) {
+    let c1 = u16::from_be_bytes([block[0], block[1]]);
+    let c2 = u16::from_be_bytes([block[2], block[3]]);
+    let r1 = ((c1 >> 11) & 0x1F) as u8;
+    let g1 = ((c1 >> 5) & 0x3F) as u8;
+    let b1 = (c1 & 0x1F) as u8;
+    let r2 = ((c2 >> 11) & 0x1F) as u8;
+    let g2 = ((c2 >> 5) & 0x3F) as u8;
+    let b2 = (c2 & 0x1F) as u8;
+    let r1 = (r1 << 3) | (r1 >> 2);
+    let g1 = (g1 << 2) | (g1 >> 4);
+    let b1 = (b1 << 3) | (b1 >> 2);
+    let r2 = (r2 << 3) | (r2 >> 2);
+    let g2 = (g2 << 2) | (g2 >> 4);
+    let b2 = (b2 << 3) | (b2 >> 2);
+    let blend = |first: u8, second: u8| {
+        ((u16::from(first) * 3 + u16::from(second) * 5) >> 3) as u8
+    };
+    let average = |first: u8, second: u8| ((u16::from(first) + u16::from(second)) / 2) as u8;
+    let mut colors = [[0_u8; 4]; 4];
+    colors[0] = [r1, g1, b1, 255];
+    colors[1] = [r2, g2, b2, 255];
+    if c1 > c2 {
+        colors[2] = [blend(r2, r1), blend(g2, g1), blend(b2, b1), 255];
+        colors[3] = [blend(r1, r2), blend(g1, g2), blend(b1, b2), 255];
+    } else {
+        colors[2] = [average(r1, r2), average(g1, g2), average(b1, b2), 255];
+        colors[3] = [average(r1, r2), average(g1, g2), average(b1, b2), 0];
+    }
+    for row in 0..4 {
+        let bits = block[4 + row];
+        for column in 0..4 {
+            let x = origin_x + column;
+            let y = origin_y + row;
+            if x >= width || y >= height {
+                continue;
+            }
+            let index = usize::from((bits >> (6 - column * 2)) & 3);
+            let at = (y * width + x) * 4;
+            rgba[at..at + 4].copy_from_slice(&colors[index]);
+        }
+    }
+}
+
+fn wrap_index(index: i64, dim: i64, wrap: Wrap) -> i64 {
+    match wrap {
+        Wrap::Repeat => index.rem_euclid(dim),
+        Wrap::Clamp => index.clamp(0, dim - 1),
+        Wrap::Mirror => {
+            let period = dim * 2;
+            let wrapped = index.rem_euclid(period);
+            if wrapped >= dim {
+                period - 1 - wrapped
+            } else {
+                wrapped
+            }
+        }
+    }
+}
+
+fn axis_samples(lo: f32, hi: f32, footprint: f32, dim: usize, wrap: Wrap) -> Vec<i64> {
+    let dim_i = dim as i64;
+    if footprint <= 1.0 {
+        let center = (lo + hi) * 0.5;
+        return vec![wrap_index((center * dim as f32).floor() as i64, dim_i, wrap)];
+    }
+    let start = (lo * dim as f32).floor() as i64;
+    let stop = (hi * dim as f32).ceil() as i64;
+    let count = (stop - start).max(1);
+    let stride = ((count + BOX_SAMPLES as i64 - 1) / BOX_SAMPLES as i64).max(1);
+    let mut samples = Vec::new();
+    for step in 0..BOX_SAMPLES as i64 {
+        let index = start + step * stride;
+        if index >= stop {
+            break;
+        }
+        samples.push(wrap_index(index, dim_i, wrap));
+    }
+    if samples.is_empty() {
+        samples.push(wrap_index(start, dim_i, wrap));
+    }
+    samples
+}
+
+fn span_scale(span: f32) -> f32 {
+    if span > 0.0 {
+        1.0 / span
+    } else {
+        f32::INFINITY
+    }
+}
+
+fn bake_textures(mesh: &mut RoomMesh, native: &[NativeTexture]) {
+    let mut ranges = vec![[f32::MAX, f32::MIN, f32::MAX, f32::MIN]; native.len()];
+    for group in &mesh.groups {
+        let Some(page) = group.texture_page else {
+            continue;
+        };
+        let range = &mut ranges[page as usize];
+        for uv in &group.uvs {
+            range[0] = range[0].min(uv[0]);
+            range[1] = range[1].max(uv[0]);
+            range[2] = range[2].min(uv[1]);
+            range[3] = range[3].max(uv[1]);
+        }
+    }
+    let layer = LAYER_SIZE as f32;
+    let mut textures = Vec::with_capacity(native.len());
+    let mut placements = Vec::with_capacity(native.len());
+    for (index, texture) in native.iter().enumerate() {
+        let range = ranges[index];
+        let (u0, u1, v0, v1) = if range[0] <= range[1] && range[2] <= range[3] {
+            (range[0], range[1], range[2], range[3])
+        } else {
+            (0.0, 1.0, 0.0, 1.0)
+        };
+        let scale_u = ((texture.width as f32) / layer).min(span_scale(u1 - u0));
+        let scale_v = ((texture.height as f32) / layer).min(span_scale(v1 - v0));
+        let tile_u = scale_u * layer;
+        let tile_v = scale_v * layer;
+        let width = (((u1 - u0) * tile_u).ceil() as u32 + 1)
+            .min(LAYER_SIZE)
+            .max(1);
+        let height = (((v1 - v0) * tile_v).ceil() as u32 + 1)
+            .min(LAYER_SIZE)
+            .max(1);
+        textures.push(RoomTexture {
+            width,
+            height,
+            rgba: bake_pixels(texture, u0, v0, tile_u, tile_v, width, height),
+        });
+        placements.push([scale_u, scale_v, u0, v0]);
+    }
+    for group in &mut mesh.groups {
+        let Some(page) = group.texture_page else {
+            continue;
+        };
+        let placement = placements[page as usize];
+        for uv in &mut group.uvs {
+            uv[0] = (uv[0] - placement[2]) * placement[0];
+            uv[1] = (uv[1] - placement[3]) * placement[1];
+        }
+    }
+    mesh.textures = textures;
+}
+
+fn bake_pixels(
+    texture: &NativeTexture,
+    u0: f32,
+    v0: f32,
+    tile_u: f32,
+    tile_v: f32,
+    width: u32,
+    height: u32,
+) -> Vec<u8> {
+    let mut rgba = vec![0_u8; width as usize * height as usize * 4];
+    let footprint_u = texture.width as f32 / tile_u;
+    let footprint_v = texture.height as f32 / tile_v;
+    for y in 0..height {
+        let lo = v0 + y as f32 / tile_v;
+        let hi = v0 + (y + 1) as f32 / tile_v;
+        let rows = axis_samples(lo, hi, footprint_v, texture.height, texture.wrap_t);
+        for x in 0..width {
+            let lo = u0 + x as f32 / tile_u;
+            let hi = u0 + (x + 1) as f32 / tile_u;
+            let columns = axis_samples(lo, hi, footprint_u, texture.width, texture.wrap_s);
+            let mut sum = [0_u32; 4];
+            for &row in &rows {
+                for &column in &columns {
+                    let at = (row as usize * texture.width + column as usize) * 4;
+                    for channel in 0..4 {
+                        sum[channel] += u32::from(texture.rgba[at + channel]);
+                    }
+                }
+            }
+            let samples = (rows.len() * columns.len()) as u32;
+            let at = (y as usize * width as usize + x as usize) * 4;
+            for channel in 0..4 {
+                rgba[at + channel] = ((sum[channel] + samples / 2) / samples) as u8;
+            }
+        }
+    }
+    rgba
 }
 
 struct ShapeContext<'a> {
@@ -420,6 +904,9 @@ fn read_shapes(
     blocks: &Blocks,
     worlds: &[[f32; 3]],
     draw_joints: &[usize],
+    material_nodes: &[(u16, Option<u16>)],
+    materials: &[Option<u16>],
+    texture_count: usize,
     mesh: &mut RoomMesh,
 ) -> Result<(), BdlError> {
     let (shape_start, _) = blocks.find(b"SHP1")?;
@@ -431,6 +918,14 @@ fn read_shapes(
     let display_table = at(shape_start, read_u32(data, at(shape_start, 0x20)?)? as usize)?;
     let matrix_table = at(shape_start, read_u32(data, at(shape_start, 0x24)?)? as usize)?;
     let draw_table = at(shape_start, read_u32(data, at(shape_start, 0x28)?)? as usize)?;
+    let mut shape_materials = vec![None; shape_count];
+    for &(shape, material) in material_nodes {
+        let slot = usize::from(shape);
+        if slot >= shape_count || shape_materials[slot].is_some() {
+            return Err(BdlError::Hierarchy);
+        }
+        shape_materials[slot] = material;
+    }
 
     for shape in 0..shape_count {
         let slot = usize::from(read_u16(data, at(index_table, shape * 2)?)?);
@@ -465,15 +960,47 @@ fn read_shapes(
         let color_field = descriptor
             .iter()
             .position(|&attribute| attribute == ATTRIBUTE_COLOR0);
+        let texcoord_field = descriptor
+            .iter()
+            .position(|&attribute| attribute == ATTRIBUTE_TEX0);
+        let mut texture_page = if materials.is_empty() || texture_count == 0 {
+            None
+        } else {
+            match shape_materials[shape] {
+                Some(index) => {
+                    let binding = *materials.get(usize::from(index)).ok_or(BdlError::Range)?;
+                    match binding {
+                        Some(texture) => {
+                            if usize::from(texture) >= texture_count {
+                                return Err(BdlError::Range);
+                            }
+                            Some(u32::from(texture))
+                        }
+                        None => None,
+                    }
+                }
+                None => None,
+            }
+        };
+        if texture_page.is_some()
+            && (texcoord_field.is_none() || context.vertices.texcoord_count == 0)
+        {
+            texture_page = None;
+        }
+        let textured = texture_page.is_some();
+        let mut group = RoomGroup {
+            texture_page,
+            ..RoomGroup::default()
+        };
 
-        for group in 0..group_count {
-            let matrix = at(matrix_table, (matrix_slot + group) * SHAPE_GROUP_STRIDE)?;
+        for subgroup in 0..group_count {
+            let matrix = at(matrix_table, (matrix_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
             let draw_matrix = usize::from(read_u16(data, matrix)?);
             if draw_matrix >= draw_joints.len() {
                 return Err(BdlError::Range);
             }
             let world = worlds[draw_joints[draw_matrix]];
-            let draw = at(draw_table, (draw_slot + group) * SHAPE_GROUP_STRIDE)?;
+            let draw = at(draw_table, (draw_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
             let display_size = read_u32(data, draw)? as usize;
             let display_start = at(display_table, read_u32(data, at(draw, 4)?)? as usize)?;
             let display_end = display_start
@@ -488,16 +1015,20 @@ fn read_shapes(
                 &descriptor,
                 position_field,
                 color_field,
+                texcoord_field,
+                textured,
                 world,
-                mesh,
+                &mut group,
             )?;
         }
+        mesh.groups.push(group);
     }
     Ok(())
 }
 
-fn emit(mesh: &mut RoomMesh, base: u32, a: usize, b: usize, c: usize) {
-    mesh.indices
+fn emit(group: &mut RoomGroup, base: u32, a: usize, b: usize, c: usize) {
+    group
+        .indices
         .extend([base + a as u32, base + c as u32, base + b as u32]);
 }
 
@@ -507,8 +1038,10 @@ fn decode_display_list(
     descriptor: &[u32],
     position_field: usize,
     color_field: Option<usize>,
+    texcoord_field: Option<usize>,
+    textured: bool,
     world: [f32; 3],
-    mesh: &mut RoomMesh,
+    group: &mut RoomGroup,
 ) -> Result<(), BdlError> {
     let data = context.data;
     let stride = descriptor.len() * 2;
@@ -543,7 +1076,7 @@ fn decode_display_list(
         }
         let indexed =
             !matches!(command, COMMAND_LINES | COMMAND_LINE_STRIP | COMMAND_POINTS);
-        let base = mesh.positions.len() as u32;
+        let base = group.positions.len() as u32;
         for _ in 0..count {
             let bytes = display
                 .get(cursor..cursor + stride)
@@ -551,6 +1084,7 @@ fn decode_display_list(
             cursor += stride;
             let mut position_index = None;
             let mut color_index = None;
+            let mut texcoord_index = None;
             for field in 0..descriptor.len() {
                 let index = usize::from(u16::from_be_bytes([
                     bytes[field * 2],
@@ -561,6 +1095,9 @@ fn decode_display_list(
                 }
                 if color_field == Some(field) {
                     color_index = Some(index);
+                }
+                if texcoord_field == Some(field) {
+                    texcoord_index = Some(index);
                 }
             }
             let position_index = position_index.ok_or(BdlError::Descriptor)?;
@@ -577,6 +1114,20 @@ fn decode_display_list(
                 }
                 None => None,
             };
+            let uv = if textured {
+                let index = texcoord_index.ok_or(BdlError::Descriptor)?;
+                if index >= context.vertices.texcoord_count {
+                    return Err(BdlError::Range);
+                }
+                let texcoord_at = context.vertices.texcoord_at + index * TEXCOORD_STRIDE;
+                let scale = 1.0 / ((1_u32 << context.vertices.texcoord_frac) as f32);
+                Some([
+                    f32::from(read_i16(data, texcoord_at)?) * scale,
+                    f32::from(read_i16(data, at(texcoord_at, TEXCOORD_STRIDE - 2)?)?) * scale,
+                ])
+            } else {
+                None
+            };
             if !indexed {
                 continue;
             }
@@ -589,12 +1140,12 @@ fn decode_display_list(
             let lx = local[0] + world[0];
             let ly = local[1] + world[1];
             let lz = local[2] + world[2];
-            mesh.positions.push([
+            group.positions.push([
                 lx * context.cos + lz * context.sin + context.origin[0],
                 ly,
                 -lx * context.sin + lz * context.cos + context.origin[1],
             ]);
-            mesh.colors.push(match color_index {
+            group.colors.push(match color_index {
                 Some(index) => {
                     let color_at = context.vertices.color_at + index * COLOR_STRIDE;
                     let bytes = data
@@ -608,6 +1159,9 @@ fn decode_display_list(
                 }
                 None => WHITE,
             });
+            if let Some(uv) = uv {
+                group.uvs.push(uv);
+            }
         }
         if !indexed {
             continue;
@@ -615,27 +1169,27 @@ fn decode_display_list(
         match command {
             COMMAND_QUADS => {
                 for vertex in (0..count).step_by(4) {
-                    emit(mesh, base, vertex, vertex + 1, vertex + 2);
-                    emit(mesh, base, vertex, vertex + 2, vertex + 3);
+                    emit(group, base, vertex, vertex + 1, vertex + 2);
+                    emit(group, base, vertex, vertex + 2, vertex + 3);
                 }
             }
             COMMAND_TRIANGLES => {
                 for vertex in (0..count).step_by(3) {
-                    emit(mesh, base, vertex, vertex + 1, vertex + 2);
+                    emit(group, base, vertex, vertex + 1, vertex + 2);
                 }
             }
             COMMAND_STRIP => {
                 for vertex in 0..count.saturating_sub(2) {
                     if vertex % 2 == 0 {
-                        emit(mesh, base, vertex, vertex + 1, vertex + 2);
+                        emit(group, base, vertex, vertex + 1, vertex + 2);
                     } else {
-                        emit(mesh, base, vertex + 1, vertex, vertex + 2);
+                        emit(group, base, vertex + 1, vertex, vertex + 2);
                     }
                 }
             }
             COMMAND_FAN => {
                 for vertex in 1..count.saturating_sub(1) {
-                    emit(mesh, base, 0, vertex, vertex + 1);
+                    emit(group, base, 0, vertex, vertex + 1);
                 }
             }
             _ => return Err(BdlError::Command),

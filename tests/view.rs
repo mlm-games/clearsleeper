@@ -1,11 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
-use clearsleeper::bdl::RoomMesh;
+use clearsleeper::bdl::{RoomGroup, RoomMesh, RoomTexture};
 use clearsleeper::view::{SceneSnapshot, build_frame, sim_yaw_for_camera};
 use clearsleeper::{App, SIM_HZ};
 use glam::{Vec2, Vec3};
-use repame_view3d::OrbitCamera;
+use repame_view3d::{OrbitCamera, SceneFilter};
 
 #[test]
 fn golden_snapshot_builds_world_frame() {
@@ -23,6 +23,10 @@ fn golden_snapshot_builds_world_frame() {
     assert!(frame.groups.iter().all(|group| group.depth_test));
     assert!(frame.background.is_some());
     assert_eq!(frame.cam.target, Vec3::new(40.0, 0.0, -25.0));
+    assert_eq!(frame.desc.layer_size, 1024);
+    assert_eq!(frame.desc.layers, 4);
+    assert_eq!(frame.desc.filter, SceneFilter::Nearest);
+    assert!(frame.uploads.is_empty());
 
     let ground = &frame.groups[0];
     assert_eq!(ground.tri_count(), 2);
@@ -95,15 +99,35 @@ fn room_mesh_replaces_placeholder_ground() {
         walls: false,
     };
     let room = RoomMesh {
-        positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
-        colors: vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-        indices: vec![0, 2, 1],
+        groups: vec![RoomGroup {
+            positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+            colors: vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            uvs: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            indices: vec![0, 2, 1],
+            texture_page: Some(2),
+        }],
+        textures: (0..3)
+            .map(|_| RoomTexture {
+                width: 4,
+                height: 4,
+                rgba: vec![255_u8; 64],
+            })
+            .collect(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 
     assert_eq!(frame.groups.len(), 2);
     let ground = &frame.groups[0];
     assert_eq!(ground.tri_count(), 1);
-    assert_eq!(ground.positions, room.positions);
-    assert_eq!(ground.colors, room.colors);
+    assert_eq!(ground.positions, room.groups[0].positions);
+    assert_eq!(ground.colors, room.groups[0].colors);
+    assert_eq!(ground.uvs, room.groups[0].uvs);
+    assert_eq!(ground.texture_page, 2);
+    assert_eq!(frame.desc.layer_size, 512);
+    assert_eq!(frame.desc.layers, 3);
+    assert_eq!(frame.desc.filter, SceneFilter::Linear);
+    assert_eq!(frame.uploads.len(), 3);
+    assert_eq!(frame.uploads[2].page, 2);
+    assert_eq!((frame.uploads[2].w, frame.uploads[2].h), (4, 4));
+    assert_eq!(frame.uploads[2].rgba.len(), 64);
 }

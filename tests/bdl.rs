@@ -4,6 +4,7 @@ struct Synthetic {
     bytes: Vec<u8>,
     matrix_type_at: usize,
     draw_flag_at: usize,
+    texture_format_at: usize,
 }
 
 fn block(tag: &[u8; 4], payload: &[u8]) -> Vec<u8> {
@@ -17,7 +18,15 @@ fn block(tag: &[u8; 4], payload: &[u8]) -> Vec<u8> {
 
 fn synthetic() -> Synthetic {
     let mut hierarchy = Vec::new();
-    for (kind, value) in [(0x10_u16, 0_u16), (1, 0), (0x10, 1), (2, 0), (0, 0)] {
+    for (kind, value) in [
+        (0x10_u16, 0_u16),
+        (1, 0),
+        (0x10, 1),
+        (2, 0),
+        (0x11, 0),
+        (0x12, 0),
+        (0, 0),
+    ] {
         hierarchy.extend(kind.to_be_bytes());
         hierarchy.extend(value.to_be_bytes());
     }
@@ -51,9 +60,15 @@ fn synthetic() -> Synthetic {
 
     let mut vtx1 = vec![0_u8; 0x38];
     vtx1[0..4].copy_from_slice(&0x40_u32.to_be_bytes());
-    vtx1[4..8].copy_from_slice(&0x70_u32.to_be_bytes());
-    vtx1[0x10..0x14].copy_from_slice(&0xA0_u32.to_be_bytes());
-    for (attribute, components, kind) in [(9_u32, 1_u32, 4_u32), (11, 1, 5), (255, 0, 0)] {
+    vtx1[4..8].copy_from_slice(&0x80_u32.to_be_bytes());
+    vtx1[0x10..0x14].copy_from_slice(&0xB0_u32.to_be_bytes());
+    vtx1[0x18..0x1C].copy_from_slice(&0xC0_u32.to_be_bytes());
+    for (attribute, components, kind) in [
+        (9_u32, 1_u32, 4_u32),
+        (11, 1, 5),
+        (13, 1, 3),
+        (255, 0, 0),
+    ] {
         vtx1.extend(attribute.to_be_bytes());
         vtx1.extend(components.to_be_bytes());
         vtx1.extend(kind.to_be_bytes());
@@ -70,6 +85,11 @@ fn synthetic() -> Synthetic {
         }
     }
     vtx1.extend([255_u8, 0, 0, 255]);
+    for uv in [[0_i16, 0], [256, 0], [256, 256], [0, 256]] {
+        for value in uv {
+            vtx1.extend(value.to_be_bytes());
+        }
+    }
 
     let mut shp1 = vec![0_u8; 0x24];
     shp1[0..2].copy_from_slice(&1_u16.to_be_bytes());
@@ -93,10 +113,30 @@ fn synthetic() -> Synthetic {
     shp1.extend(0_u32.to_be_bytes());
     shp1.push(0x98);
     shp1.extend(4_u16.to_be_bytes());
-    for position in [0_u16, 1, 3, 2] {
+    for (position, texcoord) in [(0_u16, 0_u16), (1, 1), (3, 2), (2, 3)] {
         shp1.extend(position.to_be_bytes());
         shp1.extend(0_u16.to_be_bytes());
-        shp1.extend(0_u16.to_be_bytes());
+        shp1.extend(texcoord.to_be_bytes());
+    }
+
+    let mut mat3 = vec![0_u8; 0x19C];
+    mat3[0..2].copy_from_slice(&1_u16.to_be_bytes());
+    mat3[4..8].copy_from_slice(&0x58_u32.to_be_bytes());
+    mat3[8..12].copy_from_slice(&0x50_u32.to_be_bytes());
+    mat3[0x40..0x44].copy_from_slice(&0x54_u32.to_be_bytes());
+    mat3[0xD4..0xD6].copy_from_slice(&0_u16.to_be_bytes());
+
+    let mut tex1 = vec![0_u8; 0x58];
+    tex1[0..2].copy_from_slice(&1_u16.to_be_bytes());
+    tex1[4..8].copy_from_slice(&0x20_u32.to_be_bytes());
+    tex1[0x18] = 0;
+    tex1[0x1A..0x1C].copy_from_slice(&8_u16.to_be_bytes());
+    tex1[0x1C..0x1E].copy_from_slice(&8_u16.to_be_bytes());
+    tex1[0x1E] = 1;
+    tex1[0x1F] = 1;
+    tex1[0x34..0x38].copy_from_slice(&0x20_u32.to_be_bytes());
+    for _ in 0..32 {
+        tex1.push(0xF0);
     }
 
     let blocks = [
@@ -105,9 +145,12 @@ fn synthetic() -> Synthetic {
         block(b"DRW1", &drw1),
         block(b"VTX1", &vtx1),
         block(b"SHP1", &shp1),
+        block(b"MAT3", &mat3),
+        block(b"TEX1", &tex1),
     ];
     let mut matrix_type_at = 0_usize;
     let mut draw_flag_at = 0_usize;
+    let mut texture_format_at = 0_usize;
     let mut bytes = Vec::new();
     bytes.extend(b"J3D2bdl4");
     bytes.extend([0_u8; 4]);
@@ -120,6 +163,9 @@ fn synthetic() -> Synthetic {
         if index == 4 {
             matrix_type_at = bytes.len() + 0x30;
         }
+        if index == 6 {
+            texture_format_at = bytes.len() + 0x20;
+        }
         bytes.extend(block);
     }
     let size = bytes.len() as u32;
@@ -128,6 +174,7 @@ fn synthetic() -> Synthetic {
         bytes,
         matrix_type_at,
         draw_flag_at,
+        texture_format_at,
     }
 }
 
@@ -135,8 +182,11 @@ fn synthetic() -> Synthetic {
 fn golden_strip_winding_joint_chain_and_colors() {
     let synthetic = synthetic();
     let mesh = parse(&synthetic.bytes, [0.0, 0.0], 0.0).expect("synthetic bdl parses");
+    assert_eq!(mesh.groups.len(), 1);
+    assert_eq!(mesh.textures.len(), 1);
+    let group = &mesh.groups[0];
     assert_eq!(
-        mesh.positions,
+        group.positions,
         vec![
             [0.0, 0.0, 5.0],
             [1.0, 0.0, 5.0],
@@ -144,8 +194,26 @@ fn golden_strip_winding_joint_chain_and_colors() {
             [1.0, 0.0, 6.0],
         ]
     );
-    assert_eq!(mesh.indices, vec![0, 2, 1, 2, 3, 1]);
-    assert_eq!(mesh.colors, vec![[1.0, 0.0, 0.0]; 4]);
+    assert_eq!(group.indices, vec![0, 2, 1, 2, 3, 1]);
+    assert_eq!(group.colors, vec![[1.0, 0.0, 0.0]; 4]);
+    assert_eq!(group.texture_page, Some(0));
+    assert_eq!(
+        group.uvs,
+        vec![
+            [0.0, 0.0],
+            [0.015625, 0.0],
+            [0.015625, 0.015625],
+            [0.0, 0.015625],
+        ]
+    );
+    let texture = &mesh.textures[0];
+    assert_eq!((texture.width, texture.height), (9, 9));
+    assert_eq!(texture.rgba.len(), 9 * 9 * 4);
+    assert_eq!(&texture.rgba[0..4], &[255, 255, 255, 255]);
+    assert_eq!(&texture.rgba[4..8], &[0, 0, 0, 0]);
+    assert_eq!(&texture.rgba[8..12], &[255, 255, 255, 255]);
+    assert_eq!(&texture.rgba[32..36], &[255, 255, 255, 255]);
+    assert_eq!(&texture.rgba[288..292], &[255, 255, 255, 255]);
 }
 
 #[test]
@@ -182,4 +250,12 @@ fn rejects_truncated_and_unsupported_models() {
         BdlError::Shape
     );
     synthetic.bytes[synthetic.matrix_type_at] = matrix_type;
+
+    let texture_format = synthetic.bytes[synthetic.texture_format_at];
+    synthetic.bytes[synthetic.texture_format_at] = 6;
+    assert_eq!(
+        parse(&synthetic.bytes, [0.0, 0.0], 0.0).unwrap_err(),
+        BdlError::Texture
+    );
+    synthetic.bytes[synthetic.texture_format_at] = texture_format;
 }

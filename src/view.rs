@@ -1,7 +1,7 @@
 use glam::{Vec2, Vec3};
-use repame_view3d::{Frame3d, MeshGroup, OrbitCamera, Rgb};
+use repame_view3d::{BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload};
 
-use crate::bdl::RoomMesh;
+use crate::bdl::{LAYER_SIZE, RoomGroup, RoomMesh};
 
 const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
 const GROUND: Rgb = [0.24, 0.42, 0.22];
@@ -28,6 +28,17 @@ pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
     (-cam_yaw.cos()).atan2(-cam_yaw.sin())
 }
 
+pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
+    match room {
+        Some(room) => BatchDesc {
+            layer_size: LAYER_SIZE,
+            layers: room.textures.len().max(1) as u32,
+            filter: SceneFilter::Linear,
+        },
+        None => BatchDesc::default(),
+    }
+}
+
 pub fn build_frame(
     snapshot: &SceneSnapshot,
     cam: OrbitCamera,
@@ -40,11 +51,29 @@ pub fn build_frame(
     let mut frame = Frame3d {
         cam,
         background: Some(SKY),
+        desc: batch_desc(room),
         ..Frame3d::default()
     };
     let eye = frame.cam.eye();
     match room {
-        Some(room) => frame.push(room_group(room)),
+        Some(room) => {
+            for group in &room.groups {
+                frame.push(room_group(group));
+            }
+            frame.uploads.extend(
+                room.textures
+                    .iter()
+                    .enumerate()
+                    .map(|(page, texture)| SceneUpload {
+                        page: page as u32,
+                        x: 0,
+                        y: 0,
+                        w: texture.width,
+                        h: texture.height,
+                        rgba: texture.rgba.clone(),
+                    }),
+            );
+        }
         None => frame.push(ground_group(snapshot)),
     }
     if snapshot.walls {
@@ -54,11 +83,13 @@ pub fn build_frame(
     frame
 }
 
-fn room_group(room: &RoomMesh) -> MeshGroup {
+fn room_group(group: &RoomGroup) -> MeshGroup {
     MeshGroup {
-        positions: room.positions.clone(),
-        colors: room.colors.clone(),
-        indices: room.indices.clone(),
+        positions: group.positions.clone(),
+        colors: group.colors.clone(),
+        uvs: group.uvs.clone(),
+        indices: group.indices.clone(),
+        texture_page: group.texture_page.unwrap_or(0),
         depth_test: true,
         ..MeshGroup::default()
     }

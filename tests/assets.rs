@@ -151,22 +151,136 @@ fn golden_room_mesh_matches_disc_geometry() {
         return;
     };
     let mesh = clearsleeper::assets::load_room_mesh().expect("room mesh loads from disc");
-    assert_eq!(mesh.positions.len(), 17_840);
-    assert_eq!(mesh.colors.len(), mesh.positions.len());
-    assert_eq!(mesh.indices.len(), 9_458 * 3);
+    assert_eq!(mesh.groups.len(), 17);
+    assert_eq!(mesh.textures.len(), 18);
+    let pages = [
+        Some(0),
+        Some(3),
+        Some(1),
+        Some(2),
+        Some(5),
+        Some(4),
+        Some(7),
+        Some(6),
+        Some(8),
+        Some(9),
+        Some(10),
+        Some(10),
+        Some(14),
+        Some(15),
+        Some(16),
+        None,
+        Some(17),
+    ];
+    let shapes: [(usize, usize); 17] = [
+        (164, 84),
+        (1550, 950),
+        (4055, 1987),
+        (5834, 3010),
+        (1740, 944),
+        (675, 417),
+        (1534, 814),
+        (25, 13),
+        (11, 5),
+        (1040, 584),
+        (110, 58),
+        (120, 62),
+        (686, 368),
+        (110, 58),
+        (110, 58),
+        (12, 6),
+        (64, 40),
+    ];
+    for (index, (group, (vertices, triangles))) in
+        mesh.groups.iter().zip(shapes).enumerate()
+    {
+        assert_eq!(group.texture_page, pages[index], "group {index}");
+        assert_eq!(group.positions.len(), vertices, "group {index} positions");
+        assert_eq!(group.indices.len(), triangles * 3, "group {index} indices");
+        assert_eq!(group.colors.len(), group.positions.len(), "group {index}");
+        assert!(
+            group
+                .indices
+                .iter()
+                .all(|&index| (index as usize) < group.positions.len()),
+            "group {index} index bounds"
+        );
+        if group.texture_page.is_none() {
+            assert!(group.uvs.is_empty(), "group {index} untextured uvs");
+        } else {
+            assert_eq!(group.uvs.len(), group.positions.len(), "group {index} uvs");
+            assert!(
+                group.uvs.iter().all(|[u, v]| {
+                    *u >= -1e-6 && *u <= 1.0 + 1e-6 && *v >= -1e-6 && *v <= 1.0 + 1e-6
+                }),
+                "group {index} uvs out of unit range"
+            );
+        }
+    }
+    let positions: usize = mesh.groups.iter().map(|group| group.positions.len()).sum();
+    let indices: usize = mesh.groups.iter().map(|group| group.indices.len()).sum();
+    assert_eq!(positions, 17_840);
+    assert_eq!(indices, 9_458 * 3);
     assert!(
-        mesh.indices
+        mesh.groups
             .iter()
-            .all(|&index| (index as usize) < mesh.positions.len())
+            .flat_map(|group| &group.colors)
+            .any(|color| *color != [1.0, 1.0, 1.0])
     );
-    assert!(mesh.colors.iter().any(|color| *color != [1.0, 1.0, 1.0]));
+
+    let expected_sizes: [(u32, u32); 18] = [
+        (257, 257),
+        (512, 512),
+        (193, 257),
+        (377, 512),
+        (512, 512),
+        (512, 512),
+        (129, 129),
+        (386, 503),
+        (65, 65),
+        (257, 97),
+        (129, 129),
+        (129, 129),
+        (129, 129),
+        (17, 17),
+        (257, 195),
+        (129, 129),
+        (129, 129),
+        (1, 17),
+    ];
+    for (index, (width, height)) in expected_sizes.into_iter().enumerate() {
+        let texture = &mesh.textures[index];
+        assert_eq!((texture.width, texture.height), (width, height), "texture {index}");
+        assert_eq!(
+            texture.rgba.len() as u32,
+            width * height * 4,
+            "texture {index} bytes"
+        );
+    }
+    let expected_pixels: [([u8; 4], usize); 9] = [
+        ([74, 178, 66, 0], 0),
+        ([148, 113, 66, 255], 2),
+        ([90, 130, 49, 255], 6),
+        ([90, 130, 49, 255], 7),
+        ([0, 0, 0, 0], 8),
+        ([255, 255, 255, 255], 9),
+        ([255, 255, 255, 255], 13),
+        ([255, 255, 255, 0], 15),
+        ([255, 255, 255, 255], 17),
+    ];
+    for (pixel, index) in expected_pixels {
+        let texture = &mesh.textures[index];
+        assert_eq!(&texture.rgba[0..4], &pixel, "texture {index} origin pixel");
+    }
 
     let mut minimum = [f32::MAX; 3];
     let mut maximum = [f32::MIN; 3];
-    for position in &mesh.positions {
-        for axis in 0..3 {
-            minimum[axis] = minimum[axis].min(position[axis]);
-            maximum[axis] = maximum[axis].max(position[axis]);
+    for group in &mesh.groups {
+        for position in &group.positions {
+            for axis in 0..3 {
+                minimum[axis] = minimum[axis].min(position[axis]);
+                maximum[axis] = maximum[axis].max(position[axis]);
+            }
         }
     }
     assert!((minimum[0] + 250_000.0).abs() < 0.5, "x min {}", minimum[0]);
@@ -179,31 +293,33 @@ fn golden_room_mesh_matches_disc_geometry() {
     let stage = clearsleeper::assets::load_stage().expect("stage loads from disc");
     let spawn = [stage.spawn.x, stage.spawn.z];
     let mut top: Option<(f32, f32)> = None;
-    for triangle in mesh.indices.chunks_exact(3) {
-        let a = mesh.positions[triangle[0] as usize];
-        let b = mesh.positions[triangle[1] as usize];
-        let c = mesh.positions[triangle[2] as usize];
-        if !inside_xz(a, b, c, spawn) {
-            continue;
-        }
-        let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-        let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-        let normal = [
-            u[1] * v[2] - u[2] * v[1],
-            u[2] * v[0] - u[0] * v[2],
-            u[0] * v[1] - u[1] * v[0],
-        ];
-        let length = normal.iter().map(|axis| axis * axis).sum::<f32>().sqrt();
-        if length < 1e-9 {
-            continue;
-        }
-        let ny = normal[1] / length;
-        if ny.abs() < 0.9 {
-            continue;
-        }
-        let y = (a[1] + b[1] + c[1]) / 3.0;
-        if top.is_none_or(|(best, _)| y > best) {
-            top = Some((y, ny));
+    for group in &mesh.groups {
+        for triangle in group.indices.chunks_exact(3) {
+            let a = group.positions[triangle[0] as usize];
+            let b = group.positions[triangle[1] as usize];
+            let c = group.positions[triangle[2] as usize];
+            if !inside_xz(a, b, c, spawn) {
+                continue;
+            }
+            let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+            let normal = [
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            ];
+            let length = normal.iter().map(|axis| axis * axis).sum::<f32>().sqrt();
+            if length < 1e-9 {
+                continue;
+            }
+            let ny = normal[1] / length;
+            if ny.abs() < 0.9 {
+                continue;
+            }
+            let y = (a[1] + b[1] + c[1]) / 3.0;
+            if top.is_none_or(|(best, _)| y > best) {
+                top = Some((y, ny));
+            }
         }
     }
     let (y, ny) = top.expect("horizontal ground under spawn");

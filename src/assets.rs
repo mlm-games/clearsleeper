@@ -503,7 +503,7 @@ fn room_mesh_from_assets() -> Result<crate::bdl::RoomMesh, AssetError> {
         })?;
         mesh.append(part);
     }
-    if mesh.positions.is_empty() {
+    if mesh.groups.is_empty() {
         return Err(corrupt(&path, "room has no geometry"));
     }
     Ok(mesh)

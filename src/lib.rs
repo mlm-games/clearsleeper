@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use repame_sim::Sim;
-use repame_view3d::{BatchDesc, GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
+use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::{Modifier, Signal, signal};
 use repose_ui::{ViewExt, ZStack};
 
@@ -193,7 +193,7 @@ pub fn root_view(
         frame,
         GeomHandle::new(),
         "scene.main",
-        BatchDesc::default(),
+        view::batch_desc(app.room.as_ref()),
         move |ev| match ev {
             View3dEvent::Orbit { dx, dy } => cam.update(|c| c.orbit(dx, dy)),
             View3dEvent::Zoom { factor } => cam.update(|c| c.zoom(factor)),
