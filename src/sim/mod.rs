@@ -1,3 +1,4 @@
+pub mod actor;
 pub mod area;
 pub mod collision;
 pub mod death;
@@ -15,6 +16,7 @@ pub mod walk;
 pub mod water;
 
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 use repame_sim::Sim;
 
 /// Per-tick pipeline order: input read, process execute, frame counters.
@@ -54,6 +56,17 @@ pub fn build(
     if let Some(tables) = tables.filter(|tables| tables.has_sea_actor()) {
         let sea_tables = sea::SeaTables::new(|room| tables.wave_max(room));
         sim.world.insert_resource(sea::Sea::new(sea_tables));
+    }
+    if let Some(tables) = tables {
+        for source in tables.actors() {
+            sim.world.spawn(actor::Actor {
+                name: source.name.clone(),
+                parameters: source.parameters,
+                pos: Vec3::from_array(source.pos),
+                angle: source.angle,
+                set_id: source.set_id,
+            });
+        }
     }
     let spawn = area.spawn;
     let yaw = area.yaw;

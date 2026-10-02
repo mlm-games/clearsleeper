@@ -14,7 +14,7 @@ const PALE_LEN: usize = 0x2C;
 const VIRT_LEN: usize = 0x24;
 const ACTOR_LEN: usize = 0x20;
 const ACTOR_NAME_LEN: usize = 8;
-const SEA_ACTOR: &[u8] = b"sea";
+const SEA_ACTOR: &str = "sea";
 pub const DEFAULT_WAVE_MAX: u8 = 10;
 const BOOT_TIME: f32 = 165.0;
 const TIME_H_SCALE: f32 = 15.0;
@@ -65,6 +65,15 @@ pub struct PaletteEntry {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StageActor {
+    pub name: String,
+    pub parameters: u32,
+    pub pos: [f32; 3],
+    pub angle: [i16; 3],
+    pub set_id: u16,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct StageTables {
     placements: Vec<Placement>,
     room_groups: Vec<Vec<u8>>,
@@ -73,6 +82,7 @@ pub struct StageTables {
     colo: Vec<[u8; 8]>,
     palettes: Vec<PaletteEntry>,
     skies: Vec<[u8; 3]>,
+    actors: Vec<StageActor>,
     has_sea: bool,
 }
 
@@ -133,10 +143,11 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         }
         None => Vec::new(),
     };
-    let has_sea = match locate(b"ACTR") {
-        Some((count, offset)) => contains_sea_actor(data, count, offset)?,
-        None => false,
+    let actors = match locate(b"ACTR") {
+        Some((count, offset)) => parse_actors(data, count, offset)?,
+        None => Vec::new(),
     };
+    let has_sea = actors.iter().any(|actor| actor.name == SEA_ACTOR);
     Ok(StageTables {
         placements,
         room_groups,
@@ -145,6 +156,7 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         colo,
         palettes,
         skies,
+        actors,
         has_sea,
     })
 }
@@ -233,26 +245,43 @@ fn parse_palette(data: &[u8], at: usize) -> Result<PaletteEntry, DzsError> {
     })
 }
 
-fn contains_sea_actor(data: &[u8], count: u32, offset: u32) -> Result<bool, DzsError> {
+fn parse_actors(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageActor>, DzsError> {
     let end = table_end(offset as usize, count as usize, ACTOR_LEN)?;
     if end > data.len() {
         return Err(DzsError::BadTable);
     }
+    let mut actors = Vec::with_capacity(count as usize);
     for index in 0..count as usize {
         let at = offset as usize + index * ACTOR_LEN;
         let name: [u8; ACTOR_NAME_LEN] = read_array(data, at)?;
-        let name = match name.iter().position(|&byte| byte == 0) {
-            Some(stop) => &name[..stop],
-            None => &name[..],
-        };
-        if name == SEA_ACTOR {
-            return Ok(true);
-        }
+        let stop = name
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(ACTOR_NAME_LEN);
+        actors.push(StageActor {
+            name: String::from_utf8_lossy(&name[..stop]).into_owned(),
+            parameters: read_u32(data, at + 0x08)?,
+            pos: [
+                read_f32(data, at + 0x0C)?,
+                read_f32(data, at + 0x10)?,
+                read_f32(data, at + 0x14)?,
+            ],
+            angle: [
+                read_i16(data, at + 0x18)?,
+                read_i16(data, at + 0x1A)?,
+                read_i16(data, at + 0x1C)?,
+            ],
+            set_id: read_u16(data, at + 0x1E)?,
+        });
     }
-    Ok(false)
+    Ok(actors)
 }
 
 impl StageTables {
+    pub fn actors(&self) -> &[StageActor] {
+        &self.actors
+    }
+
     pub fn placements(&self) -> &[Placement] {
         &self.placements
     }
@@ -362,6 +391,11 @@ fn read_f32(data: &[u8], at: usize) -> Result<f32, DzsError> {
 fn read_i16(data: &[u8], at: usize) -> Result<i16, DzsError> {
     let bytes = data.get(at..at + 2).ok_or(DzsError::Truncated)?;
     Ok(i16::from_be_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_u16(data: &[u8], at: usize) -> Result<u16, DzsError> {
+    let bytes = data.get(at..at + 2).ok_or(DzsError::Truncated)?;
+    Ok(u16::from_be_bytes([bytes[0], bytes[1]]))
 }
 
 fn read_u8(data: &[u8], at: usize) -> Result<u8, DzsError> {
