@@ -1,9 +1,12 @@
 //! Wind Waker recreation on repame: fixed-step sim + repose views, no bevy.
 
+use std::collections::HashSet;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
+use repose_core::input::PhysicalKey;
 use repose_core::{Modifier, Signal, signal};
 use repose_ui::{ViewExt, ZStack};
 
@@ -17,6 +20,7 @@ pub mod btk;
 pub mod dzs;
 pub mod hud;
 pub mod input;
+pub mod menus;
 pub mod save;
 pub mod sim;
 pub mod view;
@@ -29,16 +33,22 @@ pub struct App {
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
     pub room: Option<bdl::RoomMesh>,
+    pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
     room_tick: u64,
     sea_shade: f32,
+    save_dir: PathBuf,
+    name: String,
+    menu_prev: HashSet<PhysicalKey>,
 }
 
 impl App {
     /// Headless construction: silent audio, no device. Tests and tools.
     pub fn new() -> Self {
-        Self::with_audio(repame_audio::Audio::noop())
+        let mut app = Self::with_audio(repame_audio::Audio::noop());
+        app.menu.screen = menus::Screen::Playing;
+        app
     }
 
     /// Shell construction: opens the output device, silent fallback.
@@ -66,10 +76,14 @@ impl App {
             cam,
             audio,
             room,
+            menu: menus::Menu::new(),
             stage,
             rooms,
             room_tick: 0,
             sea_shade,
+            save_dir: save::slots_dir(),
+            name: save::DEFAULT_NAME.to_string(),
+            menu_prev: HashSet::new(),
         }
     }
 
@@ -79,6 +93,57 @@ impl App {
         self.stage_axis(input::axis_from_keys(held, sched.window_focused));
         self.stage_damage(input::damage_from_keys(held, sched.window_focused));
         self.stage_do(input::do_from_keys(held, sched.window_focused));
+        self.stage_menu(held, sched.window_focused);
+    }
+
+    fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
+        if self.menu.screen != menus::Screen::Playing {
+            self.stage_axis(glam::Vec2::ZERO);
+            self.stage_damage(0);
+            self.stage_do(false);
+        }
+        let cmds = if window_focused {
+            menus::cmds_from(held, &self.menu_prev)
+        } else {
+            Vec::new()
+        };
+        self.menu_prev.clone_from(held);
+        if self.menu.screen == menus::Screen::Playing || cmds.is_empty() {
+            return;
+        }
+        let before = self.menu.screen;
+        let action = self.menu.step(&cmds);
+        if before == menus::Screen::Title && self.menu.screen == menus::Screen::FileSelect {
+            let slots = (0..save::SLOTS)
+                .map(|slot| match self.read_slot(slot) {
+                    Some(saved) => menus::SlotInfo::from_save(&saved),
+                    None => menus::SlotInfo::Empty,
+                })
+                .collect();
+            self.menu.slots = slots;
+        }
+        match action {
+            Some(menus::Action::Load(slot)) => match self.read_slot(slot) {
+                Some(saved) => match self.load(&saved) {
+                    Ok(()) => {
+                        self.name = saved.name;
+                        self.menu.screen = menus::Screen::Playing;
+                    }
+                    Err(e) => log::warn!("clearsleeper: slot {slot} load failed ({e})"),
+                },
+                None => self.start_new(slot),
+            },
+            Some(menus::Action::New(slot)) => self.start_new(slot),
+            None => {}
+        }
+    }
+
+    fn start_new(&mut self, slot: usize) {
+        self.sim.world.resource_mut::<sim::frame::CurrentFrame>().0 = 0;
+        if let Err(e) = self.write_slot(slot) {
+            log::warn!("clearsleeper: slot {slot} write failed ({e})");
+        }
+        self.menu.screen = menus::Screen::Playing;
     }
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
@@ -309,7 +374,12 @@ pub fn root_view(
             _ => {}
         },
     );
-    ZStack(Modifier::new().fill_max_size()).child([viewport, hud::hearts_view(app.health())])
+    let overlay = match app.menu.screen {
+        menus::Screen::Playing => hud::hearts_view(app.health()),
+        menus::Screen::Title => menus::title_view(),
+        menus::Screen::FileSelect => menus::file_select_view(&app.menu),
+    };
+    ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
 }
 
 /// Android entry (`cargo rapk`): the lib target owns `android_main` — a bin

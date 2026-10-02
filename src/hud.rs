@@ -106,10 +106,6 @@ fn heart(state: HeartState, size: f32) -> View {
 
 /// Top-left heart row; passthrough keeps orbit drags alive underneath.
 pub fn hearts_view(health: Health) -> View {
-    let cells = heart_states(&health)
-        .into_iter()
-        .map(|state| heart(state, HEART_SIZE))
-        .collect::<Vec<_>>();
     Row(
         Modifier::new()
             .absolute()
@@ -117,5 +113,16 @@ pub fn hearts_view(health: Health) -> View {
             .gap(HEART_GAP.dp())
             .hit_passthrough(),
     )
-    .child(cells)
+    .child(heart_cells(health, HEART_SIZE))
+}
+
+pub fn hearts_strip(health: Health, size: f32) -> View {
+    Row(Modifier::new().gap(HEART_GAP.dp()).hit_passthrough()).child(heart_cells(health, size))
+}
+
+fn heart_cells(health: Health, size: f32) -> Vec<View> {
+    heart_states(&health)
+        .into_iter()
+        .map(|state| heart(state, size))
+        .collect()
 }

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -11,10 +11,18 @@ use crate::sim::player::Player;
 use crate::App;
 
 pub const SAVE_VERSION: u32 = 1;
+pub const DEFAULT_NAME: &str = "Link";
+pub const SLOTS: usize = 3;
+
+fn default_name() -> String {
+    DEFAULT_NAME.to_string()
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SaveGame {
     pub version: u32,
+    #[serde(default = "default_name")]
+    pub name: String,
     pub tick: u64,
     pub camera_yaw: f32,
     pub player: SavedPlayer,
@@ -128,6 +136,7 @@ impl App {
         let health = *world.resource::<Health>();
         SaveGame {
             version: SAVE_VERSION,
+            name: self.name.clone(),
             tick,
             camera_yaw,
             player: (&player).into(),
@@ -144,6 +153,7 @@ impl App {
                 SAVE_VERSION
             );
         }
+        self.name = save.name.clone();
         let world = &mut self.sim.world;
         *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
         world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
@@ -156,6 +166,19 @@ impl App {
             .expect("player exists at boot");
         *player = save.player.clone().into();
         Ok(())
+    }
+
+    pub fn set_save_dir(&mut self, dir: PathBuf) {
+        self.save_dir = dir;
+    }
+
+    pub fn read_slot(&self, slot: usize) -> Option<SaveGame> {
+        read_slot_in(&self.save_dir, slot)
+    }
+
+    pub fn write_slot(&mut self, slot: usize) -> anyhow::Result<()> {
+        let save = self.save();
+        write_slot_in(&self.save_dir, slot, &save)
     }
 }
 
@@ -171,4 +194,48 @@ pub fn read_save(path: &Path) -> anyhow::Result<SaveGame> {
     let text =
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     Ok(serde_json::from_str(&text)?)
+}
+
+pub fn slots_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("CS_SAVE_DIR") {
+        if !dir.is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
+    let mut dir = windows_appdata()
+        .or_else(|| non_empty_env("XDG_DATA_HOME"))
+        .or_else(|| non_empty_env("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        .unwrap_or_else(std::env::temp_dir);
+    dir.push("clearsleeper");
+    dir
+}
+
+fn non_empty_env(key: &str) -> Option<PathBuf> {
+    std::env::var(key)
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_appdata() -> Option<PathBuf> {
+    non_empty_env("APPDATA")
+}
+
+#[cfg(not(target_os = "windows"))]
+fn windows_appdata() -> Option<PathBuf> {
+    None
+}
+
+pub fn slot_path_in(dir: &Path, slot: usize) -> PathBuf {
+    dir.join(format!("slot{slot}.json"))
+}
+
+pub fn read_slot_in(dir: &Path, slot: usize) -> Option<SaveGame> {
+    read_save(&slot_path_in(dir, slot)).ok()
+}
+
+pub fn write_slot_in(dir: &Path, slot: usize, save: &SaveGame) -> anyhow::Result<()> {
+    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    write_save(&slot_path_in(dir, slot), save)
 }
