@@ -10,6 +10,7 @@ use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
 use super::player::Player;
 use super::roll::Roll;
+use super::ship::Ship;
 use super::swim::{
     Swim, BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE,
     SWIM_MAX_SPEED, SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE,
@@ -48,7 +49,7 @@ fn angle_distance(a: i16, b: i16) -> u16 {
     a.wrapping_sub(b).unsigned_abs()
 }
 
-fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f32) {
+pub(super) fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f32) {
     if *value != target {
         let mut step = scale * (target - *value);
         if step >= min_step || step <= -min_step {
@@ -68,7 +69,13 @@ fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f
     }
 }
 
-fn add_calc_angle_s(value: i16, target: i16, scale: i16, max_step: i16, min_step: i16) -> i16 {
+pub(super) fn add_calc_angle_s(
+    value: i16,
+    target: i16,
+    scale: i16,
+    max_step: i16,
+    min_step: i16,
+) -> i16 {
     let mut value = value;
     let mut diff = target.wrapping_sub(value);
     if value != target {
@@ -140,10 +147,14 @@ pub fn walk(
     swim: Res<Swim>,
     hop: Res<Hop>,
     roll: Res<Roll>,
+    ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
     mut events: ResMut<SimEvents>,
 ) {
+    if ships.iter().any(|ship| ship.riding) {
+        return;
+    }
     for mut player in &mut players {
         let player = &mut *player;
         if swim.active {

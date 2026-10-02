@@ -11,6 +11,7 @@ pub mod intent;
 pub mod player;
 pub mod roll;
 pub mod sea;
+pub mod ship;
 pub mod swim;
 pub mod walk;
 pub mod water;
@@ -59,13 +60,18 @@ pub fn build(
     }
     if let Some(tables) = tables {
         for source in tables.actors() {
-            sim.world.spawn(actor::Actor {
+            let actor = actor::Actor {
                 name: source.name.clone(),
                 parameters: source.parameters,
                 pos: Vec3::from_array(source.pos),
                 angle: source.angle,
                 set_id: source.set_id,
-            });
+            };
+            if source.name == ship::SHIP_ACTOR {
+                sim.world.spawn((actor, ship::Ship::default()));
+            } else {
+                sim.world.spawn(actor);
+            }
         }
     }
     let spawn = area.spawn;
@@ -89,6 +95,7 @@ pub fn build(
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
             swim::surface.in_set(WwSimSet::Execute),
+            ship::control.in_set(WwSimSet::Execute),
             area::clamp_to_area.in_set(WwSimSet::Execute),
             sea::sea_tick.in_set(WwSimSet::Execute),
             health::apply_damage.in_set(WwSimSet::Execute),
