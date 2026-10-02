@@ -4,10 +4,10 @@ pub const ASSETS_ENV: &str = "CS_ASSETS";
 
 const YAZ0_MAGIC: [u8; 4] = *b"Yaz0";
 const RARC_MAGIC: [u8; 4] = *b"RARC";
-const STAGE_ROOM: &str = "files/res/Stage/sea/Room44.arc";
+const STAGE_DIR: &str = "files/res/Stage/sea";
 const STAGE_MAP: &str = "files/res/Stage/sea/Stage.arc";
 const STAGE_SPAWN_POINT: i32 = 128;
-const STAGE_ROOM_NO: u8 = 44;
+const STAGE_START_ROOM: u8 = 44;
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
     "bdl/model1.bdl",
@@ -467,16 +467,69 @@ pub fn load_room_mesh() -> Option<crate::bdl::RoomMesh> {
     }
 }
 
+pub fn load_stage_tables() -> Option<crate::dzs::StageTables> {
+    match stage_tables_from_assets() {
+        Ok(tables) => Some(tables),
+        Err(error) => {
+            log::warn!("clearsleeper: stage tables unavailable ({error})");
+            None
+        }
+    }
+}
+
+pub fn start_set(tables: &crate::dzs::StageTables) -> Vec<u8> {
+    let set = tables.load_set(STAGE_START_ROOM);
+    if set.is_empty() {
+        vec![STAGE_START_ROOM]
+    } else {
+        set.to_vec()
+    }
+}
+
+pub struct RoomSet {
+    pub collision: Option<crate::sim::collision::Collision>,
+    pub mesh: Option<crate::bdl::RoomMesh>,
+}
+
+pub fn load_room_set(tables: &crate::dzs::StageTables, rooms: &[u8]) -> Option<RoomSet> {
+    let loaded =
+        AssetRoot::from_env().and_then(|root| room_set_from_assets(&root, tables, rooms));
+    match loaded {
+        Ok(set) => Some(set),
+        Err(error) => {
+            log::warn!("clearsleeper: room set {rooms:?} unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn stage_tables_from_assets() -> Result<crate::dzs::StageTables, AssetError> {
+    let root = AssetRoot::from_env()?;
+    stage_tables(&root)
+}
+
+fn stage_tables(root: &AssetRoot) -> Result<crate::dzs::StageTables, AssetError> {
+    let map = root.read_archive(STAGE_MAP)?;
+    let path = root.root().join(STAGE_MAP);
+    let data = map.read("dzs/stage.dzs")?;
+    crate::dzs::parse(data).map_err(|error| AssetError::Corrupt {
+        path,
+        detail: error.as_str(),
+    })
+}
+
 fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
     let root = AssetRoot::from_env()?;
-    let room = root.read_archive(STAGE_ROOM)?;
-    let path = root.root().join(STAGE_ROOM);
-    let collision = crate::sim::collision::Collision::parse(room.read("dzb/room.dzb")?).map_err(
-        |error| AssetError::Corrupt {
-            path: path.clone(),
-            detail: error.as_str(),
-        },
-    )?;
+    let tables = stage_tables(&root)?;
+    let rooms = start_set(&tables);
+    let set = room_set_from_assets(&root, &tables, &rooms)?;
+    let collision = set.collision.ok_or_else(|| AssetError::Corrupt {
+        path: root.root().join(room_path(STAGE_START_ROOM)),
+        detail: "room set has no collision",
+    })?;
+    let relative = room_path(STAGE_START_ROOM);
+    let path = root.root().join(&relative);
+    let room = root.read_archive(&relative)?;
     let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path)?;
     Ok(crate::sim::collision::StageData {
         spawn,
@@ -487,86 +540,94 @@ fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
 
 fn room_mesh_from_assets() -> Result<crate::bdl::RoomMesh, AssetError> {
     let root = AssetRoot::from_env()?;
-    let (origin, angle) = room_placement(&root)?;
-    let room = root.read_archive(STAGE_ROOM)?;
-    let path = root.root().join(STAGE_ROOM);
-    let mut mesh = crate::bdl::RoomMesh::default();
-    for name in ROOM_MODELS {
-        let model = match room.read(name) {
-            Ok(model) => model,
-            Err(AssetError::MissingEntry { .. }) => continue,
-            Err(error) => return Err(error),
-        };
-        let btk_name = name.replacen("bdl/", "btk/", 1).replacen(".bdl", ".btk", 1);
-        let animation = match room.read(&btk_name) {
-            Ok(data) => Some(crate::btk::parse(data).map_err(|error| AssetError::Corrupt {
-                path: path.clone(),
-                detail: error.as_str(),
-            })?),
-            Err(AssetError::MissingEntry { .. }) => None,
-            Err(error) => return Err(error),
-        };
-        let part = crate::bdl::parse(model, origin, angle, animation.as_ref()).map_err(|error| {
-            AssetError::Corrupt {
-                path: path.clone(),
-                detail: error.as_str(),
-            }
-        })?;
-        mesh.append(part);
-    }
-    if mesh.groups.is_empty() {
-        return Err(corrupt(&path, "room has no geometry"));
-    }
-    Ok(mesh)
+    let tables = stage_tables(&root)?;
+    let rooms = start_set(&tables);
+    let set = room_set_from_assets(&root, &tables, &rooms)?;
+    set.mesh.ok_or_else(|| AssetError::Corrupt {
+        path: root.root().join(room_path(STAGE_START_ROOM)),
+        detail: "room set has no geometry",
+    })
 }
 
-fn room_placement(root: &AssetRoot) -> Result<([f32; 2], f32), AssetError> {
-    let map = root.read_archive(STAGE_MAP)?;
-    let path = root.root().join(STAGE_MAP);
-    let data = map.read("dzs/stage.dzs")?;
-    let corrupt = |detail: &'static str| AssetError::Corrupt {
-        path: path.clone(),
-        detail,
-    };
-    let chunk_count = read_u32(data, 0).ok_or_else(|| corrupt("dzs truncated"))?;
-    let nodes_end = (chunk_count as usize)
-        .checked_mul(12)
-        .and_then(|bytes| bytes.checked_add(4))
-        .ok_or_else(|| corrupt("dzs chunk table overflow"))?;
-    if nodes_end > data.len() {
-        return Err(corrupt("dzs chunk table out of range"));
-    }
-    let mut mult = None;
-    for index in 0..chunk_count as usize {
-        let at = 4 + index * 12;
-        if &data[at..at + 4] == b"MULT" {
-            let count = read_u32(data, at + 4).ok_or_else(|| corrupt("dzs truncated"))?;
-            let offset = read_u32(data, at + 8).ok_or_else(|| corrupt("dzs truncated"))?;
-            mult = Some((count, offset));
-            break;
+fn room_set_from_assets(
+    root: &AssetRoot,
+    tables: &crate::dzs::StageTables,
+    rooms: &[u8],
+) -> Result<RoomSet, AssetError> {
+    let mut collision: Option<crate::sim::collision::Collision> = None;
+    let mut mesh: Option<crate::bdl::RoomMesh> = None;
+    for &room in rooms {
+        let relative = room_path(room);
+        let path = root.root().join(&relative);
+        let archive = root.read_archive(&relative)?;
+        match archive.read("dzb/room.dzb") {
+            Ok(data) => {
+                let parsed =
+                    crate::sim::collision::Collision::parse(data).map_err(|error| {
+                        AssetError::Corrupt {
+                            path: path.clone(),
+                            detail: error.as_str(),
+                        }
+                    })?;
+                match &mut collision {
+                    Some(target) => {
+                        target.append(parsed).map_err(|error| AssetError::Corrupt {
+                            path: path.clone(),
+                            detail: error.as_str(),
+                        })?;
+                    }
+                    None => collision = Some(parsed),
+                }
+            }
+            Err(AssetError::MissingEntry { .. }) => {}
+            Err(error) => return Err(error),
+        }
+        let (origin, angle) = table_placement(tables, room);
+        let mut room_part = crate::bdl::RoomMesh::default();
+        for name in ROOM_MODELS {
+            let model = match archive.read(name) {
+                Ok(model) => model,
+                Err(AssetError::MissingEntry { .. }) => continue,
+                Err(error) => return Err(error),
+            };
+            let btk_name = name.replacen("bdl/", "btk/", 1).replacen(".bdl", ".btk", 1);
+            let animation = match archive.read(&btk_name) {
+                Ok(data) => Some(crate::btk::parse(data).map_err(|error| {
+                    AssetError::Corrupt {
+                        path: path.clone(),
+                        detail: error.as_str(),
+                    }
+                })?),
+                Err(AssetError::MissingEntry { .. }) => None,
+                Err(error) => return Err(error),
+            };
+            let part = crate::bdl::parse(model, origin, angle, animation.as_ref()).map_err(
+                |error| AssetError::Corrupt {
+                    path: path.clone(),
+                    detail: error.as_str(),
+                },
+            )?;
+            room_part.append(part);
+        }
+        if !room_part.groups.is_empty() {
+            match &mut mesh {
+                Some(target) => target.append(room_part),
+                None => mesh = Some(room_part),
+            }
         }
     }
-    let Some((count, offset)) = mult else {
-        return Ok(([0.0, 0.0], 0.0));
-    };
-    let entries_end = (count as usize)
-        .checked_mul(0x0C)
-        .and_then(|bytes| bytes.checked_add(offset as usize))
-        .ok_or_else(|| corrupt("dzs mult table overflow"))?;
-    if entries_end > data.len() {
-        return Err(corrupt("dzs mult table out of range"));
+    Ok(RoomSet { collision, mesh })
+}
+
+fn table_placement(tables: &crate::dzs::StageTables, room: u8) -> ([f32; 2], f32) {
+    match tables.placement(room) {
+        Some(placement) => (placement.trans, f32::from(placement.angle) * RAD_PER_UNIT),
+        None => ([0.0, 0.0], 0.0),
     }
-    for index in 0..count as usize {
-        let at = offset as usize + index * 0x0C;
-        if data[at + 0x0A] != STAGE_ROOM_NO {
-            continue;
-        }
-        let trans_x = read_f32(data, at).ok_or_else(|| corrupt("dzs truncated"))?;
-        let trans_z = read_f32(data, at + 4).ok_or_else(|| corrupt("dzs truncated"))?;
-        let angle = read_i16(data, at + 8).ok_or_else(|| corrupt("dzs truncated"))?;
-        return Ok(([trans_x, trans_z], f32::from(angle) * RAD_PER_UNIT));
-    }
-    Ok(([0.0, 0.0], 0.0))
+}
+
+fn room_path(room: u8) -> String {
+    format!("{STAGE_DIR}/Room{room}.arc")
 }
 
 pub fn stage_spawn(data: &[u8], path: PathBuf) -> Result<(glam::Vec3, f32), AssetError> {

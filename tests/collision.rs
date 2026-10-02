@@ -139,6 +139,37 @@ fn bounds_cover_collision_extents() {
 }
 
 #[test]
+fn golden_append_merges_geometry_across_collision_tables() {
+    let (floor_verts, floor_tris) = floor_quad(10.0);
+    let mut collision = Collision::parse(&dzb(&floor_verts, &floor_tris)).unwrap();
+    let ledge_verts = [
+        [10.0, 15.0, 0.0],
+        [10.0, 15.0, 10.0],
+        [20.0, 15.0, 10.0],
+        [20.0, 15.0, 0.0],
+    ];
+    let ledge_tris = [[0_u16, 1, 2], [0, 2, 3]];
+    collision
+        .append(Collision::parse(&dzb(&ledge_verts, &ledge_tris)).unwrap())
+        .unwrap();
+
+    assert_eq!(collision.ground_at(5.0, 5.0), Some(10.0));
+    assert_eq!(collision.ground_at(15.0, 5.0), Some(15.0));
+    assert_eq!(collision.ground_at(21.0, 5.0), None);
+    let (min, max) = collision.bounds();
+    assert_eq!(min, Vec2::new(0.0, 0.0));
+    assert_eq!(max, Vec2::new(20.0, 10.0));
+}
+
+#[test]
+fn rejects_append_beyond_u16_vertex_capacity() {
+    let verts = vec![[0.0_f32, 0.0, 0.0]; 65_536];
+    let mut wide = Collision::parse(&dzb(&verts, &[[0, 0, 0]])).unwrap();
+    let extra = Collision::parse(&dzb(&[[1.0, 0.0, 0.0]], &[[0, 0, 0]])).unwrap();
+    assert_eq!(wide.append(extra).unwrap_err(), DzbError::TooLarge);
+}
+
+#[test]
 fn rejects_truncated_tables_and_bad_indices() {
     assert_eq!(
         Collision::parse(&[0_u8; 0x30]).unwrap_err(),

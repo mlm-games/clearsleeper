@@ -1,4 +1,5 @@
 use std::io::Write as _;
+use std::time::Duration;
 
 use clearsleeper::assets::{AssetError, AssetRoot, Archive, stage_spawn, yaz0_decode};
 use clearsleeper::btk::TexSrt;
@@ -418,6 +419,100 @@ fn golden_room_mesh_matches_disc_geometry() {
             "group {index} anim"
         );
     }
+}
+
+#[test]
+fn golden_stage_tables_match_disc() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc stage tables check");
+        return;
+    };
+    let tables =
+        clearsleeper::assets::load_stage_tables().expect("stage tables load from disc");
+    assert_eq!(tables.placements().len(), 50);
+    assert_eq!(tables.room_groups().len(), 50);
+
+    let placement = tables.placement(44).expect("room 44 placement");
+    assert_eq!(placement.trans, [-200_000.0, 300_000.0]);
+    assert_eq!(placement.angle, 0);
+    assert_eq!(placement.room, 44);
+    assert_eq!(placement.wave_max, 0);
+    let placeholder = tables.placement(0).expect("room 0 placement");
+    assert_eq!(placeholder.trans, [0.0, 0.0]);
+    assert_eq!(placeholder.wave_max, 255);
+
+    assert_eq!(tables.load_set(0), &[0_u8]);
+    assert_eq!(tables.load_set(44), &[0_u8, 44_u8]);
+    assert_eq!(tables.load_set(45), &[0_u8, 45_u8]);
+    assert!(tables.load_set(50).is_empty());
+
+    for placement in tables.placements() {
+        if placement.room == 0 {
+            continue;
+        }
+        assert_eq!(
+            tables.room_at(placement.trans[0], placement.trans[1]),
+            placement.room,
+            "room {} placement cell",
+            placement.room
+        );
+    }
+
+    assert_eq!(
+        clearsleeper::assets::start_set(&tables),
+        vec![0_u8, 44_u8]
+    );
+}
+
+#[test]
+fn golden_room_flow_reloads_set_across_cells() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc room flow check");
+        return;
+    };
+    let tick = Duration::from_secs_f64(1.0 / clearsleeper::SIM_HZ);
+    let mut app = clearsleeper::App::new();
+
+    assert_eq!(app.room.as_ref().expect("start room mesh").groups.len(), 17);
+    let area = app.sim.world.resource::<clearsleeper::sim::area::Area>();
+    assert!(
+        area.bounds_min.x < -419_000.0,
+        "shared ocean room missing from boot bounds {:?}",
+        area.bounds_min
+    );
+    assert_eq!(app.snapshot().tick, 0);
+
+    for _ in 0..5 {
+        app.advance(tick);
+    }
+    assert_eq!(app.snapshot().tick, 5);
+
+    {
+        let mut query = app
+            .sim
+            .world
+            .query::<&mut clearsleeper::sim::player::Player>();
+        let mut player = query.iter_mut(&mut app.sim.world).next().expect("player");
+        player.pos = Vec3::new(-100_000.0, 0.0, 300_000.0);
+    }
+    app.advance(tick);
+
+    assert_eq!(app.snapshot().tick, 0, "animation phase restarts on reload");
+    assert_eq!(app.room.as_ref().expect("island room mesh").groups.len(), 9);
+    let collision = app
+        .sim
+        .world
+        .resource::<clearsleeper::sim::collision::Collision>();
+    let ground = collision
+        .ground_at(-100_000.0, 300_000.0)
+        .expect("ground in cell 45");
+    assert!(
+        (ground + 5_000.0).abs() < 1.0,
+        "cell 45 collision not loaded, ground {ground}"
+    );
+
+    app.advance(tick);
+    assert_eq!(app.snapshot().tick, 1, "set must not reload while staying");
 }
 
 fn inside_xz(a: [f32; 3], b: [f32; 3], c: [f32; 3], point: [f32; 2]) -> bool {

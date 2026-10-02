@@ -20,6 +20,7 @@ pub enum DzbError {
     Truncated,
     BadTable,
     VertexIndex,
+    TooLarge,
 }
 
 impl DzbError {
@@ -28,6 +29,7 @@ impl DzbError {
             Self::Truncated => "dzb header truncated",
             Self::BadTable => "dzb table out of range",
             Self::VertexIndex => "dzb triangle vertex out of range",
+            Self::TooLarge => "dzb merged vertex table exceeds u16 indexing",
         }
     }
 }
@@ -197,6 +199,28 @@ impl Collision {
             tris,
             planes,
         })
+    }
+
+    pub fn append(&mut self, other: Self) -> Result<(), DzbError> {
+        let total = self
+            .verts
+            .len()
+            .checked_add(other.verts.len())
+            .ok_or(DzbError::TooLarge)?;
+        if total > usize::from(u16::MAX) + 1 {
+            return Err(DzbError::TooLarge);
+        }
+        let base = self.verts.len() as u32;
+        self.tris.extend(other.tris.iter().map(|tri| {
+            [
+                (tri[0] as u32 + base) as u16,
+                (tri[1] as u32 + base) as u16,
+                (tri[2] as u32 + base) as u16,
+            ]
+        }));
+        self.planes.extend(other.planes);
+        self.verts.extend(other.verts);
+        Ok(())
     }
 
     pub fn bounds(&self) -> (Vec2, Vec2) {

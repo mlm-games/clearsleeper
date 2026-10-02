@@ -14,6 +14,7 @@ pub mod assets;
 pub mod audio;
 pub mod bdl;
 pub mod btk;
+pub mod dzs;
 pub mod hud;
 pub mod input;
 pub mod save;
@@ -28,6 +29,9 @@ pub struct App {
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
     pub room: Option<bdl::RoomMesh>,
+    stage: Option<dzs::StageTables>,
+    rooms: Vec<u8>,
+    room_tick: u64,
 }
 
 impl App {
@@ -48,12 +52,22 @@ impl App {
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         sim::build(&mut sim, assets::load_stage());
         let room = assets::load_room_mesh();
+        let stage = assets::load_stage_tables();
+        let rooms = stage.as_ref().map(assets::start_set).unwrap_or_default();
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
         let cam = signal(OrbitCamera {
             target: spawn,
             ..OrbitCamera::default()
         });
-        Self { sim, cam, audio, room }
+        Self {
+            sim,
+            cam,
+            audio,
+            room,
+            stage,
+            rooms,
+            room_tick: 0,
+        }
     }
 
     /// Frame boundary: poll the shell into the sim's intent resources.
@@ -131,12 +145,66 @@ impl App {
             bounds_max: area.bounds_max,
             ground_y,
             walls,
-            tick: self.sim.world.resource::<sim::frame::CurrentFrame>().0,
+            tick: self
+                .sim
+                .world
+                .resource::<sim::frame::CurrentFrame>()
+                .0
+                .saturating_sub(self.room_tick),
         }
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
-        self.sim.step(dt)
+        let steps = self.sim.step(dt);
+        self.sync_rooms();
+        steps
+    }
+
+    pub fn sync_rooms(&mut self) {
+        let Some(tables) = self.stage.as_ref() else {
+            return;
+        };
+        let player = self
+            .sim
+            .world
+            .iter_entities()
+            .find_map(|entity| entity.get::<sim::player::Player>().copied());
+        let Some(player) = player else {
+            return;
+        };
+        let room = tables.room_at(player.pos.x, player.pos.z);
+        let fallback = std::slice::from_ref(&room);
+        let requested = tables.load_set(room);
+        let requested = if requested.is_empty() {
+            fallback
+        } else {
+            requested
+        };
+        if requested == self.rooms {
+            return;
+        }
+        let rooms = requested.to_vec();
+        if let Some(set) = assets::load_room_set(tables, &rooms) {
+            match set.collision {
+                Some(collision) => {
+                    let (bounds_min, bounds_max) = collision.bounds();
+                    let mut area = self.sim.world.resource_mut::<sim::area::Area>();
+                    area.bounds_min = bounds_min;
+                    area.bounds_max = bounds_max;
+                    self.sim.world.insert_resource(collision);
+                }
+                None => {
+                    self.sim.world.remove_resource::<sim::collision::Collision>();
+                    let default = sim::area::Area::default();
+                    let mut area = self.sim.world.resource_mut::<sim::area::Area>();
+                    area.bounds_min = default.bounds_min;
+                    area.bounds_max = default.bounds_max;
+                }
+            }
+            self.room = set.mesh;
+            self.room_tick = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+        }
+        self.rooms = rooms;
     }
 }
 
