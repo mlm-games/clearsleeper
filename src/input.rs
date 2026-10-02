@@ -28,3 +28,7 @@ pub fn axis_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> Vec2
 pub fn damage_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> u8 {
     u8::from(window_focused && held.contains(&PhysicalKey::KeyK))
 }
+
+pub fn do_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
+    window_focused && held.contains(&PhysicalKey::Space)
+}

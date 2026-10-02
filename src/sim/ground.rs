@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use super::collision::Collision;
 use super::player::Player;
@@ -16,4 +17,12 @@ pub fn ground_check(collision: Option<Res<Collision>>, mut players: Query<&mut P
             }
         }
     }
+}
+
+pub fn grounded(collision: Option<&Collision>, pos: Vec3) -> bool {
+    let surface = match collision {
+        Some(collision) => collision.ground_at(pos.x, pos.z),
+        None => Some(0.0),
+    };
+    matches!(surface, Some(ground) if pos.y <= ground)
 }

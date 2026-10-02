@@ -78,6 +78,7 @@ impl App {
         let held = &sched.held_keys;
         self.stage_axis(input::axis_from_keys(held, sched.window_focused));
         self.stage_damage(input::damage_from_keys(held, sched.window_focused));
+        self.stage_do(input::do_from_keys(held, sched.window_focused));
     }
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
@@ -96,6 +97,10 @@ impl App {
 
     pub fn stage_damage(&mut self, amount: u8) {
         self.sim.world.resource_mut::<sim::intent::DamageIntent>().0 = amount;
+    }
+
+    pub fn stage_do(&mut self, held: bool) {
+        self.sim.world.resource_mut::<sim::intent::DoIntent>().0 = held;
     }
 
     pub fn health(&self) -> sim::health::Health {

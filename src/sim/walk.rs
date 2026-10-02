@@ -8,6 +8,7 @@ use glam::Vec2;
 use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
 use super::intent::{CameraYaw, MoveIntent};
 use super::player::Player;
+use super::roll::Roll;
 use super::swim::{
     Swim, BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE,
     SWIM_MAX_SPEED, SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE,
@@ -38,7 +39,7 @@ fn to_s16(radians: f32) -> i16 {
     (radians * UNITS_PER_RAD).round().rem_euclid(65536.0) as i32 as i16
 }
 
-fn from_s16(units: i16) -> f32 {
+pub(crate) fn from_s16(units: i16) -> f32 {
     units as f32 * RAD_PER_UNIT
 }
 
@@ -121,7 +122,7 @@ fn set_normal_speed(
     }
 }
 
-fn target_yaw(intent: &MoveIntent, camera: &CameraYaw) -> i16 {
+pub(crate) fn target_yaw(intent: &MoveIntent, camera: &CameraYaw) -> i16 {
     let forward = Vec2::new(camera.0.sin(), camera.0.cos());
     let right = Vec2::new(-camera.0.cos(), camera.0.sin());
     let direction = forward * intent.axis.y + right * intent.axis.x;
@@ -132,6 +133,7 @@ pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
     swim: Res<Swim>,
+    roll: Res<Roll>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
     mut events: ResMut<SimEvents>,
@@ -140,10 +142,24 @@ pub fn walk(
         let player = &mut *player;
         if swim.active {
             swim_tick(player, &intent, &camera);
+        } else if roll.active {
+            roll_tick(player);
         } else {
             walk_tick(player, &intent, &camera, &mut stride, &mut events);
         }
     }
+}
+
+fn roll_tick(player: &mut Player) {
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
+    player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
+    player.pos.y += player.speed_y;
 }
 
 fn walk_tick(
