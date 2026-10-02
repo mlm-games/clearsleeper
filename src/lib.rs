@@ -132,13 +132,17 @@ impl App {
             None => (area.spawn, 0.0),
         };
         let collision = self.sim.world.get_resource::<sim::collision::Collision>();
+        let water = self.sim.world.get_resource::<sim::water::Water>();
         let (ground_y, walls) = match collision {
-            Some(collision) => (
-                collision
+            Some(collision) => {
+                let mut y = collision
                     .ground_at(player_pos.x, player_pos.z)
-                    .unwrap_or(player_pos.y),
-                false,
-            ),
+                    .unwrap_or(player_pos.y);
+                if let Some(water) = water.filter(|water| water.in_area) {
+                    y = y.max(water.surface.min(player_pos.y));
+                }
+                (y, false)
+            }
             None => (0.0, true),
         };
         view::SceneSnapshot {

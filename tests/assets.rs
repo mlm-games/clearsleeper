@@ -760,3 +760,72 @@ fn synthetic_archive() -> Vec<u8> {
     out.extend_from_slice(b"hello!NESTED!!");
     out
 }
+
+#[test]
+fn golden_open_sea_swim_carries_the_surface_into_the_snapshot() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc swim check");
+        return;
+    };
+    let tick = Duration::from_secs_f64(1.0 / clearsleeper::SIM_HZ);
+    let mut app = clearsleeper::App::new();
+
+    {
+        let mut query = app
+            .sim
+            .world
+            .query::<&mut clearsleeper::sim::player::Player>();
+        let mut player = query.iter_mut(&mut app.sim.world).next().expect("player");
+        player.pos = Vec3::new(-100_000.0, 0.0, 300_000.0);
+        player.yaw = 0.0;
+    }
+
+    let mut entered = 0_u32;
+    let mut surfaced_at = 0_u32;
+    for step in 1..=40 {
+        app.advance(tick);
+        let swim = *app
+            .sim
+            .world
+            .resource::<clearsleeper::sim::swim::Swim>();
+        let water = *app
+            .sim
+            .world
+            .resource::<clearsleeper::sim::water::Water>();
+        let p = {
+            let mut query = app
+                .sim
+                .world
+                .query::<&mut clearsleeper::sim::player::Player>();
+            *query
+                .iter_mut(&mut app.sim.world)
+                .next()
+                .expect("player")
+        };
+        if swim.active && entered == 0 {
+            entered = step;
+            assert!(!swim.surfaced, "open-sea entry plunges underwater");
+            assert!(p.pos.y < water.surface, "plunge starts submerged");
+        }
+        if swim.active && swim.surfaced {
+            if surfaced_at == 0 {
+                surfaced_at = step;
+            }
+            assert_eq!(p.pos.y, water.surface, "wave ride tracks the disc sea");
+            assert_eq!(app.snapshot().ground_y, water.surface);
+        }
+    }
+
+    assert!(entered > 0, "open sea engages swimming");
+    assert!(surfaced_at > entered, "buoyancy returns Link to the surface");
+    let air = app
+        .sim
+        .world
+        .resource::<clearsleeper::sim::swim::Swim>()
+        .air;
+    assert_eq!(
+        air,
+        900 - (40 - entered + 1) as i32,
+        "deep water drains one breath per tick"
+    );
+}

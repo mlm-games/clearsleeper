@@ -186,7 +186,7 @@ impl Sea {
         self.counters[index] as f32 / OCEAN[index].counter_max as f32
     }
 
-    fn draw_contains(&self, x: f32, z: f32) -> bool {
+    pub fn draw_contains(&self, x: f32, z: f32) -> bool {
         if wave_at(&self.tables, (chart_index(x), chart_index(z))) == 0 && self.culled {
             return false;
         }

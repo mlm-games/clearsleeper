@@ -8,6 +8,10 @@ use glam::Vec2;
 use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
 use super::intent::{CameraYaw, MoveIntent};
 use super::player::Player;
+use super::swim::{
+    Swim, BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE,
+    SWIM_MAX_SPEED, SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE,
+};
 
 const STICK_GATE: f32 = 0.05;
 const MAX_NORMAL_SPEED: f32 = 17.0;
@@ -87,85 +91,156 @@ fn add_calc_angle_s(value: i16, target: i16, scale: i16, max_step: i16, min_step
     value
 }
 
-fn set_normal_speed(player: &mut Player, desired: f32, accel: f32) {
+fn set_normal_speed(
+    player: &mut Player,
+    desired: f32,
+    drive: f32,
+    scale: f32,
+    min_step: f32,
+    max_step: f32,
+) {
     let (step_cap, decel_target) = if desired < player.speed {
         let span = player.speed - desired;
-        (span.clamp(DECEL_MIN_STEP, DECEL_MAX_STEP), desired)
+        (span.clamp(min_step, max_step), desired)
     } else {
-        (DECEL_MAX_STEP, 0.0)
+        (max_step, 0.0)
     };
-    if accel.abs() < ACCEL_EPSILON {
+    if drive.abs() < ACCEL_EPSILON {
         add_calc(
             &mut player.speed,
             decel_target,
-            DECEL_SCALE,
+            scale,
             step_cap,
-            DECEL_MIN_STEP,
+            min_step,
         );
     } else {
-        player.speed += accel;
+        player.speed += drive;
         if player.speed > desired {
             player.speed = desired;
         }
     }
 }
 
+fn target_yaw(intent: &MoveIntent, camera: &CameraYaw) -> i16 {
+    let forward = Vec2::new(camera.0.sin(), camera.0.cos());
+    let right = Vec2::new(-camera.0.cos(), camera.0.sin());
+    let direction = forward * intent.axis.y + right * intent.axis.x;
+    to_s16(direction.x.atan2(direction.y))
+}
+
 pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
+    swim: Res<Swim>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
     mut events: ResMut<SimEvents>,
 ) {
+    for mut player in &mut players {
+        let player = &mut *player;
+        if swim.active {
+            swim_tick(player, &intent, &camera);
+        } else {
+            walk_tick(player, &intent, &camera, &mut stride, &mut events);
+        }
+    }
+}
+
+fn walk_tick(
+    player: &mut Player,
+    intent: &MoveIntent,
+    camera: &CameraYaw,
+    stride: &mut Stride,
+    events: &mut SimEvents,
+) {
     let stick = intent.axis.length().min(1.0);
     let stick_sq = stick * stick;
     let desired = MAX_NORMAL_SPEED * stick_sq;
-    for mut player in &mut players {
-        let player = &mut *player;
-        let accel = if stick > STICK_GATE {
-            let forward = Vec2::new(camera.0.sin(), camera.0.cos());
-            let right = Vec2::new(-camera.0.cos(), camera.0.sin());
-            let direction = forward * intent.axis.y + right * intent.axis.x;
-            let target = to_s16(direction.x.atan2(direction.y));
-            let yaw = to_s16(player.yaw);
-            if angle_distance(target, yaw) > REVERSAL_LIMIT {
-                player.yaw =
-                    from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, REVERSAL_PARAM, REVERSAL_RATE));
-                0.0
+    let accel = if stick > STICK_GATE {
+        let target = target_yaw(intent, camera);
+        let yaw = to_s16(player.yaw);
+        if angle_distance(target, yaw) > REVERSAL_LIMIT {
+            player.yaw =
+                from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, REVERSAL_PARAM, REVERSAL_RATE));
+            0.0
+        } else {
+            let max_step = ((TURN_PARAM as f32 * stick_sq) as i16).max(TURN_PARAM_FLOOR);
+            let min_step = ((TURN_RATE as f32 * stick_sq) as i16).max(TURN_RATE_FLOOR);
+            player.yaw = from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, max_step, min_step));
+            let mut drive = (from_s16(target) - player.yaw).cos();
+            if player.speed > 0.5 * MAX_NORMAL_SPEED {
+                drive = drive.max(0.7);
             } else {
-                let max_step = ((TURN_PARAM as f32 * stick_sq) as i16).max(TURN_PARAM_FLOOR);
-                let min_step = ((TURN_RATE as f32 * stick_sq) as i16).max(TURN_RATE_FLOOR);
-                player.yaw = from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, max_step, min_step));
-                let mut drive = (from_s16(target) - player.yaw).cos();
-                if player.speed > 0.5 * MAX_NORMAL_SPEED {
-                    drive = drive.max(0.7);
-                } else {
-                    drive = drive.max(0.0);
-                }
-                let gate = 0.5 - 0.5 * (player.speed / MAX_NORMAL_SPEED).abs();
-                if stick > gate {
-                    drive * MOVE_ACCEL * stick_sq
-                } else {
-                    0.0
-                }
+                drive = drive.max(0.0);
             }
-        } else {
-            0.0
-        };
-        set_normal_speed(player, desired, accel);
-        let speed_f = if player.speed.abs() < SPEED_F_EPS {
-            0.0
-        } else {
-            player.speed
-        };
-        player.pos.x += speed_f * player.yaw.sin();
-        player.pos.z += speed_f * player.yaw.cos();
-        stride.0 += speed_f;
-        while stride.0 >= STRIDE_UNITS {
-            stride.0 -= STRIDE_UNITS;
-            events.list.push(SimEvent::Footstep);
+            let gate = 0.5 - 0.5 * (player.speed / MAX_NORMAL_SPEED).abs();
+            if stick > gate {
+                drive * MOVE_ACCEL * stick_sq
+            } else {
+                0.0
+            }
         }
-        player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
-        player.pos.y += player.speed_y;
+    } else {
+        0.0
+    };
+    set_normal_speed(
+        player,
+        desired,
+        accel,
+        DECEL_SCALE,
+        DECEL_MIN_STEP,
+        DECEL_MAX_STEP,
+    );
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
+    stride.0 += speed_f;
+    while stride.0 >= STRIDE_UNITS {
+        stride.0 -= STRIDE_UNITS;
+        events.list.push(SimEvent::Footstep);
     }
+    player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
+    player.pos.y += player.speed_y;
+}
+
+fn swim_tick(player: &mut Player, intent: &MoveIntent, camera: &CameraYaw) {
+    let stick = intent.axis.length().min(1.0);
+    let drive = if stick > STICK_GATE {
+        let target = target_yaw(intent, camera);
+        let before = player.yaw;
+        let yaw = to_s16(player.yaw);
+        if angle_distance(target, yaw) > BACKWARD_LIMIT {
+            player.yaw = from_s16(target);
+        } else {
+            player.yaw = from_s16(add_calc_angle_s(
+                yaw,
+                target,
+                SWIM_TURN_SCALE,
+                SWIM_TURN_MAX,
+                SWIM_TURN_MIN,
+            ));
+        }
+        SWIM_DRIVE * stick * (player.yaw - before).cos()
+    } else {
+        0.0
+    };
+    set_normal_speed(
+        player,
+        SWIM_MAX_SPEED * stick * stick,
+        drive,
+        SWIM_DECEL_SCALE,
+        SWIM_DECEL_MIN,
+        SWIM_DECEL_MAX,
+    );
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
 }

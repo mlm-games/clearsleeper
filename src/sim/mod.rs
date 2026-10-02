@@ -7,7 +7,9 @@ pub mod health;
 pub mod intent;
 pub mod player;
 pub mod sea;
+pub mod swim;
 pub mod walk;
+pub mod water;
 
 use bevy_ecs::prelude::*;
 use repame_sim::Sim;
@@ -32,6 +34,8 @@ pub fn build(
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(events::SimEvents::default());
     sim.world.insert_resource(events::Stride::default());
+    sim.world.insert_resource(water::Water::default());
+    sim.world.insert_resource(swim::Swim::default());
     let mut area = area::Area::default();
     let mut yaw = 0.0;
     if let Some(stage) = stage {
@@ -58,8 +62,11 @@ pub fn build(
     sim.add_chained_systems(
         (
             ground::ground_check.in_set(WwSimSet::Execute),
+            water::water_probe.in_set(WwSimSet::Execute),
+            swim::control.in_set(WwSimSet::Execute),
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
+            swim::surface.in_set(WwSimSet::Execute),
             area::clamp_to_area.in_set(WwSimSet::Execute),
             sea::sea_tick.in_set(WwSimSet::Execute),
             health::apply_damage.in_set(WwSimSet::Execute),
