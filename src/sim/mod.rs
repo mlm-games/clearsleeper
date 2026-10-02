@@ -5,6 +5,7 @@ pub mod events;
 pub mod frame;
 pub mod ground;
 pub mod health;
+pub mod hop;
 pub mod intent;
 pub mod player;
 pub mod roll;
@@ -40,6 +41,7 @@ pub fn build(
     sim.world.insert_resource(water::Water::default());
     sim.world.insert_resource(swim::Swim::default());
     sim.world.insert_resource(roll::Roll::default());
+    sim.world.insert_resource(hop::Hop::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
         area.spawn = stage.spawn;
@@ -70,6 +72,7 @@ pub fn build(
             water::water_probe.in_set(WwSimSet::Execute),
             swim::control.in_set(WwSimSet::Execute),
             roll::control.in_set(WwSimSet::Execute),
+            hop::control.in_set(WwSimSet::Execute),
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
             swim::surface.in_set(WwSimSet::Execute),

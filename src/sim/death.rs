@@ -6,6 +6,7 @@ use super::collision::Collision;
 use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::health::Health;
+use super::hop::Hop;
 use super::intent::MoveIntent;
 use super::player::Player;
 use super::roll::Roll;
@@ -31,6 +32,7 @@ pub fn check(
     mut health: ResMut<Health>,
     mut swim: ResMut<Swim>,
     mut roll: ResMut<Roll>,
+    mut hop: ResMut<Hop>,
     mut events: ResMut<SimEvents>,
     mut players: Query<&mut Player>,
 ) {
@@ -38,14 +40,14 @@ pub fn check(
         let player = &mut *player;
         if health.units == 0 {
             if swim.active || grounded(collision.as_deref(), player.pos) {
-                respawn(player, &area, &mut swim, &mut roll, &mut events);
+                respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
                 health.units = health.max.min(12);
             }
             continue;
         }
         if swim.active && swim.air == 0 {
             health.damage(1);
-            respawn(player, &area, &mut swim, &mut roll, &mut events);
+            respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
         }
     }
 }
@@ -55,6 +57,7 @@ fn respawn(
     area: &Area,
     swim: &mut Swim,
     roll: &mut Roll,
+    hop: &mut Hop,
     events: &mut SimEvents,
 ) {
     player.pos = area.spawn;
@@ -66,5 +69,6 @@ fn respawn(
     swim.air = 0;
     roll.active = false;
     roll.frame = 0.0;
+    hop.active = false;
     events.list.push(SimEvent::Restart);
 }

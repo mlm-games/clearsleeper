@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec2;
 
 use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
+use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
 use super::player::Player;
 use super::roll::Roll;
@@ -15,7 +16,7 @@ use super::swim::{
 };
 
 const STICK_GATE: f32 = 0.05;
-const MAX_NORMAL_SPEED: f32 = 17.0;
+pub(crate) const MAX_NORMAL_SPEED: f32 = 17.0;
 const MOVE_ACCEL: f32 = 3.5;
 const DECEL_SCALE: f32 = 0.6;
 const DECEL_MAX_STEP: f32 = 2.5;
@@ -33,7 +34,7 @@ const SPEED_F_EPS: f32 = 0.05;
 const GRAVITY: f32 = -2.5;
 const MAX_FALL_SPEED: f32 = -100.0;
 const UNITS_PER_RAD: f32 = 65536.0 / TAU;
-const RAD_PER_UNIT: f32 = TAU / 65536.0;
+pub(crate) const RAD_PER_UNIT: f32 = TAU / 65536.0;
 
 fn to_s16(radians: f32) -> i16 {
     (radians * UNITS_PER_RAD).round().rem_euclid(65536.0) as i32 as i16
@@ -129,10 +130,15 @@ pub(crate) fn target_yaw(intent: &MoveIntent, camera: &CameraYaw) -> i16 {
     to_s16(direction.x.atan2(direction.y))
 }
 
+pub(crate) fn facing_error(intent: &MoveIntent, camera: &CameraYaw, yaw: f32) -> u16 {
+    angle_distance(target_yaw(intent, camera), to_s16(yaw))
+}
+
 pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
     swim: Res<Swim>,
+    hop: Res<Hop>,
     roll: Res<Roll>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -142,12 +148,34 @@ pub fn walk(
         let player = &mut *player;
         if swim.active {
             swim_tick(player, &intent, &camera);
+        } else if hop.active {
+            hop_tick(player);
         } else if roll.active {
             roll_tick(player);
         } else {
             walk_tick(player, &intent, &camera, &mut stride, &mut events);
         }
     }
+}
+
+fn hop_tick(player: &mut Player) {
+    if player.speed < MAX_NORMAL_SPEED {
+        player.speed = (player.speed + HOP_ACCEL).min(MAX_NORMAL_SPEED);
+    } else if player.speed > MAX_NORMAL_SPEED {
+        player.speed = (player.speed - HOP_ACCEL).max(MAX_NORMAL_SPEED);
+    }
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
+    player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
+    if player.speed_y > 0.0 {
+        player.speed_y = (player.speed_y - HOP_RISE_STEP).max(0.0);
+    }
+    player.pos.y += player.speed_y;
 }
 
 fn roll_tick(player: &mut Player) {
