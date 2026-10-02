@@ -10,6 +10,7 @@ pub struct SimEvents {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimEvent {
     Footstep,
+    Restart,
 }
 
 /// Walk distance accumulated toward the next footstep.

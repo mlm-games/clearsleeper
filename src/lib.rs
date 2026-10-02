@@ -116,6 +116,7 @@ impl App {
                 sim::events::SimEvent::Footstep => {
                     self.audio.play(audio::FOOTSTEP_CUE);
                 }
+                sim::events::SimEvent::Restart => {}
             }
         }
     }
@@ -129,7 +130,7 @@ impl App {
         let area = self.sim.world.resource::<sim::area::Area>();
         let (player_pos, player_yaw) = match player {
             Some(player) => (player.pos, player.yaw),
-            None => (area.spawn, 0.0),
+            None => (area.spawn, area.yaw),
         };
         let collision = self.sim.world.get_resource::<sim::collision::Collision>();
         let water = self.sim.world.get_resource::<sim::water::Water>();

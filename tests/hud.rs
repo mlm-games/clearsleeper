@@ -44,10 +44,9 @@ fn golden_damage_via_key_stages_and_clamps() {
     let mut app = App::new();
     frame(&mut app, &[PhysicalKey::KeyK], true);
     assert_eq!(app.health().units, 11);
-    for _ in 0..12 {
-        frame(&mut app, &[PhysicalKey::KeyK], true);
-    }
-    assert_eq!(app.health().units, 0);
+    frame(&mut app, &[PhysicalKey::KeyK], true);
+    assert_eq!(app.health().units, 10);
+
     app.sim.world.resource_mut::<Health>().heal(100);
     assert_eq!(app.health(), Health::default());
     frame(&mut app, &[PhysicalKey::KeyK], false);

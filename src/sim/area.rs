@@ -9,6 +9,7 @@ pub struct Area {
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
     pub spawn: Vec3,
+    pub yaw: f32,
 }
 
 impl Default for Area {
@@ -17,6 +18,7 @@ impl Default for Area {
             bounds_min: Vec2::new(-1000.0, -1000.0),
             bounds_max: Vec2::new(1000.0, 1000.0),
             spawn: Vec3::ZERO,
+            yaw: 0.0,
         }
     }
 }

@@ -36,6 +36,8 @@ pub struct SavedArea {
     pub bounds_min: [f32; 2],
     pub bounds_max: [f32; 2],
     pub spawn: [f32; 3],
+    #[serde(default)]
+    pub yaw: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,6 +80,7 @@ impl From<&Area> for SavedArea {
             bounds_min: area.bounds_min.into(),
             bounds_max: area.bounds_max.into(),
             spawn: area.spawn.into(),
+            yaw: area.yaw,
         }
     }
 }
@@ -88,6 +91,7 @@ impl From<SavedArea> for Area {
             bounds_min: saved.bounds_min.into(),
             bounds_max: saved.bounds_max.into(),
             spawn: saved.spawn.into(),
+            yaw: saved.yaw,
         }
     }
 }

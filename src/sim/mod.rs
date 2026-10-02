@@ -1,5 +1,6 @@
 pub mod area;
 pub mod collision;
+pub mod death;
 pub mod events;
 pub mod frame;
 pub mod ground;
@@ -37,13 +38,12 @@ pub fn build(
     sim.world.insert_resource(water::Water::default());
     sim.world.insert_resource(swim::Swim::default());
     let mut area = area::Area::default();
-    let mut yaw = 0.0;
     if let Some(stage) = stage {
         area.spawn = stage.spawn;
         let (bounds_min, bounds_max) = stage.collision.bounds();
         area.bounds_min = bounds_min;
         area.bounds_max = bounds_max;
-        yaw = stage.yaw;
+        area.yaw = stage.yaw;
         sim.world.insert_resource(stage.collision);
     }
     if let Some(tables) = tables.filter(|tables| tables.has_sea_actor()) {
@@ -51,6 +51,7 @@ pub fn build(
         sim.world.insert_resource(sea::Sea::new(sea_tables));
     }
     let spawn = area.spawn;
+    let yaw = area.yaw;
     sim.world.insert_resource(area);
     sim.world.insert_resource(collision::MoveFrom(spawn));
     sim.world.spawn((player::Player {
@@ -61,6 +62,7 @@ pub fn build(
     },));
     sim.add_chained_systems(
         (
+            death::freeze.in_set(WwSimSet::Execute),
             ground::ground_check.in_set(WwSimSet::Execute),
             water::water_probe.in_set(WwSimSet::Execute),
             swim::control.in_set(WwSimSet::Execute),
@@ -70,6 +72,7 @@ pub fn build(
             area::clamp_to_area.in_set(WwSimSet::Execute),
             sea::sea_tick.in_set(WwSimSet::Execute),
             health::apply_damage.in_set(WwSimSet::Execute),
+            death::check.in_set(WwSimSet::Execute),
             frame::advance.in_set(WwSimSet::After),
         )
             .chain(),
