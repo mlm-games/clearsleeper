@@ -32,6 +32,7 @@ pub struct App {
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
     room_tick: u64,
+    sea_shade: f32,
 }
 
 impl App {
@@ -50,9 +51,10 @@ impl App {
             log::warn!("clearsleeper: cue bank failed to load ({e})");
         }
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        sim::build(&mut sim, assets::load_stage());
-        let room = assets::load_room_mesh();
         let stage = assets::load_stage_tables();
+        sim::build(&mut sim, assets::load_stage(), stage.as_ref());
+        let room = assets::load_room_mesh();
+        let sea_shade = assets::load_sea_shade().unwrap_or(0.0);
         let rooms = stage.as_ref().map(assets::start_set).unwrap_or_default();
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
         let cam = signal(OrbitCamera {
@@ -67,6 +69,7 @@ impl App {
             stage,
             rooms,
             room_tick: 0,
+            sea_shade,
         }
     }
 
@@ -151,7 +154,33 @@ impl App {
                 .resource::<sim::frame::CurrentFrame>()
                 .0
                 .saturating_sub(self.room_tick),
+            sky: self
+                .stage
+                .as_ref()
+                .and_then(dzs::StageTables::boot_sky)
+                .unwrap_or(view::SKY),
+            sea: self.sea_view(),
         }
+    }
+
+    fn sea_view(&self) -> Option<view::SeaView> {
+        let sea = self.sim.world.get_resource::<sim::sea::Sea>()?;
+        if sea.culled() {
+            return None;
+        }
+        let (amb, dif) = self.stage.as_ref()?.boot_sea_colors()?;
+        let tone = sea.flat() * sea.flat();
+        let mut color = [0.0; 3];
+        for axis in 0..3 {
+            let full = dif[axis] + tone * (amb[axis] - dif[axis]);
+            color[axis] = dif[axis] + self.sea_shade * (full - dif[axis]);
+        }
+        Some(view::SeaView {
+            origin: sea.origin(),
+            side: sim::sea::GRID_CELLS,
+            heights: sea.heights().to_vec(),
+            color,
+        })
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {

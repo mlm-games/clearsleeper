@@ -515,6 +515,104 @@ fn golden_room_flow_reloads_set_across_cells() {
     assert_eq!(app.snapshot().tick, 1, "set must not reload while staying");
 }
 
+#[test]
+fn golden_boot_palette_and_sea_match_disc() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc boot palette check");
+        return;
+    };
+    let tables =
+        clearsleeper::assets::load_stage_tables().expect("stage tables load from disc");
+    assert_eq!(tables.boot_time(), 165.0);
+    assert!(tables.has_sea_actor());
+    assert_eq!(tables.wave_max(44), 0);
+    assert_eq!(tables.wave_max(45), 5);
+    assert_eq!(tables.wave_max(0), 255);
+    assert_eq!(tables.wave_max(50), 10);
+    assert_eq!(
+        tables.boot_sky(),
+        Some([80.0 / 255.0, 120.0 / 255.0, 1.0, 1.0])
+    );
+    assert_eq!(
+        tables.boot_sea_colors(),
+        Some((
+            [1.0, 1.0, 1.0],
+            [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
+        ))
+    );
+    let shade = clearsleeper::assets::load_sea_shade().expect("sea texture loads from disc");
+    assert!((shade - 0.148_063_15).abs() < 1e-6, "shade {shade}");
+}
+
+#[test]
+fn golden_snapshot_carries_sky_and_shore_sea() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc sea snapshot check");
+        return;
+    };
+    let tick = Duration::from_secs_f64(1.0 / clearsleeper::SIM_HZ);
+    let mut app = clearsleeper::App::new();
+
+    let boot = app.snapshot();
+    assert_eq!(boot.sky, [80.0 / 255.0, 120.0 / 255.0, 1.0, 1.0]);
+    assert!(boot.sea.is_none(), "calm island cell culls the open sea");
+
+    {
+        let mut query = app
+            .sim
+            .world
+            .query::<&mut clearsleeper::sim::player::Player>();
+        let mut player = query.iter_mut(&mut app.sim.world).next().expect("player");
+        player.pos = Vec3::new(-160_000.0, 0.0, 300_000.0);
+    }
+    app.advance(tick);
+
+    let shore = app.snapshot().sea.expect("shore edge sea view");
+    assert_eq!(shore.side, 65);
+    assert_eq!(shore.heights.len(), 65 * 65);
+    assert_eq!(shore.heights[32 * 65 + 32], 1.0);
+    assert_eq!(shore.heights[0], 1.0);
+    assert_eq!(
+        shore.color,
+        [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
+        "zero flat interpolation keeps the diffuse sea tint"
+    );
+    assert_eq!(
+        shore.origin,
+        glam::Vec2::new(-185_600.0, 274_400.0)
+    );
+
+    {
+        let mut query = app
+            .sim
+            .world
+            .query::<&mut clearsleeper::sim::player::Player>();
+        let mut player = query.iter_mut(&mut app.sim.world).next().expect("player");
+        player.pos = Vec3::new(-100_000.0, 0.0, 300_000.0);
+    }
+    app.advance(tick);
+
+    let open = app.snapshot().sea.expect("open water sea view");
+    assert_eq!(open.side, 65);
+    let shade = clearsleeper::assets::load_sea_shade().expect("sea texture loads from disc");
+    assert_ne!(
+        open.color,
+        [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
+        "flat shore water must tint with the texture shade"
+    );
+    for axis in 0..3 {
+        let diffuse = [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0][axis];
+        let expected = diffuse + shade * (1.0 - diffuse);
+        assert!(
+            (open.color[axis] - expected).abs() < 1e-6,
+            "channel {axis}: {} != {expected}",
+            open.color[axis]
+        );
+    }
+    assert!((open.origin.x - -125_600.0).abs() < 1e-3);
+    assert!((open.origin.y - 274_400.0).abs() < 1e-3);
+}
+
 fn inside_xz(a: [f32; 3], b: [f32; 3], c: [f32; 3], point: [f32; 2]) -> bool {
     let v0 = [b[0] - a[0], b[2] - a[2]];
     let v1 = [c[0] - a[0], c[2] - a[2]];

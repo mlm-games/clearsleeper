@@ -50,6 +50,38 @@ fn synthetic() -> Vec<u8> {
     data
 }
 
+fn kankyo() -> Vec<u8> {
+    let counts = [1_u32, 2, 3, 6, 2, 2];
+    let tags: [&[u8; 4]; 6] = [b"STAG", b"EnvR", b"Colo", b"Pale", b"Virt", b"ACTR"];
+    let stag_at = 4 + counts.len() * 12;
+    let envr_at = stag_at + 0x20;
+    let colo_at = envr_at + 2 * 0x08;
+    let pale_at = colo_at + 3 * 0x0C;
+    let virt_at = pale_at + 6 * 0x2C;
+    let actr_at = virt_at + 2 * 0x24;
+    let offsets = [stag_at, envr_at, colo_at, pale_at, virt_at, actr_at];
+    let mut data = vec![0_u8; actr_at + 2 * 0x20];
+    write_u32(&mut data, 0, counts.len() as u32);
+    for (index, tag) in tags.into_iter().enumerate() {
+        let node = 4 + index * 12;
+        data[node..node + 4].copy_from_slice(tag);
+        write_u32(&mut data, node + 4, counts[index]);
+        write_u32(&mut data, node + 8, offsets[index] as u32);
+    }
+    data[stag_at + 0x0D] = 3;
+    data[envr_at] = 1;
+    data[colo_at + 0x0C + 5] = 5;
+    let pale = pale_at + 5 * 0x2C;
+    data[pale + 0x0C..pale + 0x0F].copy_from_slice(&[255, 255, 255]);
+    data[pale + 0x0F..pale + 0x12].copy_from_slice(&[9, 99, 224]);
+    data[pale + 0x21] = 1;
+    let virt = virt_at + 0x24;
+    data[virt + 0x18..virt + 0x1B].copy_from_slice(&[10, 20, 30]);
+    data[actr_at..actr_at + 8].copy_from_slice(b"Ship\0\0\0\0");
+    data[actr_at + 0x20..actr_at + 0x28].copy_from_slice(b"sea\0\0\0\0\0");
+    data
+}
+
 fn write_u32(data: &mut [u8], at: usize, value: u32) {
     data[at..at + 4].copy_from_slice(&value.to_be_bytes());
 }
@@ -110,6 +142,33 @@ fn golden_room_at_maps_sea_chart_cells() {
 }
 
 #[test]
+fn golden_stage_tables_kankyo_chain_and_wave_max() {
+    let tables = dzs::parse(&kankyo()).unwrap();
+    assert_eq!(tables.boot_time(), 45.0);
+    assert!(tables.has_sea_actor());
+    assert_eq!(
+        tables.boot_sky(),
+        Some([10.0 / 255.0, 20.0 / 255.0, 30.0 / 255.0, 1.0])
+    );
+    assert_eq!(
+        tables.boot_sea_colors(),
+        Some((
+            [1.0, 1.0, 1.0],
+            [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
+        ))
+    );
+
+    let stage = dzs::parse(&synthetic()).unwrap();
+    assert_eq!(stage.boot_time(), 165.0);
+    assert!(!stage.has_sea_actor());
+    assert_eq!(stage.boot_sky(), None);
+    assert_eq!(stage.boot_sea_colors(), None);
+    assert_eq!(stage.wave_max(7), 3);
+    assert_eq!(stage.wave_max(44), 255);
+    assert_eq!(stage.wave_max(9), 10);
+}
+
+#[test]
 fn rejects_truncated_and_malformed_stage_streams() {
     assert_eq!(dzs::parse(&[]).unwrap_err(), DzsError::Truncated);
 
@@ -137,4 +196,12 @@ fn rejects_truncated_and_malformed_stage_streams() {
     let record0 = read_u32(&bad_rooms, entries_at) as usize;
     write_u32(&mut bad_rooms, record0 + 4, 0xFFFF_FFF0);
     assert_eq!(dzs::parse(&bad_rooms).unwrap_err(), DzsError::BadRecord);
+
+    let mut bad_stag = kankyo();
+    write_u32(&mut bad_stag, 12, 0xFFFF_0000);
+    assert_eq!(dzs::parse(&bad_stag).unwrap_err(), DzsError::BadTable);
+
+    let mut bad_actr = kankyo();
+    write_u32(&mut bad_actr, 72, 0xFFFF_0000);
+    assert_eq!(dzs::parse(&bad_actr).unwrap_err(), DzsError::BadTable);
 }

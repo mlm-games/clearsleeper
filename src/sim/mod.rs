@@ -6,6 +6,7 @@ pub mod ground;
 pub mod health;
 pub mod intent;
 pub mod player;
+pub mod sea;
 pub mod walk;
 
 use bevy_ecs::prelude::*;
@@ -19,7 +20,11 @@ pub enum WwSimSet {
     After,
 }
 
-pub fn build(sim: &mut Sim, stage: Option<collision::StageData>) {
+pub fn build(
+    sim: &mut Sim,
+    stage: Option<collision::StageData>,
+    tables: Option<&crate::dzs::StageTables>,
+) {
     sim.world.insert_resource(frame::CurrentFrame(0));
     sim.world.insert_resource(intent::MoveIntent::default());
     sim.world.insert_resource(intent::CameraYaw::default());
@@ -37,6 +42,10 @@ pub fn build(sim: &mut Sim, stage: Option<collision::StageData>) {
         yaw = stage.yaw;
         sim.world.insert_resource(stage.collision);
     }
+    if let Some(tables) = tables.filter(|tables| tables.has_sea_actor()) {
+        let sea_tables = sea::SeaTables::new(|room| tables.wave_max(room));
+        sim.world.insert_resource(sea::Sea::new(sea_tables));
+    }
     let spawn = area.spawn;
     sim.world.insert_resource(area);
     sim.world.insert_resource(collision::MoveFrom(spawn));
@@ -52,6 +61,7 @@ pub fn build(sim: &mut Sim, stage: Option<collision::StageData>) {
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
             area::clamp_to_area.in_set(WwSimSet::Execute),
+            sea::sea_tick.in_set(WwSimSet::Execute),
             health::apply_damage.in_set(WwSimSet::Execute),
             frame::advance.in_set(WwSimSet::After),
         )

@@ -3,7 +3,7 @@ use repame_view3d::{BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter
 
 use crate::bdl::{LAYER_SIZE, RoomGroup, RoomMesh};
 
-const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
+pub const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
 const GROUND: Rgb = [0.24, 0.42, 0.22];
 const WALL: Rgb = [0.48, 0.20, 0.20];
 const BODY: Rgb = [0.87, 0.85, 0.78];
@@ -14,7 +14,7 @@ const WALL_THICKNESS: f32 = 8.0;
 const PLAYER_HALF: f32 = 8.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
     pub player_yaw: f32,
@@ -23,6 +23,16 @@ pub struct SceneSnapshot {
     pub ground_y: f32,
     pub walls: bool,
     pub tick: u64,
+    pub sky: [f32; 4],
+    pub sea: Option<SeaView>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SeaView {
+    pub origin: Vec2,
+    pub side: usize,
+    pub heights: Vec<f32>,
+    pub color: [f32; 3],
 }
 
 pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
@@ -51,7 +61,7 @@ pub fn build_frame(
     };
     let mut frame = Frame3d {
         cam,
-        background: Some(SKY),
+        background: Some(snapshot.sky),
         desc: batch_desc(room),
         ..Frame3d::default()
     };
@@ -77,6 +87,9 @@ pub fn build_frame(
         }
         None => frame.push(ground_group(snapshot)),
     }
+    if let Some(sea) = &snapshot.sea {
+        frame.push(sea_group(sea, eye));
+    }
     if snapshot.walls {
         frame.push(walls_group(snapshot, eye));
     }
@@ -99,6 +112,59 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
         depth_test: true,
         ..MeshGroup::default()
     }
+}
+
+fn sea_group(sea: &SeaView, eye: Vec3) -> MeshGroup {
+    use crate::sim::sea::GRID_SIZE;
+    let reach = repame_view3d::FAR + GRID_SIZE;
+    let reach = reach * reach;
+    let mut group = MeshGroup::default();
+    for z in 0..sea.side.saturating_sub(1) {
+        for x in 0..sea.side.saturating_sub(1) {
+            let x0 = sea.origin.x + x as f32 * GRID_SIZE;
+            let z0 = sea.origin.y + z as f32 * GRID_SIZE;
+            let x1 = x0 + GRID_SIZE;
+            let z1 = z0 + GRID_SIZE;
+            let dx = (x0 + x1) * 0.5 - eye.x;
+            let dz = (z0 + z1) * 0.5 - eye.z;
+            if dx * dx + dz * dz > reach {
+                continue;
+            }
+            let corners = [
+                [x0, sea.heights[(z + 1) * sea.side + x], z1],
+                [x1, sea.heights[(z + 1) * sea.side + x + 1], z1],
+                [x1, sea.heights[z * sea.side + x + 1], z0],
+                [x0, sea.heights[z * sea.side + x], z0],
+            ];
+            let first = [
+                corners[1][0] - corners[0][0],
+                corners[1][1] - corners[0][1],
+                corners[1][2] - corners[0][2],
+            ];
+            let second = [
+                corners[3][0] - corners[0][0],
+                corners[3][1] - corners[0][1],
+                corners[3][2] - corners[0][2],
+            ];
+            let normal = [
+                first[1] * second[2] - first[2] * second[1],
+                first[2] * second[0] - first[0] * second[2],
+                first[0] * second[1] - first[1] * second[0],
+            ];
+            let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2])
+                .sqrt();
+            let normal = [normal[0] / length, normal[1] / length, normal[2] / length];
+            let base = group.positions.len() as u32;
+            group.positions.extend(corners);
+            group.colors.extend([sea.color; 4]);
+            group.normals.extend([normal; 4]);
+            group
+                .indices
+                .extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+        }
+    }
+    group.depth_test = true;
+    group
 }
 
 fn animated_uvs(room: &RoomMesh, group: &RoomGroup, tick: u64) -> Vec<[f32; 2]> {

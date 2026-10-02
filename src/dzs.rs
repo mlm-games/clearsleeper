@@ -7,6 +7,30 @@ const SEA_CELL_SIZE: f32 = 100_000.0;
 const SEA_CHART_MIN: i32 = 1;
 const SEA_CHART_MAX: i32 = 7;
 const SEA_CHART_SIDE: i32 = 7;
+const STAG_LEN: usize = 0x20;
+const ENVR_LEN: usize = 0x08;
+const COLO_LEN: usize = 0x0C;
+const PALE_LEN: usize = 0x2C;
+const VIRT_LEN: usize = 0x24;
+const ACTOR_LEN: usize = 0x20;
+const ACTOR_NAME_LEN: usize = 8;
+const SEA_ACTOR: &[u8] = b"sea";
+pub const DEFAULT_WAVE_MAX: u8 = 10;
+const BOOT_TIME: f32 = 165.0;
+const TIME_H_SCALE: f32 = 15.0;
+const SCHEDULE: [(f32, f32, u8); 11] = [
+    (0.0, 90.0, 5),
+    (90.0, 105.0, 5),
+    (105.0, 120.0, 0),
+    (120.0, 150.0, 1),
+    (150.0, 270.0, 2),
+    (270.0, 285.0, 2),
+    (285.0, 300.0, 3),
+    (300.0, 315.0, 4),
+    (315.0, 360.0, 5),
+    (360.0, 360.0, 5),
+    (360.0, 360.0, 5),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DzsError {
@@ -33,10 +57,23 @@ pub struct Placement {
     pub wave_max: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaletteEntry {
+    pub bg1_amb: [u8; 3],
+    pub bg1_dif: [u8; 3],
+    pub virt_idx: u8,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StageTables {
     placements: Vec<Placement>,
     room_groups: Vec<Vec<u8>>,
+    time_h: Option<i8>,
+    envr: Vec<[u8; 8]>,
+    colo: Vec<[u8; 8]>,
+    palettes: Vec<PaletteEntry>,
+    skies: Vec<[u8; 3]>,
+    has_sea: bool,
 }
 
 pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
@@ -45,31 +82,70 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
     if nodes_end > data.len() {
         return Err(DzsError::BadTable);
     }
-    let mut mult = None;
-    let mut rtbl = None;
+    let mut nodes = Vec::with_capacity(chunk_count as usize);
     for index in 0..chunk_count as usize {
         let at = 4 + index * CHUNK_LEN;
-        let tag = &data[at..at + 4];
-        let count = read_u32(data, at + 4)?;
-        let offset = read_u32(data, at + 8)?;
-        if tag == b"MULT" && mult.is_none() {
-            mult = Some((count, offset));
-        }
-        if tag == b"RTBL" && rtbl.is_none() {
-            rtbl = Some((count, offset));
-        }
+        nodes.push((
+            [data[at], data[at + 1], data[at + 2], data[at + 3]],
+            read_u32(data, at + 4)?,
+            read_u32(data, at + 8)?,
+        ));
     }
-    let placements = match mult {
+    let locate = |tag: &[u8; 4]| {
+        nodes
+            .iter()
+            .find(|(name, ..)| name == tag)
+            .map(|(_, count, offset)| (*count, *offset))
+    };
+    let placements = match locate(b"MULT") {
         Some((count, offset)) => parse_placements(data, count, offset)?,
         None => Vec::new(),
     };
-    let room_groups = match rtbl {
+    let room_groups = match locate(b"RTBL") {
         Some((count, offset)) => parse_room_groups(data, count, offset)?,
         None => Vec::new(),
+    };
+    let time_h = match locate(b"STAG") {
+        Some((count, offset)) if count > 0 => Some(parse_time_h(data, offset)?),
+        _ => None,
+    };
+    let envr = match locate(b"EnvR") {
+        Some((count, offset)) => {
+            parse_records::<[u8; 8]>(data, count, offset, ENVR_LEN, read_array)?
+        }
+        None => Vec::new(),
+    };
+    let colo = match locate(b"Colo") {
+        Some((count, offset)) => {
+            parse_records::<[u8; 8]>(data, count, offset, COLO_LEN, read_array)?
+        }
+        None => Vec::new(),
+    };
+    let palettes = match locate(b"Pale") {
+        Some((count, offset)) => parse_records(data, count, offset, PALE_LEN, parse_palette)?,
+        None => Vec::new(),
+    };
+    let skies = match locate(b"Virt") {
+        Some((count, offset)) => {
+            parse_records::<[u8; 3]>(data, count, offset, VIRT_LEN, |data, at| {
+                read_array(data, at + 0x18)
+            })?
+        }
+        None => Vec::new(),
+    };
+    let has_sea = match locate(b"ACTR") {
+        Some((count, offset)) => contains_sea_actor(data, count, offset)?,
+        None => false,
     };
     Ok(StageTables {
         placements,
         room_groups,
+        time_h,
+        envr,
+        colo,
+        palettes,
+        skies,
+        has_sea,
     })
 }
 
@@ -123,6 +199,59 @@ fn parse_room_groups(data: &[u8], count: u32, offset: u32) -> Result<Vec<Vec<u8>
     Ok(room_groups)
 }
 
+fn parse_records<T>(
+    data: &[u8],
+    count: u32,
+    offset: u32,
+    stride: usize,
+    mut read: impl FnMut(&[u8], usize) -> Result<T, DzsError>,
+) -> Result<Vec<T>, DzsError> {
+    let end = table_end(offset as usize, count as usize, stride)?;
+    if end > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    let mut records = Vec::with_capacity(count as usize);
+    for index in 0..count as usize {
+        records.push(read(data, offset as usize + index * stride)?);
+    }
+    Ok(records)
+}
+
+fn parse_time_h(data: &[u8], offset: u32) -> Result<i8, DzsError> {
+    let end = table_end(offset as usize, 1, STAG_LEN)?;
+    if end > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    Ok(read_u8(data, offset as usize + 0x0D)? as i8)
+}
+
+fn parse_palette(data: &[u8], at: usize) -> Result<PaletteEntry, DzsError> {
+    Ok(PaletteEntry {
+        bg1_amb: read_array(data, at + 0x0C)?,
+        bg1_dif: read_array(data, at + 0x0F)?,
+        virt_idx: read_u8(data, at + 0x21)?,
+    })
+}
+
+fn contains_sea_actor(data: &[u8], count: u32, offset: u32) -> Result<bool, DzsError> {
+    let end = table_end(offset as usize, count as usize, ACTOR_LEN)?;
+    if end > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    for index in 0..count as usize {
+        let at = offset as usize + index * ACTOR_LEN;
+        let name: [u8; ACTOR_NAME_LEN] = read_array(data, at)?;
+        let name = match name.iter().position(|&byte| byte == 0) {
+            Some(stop) => &name[..stop],
+            None => &name[..],
+        };
+        if name == SEA_ACTOR {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 impl StageTables {
     pub fn placements(&self) -> &[Placement] {
         &self.placements
@@ -156,6 +285,61 @@ impl StageTables {
         }
         ((row - SEA_CHART_MIN) * SEA_CHART_SIDE + (column - SEA_CHART_MIN) + 1) as u8
     }
+
+    pub fn wave_max(&self, room: u8) -> u8 {
+        self.placement(room)
+            .map_or(DEFAULT_WAVE_MAX, |entry| entry.wave_max)
+    }
+
+    pub fn has_sea_actor(&self) -> bool {
+        self.has_sea
+    }
+
+    pub fn boot_time(&self) -> f32 {
+        match self.time_h {
+            Some(hours) if hours >= 0 => hours as f32 * TIME_H_SCALE,
+            _ => BOOT_TIME,
+        }
+    }
+
+    pub fn boot_sky(&self) -> Option<[f32; 4]> {
+        let entry = self.boot_palette().and_then(|palette| {
+            self.skies
+                .get(usize::from(palette.virt_idx))
+                .copied()
+        })?;
+        Some([
+            entry[0] as f32 / 255.0,
+            entry[1] as f32 / 255.0,
+            entry[2] as f32 / 255.0,
+            1.0,
+        ])
+    }
+
+    pub fn boot_sea_colors(&self) -> Option<([f32; 3], [f32; 3])> {
+        let palette = self.boot_palette()?;
+        Some((
+            bytes_to_unit(palette.bg1_amb),
+            bytes_to_unit(palette.bg1_dif),
+        ))
+    }
+
+    fn boot_palette(&self) -> Option<&PaletteEntry> {
+        let schedule = SCHEDULE.iter().find(|(begin, end, _)| {
+            self.boot_time() >= *begin && self.boot_time() <= *end
+        })?;
+        let envr = self.envr.first()?;
+        let colo = self.colo.get(usize::from(envr[0]))?;
+        self.palettes.get(usize::from(colo[usize::from(schedule.2)]))
+    }
+}
+
+fn bytes_to_unit(bytes: [u8; 3]) -> [f32; 3] {
+    [
+        bytes[0] as f32 / 255.0,
+        bytes[1] as f32 / 255.0,
+        bytes[2] as f32 / 255.0,
+    ]
 }
 
 fn table_end(offset: usize, count: usize, stride: usize) -> Result<usize, DzsError> {
@@ -182,4 +366,11 @@ fn read_i16(data: &[u8], at: usize) -> Result<i16, DzsError> {
 
 fn read_u8(data: &[u8], at: usize) -> Result<u8, DzsError> {
     data.get(at).copied().ok_or(DzsError::Truncated)
+}
+
+fn read_array<const N: usize>(data: &[u8], at: usize) -> Result<[u8; N], DzsError> {
+    let bytes = data.get(at..at + N).ok_or(DzsError::Truncated)?;
+    let mut out = [0_u8; N];
+    out.copy_from_slice(bytes);
+    Ok(out)
 }

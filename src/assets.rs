@@ -15,6 +15,9 @@ const ROOM_MODELS: [&str; 4] = [
     "bdl/model3.bdl",
 ];
 const RAD_PER_UNIT: f32 = std::f32::consts::TAU / 65536.0;
+const OBJECT_ALWAYS: &str = "files/res/Object/Always.arc";
+const SEA_TEXTURE_ENTRY: &str = "tex/b_sea_tex0and2.bti";
+const BTI_IMAGE_OFFSET: usize = 0x1C;
 
 #[derive(Debug)]
 pub enum AssetError {
@@ -475,6 +478,48 @@ pub fn load_stage_tables() -> Option<crate::dzs::StageTables> {
             None
         }
     }
+}
+
+pub fn load_sea_shade() -> Option<f32> {
+    match sea_shade_from_assets() {
+        Ok(shade) => Some(shade),
+        Err(error) => {
+            log::warn!("clearsleeper: sea texture unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn sea_shade_from_assets() -> Result<f32, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let archive = root.read_archive(OBJECT_ALWAYS)?;
+    let path = root.root().join(OBJECT_ALWAYS);
+    let bti = archive.read(SEA_TEXTURE_ENTRY)?;
+    sea_shade(bti).ok_or(AssetError::Corrupt {
+        path,
+        detail: "sea texture unsupported",
+    })
+}
+
+fn sea_shade(bti: &[u8]) -> Option<f32> {
+    if bti.first() != Some(&0) {
+        return None;
+    }
+    let width = u16::from_be_bytes([*bti.get(2)?, *bti.get(3)?]) as usize;
+    let height = u16::from_be_bytes([*bti.get(4)?, *bti.get(5)?]) as usize;
+    let offset = u32::from_be_bytes([
+        *bti.get(BTI_IMAGE_OFFSET)?,
+        *bti.get(BTI_IMAGE_OFFSET + 1)?,
+        *bti.get(BTI_IMAGE_OFFSET + 2)?,
+        *bti.get(BTI_IMAGE_OFFSET + 3)?,
+    ]) as usize;
+    let pixels = width.checked_mul(height)?;
+    let data = bti.get(offset..offset + pixels.div_ceil(2))?;
+    let total: u64 = data
+        .iter()
+        .map(|byte| u64::from(byte >> 4) + u64::from(byte & 0x0F))
+        .sum();
+    Some(total as f32 / (15.0 * pixels as f32))
 }
 
 pub fn start_set(tables: &crate::dzs::StageTables) -> Vec<u8> {

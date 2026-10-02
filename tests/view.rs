@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use clearsleeper::bdl::{AnimBinding, RoomGroup, RoomMesh, RoomTexture};
 use clearsleeper::btk::{Entry, Key, TextureAnimation};
-use clearsleeper::view::{SceneSnapshot, build_frame, sim_yaw_for_camera};
+use clearsleeper::view::{SceneSnapshot, SeaView, build_frame, sim_yaw_for_camera};
 use clearsleeper::{App, SIM_HZ};
 use glam::{Vec2, Vec3};
 use repame_view3d::{OrbitCamera, SceneFilter};
@@ -18,6 +18,8 @@ fn golden_snapshot_builds_world_frame() {
         ground_y: 0.0,
         walls: true,
         tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: None,
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -100,6 +102,8 @@ fn room_mesh_replaces_placeholder_ground() {
         ground_y: 0.0,
         walls: false,
         tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: None,
     };
     let room = RoomMesh {
         groups: vec![RoomGroup {
@@ -149,6 +153,8 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         ground_y: 0.0,
         walls: false,
         tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: None,
     };
     let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
     let normals = vec![[0.0, 1.0, 0.0]; 3];
@@ -247,6 +253,8 @@ fn room_group_applies_texture_animation_to_uvs() {
         ground_y: 0.0,
         walls: false,
         tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: None,
     };
     let room = RoomMesh {
         groups: vec![
@@ -292,4 +300,81 @@ fn room_group_applies_texture_animation_to_uvs() {
         }
     }
     assert_eq!(frame.groups[1].uvs, room.groups[1].uvs);
+}
+
+#[test]
+fn golden_sea_view_builds_wave_mesh() {
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::new(0.0, 0.0, 0.0),
+        player_yaw: 0.0,
+        bounds_min: Vec2::new(-100.0, -100.0),
+        bounds_max: Vec2::new(100.0, 100.0),
+        ground_y: 0.0,
+        walls: false,
+        tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: Some(SeaView {
+            origin: Vec2::new(0.0, 0.0),
+            side: 3,
+            heights: vec![1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0],
+            color: [0.5, 0.6, 0.7],
+        }),
+    };
+    let frame = build_frame(&snapshot, OrbitCamera::default(), None);
+
+    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.background, Some(snapshot.sky));
+    let group = &frame.groups[1];
+    assert_eq!(group.tri_count(), 8);
+    assert_eq!(group.positions.len(), 16);
+    assert_eq!(group.colors, vec![[0.5, 0.6, 0.7]; 16]);
+    assert_eq!(group.normals.len(), 16);
+    assert!(group.uvs.is_empty());
+    assert!(group.depth_test);
+    assert_eq!(
+        group.bounds(),
+        Some((
+            [0.0, 1.0, 0.0],
+            [1600.0, 2.0, 1600.0],
+        ))
+    );
+    assert_eq!(
+        group.normals[8],
+        [0.0, 1.0, 0.0],
+        "untouched quad keeps an exact up normal"
+    );
+    assert!(
+        group.normals[12][1] < 1.0,
+        "raised corner must tilt its quad: {:?}",
+        group.normals[12]
+    );
+    for normal in &group.normals {
+        let length =
+            normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+        assert!((length - 1.0).abs() < 1e-5, "normal not unit: {normal:?}");
+    }
+}
+
+#[test]
+fn sea_group_culls_beyond_the_far_plane() {
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::new(0.0, 0.0, 0.0),
+        player_yaw: 0.0,
+        bounds_min: Vec2::new(-100.0, -100.0),
+        bounds_max: Vec2::new(100.0, 100.0),
+        ground_y: 0.0,
+        walls: false,
+        tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: Some(SeaView {
+            origin: Vec2::new(50_000.0, 50_000.0),
+            side: 3,
+            heights: vec![1.0; 9],
+            color: [0.5, 0.6, 0.7],
+        }),
+    };
+    let frame = build_frame(&snapshot, OrbitCamera::default(), None);
+
+    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups[1].tri_count(), 0);
 }
