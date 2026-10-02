@@ -40,7 +40,7 @@ pub struct SavedArea {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedHealth {
-    pub half_units: u8,
+    pub units: u8,
     pub max: u8,
 }
 
@@ -95,7 +95,7 @@ impl From<SavedArea> for Area {
 impl From<&Health> for SavedHealth {
     fn from(health: &Health) -> Self {
         Self {
-            half_units: health.half_units,
+            units: health.units,
             max: health.max,
         }
     }
@@ -104,7 +104,7 @@ impl From<&Health> for SavedHealth {
 impl From<SavedHealth> for Health {
     fn from(saved: SavedHealth) -> Self {
         Health {
-            half_units: saved.half_units,
+            units: saved.units,
             max: saved.max,
         }
     }

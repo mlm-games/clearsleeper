@@ -18,19 +18,23 @@ const EMPTY_HEX: &str = "#453033";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeartState {
     Full,
+    ThreeQuarters,
     Half,
+    Quarter,
     Empty,
 }
 
-/// One entry per heart container, left to right: units >= 2 fills a slot,
-/// 1 leaves a half. Health beyond `max` cannot occur (clamped at the source).
+/// One entry per heart container, left to right: 4 units fill a slot and the
+/// remainder shows its quarter. Health beyond `max` cannot occur (clamped at the source).
 pub fn heart_states(health: &Health) -> Vec<HeartState> {
-    let slots = health.max.div_ceil(2) as usize;
-    let units = health.half_units as usize;
+    let slots = health.max.div_ceil(4) as usize;
+    let units = health.units as usize;
     (0..slots)
-        .map(|slot| match units.saturating_sub(slot * 2) {
+        .map(|slot| match units.saturating_sub(slot * 4) {
             0 => HeartState::Empty,
-            1 => HeartState::Half,
+            1 => HeartState::Quarter,
+            2 => HeartState::Half,
+            3 => HeartState::ThreeQuarters,
             _ => HeartState::Full,
         })
         .collect()
@@ -78,20 +82,25 @@ fn heart(state: HeartState, size: f32) -> View {
     let frame = || Modifier::new().size(size.dp(), size.dp());
     let full = Color::from_hex(FULL_HEX);
     let empty = Color::from_hex(EMPTY_HEX);
-    match state {
-        HeartState::Full => ZStack(frame()).child(heart_shapes(full, size)),
-        HeartState::Empty => ZStack(frame()).child(heart_shapes(empty, size)),
-        HeartState::Half => ZStack(frame()).child([
+    let filled_to = |width: f32| {
+        ZStack(frame()).child([
             ZStack(frame()).child(heart_shapes(empty, size)),
             UiBox(
                 Modifier::new()
                     .absolute()
                     .offset(Some(0.0.dp()), Some(0.0.dp()), None, None)
-                    .size((size / 2.0).dp(), size.dp())
+                    .size(width.dp(), size.dp())
                     .clip_rounded(0.0.dp()),
             )
             .child(heart_shapes(full, size)),
-        ]),
+        ])
+    };
+    match state {
+        HeartState::Full => ZStack(frame()).child(heart_shapes(full, size)),
+        HeartState::Empty => ZStack(frame()).child(heart_shapes(empty, size)),
+        HeartState::Quarter => filled_to(size / 4.0),
+        HeartState::Half => filled_to(size / 2.0),
+        HeartState::ThreeQuarters => filled_to(size * 3.0 / 4.0),
     }
 }
 

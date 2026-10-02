@@ -24,7 +24,7 @@ pub fn axis_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> Vec2
     axis.clamp_length_max(1.0)
 }
 
-/// Held debug key → whole-heart damage staged this frame. Focus loss clears.
+/// Held debug key → quarter-heart damage staged this frame. Focus loss clears.
 pub fn damage_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> u8 {
     u8::from(window_focused && held.contains(&PhysicalKey::KeyK))
 }
