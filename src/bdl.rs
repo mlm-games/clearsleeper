@@ -35,6 +35,16 @@ const MATERIAL_COLOR_CHAN_IDX: usize = 0x00C;
 const COLOR_CHAN_STRIDE: usize = 8;
 const COLOR_CHAN_MAX: usize = 4;
 const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
+const MATERIAL_TEX_GEN_NUM: usize = 0x003;
+const MATERIAL_TEV_STAGE_NUM: usize = 0x004;
+const MATERIAL_TEX_COORD_IDX: usize = 0x028;
+const MATERIAL_TEV_ORDER_IDX: usize = 0x0BC;
+const TEX_COORD_STRIDE: usize = 4;
+const TEV_ORDER_STRIDE: usize = 4;
+const TEX_GEN_MAX: u8 = 8;
+const TEV_STAGE_MAX: u8 = 16;
+const GX_TEXMTX0: u8 = 30;
+const GX_IDENTITY: u8 = 60;
 const FORMAT_I4: u8 = 0;
 const FORMAT_IA4: u8 = 2;
 const FORMAT_CMPR: u8 = 0xE;
@@ -99,10 +109,18 @@ impl BdlError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnimBinding {
+    pub set: u32,
+    pub track: u32,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RoomMesh {
     pub groups: Vec<RoomGroup>,
     pub textures: Vec<RoomTexture>,
+    pub uv_placements: Vec<[f32; 4]>,
+    pub animations: Vec<crate::btk::TextureAnimation>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -114,6 +132,7 @@ pub struct RoomGroup {
     pub indices: Vec<u32>,
     pub texture_page: Option<u32>,
     pub lit: bool,
+    pub anim: Option<AnimBinding>,
 }
 
 #[derive(Debug, Clone)]
@@ -126,17 +145,28 @@ pub struct RoomTexture {
 impl RoomMesh {
     pub fn append(&mut self, mut part: RoomMesh) {
         let page_base = self.textures.len() as u32;
+        let animation_base = self.animations.len() as u32;
         for group in &mut part.groups {
             if let Some(page) = group.texture_page.as_mut() {
                 *page += page_base;
             }
+            if let Some(binding) = group.anim.as_mut() {
+                binding.set += animation_base;
+            }
         }
+        self.uv_placements.append(&mut part.uv_placements);
+        self.animations.append(&mut part.animations);
         self.groups.append(&mut part.groups);
         self.textures.append(&mut part.textures);
     }
 }
 
-pub fn parse(data: &[u8], origin: [f32; 2], angle: f32) -> Result<RoomMesh, BdlError> {
+pub fn parse(
+    data: &[u8],
+    origin: [f32; 2],
+    angle: f32,
+    animation: Option<&crate::btk::TextureAnimation>,
+) -> Result<RoomMesh, BdlError> {
     let blocks = Blocks::parse(data)?;
     let (worlds, material_nodes) = read_joints(data, &blocks)?;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
@@ -150,8 +180,12 @@ pub fn parse(data: &[u8], origin: [f32; 2], angle: f32) -> Result<RoomMesh, BdlE
         origin,
         sin,
         cos,
+        animation,
     };
     let mut mesh = RoomMesh::default();
+    if let Some(animation) = animation {
+        mesh.animations.push(animation.clone());
+    }
     read_shapes(
         &context,
         &blocks,
@@ -553,10 +587,13 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
     })
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct MaterialBinding {
     texture: Option<u16>,
     lit: bool,
+    name: Option<String>,
+    coord: Option<u8>,
+    init_matrix: Option<u8>,
 }
 
 fn material_lit(
@@ -599,6 +636,152 @@ fn material_lit(
     Ok(false)
 }
 
+fn read_material_names(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    table: usize,
+    count: usize,
+) -> Result<Vec<String>, BdlError> {
+    let base = at(start, table)?;
+    if at(base, 4)? > end {
+        return Err(BdlError::Block);
+    }
+    if usize::from(read_u16(data, base)?) < count {
+        return Err(BdlError::Block);
+    }
+    if at(base, 4 + count * 4)? > end {
+        return Err(BdlError::Block);
+    }
+    let mut names = Vec::with_capacity(count);
+    for material in 0..count {
+        let offset = usize::from(read_u16(data, at(base, 4 + material * 4 + 2)?)?);
+        let string = at(base, offset)?;
+        if string >= end {
+            return Err(BdlError::Block);
+        }
+        let bytes = data.get(string..end).ok_or(BdlError::Truncated)?;
+        let length = bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .ok_or(BdlError::Block)?;
+        let name = std::str::from_utf8(&bytes[..length]).map_err(|_| BdlError::Block)?;
+        names.push(name.to_owned());
+    }
+    Ok(names)
+}
+
+fn block_byte(data: &[u8], base: usize, offset: usize, end: usize) -> Result<u8, BdlError> {
+    let position = at(base, offset)?;
+    if position >= end {
+        return Err(BdlError::Block);
+    }
+    data.get(position).copied().ok_or(BdlError::Truncated)
+}
+
+fn material_coord(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    tex_gen_num_table: u32,
+    tex_coord_table: u32,
+    tev_order_table: u32,
+    tev_stage_table: u32,
+) -> Result<(Option<u8>, Option<u8>), BdlError> {
+    if tex_gen_num_table == 0
+        || tex_coord_table == 0
+        || tev_order_table == 0
+        || tev_stage_table == 0
+    {
+        return Ok((None, None));
+    }
+    let tex_gen_num_index = usize::from(block_byte(
+        data,
+        init,
+        MATERIAL_TEX_GEN_NUM,
+        end,
+    )?);
+    let tex_gen_num_table_at = at(start, tex_gen_num_table as usize)?;
+    let tex_gen_num = block_byte(data, tex_gen_num_table_at, tex_gen_num_index, end)?;
+    if tex_gen_num > TEX_GEN_MAX {
+        return Err(BdlError::Descriptor);
+    }
+    let stage_num_index = usize::from(block_byte(
+        data,
+        init,
+        MATERIAL_TEV_STAGE_NUM,
+        end,
+    )?);
+    let stage_num_table_at = at(start, tev_stage_table as usize)?;
+    let stage_num = block_byte(data, stage_num_table_at, stage_num_index, end)?;
+    if stage_num > TEV_STAGE_MAX {
+        return Err(BdlError::Descriptor);
+    }
+    let tev_order_table_at = at(start, tev_order_table as usize)?;
+    let mut coord = None;
+    for stage in 0..usize::from(stage_num) {
+        if at(init, MATERIAL_TEV_ORDER_IDX + stage * 2 + 2)? > end {
+            return Err(BdlError::Block);
+        }
+        let order_index =
+            usize::from(read_u16(data, at(init, MATERIAL_TEV_ORDER_IDX + stage * 2)?)?);
+        let order = at(tev_order_table_at, order_index * TEV_ORDER_STRIDE)?;
+        if at(order, TEV_ORDER_STRIDE)? > end {
+            return Err(BdlError::Block);
+        }
+        if block_byte(data, order, 1, end)? != 0 {
+            continue;
+        }
+        let slot = block_byte(data, order, 0, end)?;
+        if usize::from(slot) >= usize::from(tex_gen_num) {
+            return Err(BdlError::Descriptor);
+        }
+        coord = Some(slot);
+        break;
+    }
+    let init_matrix = match coord {
+        None => None,
+        Some(slot) => {
+            if at(init, MATERIAL_TEX_COORD_IDX + usize::from(slot) * 2 + 2)? > end {
+                return Err(BdlError::Block);
+            }
+            let info_index = usize::from(read_u16(
+                data,
+                at(init, MATERIAL_TEX_COORD_IDX + usize::from(slot) * 2)?,
+            )?);
+            let info_table_at = at(start, tex_coord_table as usize)?;
+            let info = at(info_table_at, info_index * TEX_COORD_STRIDE)?;
+            if at(info, TEX_COORD_STRIDE)? > end {
+                return Err(BdlError::Block);
+            }
+            let matrix = block_byte(data, info, 2, end)?;
+            match matrix.checked_sub(GX_TEXMTX0) {
+                Some(offset) if matrix < GX_IDENTITY && offset % 3 == 0 => {
+                    Some((offset / 3) as u8)
+                }
+                _ => None,
+            }
+        }
+    };
+    Ok((coord, init_matrix))
+}
+
+fn material_anim(
+    animation: &crate::btk::TextureAnimation,
+    binding: &MaterialBinding,
+) -> Option<AnimBinding> {
+    let name = binding.name.as_deref()?;
+    let coord = binding.coord?;
+    let slot = if animation.has_track(name, coord) {
+        coord
+    } else {
+        binding.init_matrix?
+    };
+    let track = animation.track(name, slot)?;
+    Some(AnimBinding { set: 0, track })
+}
+
 fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, BdlError> {
     let Some((start, end)) = blocks.get(b"MAT3") else {
         return Ok(Vec::new());
@@ -609,6 +792,16 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     let texno_table = at(start, read_u32(data, at(start, 0x48)?)? as usize)?;
     let color_chan_num = read_u32(data, at(start, 0x24)?)?;
     let color_chan_info = read_u32(data, at(start, 0x28)?)?;
+    let name_table = read_u32(data, at(start, 0x14)?)?;
+    let tex_gen_num_table = read_u32(data, at(start, 0x34)?)?;
+    let tex_coord_table = read_u32(data, at(start, 0x38)?)?;
+    let tev_order_table = read_u32(data, at(start, 0x4C)?)?;
+    let tev_stage_table = read_u32(data, at(start, 0x58)?)?;
+    let names = if name_table == 0 {
+        Vec::new()
+    } else {
+        read_material_names(data, start, end, name_table as usize, count)?
+    };
     let mut materials = Vec::with_capacity(count);
     for material in 0..count {
         let slot = usize::from(read_u16(data, at(index_table, material * 2)?)?);
@@ -634,7 +827,23 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             color_chan_num,
             color_chan_info,
         )?;
-        materials.push(MaterialBinding { texture, lit });
+        let (coord, init_matrix) = material_coord(
+            data,
+            start,
+            end,
+            init,
+            tex_gen_num_table,
+            tex_coord_table,
+            tev_order_table,
+            tev_stage_table,
+        )?;
+        materials.push(MaterialBinding {
+            texture,
+            lit,
+            name: names.get(material).cloned(),
+            coord,
+            init_matrix,
+        });
     }
     Ok(materials)
 }
@@ -961,6 +1170,7 @@ fn bake_textures(mesh: &mut RoomMesh, native: &[NativeTexture]) {
         }
     }
     mesh.textures = textures;
+    mesh.uv_placements = placements;
 }
 
 fn bake_pixels(
@@ -1008,6 +1218,7 @@ struct ShapeContext<'a> {
     origin: [f32; 2],
     sin: f32,
     cos: f32,
+    animation: Option<&'a crate::btk::TextureAnimation>,
 }
 
 fn read_shapes(
@@ -1108,9 +1319,17 @@ fn read_shapes(
             texture_page = None;
         }
         let textured = texture_page.is_some();
+        let anim = match (texture_page, context.animation, shape_materials[shape]) {
+            (Some(_), Some(animation), Some(index)) if !materials.is_empty() => {
+                let binding = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
+                material_anim(animation, binding)
+            }
+            _ => None,
+        };
         let mut group = RoomGroup {
             texture_page,
             lit,
+            anim,
             ..RoomGroup::default()
         };
 

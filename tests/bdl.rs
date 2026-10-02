@@ -181,7 +181,7 @@ fn synthetic() -> Synthetic {
 #[test]
 fn golden_strip_winding_joint_chain_and_colors() {
     let synthetic = synthetic();
-    let mesh = parse(&synthetic.bytes, [0.0, 0.0], 0.0).expect("synthetic bdl parses");
+    let mesh = parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).expect("synthetic bdl parses");
     assert_eq!(mesh.groups.len(), 1);
     assert_eq!(mesh.textures.len(), 1);
     let group = &mesh.groups[0];
@@ -208,6 +208,9 @@ fn golden_strip_winding_joint_chain_and_colors() {
     );
     let texture = &mesh.textures[0];
     assert_eq!((texture.width, texture.height), (9, 9));
+    assert_eq!(mesh.uv_placements, vec![[1.0 / 64.0, 1.0 / 64.0, 0.0, 0.0]]);
+    assert!(mesh.animations.is_empty());
+    assert!(group.anim.is_none());
     assert_eq!(texture.rgba.len(), 9 * 9 * 4);
     assert_eq!(&texture.rgba[0..4], &[255, 255, 255, 255]);
     assert_eq!(&texture.rgba[4..8], &[0, 0, 0, 0]);
@@ -219,18 +222,18 @@ fn golden_strip_winding_joint_chain_and_colors() {
 #[test]
 fn rejects_truncated_and_unsupported_models() {
     let mut synthetic = synthetic();
-    assert!(parse(&synthetic.bytes, [0.0, 0.0], 0.0).is_ok());
+    assert!(parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).is_ok());
 
     let mut magic = synthetic.bytes.clone();
     magic[0] = b'X';
     assert_eq!(
-        parse(&magic, [0.0, 0.0], 0.0).unwrap_err(),
+        parse(&magic, [0.0, 0.0], 0.0, None).unwrap_err(),
         BdlError::Magic
     );
 
     for cut in 0..synthetic.bytes.len() {
         assert!(
-            parse(&synthetic.bytes[..cut], [0.0, 0.0], 0.0).is_err(),
+            parse(&synthetic.bytes[..cut], [0.0, 0.0], 0.0, None).is_err(),
             "cut {cut}"
         );
     }
@@ -238,7 +241,7 @@ fn rejects_truncated_and_unsupported_models() {
     let flag = synthetic.bytes[synthetic.draw_flag_at];
     synthetic.bytes[synthetic.draw_flag_at] = 1;
     assert_eq!(
-        parse(&synthetic.bytes, [0.0, 0.0], 0.0).unwrap_err(),
+        parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).unwrap_err(),
         BdlError::Envelope
     );
     synthetic.bytes[synthetic.draw_flag_at] = flag;
@@ -246,7 +249,7 @@ fn rejects_truncated_and_unsupported_models() {
     let matrix_type = synthetic.bytes[synthetic.matrix_type_at];
     synthetic.bytes[synthetic.matrix_type_at] = 1;
     assert_eq!(
-        parse(&synthetic.bytes, [0.0, 0.0], 0.0).unwrap_err(),
+        parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).unwrap_err(),
         BdlError::Shape
     );
     synthetic.bytes[synthetic.matrix_type_at] = matrix_type;
@@ -254,7 +257,7 @@ fn rejects_truncated_and_unsupported_models() {
     let texture_format = synthetic.bytes[synthetic.texture_format_at];
     synthetic.bytes[synthetic.texture_format_at] = 6;
     assert_eq!(
-        parse(&synthetic.bytes, [0.0, 0.0], 0.0).unwrap_err(),
+        parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).unwrap_err(),
         BdlError::Texture
     );
     synthetic.bytes[synthetic.texture_format_at] = texture_format;

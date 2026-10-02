@@ -22,6 +22,7 @@ pub struct SceneSnapshot {
     pub bounds_max: Vec2,
     pub ground_y: f32,
     pub walls: bool,
+    pub tick: u64,
 }
 
 pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
@@ -58,7 +59,7 @@ pub fn build_frame(
     match room {
         Some(room) => {
             for group in &room.groups {
-                frame.push(room_group(group));
+                frame.push(room_group(room, group, snapshot.tick));
             }
             frame.uploads.extend(
                 room.textures
@@ -83,7 +84,7 @@ pub fn build_frame(
     frame
 }
 
-fn room_group(group: &RoomGroup) -> MeshGroup {
+fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
     MeshGroup {
         positions: group.positions.clone(),
         colors: group.colors.clone(),
@@ -92,12 +93,42 @@ fn room_group(group: &RoomGroup) -> MeshGroup {
         } else {
             Vec::new()
         },
-        uvs: group.uvs.clone(),
+        uvs: animated_uvs(room, group, tick),
         indices: group.indices.clone(),
         texture_page: group.texture_page.unwrap_or(0),
         depth_test: true,
         ..MeshGroup::default()
     }
+}
+
+fn animated_uvs(room: &RoomMesh, group: &RoomGroup, tick: u64) -> Vec<[f32; 2]> {
+    let (Some(binding), Some(page)) = (group.anim, group.texture_page) else {
+        return group.uvs.clone();
+    };
+    let (Some(animation), Some(&placement)) = (
+        room.animations.get(binding.set as usize),
+        room.uv_placements.get(page as usize),
+    ) else {
+        return group.uvs.clone();
+    };
+    let matrix = match animation.uv_transform(binding.track, animation.frame_at(tick)) {
+        Some(matrix) => matrix,
+        None => return group.uvs.clone(),
+    };
+    group
+        .uvs
+        .iter()
+        .map(|uv| {
+            let u = (uv[0] / placement[0]) + placement[2];
+            let v = (uv[1] / placement[1]) + placement[3];
+            let mapped_u = matrix.a * u + matrix.b * v + matrix.tx;
+            let mapped_v = matrix.c * u + matrix.d * v + matrix.ty;
+            [
+                (mapped_u - placement[2]) * placement[0],
+                (mapped_v - placement[3]) * placement[1],
+            ]
+        })
+        .collect()
 }
 
 fn ground_group(snapshot: &SceneSnapshot) -> MeshGroup {

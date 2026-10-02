@@ -1,6 +1,7 @@
 use std::io::Write as _;
 
 use clearsleeper::assets::{AssetError, AssetRoot, Archive, stage_spawn, yaz0_decode};
+use clearsleeper::btk::TexSrt;
 use glam::Vec3;
 
 #[test]
@@ -343,6 +344,80 @@ fn golden_room_mesh_matches_disc_geometry() {
     let (y, ny) = top.expect("horizontal ground under spawn");
     assert!((y - 143.37).abs() < 1.0, "ground y {y}");
     assert!(ny > 0.5, "surface normal {ny}");
+
+    assert_eq!(mesh.animations.len(), 1);
+    assert_eq!(mesh.uv_placements.len(), mesh.textures.len());
+    let animation = &mesh.animations[0];
+    assert_eq!(animation.frame_max, 100);
+    assert_eq!(animation.dec_shift, 1);
+    assert_eq!(animation.track_count(), 16);
+    assert_eq!(animation.track("SC_01_mizuB_v_x", 0), Some(0));
+    assert_eq!(animation.track("SC_01_mizu_v", 0), Some(2));
+    assert_eq!(animation.track("SC_01_mizu_v", 1), Some(3));
+    assert_eq!(animation.track("SC_01_mizu_v(2)", 4), Some(10));
+    assert_eq!(animation.track("SC_01_mizu_v_x(2)", 0), Some(11));
+    assert_eq!(animation.track("SC_01_mizu", 0), None);
+    assert_eq!(animation.center(2), Some([0.5, 0.5, 0.5]));
+    assert_eq!(
+        animation.eval(2, 0.0),
+        TexSrt {
+            scale_x: 1.0,
+            scale_y: 1.0,
+            rotation: 0,
+            translation_x: 0.0,
+            translation_y: 0.0,
+        }
+    );
+    assert_eq!(
+        animation.eval(2, 25.0),
+        TexSrt {
+            scale_x: 0.949999988079071,
+            scale_y: 0.949999988079071,
+            rotation: 16370,
+            translation_x: 0.0,
+            translation_y: 0.0,
+        }
+    );
+    assert_eq!(
+        animation.eval(2, 50.0),
+        TexSrt {
+            scale_x: 0.8999999761581421,
+            scale_y: 0.8999999761581421,
+            rotation: 32766,
+            translation_x: 0.0,
+            translation_y: 0.0,
+        }
+    );
+    assert_eq!(animation.frame_at(0), 0.0);
+    assert_eq!(animation.frame_at(10), 10.0);
+    assert_eq!(animation.frame_at(25), 25.0);
+    assert_eq!(animation.frame_at(299), 99.0);
+    let tracks: [Option<u32>; 17] = [
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(2),
+        Some(4),
+        Some(6),
+        Some(0),
+        Some(11),
+        Some(13),
+        Some(15),
+        None,
+        None,
+    ];
+    for (index, expected) in tracks.into_iter().enumerate() {
+        assert_eq!(
+            mesh.groups[index].anim.map(|binding| (binding.set, binding.track)),
+            expected.map(|track| (0, track)),
+            "group {index} anim"
+        );
+    }
 }
 
 fn inside_xz(a: [f32; 3], b: [f32; 3], c: [f32; 3], point: [f32; 2]) -> bool {

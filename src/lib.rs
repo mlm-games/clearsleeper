@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 pub mod assets;
 pub mod audio;
 pub mod bdl;
+pub mod btk;
 pub mod hud;
 pub mod input;
 pub mod save;
@@ -130,6 +131,7 @@ impl App {
             bounds_max: area.bounds_max,
             ground_y,
             walls,
+            tick: self.sim.world.resource::<sim::frame::CurrentFrame>().0,
         }
     }
 

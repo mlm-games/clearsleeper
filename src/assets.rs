@@ -497,9 +497,20 @@ fn room_mesh_from_assets() -> Result<crate::bdl::RoomMesh, AssetError> {
             Err(AssetError::MissingEntry { .. }) => continue,
             Err(error) => return Err(error),
         };
-        let part = crate::bdl::parse(model, origin, angle).map_err(|error| AssetError::Corrupt {
-            path: path.clone(),
-            detail: error.as_str(),
+        let btk_name = name.replacen("bdl/", "btk/", 1).replacen(".bdl", ".btk", 1);
+        let animation = match room.read(&btk_name) {
+            Ok(data) => Some(crate::btk::parse(data).map_err(|error| AssetError::Corrupt {
+                path: path.clone(),
+                detail: error.as_str(),
+            })?),
+            Err(AssetError::MissingEntry { .. }) => None,
+            Err(error) => return Err(error),
+        };
+        let part = crate::bdl::parse(model, origin, angle, animation.as_ref()).map_err(|error| {
+            AssetError::Corrupt {
+                path: path.clone(),
+                detail: error.as_str(),
+            }
         })?;
         mesh.append(part);
     }

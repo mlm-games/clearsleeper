@@ -1,7 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
-use clearsleeper::bdl::{RoomGroup, RoomMesh, RoomTexture};
+use clearsleeper::bdl::{AnimBinding, RoomGroup, RoomMesh, RoomTexture};
+use clearsleeper::btk::{Entry, Key, TextureAnimation};
 use clearsleeper::view::{SceneSnapshot, build_frame, sim_yaw_for_camera};
 use clearsleeper::{App, SIM_HZ};
 use glam::{Vec2, Vec3};
@@ -16,6 +17,7 @@ fn golden_snapshot_builds_world_frame() {
         bounds_max: Vec2::new(800.0, 600.0),
         ground_y: 0.0,
         walls: true,
+        tick: 0,
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -97,6 +99,7 @@ fn room_mesh_replaces_placeholder_ground() {
         bounds_max: Vec2::new(800.0, 600.0),
         ground_y: 0.0,
         walls: false,
+        tick: 0,
     };
     let room = RoomMesh {
         groups: vec![RoomGroup {
@@ -107,6 +110,7 @@ fn room_mesh_replaces_placeholder_ground() {
             indices: vec![0, 2, 1],
             texture_page: Some(2),
             lit: false,
+            anim: None,
         }],
         textures: (0..3)
             .map(|_| RoomTexture {
@@ -115,6 +119,7 @@ fn room_mesh_replaces_placeholder_ground() {
                 rgba: vec![255_u8; 64],
             })
             .collect(),
+        ..RoomMesh::default()
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 
@@ -143,6 +148,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         bounds_max: Vec2::new(100.0, 100.0),
         ground_y: 0.0,
         walls: false,
+        tick: 0,
     };
     let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
     let normals = vec![[0.0, 1.0, 0.0]; 3];
@@ -154,14 +160,136 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         indices: vec![0, 2, 1],
         texture_page: None,
         lit,
+        anim: None,
     };
     let room = RoomMesh {
         groups: vec![group(true), group(false)],
         textures: Vec::new(),
+        ..RoomMesh::default()
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 
     assert_eq!(frame.groups.len(), 3);
     assert_eq!(frame.groups[0].normals, normals);
     assert!(frame.groups[1].normals.is_empty());
+}
+
+#[test]
+fn room_group_applies_texture_animation_to_uvs() {
+    let animation = TextureAnimation {
+        frame_max: 10,
+        dec_shift: 0,
+        texture_matrix_ids: vec![0],
+        centers: vec![[0.25, 0.5, 0.0]],
+        names: vec!["wat".to_owned()],
+        scale_values: vec![1.5, 0.75],
+        rotation_values: vec![0],
+        translation_values: vec![0.5, 0.0],
+        entries: vec![
+            Entry {
+                scale: Key {
+                    max_frame: 1,
+                    offset: 0,
+                    kind: 0,
+                },
+                rotation: Key {
+                    max_frame: 0,
+                    offset: 0,
+                    kind: 0,
+                },
+                translation: Key {
+                    max_frame: 1,
+                    offset: 0,
+                    kind: 0,
+                },
+            },
+            Entry {
+                scale: Key {
+                    max_frame: 1,
+                    offset: 1,
+                    kind: 0,
+                },
+                rotation: Key {
+                    max_frame: 0,
+                    offset: 0,
+                    kind: 0,
+                },
+                translation: Key {
+                    max_frame: 1,
+                    offset: 1,
+                    kind: 0,
+                },
+            },
+            Entry {
+                scale: Key {
+                    max_frame: 0,
+                    offset: 0,
+                    kind: 0,
+                },
+                rotation: Key {
+                    max_frame: 1,
+                    offset: 0,
+                    kind: 0,
+                },
+                translation: Key {
+                    max_frame: 0,
+                    offset: 0,
+                    kind: 0,
+                },
+            },
+        ],
+    };
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::ZERO,
+        player_yaw: 0.0,
+        bounds_min: Vec2::new(-100.0, -100.0),
+        bounds_max: Vec2::new(100.0, 100.0),
+        ground_y: 0.0,
+        walls: false,
+        tick: 0,
+    };
+    let room = RoomMesh {
+        groups: vec![
+            RoomGroup {
+                positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+                colors: vec![[1.0, 1.0, 1.0]; 3],
+                normals: Vec::new(),
+                uvs: vec![[0.4, 0.6], [0.5, 0.6], [0.4, 0.7]],
+                indices: vec![0, 2, 1],
+                texture_page: Some(0),
+                lit: false,
+                anim: Some(AnimBinding { set: 0, track: 0 }),
+            },
+            RoomGroup {
+                positions: vec![[2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [2.0, 0.0, 1.0]],
+                colors: vec![[1.0, 1.0, 1.0]; 3],
+                normals: Vec::new(),
+                uvs: vec![[0.4, 0.6], [0.5, 0.6], [0.4, 0.7]],
+                indices: vec![0, 2, 1],
+                texture_page: Some(0),
+                lit: false,
+                anim: None,
+            },
+        ],
+        textures: vec![RoomTexture {
+            width: 4,
+            height: 4,
+            rgba: vec![255_u8; 64],
+        }],
+        uv_placements: vec![[2.0, 1.0, 0.1, 0.0]],
+        animations: vec![animation],
+    };
+    let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
+
+    let expected: [[f32; 2]; 3] = [[1.45, 0.575], [1.6, 0.575], [1.45, 0.65]];
+    for (index, expected) in expected.into_iter().enumerate() {
+        for axis in 0..2 {
+            assert!(
+                (frame.groups[0].uvs[index][axis] - expected[axis]).abs() < 1e-6,
+                "animated uv {index}: {:?}",
+                frame.groups[0].uvs[index]
+            );
+        }
+    }
+    assert_eq!(frame.groups[1].uvs, room.groups[1].uvs);
 }
