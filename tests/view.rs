@@ -102,9 +102,11 @@ fn room_mesh_replaces_placeholder_ground() {
         groups: vec![RoomGroup {
             positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
             colors: vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            normals: Vec::new(),
             uvs: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
             indices: vec![0, 2, 1],
             texture_page: Some(2),
+            lit: false,
         }],
         textures: (0..3)
             .map(|_| RoomTexture {
@@ -130,4 +132,36 @@ fn room_mesh_replaces_placeholder_ground() {
     assert_eq!(frame.uploads[2].page, 2);
     assert_eq!((frame.uploads[2].w, frame.uploads[2].h), (4, 4));
     assert_eq!(frame.uploads[2].rgba.len(), 64);
+}
+
+#[test]
+fn lit_room_group_carries_normals_and_unlit_drops_them() {
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::new(0.0, 0.0, 0.0),
+        player_yaw: 0.0,
+        bounds_min: Vec2::new(-100.0, -100.0),
+        bounds_max: Vec2::new(100.0, 100.0),
+        ground_y: 0.0,
+        walls: false,
+    };
+    let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
+    let normals = vec![[0.0, 1.0, 0.0]; 3];
+    let group = |lit: bool| RoomGroup {
+        positions: positions.clone(),
+        colors: vec![[1.0, 1.0, 1.0]; 3],
+        normals: normals.clone(),
+        uvs: Vec::new(),
+        indices: vec![0, 2, 1],
+        texture_page: None,
+        lit,
+    };
+    let room = RoomMesh {
+        groups: vec![group(true), group(false)],
+        textures: Vec::new(),
+    };
+    let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
+
+    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups[0].normals, normals);
+    assert!(frame.groups[1].normals.is_empty());
 }

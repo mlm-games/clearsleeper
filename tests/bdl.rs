@@ -62,17 +62,17 @@ fn synthetic() -> Synthetic {
     vtx1[0..4].copy_from_slice(&0x40_u32.to_be_bytes());
     vtx1[4..8].copy_from_slice(&0x80_u32.to_be_bytes());
     vtx1[0x10..0x14].copy_from_slice(&0xB0_u32.to_be_bytes());
-    vtx1[0x18..0x1C].copy_from_slice(&0xC0_u32.to_be_bytes());
-    for (attribute, components, kind) in [
-        (9_u32, 1_u32, 4_u32),
-        (11, 1, 5),
-        (13, 1, 3),
-        (255, 0, 0),
+    vtx1[0x18..0x1C].copy_from_slice(&0xB4_u32.to_be_bytes());
+    for (attribute, components, kind, frac) in [
+        (9_u32, 1_u32, 4_u32, 0_u8),
+        (11, 1, 5, 0),
+        (13, 1, 3, 8),
+        (255, 0, 0, 0),
     ] {
         vtx1.extend(attribute.to_be_bytes());
         vtx1.extend(components.to_be_bytes());
         vtx1.extend(kind.to_be_bytes());
-        vtx1.extend([0_u8; 4]);
+        vtx1.extend([frac, 0, 0, 0]);
     }
     for position in [
         [0.0_f32, 0.0, 0.0],

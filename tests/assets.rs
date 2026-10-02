@@ -216,6 +216,24 @@ fn golden_room_mesh_matches_disc_geometry() {
                 "group {index} uvs out of unit range"
             );
         }
+        assert!(!group.lit, "group {index} lit");
+        if index == 11 {
+            assert_eq!(
+                group.normals.len(),
+                group.positions.len(),
+                "group {index} normals"
+            );
+            assert!(
+                group
+                    .normals
+                    .iter()
+                    .all(|normal| *normal == [0.0, 1.0, 0.0]),
+                "group {index} normals {:?}",
+                group.normals[0]
+            );
+        } else {
+            assert!(group.normals.is_empty(), "group {index} normals");
+        }
     }
     let positions: usize = mesh.groups.iter().map(|group| group.positions.len()).sum();
     let indices: usize = mesh.groups.iter().map(|group| group.indices.len()).sum();

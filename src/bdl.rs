@@ -8,8 +8,11 @@ const SHAPE_INIT_STRIDE: usize = 0x28;
 const SHAPE_GROUP_STRIDE: usize = 8;
 const POSITION_STRIDE: usize = 12;
 const COLOR_STRIDE: usize = 4;
+const NORMAL_STRIDE_S16: usize = 6;
+const NORMAL_STRIDE_F32: usize = 12;
 const ATTRIBUTE_TERM: u32 = 0xFF;
 const ATTRIBUTE_POSITION: u32 = 9;
+const ATTRIBUTE_NORMAL: u32 = 10;
 const ATTRIBUTE_COLOR0: u32 = 11;
 const ATTRIBUTE_TEX0: u32 = 13;
 const TYPE_INDEX16: u32 = 3;
@@ -20,11 +23,17 @@ const COMPONENT_ONE: u32 = 1;
 const POSITION_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_F32);
 const COLOR_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_RGBA8);
 const TEXCOORD_FORM: (u32, u32) = (COMPONENT_ONE, TYPE_S16);
+const NORMAL_FORM_S16: (u32, u32) = (0, TYPE_S16);
+const NORMAL_FORM_F32: (u32, u32) = (0, TYPE_F32);
 const TEXCOORD_STRIDE: usize = 4;
 const TEXTURE_STRIDE: usize = 0x20;
 const TEXTURE_IMAGE_OFFSET: usize = 0x1C;
 const MATERIAL_INIT_STRIDE: usize = 0x14C;
 const MATERIAL_TEX_NO: usize = 0x084;
+const MATERIAL_COLOR_CHAN_NUM: usize = 0x002;
+const MATERIAL_COLOR_CHAN_IDX: usize = 0x00C;
+const COLOR_CHAN_STRIDE: usize = 8;
+const COLOR_CHAN_MAX: usize = 4;
 const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
 const FORMAT_I4: u8 = 0;
 const FORMAT_IA4: u8 = 2;
@@ -100,9 +109,11 @@ pub struct RoomMesh {
 pub struct RoomGroup {
     pub positions: Vec<[f32; 3]>,
     pub colors: Vec<[f32; 3]>,
+    pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
     pub indices: Vec<u32>,
     pub texture_page: Option<u32>,
+    pub lit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -391,6 +402,10 @@ struct VertexArrays {
     position_count: usize,
     color_at: usize,
     color_count: usize,
+    normal_at: usize,
+    normal_count: usize,
+    normal_stride: usize,
+    normal_frac: u32,
     texcoord_at: usize,
     texcoord_count: usize,
     texcoord_frac: u32,
@@ -412,6 +427,7 @@ fn next_relative(data: &[u8], start: usize, after: u32) -> Result<Option<u32>, B
 fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlError> {
     let (start, end) = blocks.find(b"VTX1")?;
     let position_rel = read_u32(data, at(start, 0x0C)?)?;
+    let normal_rel = read_u32(data, at(start, 0x10)?)?;
     let color_rel = read_u32(data, at(start, 0x18)?)?;
     let texcoord_rel = read_u32(data, at(start, 0x20)?)?;
     if position_rel == 0 {
@@ -439,6 +455,18 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
         (color_at, color_bytes / COLOR_STRIDE)
     };
 
+    let (normal_at, normal_bytes) = if normal_rel == 0 {
+        (0, 0)
+    } else {
+        let normal_end = match next_relative(data, start, 0x10)? {
+            Some(rel) => at(start, rel as usize)?,
+            None => end,
+        };
+        let normal_at = at(start, normal_rel as usize)?;
+        let normal_bytes = normal_end.checked_sub(normal_at).ok_or(BdlError::Block)?;
+        (normal_at, normal_bytes)
+    };
+
     let (texcoord_at, texcoord_count) = if texcoord_rel == 0 {
         (0, 0)
     } else {
@@ -452,8 +480,10 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
     };
 
     let mut position_form = None;
+    let mut normal_form = None;
     let mut color_form = None;
     let mut texcoord_form = None;
+    let mut normal_frac = 0_u32;
     let mut texcoord_frac = 0_u32;
     let mut cursor = at(start, read_u32(data, at(start, 0x08)?)? as usize)?;
     loop {
@@ -463,6 +493,10 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
         if attribute == ATTRIBUTE_TEX0 {
             texcoord_form = Some((components, kind));
             texcoord_frac = u32::from(*data.get(at(cursor, 12)?).ok_or(BdlError::Truncated)?);
+        }
+        if attribute == ATTRIBUTE_NORMAL {
+            normal_form = Some((components, kind));
+            normal_frac = u32::from(*data.get(at(cursor, 12)?).ok_or(BdlError::Truncated)?);
         }
         cursor += FORM_STRIDE;
         if attribute == ATTRIBUTE_TERM {
@@ -487,19 +521,85 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
     if texcoord_rel != 0 && texcoord_frac > 31 {
         return Err(BdlError::Descriptor);
     }
+    if normal_rel != 0
+        && normal_form != Some(NORMAL_FORM_S16)
+        && normal_form != Some(NORMAL_FORM_F32)
+    {
+        return Err(BdlError::Descriptor);
+    }
+    if normal_rel != 0 && normal_form == Some(NORMAL_FORM_S16) && normal_frac > 31 {
+        return Err(BdlError::Descriptor);
+    }
+    let (normal_stride, normal_count) = if normal_rel == 0 {
+        (0, 0)
+    } else if normal_form == Some(NORMAL_FORM_F32) {
+        (NORMAL_STRIDE_F32, normal_bytes / NORMAL_STRIDE_F32)
+    } else {
+        (NORMAL_STRIDE_S16, normal_bytes / NORMAL_STRIDE_S16)
+    };
 
     Ok(VertexArrays {
         position_at,
         position_count,
         color_at,
         color_count,
+        normal_at,
+        normal_count,
+        normal_stride,
+        normal_frac,
         texcoord_at,
         texcoord_count,
         texcoord_frac,
     })
 }
 
-fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<Option<u16>>, BdlError> {
+#[derive(Debug, Clone, Copy)]
+struct MaterialBinding {
+    texture: Option<u16>,
+    lit: bool,
+}
+
+fn material_lit(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    color_chan_num: u32,
+    color_chan_info: u32,
+) -> Result<bool, BdlError> {
+    if color_chan_num == 0 || color_chan_info == 0 {
+        return Ok(false);
+    }
+    let num_table = at(start, color_chan_num as usize)?;
+    let info_table = at(start, color_chan_info as usize)?;
+    let num_index = usize::from(
+        *data
+            .get(at(init, MATERIAL_COLOR_CHAN_NUM)?)
+            .ok_or(BdlError::Truncated)?,
+    );
+    let num_at = at(num_table, num_index)?;
+    if at(num_at, 1)? > end {
+        return Err(BdlError::Block);
+    }
+    let channel_count = usize::from(*data.get(num_at).ok_or(BdlError::Truncated)?);
+    if channel_count > COLOR_CHAN_MAX {
+        return Err(BdlError::Descriptor);
+    }
+    for channel in 0..channel_count {
+        let info_index =
+            usize::from(read_u16(data, at(init, MATERIAL_COLOR_CHAN_IDX + channel * 2)?)?);
+        let info = at(info_table, info_index * COLOR_CHAN_STRIDE)?;
+        if at(info, COLOR_CHAN_STRIDE)? > end {
+            return Err(BdlError::Block);
+        }
+        if *data.get(info).ok_or(BdlError::Truncated)? != 0 {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, BdlError> {
     let Some((start, end)) = blocks.get(b"MAT3") else {
         return Ok(Vec::new());
     };
@@ -507,6 +607,8 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<Option<u16>>, BdlE
     let init_table = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
     let index_table = at(start, read_u32(data, at(start, 0x10)?)? as usize)?;
     let texno_table = at(start, read_u32(data, at(start, 0x48)?)? as usize)?;
+    let color_chan_num = read_u32(data, at(start, 0x24)?)?;
+    let color_chan_info = read_u32(data, at(start, 0x28)?)?;
     let mut materials = Vec::with_capacity(count);
     for material in 0..count {
         let slot = usize::from(read_u16(data, at(index_table, material * 2)?)?);
@@ -515,15 +617,24 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<Option<u16>>, BdlE
             return Err(BdlError::Block);
         }
         let texno = read_u16(data, at(init, MATERIAL_TEX_NO)?)?;
-        if texno == MATERIAL_UNTEXTURED {
-            materials.push(None);
-            continue;
-        }
-        let binding = at(texno_table, usize::from(texno) * 2)?;
-        if at(binding, 2)? > end {
-            return Err(BdlError::Block);
-        }
-        materials.push(Some(read_u16(data, binding)?));
+        let texture = if texno == MATERIAL_UNTEXTURED {
+            None
+        } else {
+            let binding = at(texno_table, usize::from(texno) * 2)?;
+            if at(binding, 2)? > end {
+                return Err(BdlError::Block);
+            }
+            Some(read_u16(data, binding)?)
+        };
+        let lit = material_lit(
+            data,
+            start,
+            end,
+            init,
+            color_chan_num,
+            color_chan_info,
+        )?;
+        materials.push(MaterialBinding { texture, lit });
     }
     Ok(materials)
 }
@@ -905,7 +1016,7 @@ fn read_shapes(
     worlds: &[[f32; 3]],
     draw_joints: &[usize],
     material_nodes: &[(u16, Option<u16>)],
-    materials: &[Option<u16>],
+    materials: &[MaterialBinding],
     texture_count: usize,
     mesh: &mut RoomMesh,
 ) -> Result<(), BdlError> {
@@ -957,19 +1068,28 @@ fn read_shapes(
             .iter()
             .position(|&attribute| attribute == ATTRIBUTE_POSITION)
             .ok_or(BdlError::Descriptor)?;
+        let normal_field = descriptor
+            .iter()
+            .position(|&attribute| attribute == ATTRIBUTE_NORMAL);
         let color_field = descriptor
             .iter()
             .position(|&attribute| attribute == ATTRIBUTE_COLOR0);
         let texcoord_field = descriptor
             .iter()
             .position(|&attribute| attribute == ATTRIBUTE_TEX0);
+        let lit = match shape_materials[shape] {
+            Some(index) if !materials.is_empty() => {
+                materials.get(usize::from(index)).ok_or(BdlError::Range)?.lit
+            }
+            _ => false,
+        };
         let mut texture_page = if materials.is_empty() || texture_count == 0 {
             None
         } else {
             match shape_materials[shape] {
                 Some(index) => {
-                    let binding = *materials.get(usize::from(index)).ok_or(BdlError::Range)?;
-                    match binding {
+                    let binding = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
+                    match binding.texture {
                         Some(texture) => {
                             if usize::from(texture) >= texture_count {
                                 return Err(BdlError::Range);
@@ -990,6 +1110,7 @@ fn read_shapes(
         let textured = texture_page.is_some();
         let mut group = RoomGroup {
             texture_page,
+            lit,
             ..RoomGroup::default()
         };
 
@@ -1014,6 +1135,7 @@ fn read_shapes(
                 display,
                 &descriptor,
                 position_field,
+                normal_field,
                 color_field,
                 texcoord_field,
                 textured,
@@ -1032,11 +1154,26 @@ fn emit(group: &mut RoomGroup, base: u32, a: usize, b: usize, c: usize) {
         .extend([base + a as u32, base + c as u32, base + b as u32]);
 }
 
+fn normalize(vector: [f32; 3]) -> [f32; 3] {
+    let length_squared =
+        vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2];
+    if length_squared <= 0.0 {
+        return vector;
+    }
+    let inverse = length_squared.sqrt().recip();
+    [
+        vector[0] * inverse,
+        vector[1] * inverse,
+        vector[2] * inverse,
+    ]
+}
+
 fn decode_display_list(
     context: &ShapeContext<'_>,
     display: &[u8],
     descriptor: &[u32],
     position_field: usize,
+    normal_field: Option<usize>,
     color_field: Option<usize>,
     texcoord_field: Option<usize>,
     textured: bool,
@@ -1083,6 +1220,7 @@ fn decode_display_list(
                 .ok_or(BdlError::Truncated)?;
             cursor += stride;
             let mut position_index = None;
+            let mut normal_index = None;
             let mut color_index = None;
             let mut texcoord_index = None;
             for field in 0..descriptor.len() {
@@ -1092,6 +1230,9 @@ fn decode_display_list(
                 ]));
                 if field == position_field {
                     position_index = Some(index);
+                }
+                if normal_field == Some(field) {
+                    normal_index = Some(index);
                 }
                 if color_field == Some(field) {
                     color_index = Some(index);
@@ -1159,6 +1300,33 @@ fn decode_display_list(
                 }
                 None => WHITE,
             });
+            if normal_field.is_some() {
+                let index = normal_index.ok_or(BdlError::Descriptor)?;
+                if index >= context.vertices.normal_count {
+                    return Err(BdlError::Range);
+                }
+                let normal_at =
+                    context.vertices.normal_at + index * context.vertices.normal_stride;
+                let normal = if context.vertices.normal_stride == NORMAL_STRIDE_F32 {
+                    [
+                        read_f32(data, normal_at)?,
+                        read_f32(data, normal_at + 4)?,
+                        read_f32(data, normal_at + 8)?,
+                    ]
+                } else {
+                    let scale = 1.0 / ((1_u32 << context.vertices.normal_frac) as f32);
+                    [
+                        f32::from(read_i16(data, normal_at)?) * scale,
+                        f32::from(read_i16(data, normal_at + 2)?) * scale,
+                        f32::from(read_i16(data, normal_at + 4)?) * scale,
+                    ]
+                };
+                group.normals.push(normalize([
+                    normal[0] * context.cos + normal[2] * context.sin,
+                    normal[1],
+                    -normal[0] * context.sin + normal[2] * context.cos,
+                ]));
+            }
             if let Some(uv) = uv {
                 group.uvs.push(uv);
             }

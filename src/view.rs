@@ -87,6 +87,11 @@ fn room_group(group: &RoomGroup) -> MeshGroup {
     MeshGroup {
         positions: group.positions.clone(),
         colors: group.colors.clone(),
+        normals: if group.lit {
+            group.normals.clone()
+        } else {
+            Vec::new()
+        },
         uvs: group.uvs.clone(),
         indices: group.indices.clone(),
         texture_page: group.texture_page.unwrap_or(0),
