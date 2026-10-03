@@ -18,6 +18,7 @@ pub mod roll;
 pub mod sea;
 pub mod ship;
 pub mod swim;
+pub mod talk;
 pub mod transition;
 pub mod walk;
 pub mod water;
@@ -50,6 +51,11 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             world.spawn((actor, state, hit_points));
         } else if pickup::is_pickup(&source.name) {
             world.spawn((actor, pickup::Pickup::spawn(source.parameters)));
+        } else if source.name == talk::TALK_ACTOR {
+            let speaker = talk::Talk {
+                message: talk::message(source.angle[0]),
+            };
+            world.spawn((actor, speaker));
         } else {
             world.spawn((actor, combat::HitPoints::default()));
         }
@@ -88,6 +94,7 @@ pub fn build(
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(pickup::Rupees::default());
+    sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -121,6 +128,7 @@ pub fn build(
         (
             (
                 death::freeze.in_set(WwSimSet::Execute),
+                talk::control.in_set(WwSimSet::Execute),
                 ground::ground_check.in_set(WwSimSet::Execute),
                 water::water_probe.in_set(WwSimSet::Execute),
                 swim::control.in_set(WwSimSet::Execute),

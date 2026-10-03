@@ -8,6 +8,7 @@ use super::intent::{CameraYaw, DoIntent, MoveIntent};
 use super::lock::Lock;
 use super::player::Player;
 use super::swim::Swim;
+use super::talk::Dialogue;
 use super::walk::{from_s16, target_yaw};
 
 const ROLL_STICK: f32 = 0.75;
@@ -34,6 +35,7 @@ pub fn control(
     health: Res<Health>,
     lock: Res<Lock>,
     combat: Res<Combat>,
+    dialogue: Res<Dialogue>,
     collision: Option<Res<Collision>>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -54,6 +56,7 @@ pub fn control(
         }
         if roll.active
             || !pressed
+            || dialogue.open
             || swim.active
             || health.units == 0
             || lock.target.is_some()
