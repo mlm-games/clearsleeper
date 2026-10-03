@@ -544,3 +544,27 @@ fn golden_bare_lance_punches() {
         "and works with its fists instead"
     );
 }
+
+#[test]
+fn golden_open_water_holds_enemies_where_they_stand() {
+    let mut app = App::new();
+    app.sim
+        .world
+        .remove_resource::<clearsleeper::sim::collision::Collision>();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
+    for _ in 0..40 {
+        tick(&mut app);
+    }
+    let actor = app
+        .sim
+        .world
+        .entity(foe)
+        .get::<Actor>()
+        .expect("the foe is placed");
+    assert_eq!(
+        actor.pos.z, 0.0,
+        "with no floor under it, it holds its post"
+    );
+    assert_eq!(state(&app, foe), EnemyState::Wait, "and stays alert-free");
+}

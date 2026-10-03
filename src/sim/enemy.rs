@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::collision::Collision;
 use super::combat::HitPoints;
 use super::health::Health;
 use super::player::Player;
@@ -395,6 +396,7 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
 }
 
 pub fn control(
+    collision: Option<Res<Collision>>,
     mut health: ResMut<Health>,
     players: Query<&Player>,
     mut hurts: Query<&mut Hurt>,
@@ -405,6 +407,7 @@ pub fn control(
     let Some(player) = players.iter().next() else {
         return;
     };
+    let floored = collision.is_some();
     for (entity, mut enemy, mut actor) in &mut enemies {
         let mut stunned = false;
         let mut recovering = false;
@@ -426,8 +429,10 @@ pub fn control(
                 EnemyState::Wait
             };
             enemy.closing = false;
-        } else {
+        } else if floored {
             tick(&mut enemy, &mut actor, player, &mut health);
+        } else {
+            enemy.speed = 0.0;
         }
         if recovering && enemy.armed && enemy.lance {
             let dx = player.pos.x - actor.pos.x;
