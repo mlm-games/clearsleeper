@@ -28,6 +28,7 @@ pub enum ActorKind {
     Warship,
     Cannon,
     Fire,
+    Gull,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -138,6 +139,7 @@ const BOOM: Rgb = [0.72, 0.30, 0.52];
 const BALLOON: Rgb = [0.86, 0.44, 0.52];
 const WARSHIP: Rgb = [0.30, 0.26, 0.32];
 const EMBER: Rgb = [0.94, 0.52, 0.18];
+const SEAGULL: Rgb = [0.94, 0.94, 0.90];
 const HEART: Rgb = [0.86, 0.20, 0.22];
 const RUPEE: Rgb = [0.24, 0.72, 0.32];
 const RELIC: Rgb = [0.90, 0.52, 0.86];
@@ -166,6 +168,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Warship => WARSHIP,
         ActorKind::Cannon => BOMB,
         ActorKind::Fire => EMBER,
+        ActorKind::Gull => SEAGULL,
         ActorKind::Pickup => pickup_look(actor.item).0,
     }
 }

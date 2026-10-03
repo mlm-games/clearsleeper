@@ -12,6 +12,7 @@ pub mod fire;
 pub mod flags;
 pub mod frame;
 pub mod ground;
+pub mod gull;
 pub mod health;
 pub mod hop;
 pub mod intent;
@@ -70,6 +71,9 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             world.spawn((actor, warship::spawn(source.angle[1])));
         } else if source.name == fire::FIRE_ACTOR {
             world.spawn((actor, fire::spawn(source.parameters, world.resource())));
+        } else if source.name == gull::GULL_ACTOR {
+            let state = gull::spawn(source.parameters, &actor);
+            world.spawn((actor, state));
         } else if source.name == cleared::CLEARED_ACTOR {
             world.spawn((actor, cleared::spawn(source.parameters, world.resource())));
         } else if source.name == balloon::BALLOON_ACTOR {
@@ -177,6 +181,7 @@ pub fn build(
                 enemy::control.in_set(WwSimSet::Execute),
                 balloon::control.in_set(WwSimSet::Execute),
                 fire::control.in_set(WwSimSet::Execute),
+                gull::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (
