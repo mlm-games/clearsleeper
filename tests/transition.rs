@@ -232,10 +232,13 @@ fn golden_swap_stage_teleports_and_rebuilds() {
         .iter_entities()
         .filter_map(|entity| entity.get::<Actor>().map(|actor| actor.name.clone()))
         .collect();
-    assert_eq!(
-        names,
-        ["Pot"],
-        "the destination's actors replace the previous stage's"
+    assert!(
+        !names.iter().any(|name| name == "Ship"),
+        "the previous stage's actors are gone"
+    );
+    assert!(
+        names.iter().any(|name| name == "Pot"),
+        "the destination's stage actors spawn"
     );
     assert_eq!(app.stage().unwrap().name(), "House01");
     assert_eq!(app.health().units, 7, "game state survives the swap");

@@ -569,11 +569,16 @@ pub fn start_set(tables: &crate::dzs::StageTables) -> Vec<u8> {
 pub struct RoomSet {
     pub collision: Option<crate::sim::collision::Collision>,
     pub mesh: Option<crate::bdl::RoomMesh>,
+    pub actors: Vec<crate::dzs::StageActor>,
 }
 
-pub fn load_room_set(tables: &crate::dzs::StageTables, rooms: &[u8]) -> Option<RoomSet> {
+pub fn load_room_set(
+    tables: &crate::dzs::StageTables,
+    rooms: &[u8],
+    layer: impl Fn(u8) -> u8,
+) -> Option<RoomSet> {
     let loaded =
-        AssetRoot::from_env().and_then(|root| room_set_from_assets(&root, tables, rooms));
+        AssetRoot::from_env().and_then(|root| room_set_from_assets(&root, tables, rooms, &layer));
     match loaded {
         Ok(set) => Some(set),
         Err(error) => {
@@ -604,11 +609,16 @@ fn stage_tables(root: &AssetRoot, stage: &str) -> Result<crate::dzs::StageTables
         })
 }
 
+fn fresh_layer(tables: &crate::dzs::StageTables) -> impl Fn(u8) -> u8 + '_ {
+    let stories = crate::sim::flags::StoryBits::default();
+    move |room| crate::sim::layer::no(tables.name(), room, &stories)
+}
+
 fn stage_from_assets(stage: &str) -> Result<crate::sim::collision::StageData, AssetError> {
     let root = AssetRoot::from_env()?;
     let tables = stage_tables(&root, stage)?;
     let rooms = start_set(&tables);
-    let set = room_set_from_assets(&root, &tables, &rooms)?;
+    let set = room_set_from_assets(&root, &tables, &rooms, &fresh_layer(&tables))?;
     let collision = set.collision.ok_or_else(|| AssetError::Corrupt {
         path: root.root().join(room_path(stage, STAGE_START_ROOM)),
         detail: "room set has no collision",
@@ -640,7 +650,7 @@ fn room_mesh_from_assets(stage: &str) -> Result<crate::bdl::RoomMesh, AssetError
     let root = AssetRoot::from_env()?;
     let tables = stage_tables(&root, stage)?;
     let rooms = start_set(&tables);
-    let set = room_set_from_assets(&root, &tables, &rooms)?;
+    let set = room_set_from_assets(&root, &tables, &rooms, &fresh_layer(&tables))?;
     set.mesh.ok_or_else(|| AssetError::Corrupt {
         path: root.root().join(room_path(stage, STAGE_START_ROOM)),
         detail: "room set has no geometry",
@@ -651,9 +661,11 @@ fn room_set_from_assets(
     root: &AssetRoot,
     tables: &crate::dzs::StageTables,
     rooms: &[u8],
+    layer: &impl Fn(u8) -> u8,
 ) -> Result<RoomSet, AssetError> {
     let mut collision: Option<crate::sim::collision::Collision> = None;
     let mut mesh: Option<crate::bdl::RoomMesh> = None;
+    let mut actors: Vec<crate::dzs::StageActor> = Vec::new();
     for &room in rooms {
         let relative = room_path(tables.name(), room);
         let path = root.root().join(&relative);
@@ -713,8 +725,25 @@ fn room_set_from_assets(
                 None => mesh = Some(room_part),
             }
         }
+        match archive.read("dzr/room.dzr") {
+            Ok(data) => match crate::dzs::room_actors(data, layer(room)) {
+                Ok(placed) => actors.extend(placed),
+                Err(error) => {
+                    log::warn!(
+                        "clearsleeper: room {room} actor table unusable ({})",
+                        error.as_str()
+                    );
+                }
+            },
+            Err(AssetError::MissingEntry { .. }) => {}
+            Err(error) => return Err(error),
+        }
     }
-    Ok(RoomSet { collision, mesh })
+    Ok(RoomSet {
+        collision,
+        mesh,
+        actors,
+    })
 }
 
 fn table_placement(tables: &crate::dzs::StageTables, room: u8) -> ([f32; 2], f32) {

@@ -19,6 +19,7 @@ pub mod hop;
 pub mod intent;
 pub mod item;
 pub mod jump;
+pub mod layer;
 pub mod lock;
 pub mod pickup;
 pub mod player;
@@ -46,53 +47,67 @@ pub enum WwSimSet {
 
 pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) {
     for source in tables.actors() {
-        let actor = actor::Actor {
-            name: source.name.clone(),
-            parameters: source.parameters,
-            pos: Vec3::from_array(source.pos),
-            angle: source.angle,
-            set_id: source.set_id,
-        };
-        if source.name == ship::SHIP_ACTOR {
-            world.spawn((actor, ship::Ship::default()));
-        } else if source.name == enemy::ENEMY_ACTOR {
-            let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
-            world.spawn((actor, state, hit_points, enemy::Hurt::default()));
-        } else if source.name == enemy::LANCE_ACTOR {
-            if let Some((state, hit_points)) =
-                enemy::spawn_lance(source.parameters, source.angle[1])
-            {
-                world.spawn((actor, state, hit_points, enemy::Hurt::default()));
-            } else {
-                world.spawn(actor);
-            }
-        } else if source.name == warship::SHIP_ACTOR
-            && warship::is_switched(source.parameters, source.angle[0], world.resource())
-        {
-            world.spawn((actor, warship::spawn(source.angle[1])));
-        } else if source.name == fire::FIRE_ACTOR {
-            world.spawn((actor, fire::spawn(source.parameters, world.resource())));
-        } else if source.name == gull::GULL_ACTOR {
-            let state = gull::spawn(source.parameters, &actor);
-            world.spawn((actor, state));
-        } else if source.name == cleared::CLEARED_ACTOR {
-            world.spawn((actor, cleared::spawn(source.parameters, world.resource())));
-        } else if source.name == balloon::BALLOON_ACTOR {
-            let (state, hit_points) = balloon::spawn(source.parameters);
-            world.spawn((actor, state, hit_points, enemy::Hurt::default()));
-        } else if pickup::is_pickup(&source.name) {
-            world.spawn((actor, pickup::Pickup::spawn(source.parameters)));
-        } else if source.name == talk::TALK_ACTOR {
-            let speaker = talk::Talk {
-                message: talk::message(source.angle[0]),
-            };
-            world.spawn((actor, speaker));
-        } else if flags::is_event_switch(&source.name) {
-            let switch = flags::EventSwitch::spawn(source.parameters);
-            world.spawn((actor, switch));
+        spawn_actor(world, source);
+    }
+}
+
+pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
+    let actor = actor::Actor {
+        name: source.name.clone(),
+        parameters: source.parameters,
+        pos: Vec3::from_array(source.pos),
+        angle: source.angle,
+        set_id: source.set_id,
+    };
+    if source.name == ship::SHIP_ACTOR {
+        world.spawn((actor, ship::Ship::default())).id()
+    } else if source.name == enemy::ENEMY_ACTOR {
+        let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
+        world
+            .spawn((actor, state, hit_points, enemy::Hurt::default()))
+            .id()
+    } else if source.name == enemy::LANCE_ACTOR {
+        if let Some((state, hit_points)) = enemy::spawn_lance(source.parameters, source.angle[1]) {
+            world
+                .spawn((actor, state, hit_points, enemy::Hurt::default()))
+                .id()
         } else {
-            world.spawn(actor);
+            world.spawn(actor).id()
         }
+    } else if source.name == warship::SHIP_ACTOR
+        && warship::is_switched(source.parameters, source.angle[0], world.resource())
+    {
+        world.spawn((actor, warship::spawn(source.angle[1]))).id()
+    } else if source.name == fire::FIRE_ACTOR {
+        world
+            .spawn((actor, fire::spawn(source.parameters, world.resource())))
+            .id()
+    } else if source.name == gull::GULL_ACTOR {
+        let state = gull::spawn(source.parameters, &actor);
+        world.spawn((actor, state)).id()
+    } else if source.name == cleared::CLEARED_ACTOR {
+        world
+            .spawn((actor, cleared::spawn(source.parameters, world.resource())))
+            .id()
+    } else if source.name == balloon::BALLOON_ACTOR {
+        let (state, hit_points) = balloon::spawn(source.parameters);
+        world
+            .spawn((actor, state, hit_points, enemy::Hurt::default()))
+            .id()
+    } else if pickup::is_pickup(&source.name) {
+        world
+            .spawn((actor, pickup::Pickup::spawn(source.parameters)))
+            .id()
+    } else if source.name == talk::TALK_ACTOR {
+        let speaker = talk::Talk {
+            message: talk::message(source.angle[0]),
+        };
+        world.spawn((actor, speaker)).id()
+    } else if flags::is_event_switch(&source.name) {
+        let switch = flags::EventSwitch::spawn(source.parameters);
+        world.spawn((actor, switch)).id()
+    } else {
+        world.spawn(actor).id()
     }
 }
 

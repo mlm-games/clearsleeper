@@ -238,6 +238,23 @@ impl App {
                     save.area.yaw,
                 );
             }
+        } else {
+            let rooms = save.rooms.clone();
+            if !rooms.is_empty() {
+                let stories = *self.sim.world.resource::<StoryBits>();
+                let set = self
+                    .stage
+                    .as_ref()
+                    .and_then(|tables| crate::load_rooms(tables, &rooms, stories));
+                match set {
+                    Some(set) => {
+                        let frame = self.sim.world.resource::<CurrentFrame>().0;
+                        self.install_room_set(set, frame);
+                        self.rooms = rooms;
+                    }
+                    None => self.install_room_actors(Vec::new()),
+                }
+            }
         }
         let world = &mut self.sim.world;
         *world.resource_mut::<Area>() = save.area.clone().into();

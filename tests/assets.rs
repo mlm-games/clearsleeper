@@ -831,3 +831,21 @@ fn golden_open_sea_swim_carries_the_surface_into_the_snapshot() {
         "deep water drains one breath per tick"
     );
 }
+
+#[test]
+fn real_disc_room_actors_merge_layer_tables() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc room actor check");
+        return;
+    };
+    let tables = clearsleeper::assets::load_stage_tables(SEA_STAGE).expect("sea tables load");
+    let set = clearsleeper::assets::load_room_set(&tables, &[44], |_| 0)
+        .expect("start island room set loads from disc");
+    assert_eq!(set.actors.len(), 211);
+    let names: Vec<&str> = set.actors.iter().map(|actor| actor.name.as_str()).collect();
+    assert!(names.contains(&"NpcSo"), "base table carries the soldier");
+    assert!(
+        names.contains(&"Pirates"),
+        "the start island layer table merges in"
+    );
+}

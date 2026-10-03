@@ -97,7 +97,9 @@ pub struct StageTables {
     has_sea: bool,
 }
 
-pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
+type ChunkNode = ([u8; 4], u32, u32);
+
+fn chunk_nodes(data: &[u8]) -> Result<Vec<ChunkNode>, DzsError> {
     let chunk_count = read_u32(data, 0)?;
     let nodes_end = table_end(4, chunk_count as usize, CHUNK_LEN)?;
     if nodes_end > data.len() {
@@ -112,12 +114,45 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
             read_u32(data, at + 8)?,
         ));
     }
-    let locate = |tag: &[u8; 4]| {
-        nodes
-            .iter()
-            .find(|(name, ..)| name == tag)
-            .map(|(_, count, offset)| (*count, *offset))
+    Ok(nodes)
+}
+
+fn chunk_locate(nodes: &[ChunkNode], tag: &[u8; 4]) -> Option<(u32, u32)> {
+    nodes
+        .iter()
+        .find(|(name, ..)| name == tag)
+        .map(|(_, count, offset)| (*count, *offset))
+}
+
+fn layer_chunk(layer: u8) -> Option<[u8; 4]> {
+    let digit = match layer {
+        0..=9 => b'0' + layer,
+        10 => b'a',
+        11 => b'b',
+        _ => return None,
     };
+    Some([b'A', b'C', b'T', digit])
+}
+
+pub fn room_actors(data: &[u8], layer: u8) -> Result<Vec<StageActor>, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    let mut actors = Vec::new();
+    for tag in [b"ACTR", b"TGOB"] {
+        if let Some((count, offset)) = chunk_locate(&nodes, tag) {
+            actors.extend(parse_actors(data, count, offset)?);
+        }
+    }
+    if let Some(tag) = layer_chunk(layer) {
+        if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
+            actors.extend(parse_actors(data, count, offset)?);
+        }
+    }
+    Ok(actors)
+}
+
+pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    let locate = |tag: &[u8; 4]| chunk_locate(&nodes, tag);
     let placements = match locate(b"MULT") {
         Some((count, offset)) => parse_placements(data, count, offset)?,
         None => Vec::new(),

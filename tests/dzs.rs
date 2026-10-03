@@ -244,3 +244,65 @@ fn golden_scls_exit_table_parses_destinations() {
     );
     assert_eq!(tables.with_name("House01").name(), "House01");
 }
+
+fn room_layer() -> Vec<u8> {
+    let actr_at = 4 + 4 * 12;
+    let tgob_at = actr_at + 2 * 0x20;
+    let act1_at = tgob_at + 0x20;
+    let actb_at = act1_at + 0x20;
+    let mut data = vec![0_u8; actb_at + 0x20];
+    write_u32(&mut data, 0, 4);
+    data[4..8].copy_from_slice(b"ACTR");
+    write_u32(&mut data, 8, 2);
+    write_u32(&mut data, 12, actr_at as u32);
+    data[16..20].copy_from_slice(b"TGOB");
+    write_u32(&mut data, 20, 1);
+    write_u32(&mut data, 24, tgob_at as u32);
+    data[28..32].copy_from_slice(b"ACT1");
+    write_u32(&mut data, 32, 1);
+    write_u32(&mut data, 36, act1_at as u32);
+    data[40..44].copy_from_slice(b"ACTb");
+    write_u32(&mut data, 44, 1);
+    write_u32(&mut data, 48, actb_at as u32);
+    write_name(&mut data, actr_at, b"NpcSo");
+    write_u32(&mut data, actr_at + 0x08, 0x0000_1234);
+    write_name(&mut data, actr_at + 0x20, b"TagSo");
+    write_name(&mut data, tgob_at, b"Ebrock");
+    write_name(&mut data, act1_at, b"Pirates");
+    write_name(&mut data, actb_at, b"Kamome");
+    data
+}
+
+fn write_name(data: &mut [u8], at: usize, name: &[u8]) {
+    data[at..at + 8].fill(0);
+    data[at..at + name.len()].copy_from_slice(name);
+}
+
+fn actor_names(actors: &[dzs::StageActor]) -> Vec<&str> {
+    actors.iter().map(|actor| actor.name.as_str()).collect()
+}
+
+#[test]
+fn golden_room_actors_merge_base_and_layer_tables() {
+    let data = room_layer();
+    let base = dzs::room_actors(&data, 0).unwrap();
+    assert_eq!(base[0].parameters, 0x0000_1234);
+    assert_eq!(actor_names(&base), ["NpcSo", "TagSo", "Ebrock"]);
+
+    let night = dzs::room_actors(&data, 1).unwrap();
+    assert_eq!(actor_names(&night), ["NpcSo", "TagSo", "Ebrock", "Pirates"]);
+
+    let reef = dzs::room_actors(&data, 11).unwrap();
+    assert_eq!(actor_names(&reef), ["NpcSo", "TagSo", "Ebrock", "Kamome"]);
+
+    let past = dzs::room_actors(&data, 12).unwrap();
+    assert_eq!(actor_names(&past), ["NpcSo", "TagSo", "Ebrock"]);
+}
+
+#[test]
+fn room_actors_reject_truncated_chunk_tables() {
+    assert!(matches!(
+        dzs::room_actors(&4_u32.to_be_bytes(), 0),
+        Err(dzs::DzsError::Truncated | dzs::DzsError::BadTable)
+    ));
+}

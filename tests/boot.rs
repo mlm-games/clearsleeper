@@ -19,3 +19,31 @@ fn golden_boot_spawns_one_player_in_area() {
     let players: Vec<Player> = query.iter(&app.sim.world).copied().collect();
     assert_eq!(players.len(), 1);
 }
+
+#[test]
+fn golden_boot_spawns_start_room_actors() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping start room actor check");
+        return;
+    };
+    let mut app = App::new();
+    let mut query = app.sim.world.query::<&clearsleeper::sim::actor::Actor>();
+    let names: Vec<String> = query
+        .iter(&app.sim.world)
+        .map(|actor| actor.name.clone())
+        .collect();
+    assert!(
+        names.iter().any(|name| name == "NpcSo"),
+        "the start island room spawns its soldier"
+    );
+
+    app.advance(Duration::from_millis(100));
+    let names: Vec<String> = query
+        .iter(&app.sim.world)
+        .map(|actor| actor.name.clone())
+        .collect();
+    assert!(
+        names.iter().any(|name| name == "NpcSo"),
+        "room actors survive the first ticks"
+    );
+}

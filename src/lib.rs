@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use bevy_ecs::entity::Entity;
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;
@@ -37,6 +38,7 @@ pub struct App {
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
     room_tick: u64,
+    room_actors: Vec<Entity>,
     sea_shade: f32,
     save_dir: PathBuf,
     name: String,
@@ -67,7 +69,6 @@ impl App {
             assets::load_stage(assets::SEA_STAGE),
             stage.as_ref(),
         );
-        let room = assets::load_room_mesh(assets::SEA_STAGE);
         let sea_shade = assets::load_sea_shade().unwrap_or(0.0);
         let rooms = stage.as_ref().map(assets::start_set).unwrap_or_default();
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
@@ -75,20 +76,30 @@ impl App {
             target: spawn,
             ..OrbitCamera::default()
         });
-        Self {
+        let mut app = Self {
             sim,
             cam,
             audio,
-            room,
+            room: None,
             menu: menus::Menu::new(),
             stage,
             rooms,
             room_tick: 0,
+            room_actors: Vec::new(),
             sea_shade,
             save_dir: save::slots_dir(),
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
+        };
+        let stories = *app.sim.world.resource::<sim::flags::StoryBits>();
+        let frame = app.sim.world.resource::<sim::frame::CurrentFrame>().0;
+        if let Some(tables) = app.stage.as_ref() {
+            let rooms = app.rooms.clone();
+            if let Some(set) = load_rooms(tables, &rooms, stories) {
+                app.install_room_set(set, frame);
+            }
         }
+        app
     }
 
     /// Frame boundary: poll the shell into the sim's intent resources.
@@ -475,11 +486,7 @@ impl App {
     ) {
         let has_sea = tables.has_sea_actor();
         let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
-        if !has_sea {
-            if let Some(set) = assets::load_room_set(&tables, &rooms) {
-                self.install_room_set(set, frame);
-            }
-        }
+        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
         *self.sim.world.resource_mut::<sim::transition::NextStage>() =
             sim::transition::NextStage(None);
         {
@@ -494,7 +501,13 @@ impl App {
             self.sim.world.remove_resource::<sim::sea::Sea>();
         }
         sim::clear_actors(&mut self.sim.world);
+        self.room_actors.clear();
         sim::spawn_actors(&mut self.sim.world, &tables);
+        if !rooms.is_empty() {
+            if let Some(set) = load_rooms(&tables, &rooms, stories) {
+                self.install_room_set(set, frame);
+            }
+        }
         *self.sim.world.resource_mut::<sim::swim::Swim>() = sim::swim::Swim::default();
         *self.sim.world.resource_mut::<sim::roll::Roll>() = sim::roll::Roll::default();
         *self.sim.world.resource_mut::<sim::hop::Hop>() = sim::hop::Hop::default();
@@ -532,9 +545,21 @@ impl App {
         }
         self.room = set.mesh;
         self.room_tick = frame;
+        self.install_room_actors(set.actors);
+    }
+
+    fn install_room_actors(&mut self, actors: Vec<dzs::StageActor>) {
+        for entity in std::mem::take(&mut self.room_actors) {
+            let _ = self.sim.world.despawn(entity);
+        }
+        self.room_actors = actors
+            .iter()
+            .map(|source| sim::spawn_actor(&mut self.sim.world, source))
+            .collect();
     }
 
     pub fn sync_rooms(&mut self) {
+        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
         let Some(tables) = self.stage.as_ref() else {
             return;
         };
@@ -561,12 +586,25 @@ impl App {
             return;
         }
         let rooms = requested.to_vec();
-        if let Some(set) = assets::load_room_set(tables, &rooms) {
-            let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
-            self.install_room_set(set, frame);
+        match load_rooms(tables, &rooms, stories) {
+            Some(set) => {
+                let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+                self.install_room_set(set, frame);
+            }
+            None => self.install_room_actors(Vec::new()),
         }
         self.rooms = rooms;
     }
+}
+
+fn load_rooms(
+    tables: &dzs::StageTables,
+    rooms: &[u8],
+    stories: sim::flags::StoryBits,
+) -> Option<assets::RoomSet> {
+    assets::load_room_set(tables, rooms, |room| {
+        sim::layer::no(tables.name(), room, &stories)
+    })
 }
 
 impl Default for App {
