@@ -5,6 +5,7 @@ pub mod combat;
 pub mod death;
 pub mod enemy;
 pub mod events;
+pub mod flags;
 pub mod frame;
 pub mod ground;
 pub mod health;
@@ -56,6 +57,9 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
                 message: talk::message(source.angle[0]),
             };
             world.spawn((actor, speaker));
+        } else if flags::is_event_switch(&source.name) {
+            let switch = flags::EventSwitch::spawn(source.parameters);
+            world.spawn((actor, switch));
         } else {
             world.spawn((actor, combat::HitPoints::default()));
         }
@@ -95,6 +99,8 @@ pub fn build(
     sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(talk::Dialogue::default());
+    sim.world.insert_resource(flags::EventFlags::default());
+    sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -129,6 +135,7 @@ pub fn build(
             (
                 death::freeze.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
+                flags::control.in_set(WwSimSet::Execute),
                 ground::ground_check.in_set(WwSimSet::Execute),
                 water::water_probe.in_set(WwSimSet::Execute),
                 swim::control.in_set(WwSimSet::Execute),
