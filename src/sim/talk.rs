@@ -3,6 +3,7 @@ use glam::Vec2;
 
 use super::actor::Actor;
 use super::area::StageName;
+use super::event::{ActiveEvent, EventList};
 use super::flags::{Arrivals, OrderFlags, StoryBits};
 use super::health::Health;
 use super::intent::{DoIntent, MoveIntent};
@@ -24,6 +25,19 @@ const MISSING_MESSAGE: i16 = -1;
 const TALK_END_FLAG: u16 = 0x0008;
 const SPOKEN_FLAG: u16 = 0x0901;
 const BOW_EVENT_FLAG: u16 = 0x3A10;
+
+const ORDER_NAMES: [&str; 6] = [
+    "SO_1ST_MEET",
+    "SO_1ST_MEET_END",
+    "SO_MAPOPEN",
+    "SO_BOW",
+    "SO_GET_RUPEE",
+    "SO_TRIFORCE_CHECK",
+];
+const ORDER_FIRST_END: u8 = 4;
+const ORDER_MAP_OPEN: u8 = 5;
+const ORDER_BOW: u8 = 6;
+const ORDER_GET_RUPEE: u8 = 7;
 
 const MEET_A: u16 = 0x32CA;
 const MEET_B: u16 = 0x32CB;
@@ -58,6 +72,7 @@ pub struct Talk {
     pub rupee_done: bool,
     pub rupee_count: u8,
     pub gone: bool,
+    pub order: u8,
 }
 
 impl Talk {
@@ -70,6 +85,7 @@ impl Talk {
             rupee_done: false,
             rupee_count: 0,
             gone: false,
+            order: 0,
         }
     }
 }
@@ -223,6 +239,65 @@ fn vanish(talk: &mut Talk, stories: &mut StoryBits, order_flags: &mut OrderFlags
     talk.gone = true;
 }
 
+impl Scene {
+    fn order(self) -> u8 {
+        match self {
+            Scene::FirstEnd => ORDER_FIRST_END,
+            Scene::MapOpen => ORDER_MAP_OPEN,
+            Scene::Bow => ORDER_BOW,
+            Scene::GetRupee => ORDER_GET_RUPEE,
+        }
+    }
+}
+
+fn ordered(list: &EventList, order: u8) -> Option<usize> {
+    let index = usize::from(order).checked_sub(3)?;
+    list.event_index(ORDER_NAMES.get(index)?)
+}
+
+fn complete(
+    talk: &mut Talk,
+    order: u8,
+    stories: &mut StoryBits,
+    order_flags: &mut OrderFlags,
+) -> bool {
+    match order {
+        ORDER_FIRST_END => {
+            vanish(talk, stories, order_flags);
+            false
+        }
+        ORDER_MAP_OPEN => {
+            talk.map_done = true;
+            order_flags.set(TALK_END_FLAG);
+            true
+        }
+        ORDER_BOW => {
+            talk.bow_done = true;
+            order_flags.set(TALK_END_FLAG);
+            stories.set(BOW_EVENT_FLAG);
+            true
+        }
+        ORDER_GET_RUPEE => {
+            talk.rupee_done = true;
+            order_flags.set(TALK_END_FLAG);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn context(stories: StoryBits, arrivals: Arrivals, sea: bool, actors: &Query<&Actor>) -> Context {
+    Context {
+        stories,
+        arrivals,
+        sea,
+        has_bow: false,
+        timer_active: false,
+        minigame_tag: any_minigame_tag(actors),
+        accepted: false,
+    }
+}
+
 fn talking(player: &Player, actor: &Actor) -> bool {
     let dx = player.pos.x - actor.pos.x;
     let dz = player.pos.z - actor.pos.z;
@@ -245,6 +320,8 @@ pub fn control(
     mut order_flags: ResMut<OrderFlags>,
     arrivals: Res<Arrivals>,
     stage: Res<StageName>,
+    list: Res<EventList>,
+    mut active: ResMut<ActiveEvent>,
     mut talks: Query<(Entity, &mut Talk, &Actor)>,
     actors: Query<&Actor>,
     mut players: Query<&mut Player>,
@@ -252,15 +329,7 @@ pub fn control(
     let pressed = do_intent.0 && !dialogue.held;
     dialogue.held = do_intent.0;
     if pressed {
-        let ctx = Context {
-            stories: *stories,
-            arrivals: *arrivals,
-            sea: stage.0 == SEA,
-            has_bow: false,
-            timer_active: false,
-            minigame_tag: any_minigame_tag(&actors),
-            accepted: false,
-        };
+        let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
         if dialogue.open {
             let Some((_, mut talk, _)) = dialogue
                 .speaker
@@ -273,42 +342,65 @@ pub fn control(
             let step = advance(dialogue.message, &talk, &ctx);
             match step {
                 Step::Next(message) => dialogue.message = message,
-                Step::Done(scene) => match scene {
-                    Some(Scene::MapOpen) => {
-                        talk.map_done = true;
-                        order_flags.set(TALK_END_FLAG);
-                        dialogue.message = opening(&talk, &ctx);
-                    }
-                    Some(Scene::Bow) => {
-                        talk.bow_done = true;
-                        order_flags.set(TALK_END_FLAG);
-                        let message = opening(&talk, &ctx);
-                        stories.set(BOW_EVENT_FLAG);
-                        dialogue.message = message;
-                    }
-                    Some(Scene::GetRupee) => {
-                        talk.rupee_done = true;
-                        order_flags.set(TALK_END_FLAG);
-                        dialogue.message = opening(&talk, &ctx);
-                    }
-                    Some(Scene::FirstEnd) | None => {
+                Step::Done(Some(scene)) => {
+                    let order = scene.order();
+                    if ordered(&list, order).is_some() {
+                        talk.order = order;
                         dialogue.open = false;
                         dialogue.speaker = None;
-                        vanish(&mut talk, &mut stories, &mut order_flags);
+                    } else if complete(&mut talk, order, &mut stories, &mut order_flags) {
+                        dialogue.message = opening(&talk, &ctx);
+                    } else {
+                        dialogue.open = false;
+                        dialogue.speaker = None;
                     }
-                },
+                }
+                Step::Done(None) => {
+                    dialogue.open = false;
+                    dialogue.speaker = None;
+                    vanish(&mut talk, &mut stories, &mut order_flags);
+                }
             }
         } else if health.units > 0 {
             let Some(player) = players.iter().next() else {
                 return;
             };
             for (entity, talk, actor) in &talks {
-                if !talk.gone && talking(player, actor) {
+                if !talk.gone && talk.order == 0 && talking(player, actor) {
                     dialogue.open = true;
                     dialogue.speaker = Some(entity);
                     dialogue.message = opening(&talk, &ctx);
                     break;
                 }
+            }
+        }
+    }
+    for (entity, mut talk, _) in &mut talks {
+        if talk.order == 0 {
+            continue;
+        }
+        let order = talk.order;
+        let Some(index) = ordered(&list, order) else {
+            talk.order = 0;
+            if complete(&mut talk, order, &mut stories, &mut order_flags) {
+                let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
+                dialogue.open = true;
+                dialogue.speaker = Some(entity);
+                dialogue.message = opening(&talk, &ctx);
+            }
+            continue;
+        };
+        if active.stage_of(index).is_none() {
+            active.order(&list, index);
+        }
+        if active.end_check(index) {
+            active.end(index);
+            talk.order = 0;
+            if complete(&mut talk, order, &mut stories, &mut order_flags) {
+                let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
+                dialogue.open = true;
+                dialogue.speaker = Some(entity);
+                dialogue.message = opening(&talk, &ctx);
             }
         }
     }

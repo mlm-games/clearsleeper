@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy_ecs::prelude::{Entity, With};
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::area::StageName;
+use clearsleeper::sim::event::{ActiveEvent, EventList, Stage};
 use clearsleeper::sim::flags::{Arrivals, OrderFlags, StoryBits};
 use clearsleeper::sim::player::Player;
 use clearsleeper::sim::talk::{self, Context, Dialogue, Scene, Step, Talk, advance, opening};
@@ -15,6 +16,48 @@ const UNCHARTED: i8 = 3;
 
 fn tick(app: &mut App) {
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+}
+
+fn event_list(names: &[&str]) -> EventList {
+    const HEADER_LEN: usize = 0x40;
+    const STAFF_LEN: usize = 80;
+    const CUT_LEN: usize = 80;
+    let count = names.len();
+    let event_top = HEADER_LEN;
+    let staff_top = event_top + count * 176;
+    let cut_top = staff_top + count * STAFF_LEN;
+    let end = cut_top + count * CUT_LEN;
+    let sections = [
+        (event_top as u32, count as u32),
+        (staff_top as u32, count as u32),
+        (cut_top as u32, count as u32),
+        (end as u32, 0),
+        (end as u32, 0),
+        (end as u32, 0),
+        (end as u32, 0),
+    ];
+    let mut data = vec![0_u8; HEADER_LEN];
+    for (index, (top, size)) in sections.iter().enumerate() {
+        data[index * 8..index * 8 + 4].copy_from_slice(&top.to_be_bytes());
+        data[index * 8 + 4..index * 8 + 8].copy_from_slice(&size.to_be_bytes());
+    }
+    for name in names {
+        let mut record = vec![0_u8; 176];
+        record[..name.len()].copy_from_slice(name.as_bytes());
+        record[0x2C..0x30].copy_from_slice(&0_u32.to_be_bytes());
+        record[0x7C..0x80].copy_from_slice(&1_i32.to_be_bytes());
+        for slot in 0..3 {
+            let at = 0x88 + slot * 4;
+            record[at..at + 4].copy_from_slice(&(-1_i32).to_be_bytes());
+        }
+        data.extend(record);
+        let mut staff = vec![0_u8; STAFF_LEN];
+        staff[0x2C..0x30].copy_from_slice(&0_i32.to_be_bytes());
+        staff[0x30..0x34].copy_from_slice(&0_u32.to_be_bytes());
+        data.extend(staff);
+        data.extend(vec![0_u8; CUT_LEN]);
+    }
+    EventList::parse(&data).expect("the synthetic event list parses")
 }
 
 fn press(app: &mut App) {
@@ -77,6 +120,10 @@ fn stories(app: &App) -> StoryBits {
 
 fn order_flags(app: &App) -> OrderFlags {
     *app.sim.world.resource::<OrderFlags>()
+}
+
+fn stage_of(app: &App, index: usize) -> Option<clearsleeper::sim::event::Stage> {
+    app.sim.world.resource::<ActiveEvent>().stage_of(index)
 }
 
 fn fresh_context() -> Context {
@@ -438,5 +485,140 @@ fn golden_soldier_ladder_branches_on_the_first_visit() {
         advance(0x32D0, &outward, &ctx),
         Step::Next(0x32D4),
         "the home grid reads as arrived"
+    );
+}
+
+#[test]
+fn golden_talk_runs_the_map_event_before_reopening_the_box() {
+    let mut app = App::new();
+    app.sim
+        .world
+        .insert_resource(event_list(&["SO_MAPOPEN", "SO_1ST_MEET_END"]));
+    spawn_talker(&mut app, Vec3::ZERO, 0x1234, UNCHARTED);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x32D0,
+        "an uncharted island opens on the arrive check"
+    );
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x32D1,
+        "the uncharted grid offers the map"
+    );
+    press(&mut app);
+    assert!(
+        !dialogue(&app).open,
+        "the box closes while the map event runs"
+    );
+    assert_eq!(talker(&mut app).order, 5, "the map event takes the order");
+    assert!(
+        !talker(&mut app).map_done,
+        "the map lands only once it ends"
+    );
+    assert_eq!(
+        stage_of(&app, 0),
+        Some(Stage::Play),
+        "the ordered event runs"
+    );
+    tick(&mut app);
+    assert_eq!(
+        stage_of(&app, 0),
+        Some(Stage::Close),
+        "the interpreter closes the finished event"
+    );
+    assert!(
+        !dialogue(&app).open,
+        "the box waits on the interpreter, not on the button"
+    );
+    tick(&mut app);
+    assert!(dialogue(&app).open, "the ended event hands the talk back");
+    assert_eq!(talker(&mut app).order, 0, "the spent order clears");
+    assert!(
+        talker(&mut app).map_done,
+        "the map event records the map done"
+    );
+    assert_eq!(
+        dialogue(&app).message,
+        0x1234,
+        "the reopened box starts on the base line"
+    );
+    assert!(
+        order_flags(&app).has(0x0008),
+        "the map event raises the talk order flag"
+    );
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x32D2,
+        "the base line continues after the map event"
+    );
+}
+
+#[test]
+fn golden_talk_dives_after_the_farewell_event_runs() {
+    let mut app = App::new();
+    app.sim
+        .world
+        .insert_resource(event_list(&["SO_MAPOPEN", "SO_1ST_MEET_END"]));
+    app.sim.world.insert_resource(StageName("sea".to_owned()));
+    spawn_talker(&mut app, Vec3::ZERO, 0x1234, DRAGON_ROOST);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
+    press(&mut app);
+    assert_eq!(dialogue(&app).message, 0x32CA, "the meeting opens");
+    press(&mut app);
+    press(&mut app);
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x32CD,
+        "the meeting reaches its ask"
+    );
+    press(&mut app);
+    assert!(!dialogue(&app).open, "the map event takes the box");
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x1234,
+        "the ended map event reopens on the base line"
+    );
+    press(&mut app);
+    assert_eq!(
+        dialogue(&app).message,
+        0x32CE,
+        "the mapped first visit points at the farewell"
+    );
+    press(&mut app);
+    assert!(
+        !dialogue(&app).open,
+        "the box closes while the farewell event runs"
+    );
+    assert_eq!(
+        talker(&mut app).order,
+        4,
+        "the farewell event takes the order"
+    );
+    assert!(!talker(&mut app).gone, "the dive waits on the event");
+    tick(&mut app);
+    tick(&mut app);
+    tick(&mut app);
+    assert!(
+        talker(&mut app).gone,
+        "the ended farewell event dives the soldier away"
+    );
+    assert!(
+        stories(&app).test(0x0901),
+        "the dive marks the soldier spoken"
+    );
+    assert!(
+        order_flags(&app).has(0x0008),
+        "the farewell event raises the talk order flag"
+    );
+    press(&mut app);
+    assert!(
+        !dialogue(&app).open,
+        "a dived soldier does not answer again"
     );
 }
