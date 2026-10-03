@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::health::Health;
-use super::item::{FIRST_ARROW, FIRST_BOMB, Held, LAST_ARROW, LAST_BOMB};
+use super::item::{BOOMERANG, FIRST_ARROW, FIRST_BOMB, Held, LAST_ARROW, LAST_BOMB};
 use super::player::Player;
 
 pub const ITEM_ACTORS: [&str; 3] = ["item", "Sitem", "Bitem"];
@@ -66,6 +66,7 @@ impl Pickup {
                 | HEART_CONTAINER
                 | FIRST_BOMB..=LAST_BOMB
                 | FIRST_ARROW..=LAST_ARROW
+                | BOOMERANG
         )
     }
 }
@@ -87,7 +88,7 @@ fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
             health.max = health.max.saturating_add(4).min(MAX_LIFE);
             health.units = health.max;
         }
-        FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW => held.equip(item),
+        FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW | BOOMERANG => held.equip(item),
         _ => {}
     }
 }

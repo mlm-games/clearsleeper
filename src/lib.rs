@@ -309,6 +309,16 @@ impl App {
                 });
                 continue;
             }
+            if let Some(boom) = entity.get::<sim::item::Boomerang>() {
+                out.push(view::ActorView {
+                    pos: boom.pos,
+                    kind: view::ActorKind::Boomerang,
+                    item: 0,
+                    height: 10.0,
+                    half: 10.0,
+                });
+                continue;
+            }
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
@@ -574,12 +584,8 @@ pub fn root_view(
     );
     let overlay = match app.menu.screen {
         menus::Screen::Playing => {
-            let (item, count) = app.held();
-            hud::status_view(
-                app.health(),
-                app.rupees(),
-                (count > 0).then_some((item, count)),
-            )
+            let held = *app.sim.world.resource::<sim::item::Held>();
+            hud::status_view(app.health(), app.rupees(), (held.count > 0).then_some(held))
         }
         menus::Screen::Title => menus::title_view(),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),

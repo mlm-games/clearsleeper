@@ -22,6 +22,7 @@ pub enum ActorKind {
     Ship,
     Bomb,
     Arrow,
+    Boomerang,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -128,6 +129,7 @@ const TALKER: Rgb = [0.32, 0.42, 0.82];
 const SHIP: Rgb = [0.58, 0.44, 0.24];
 const BOMB: Rgb = [0.18, 0.18, 0.22];
 const ARROW: Rgb = [0.86, 0.82, 0.66];
+const BOOM: Rgb = [0.72, 0.30, 0.52];
 const HEART: Rgb = [0.86, 0.20, 0.22];
 const RUPEE: Rgb = [0.24, 0.72, 0.32];
 const RELIC: Rgb = [0.90, 0.52, 0.86];
@@ -150,6 +152,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Ship => SHIP,
         ActorKind::Bomb => BOMB,
         ActorKind::Arrow => ARROW,
+        ActorKind::Boomerang => BOOM,
         ActorKind::Pickup => pickup_look(actor.item).0,
     }
 }

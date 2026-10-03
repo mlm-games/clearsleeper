@@ -6,6 +6,7 @@ use repose_core::{Color, Modifier, Sp, Transform, UnitExt, View};
 use repose_ui::{Box as UiBox, Row, Text, TextStyle, ViewExt, ZStack};
 
 use crate::sim::health::Health;
+use crate::sim::item::{Held, Kind};
 
 const HEART_SIZE: f32 = 24.0;
 const HEART_GAP: f32 = 5.0;
@@ -116,10 +117,10 @@ pub fn hearts_strip(health: Health, size: f32) -> View {
 
 const PURSE_HEX: &str = "#3FA94B";
 
-pub fn status_view(health: Health, rupees: u32, held: Option<(u8, u8)>) -> View {
+pub fn status_view(health: Health, rupees: u32, held: Option<Held>) -> View {
     let mut stack = vec![hearts_view(health), purse_view(rupees)];
-    if let Some((kind, count)) = held {
-        stack.push(held_view(kind, count));
+    if let Some(held) = held {
+        stack.push(held_view(held));
     }
     ZStack(Modifier::new().fill_max_size().hit_passthrough()).child(stack)
 }
@@ -143,12 +144,14 @@ fn purse_view(rupees: u32) -> View {
     ])
 }
 
-fn held_view(kind: u8, count: u8) -> View {
-    let (hex, label) = match kind {
-        0 => ("#2E3138", "none"),
-        _ if kind <= crate::sim::item::LAST_BOMB => ("#2E3138", "bomb"),
-        _ => ("#C9C4B4", "arrow"),
+fn held_view(held: Held) -> View {
+    let hex = match held.kind() {
+        Some(Kind::Bomb) => "#2E3138",
+        Some(Kind::Arrow) => "#C9C4B4",
+        Some(Kind::Boomerang) => "#B84C85",
+        None => "#2E3138",
     };
+    let label = held.label();
     Row(Modifier::new()
         .absolute()
         .offset(
@@ -165,7 +168,7 @@ fn held_view(kind: u8, count: u8) -> View {
                 .size(14.0.dp(), 14.0.dp())
                 .background(Color::from_hex(hex)),
         ),
-        Text(format!("{label} {count}"))
+        Text(format!("{label} {}", held.count))
             .size(Sp(16.0))
             .color(Color::from_hex("#F2EDE3")),
     ])

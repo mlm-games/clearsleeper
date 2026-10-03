@@ -4,7 +4,7 @@ use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::combat::HitPoints;
 use clearsleeper::sim::enemy;
-use clearsleeper::sim::item::{self, Arrow, Bomb, Held, Kind};
+use clearsleeper::sim::item::{self, Arrow, Bomb, Boomerang, Held, Kind};
 use clearsleeper::sim::player::Player;
 use glam::Vec3;
 use repose_core::input::PhysicalKey;
@@ -58,6 +58,14 @@ fn arrows(app: &App) -> Vec<Arrow> {
         .world
         .iter_entities()
         .filter_map(|e| e.get::<Arrow>().copied())
+        .collect()
+}
+
+fn spins(app: &App) -> Vec<Boomerang> {
+    app.sim
+        .world
+        .iter_entities()
+        .filter_map(|e| e.get::<Boomerang>().cloned())
         .collect()
 }
 
@@ -235,4 +243,50 @@ fn golden_items_survive_a_reload() {
         (item::FIRST_BOMB, 10),
         "the bag rides along in the save"
     );
+}
+
+#[test]
+fn golden_boomerang_comes_back_to_the_hand() {
+    let mut app = App::new();
+    hold(&mut app, item::BOOMERANG);
+    use_button(&mut app);
+    assert_eq!(spins(&app).len(), 1, "the spin leaves the hand");
+    assert_eq!(app.held().1, 1, "and the hand keeps it");
+    for _ in 0..400 {
+        tick(&mut app);
+    }
+    assert!(spins(&app).is_empty(), "the spin comes home");
+    assert_eq!(app.held(), (item::BOOMERANG, 1), "still in hand");
+}
+
+#[test]
+fn golden_boomerang_bites_two_foes_and_returns() {
+    let mut app = App::new();
+    hold(&mut app, item::BOOMERANG);
+    let first = foe(&mut app, Vec3::new(0.0, 0.0, 150.0));
+    let second = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
+    use_button(&mut app);
+    for _ in 0..30 {
+        tick(&mut app);
+    }
+    assert_eq!(foe_hp(&app, first), 4, "the first foe loses a quarter");
+    assert_eq!(foe_hp(&app, second), 4, "so does the second");
+    for _ in 0..40 {
+        tick(&mut app);
+    }
+    assert!(spins(&app).is_empty(), "two locks and it turns for home");
+}
+
+#[test]
+fn golden_boomerang_recalls_on_the_second_press() {
+    let mut app = App::new();
+    hold(&mut app, item::BOOMERANG);
+    use_button(&mut app);
+    assert!(!spins(&app)[0].returning, "it flies out first");
+    use_button(&mut app);
+    assert!(spins(&app)[0].returning, "a second press calls it back");
+    for _ in 0..20 {
+        tick(&mut app);
+    }
+    assert!(spins(&app).is_empty(), "and it is home");
 }
