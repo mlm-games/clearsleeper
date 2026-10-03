@@ -97,6 +97,7 @@ impl App {
         self.stage_axis(input::axis_from_keys(held, sched.window_focused));
         self.stage_damage(input::damage_from_keys(held, sched.window_focused));
         self.stage_do(input::do_from_keys(held, sched.window_focused));
+        self.stage_target(input::target_from_keys(held, sched.window_focused));
         self.stage_menu(held, sched.window_focused);
     }
 
@@ -105,6 +106,7 @@ impl App {
             self.stage_axis(glam::Vec2::ZERO);
             self.stage_damage(0);
             self.stage_do(false);
+            self.stage_target(false);
         }
         let cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
@@ -179,6 +181,13 @@ impl App {
         self.sim.world.resource_mut::<sim::intent::DoIntent>().0 = held;
     }
 
+    pub fn stage_target(&mut self, held: bool) {
+        self.sim
+            .world
+            .resource_mut::<sim::intent::TargetIntent>()
+            .0 = held;
+    }
+
     pub fn health(&self) -> sim::health::Health {
         *self.sim.world.resource::<sim::health::Health>()
     }
@@ -210,9 +219,9 @@ impl App {
             .iter_entities()
             .find_map(|entity| entity.get::<sim::player::Player>().copied());
         let area = self.sim.world.resource::<sim::area::Area>();
-        let (player_pos, player_yaw) = match player {
-            Some(player) => (player.pos, player.yaw),
-            None => (area.spawn, area.yaw),
+        let (player_pos, player_yaw, player_face) = match player {
+            Some(player) => (player.pos, player.yaw, player.face),
+            None => (area.spawn, area.yaw, area.yaw),
         };
         let collision = self.sim.world.get_resource::<sim::collision::Collision>();
         let water = self.sim.world.get_resource::<sim::water::Water>();
@@ -231,6 +240,7 @@ impl App {
         view::SceneSnapshot {
             player_pos,
             player_yaw,
+            player_face,
             bounds_min: area.bounds_min,
             bounds_max: area.bounds_max,
             ground_y,

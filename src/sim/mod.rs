@@ -8,6 +8,8 @@ pub mod ground;
 pub mod health;
 pub mod hop;
 pub mod intent;
+pub mod jump;
+pub mod lock;
 pub mod player;
 pub mod roll;
 pub mod sea;
@@ -64,6 +66,7 @@ pub fn build(
     sim.world.insert_resource(intent::CameraYaw::default());
     sim.world.insert_resource(intent::DamageIntent::default());
     sim.world.insert_resource(intent::DoIntent::default());
+    sim.world.insert_resource(intent::TargetIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(events::SimEvents::default());
@@ -72,6 +75,8 @@ pub fn build(
     sim.world.insert_resource(swim::Swim::default());
     sim.world.insert_resource(roll::Roll::default());
     sim.world.insert_resource(hop::Hop::default());
+    sim.world.insert_resource(lock::Lock::default());
+    sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -97,6 +102,7 @@ pub fn build(
     sim.world.spawn((player::Player {
         pos: spawn,
         yaw,
+        face: yaw,
         speed: 0.0,
         speed_y: 0.0,
     },));
@@ -106,6 +112,8 @@ pub fn build(
             ground::ground_check.in_set(WwSimSet::Execute),
             water::water_probe.in_set(WwSimSet::Execute),
             swim::control.in_set(WwSimSet::Execute),
+            lock::control.in_set(WwSimSet::Execute),
+            jump::control.in_set(WwSimSet::Execute),
             roll::control.in_set(WwSimSet::Execute),
             hop::control.in_set(WwSimSet::Execute),
             collision::remember_move_from.in_set(WwSimSet::Execute),

@@ -8,6 +8,7 @@ use glam::Vec2;
 use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
+use super::jump::{BACK_GRAVITY, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
 use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
@@ -37,7 +38,7 @@ const MAX_FALL_SPEED: f32 = -100.0;
 const UNITS_PER_RAD: f32 = 65536.0 / TAU;
 pub(crate) const RAD_PER_UNIT: f32 = TAU / 65536.0;
 
-fn to_s16(radians: f32) -> i16 {
+pub(super) fn to_s16(radians: f32) -> i16 {
     (radians * UNITS_PER_RAD).round().rem_euclid(65536.0) as i32 as i16
 }
 
@@ -147,6 +148,7 @@ pub fn walk(
     swim: Res<Swim>,
     hop: Res<Hop>,
     roll: Res<Roll>,
+    jump: Res<Jump>,
     ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -163,6 +165,8 @@ pub fn walk(
             hop_tick(player);
         } else if roll.active {
             roll_tick(player);
+        } else if jump.active {
+            jump_tick(player, &jump);
         } else {
             walk_tick(player, &intent, &camera, &mut stride, &mut events);
         }
@@ -198,6 +202,30 @@ fn roll_tick(player: &mut Player) {
     player.pos.x += speed_f * player.yaw.sin();
     player.pos.z += speed_f * player.yaw.cos();
     player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
+    player.pos.y += player.speed_y;
+}
+
+fn jump_tick(player: &mut Player, jump: &Jump) {
+    let side = match jump.kind {
+        JumpKind::Back => None,
+        JumpKind::Left => Some(SIDE_OFFSET),
+        JumpKind::Right => Some(-SIDE_OFFSET),
+    };
+    if let Some(offset) = side {
+        player.yaw = player.face + offset;
+    }
+    let gravity = match jump.kind {
+        JumpKind::Back => BACK_GRAVITY,
+        JumpKind::Left | JumpKind::Right => SIDE_GRAVITY,
+    };
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
+    player.speed_y = (player.speed_y + gravity).max(MAX_FALL_SPEED);
     player.pos.y += player.speed_y;
 }
 

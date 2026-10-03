@@ -13,6 +13,7 @@ fn golden_snapshot_builds_world_frame() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::new(40.0, 0.0, -25.0),
         player_yaw: 1.0,
+        player_face: 1.0,
         bounds_min: Vec2::new(-800.0, -600.0),
         bounds_max: Vec2::new(800.0, 600.0),
         ground_y: 0.0,
@@ -97,6 +98,7 @@ fn room_mesh_replaces_placeholder_ground() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::new(40.0, 0.0, -25.0),
         player_yaw: 1.0,
+        player_face: 1.0,
         bounds_min: Vec2::new(-800.0, -600.0),
         bounds_max: Vec2::new(800.0, 600.0),
         ground_y: 0.0,
@@ -148,6 +150,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::new(0.0, 0.0, 0.0),
         player_yaw: 0.0,
+        player_face: 0.0,
         bounds_min: Vec2::new(-100.0, -100.0),
         bounds_max: Vec2::new(100.0, 100.0),
         ground_y: 0.0,
@@ -248,6 +251,7 @@ fn room_group_applies_texture_animation_to_uvs() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::ZERO,
         player_yaw: 0.0,
+        player_face: 0.0,
         bounds_min: Vec2::new(-100.0, -100.0),
         bounds_max: Vec2::new(100.0, 100.0),
         ground_y: 0.0,
@@ -307,6 +311,7 @@ fn golden_sea_view_builds_wave_mesh() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::new(0.0, 0.0, 0.0),
         player_yaw: 0.0,
+        player_face: 0.0,
         bounds_min: Vec2::new(-100.0, -100.0),
         bounds_max: Vec2::new(100.0, 100.0),
         ground_y: 0.0,
@@ -360,6 +365,7 @@ fn sea_group_culls_beyond_the_far_plane() {
     let snapshot = SceneSnapshot {
         player_pos: Vec3::new(0.0, 0.0, 0.0),
         player_yaw: 0.0,
+        player_face: 0.0,
         bounds_min: Vec2::new(-100.0, -100.0),
         bounds_max: Vec2::new(100.0, 100.0),
         ground_y: 0.0,

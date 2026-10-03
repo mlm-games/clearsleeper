@@ -18,6 +18,7 @@ const PLAYER_HEIGHT: f32 = 32.0;
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
     pub player_yaw: f32,
+    pub player_face: f32,
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
     pub ground_y: f32,
@@ -271,7 +272,7 @@ fn player_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
         BODY,
         eye,
     );
-    let (sin, cos) = snapshot.player_yaw.sin_cos();
+    let (sin, cos) = snapshot.player_face.sin_cos();
     let nose = PLAYER_HALF + 2.0;
     group.push_box(
         px + sin * nose,

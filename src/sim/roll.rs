@@ -4,6 +4,7 @@ use super::collision::Collision;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
+use super::lock::Lock;
 use super::player::Player;
 use super::swim::Swim;
 use super::walk::{from_s16, target_yaw};
@@ -30,6 +31,7 @@ pub fn control(
     camera: Res<CameraYaw>,
     swim: Res<Swim>,
     health: Res<Health>,
+    lock: Res<Lock>,
     collision: Option<Res<Collision>>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -48,7 +50,7 @@ pub fn control(
                 continue;
             }
         }
-        if roll.active || !pressed || swim.active || health.units == 0 {
+        if roll.active || !pressed || swim.active || health.units == 0 || lock.target.is_some() {
             continue;
         }
         let stick = intent.axis.length().min(1.0);

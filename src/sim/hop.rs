@@ -4,6 +4,7 @@ use super::collision::Collision;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, MoveIntent};
+use super::jump::Jump;
 use super::player::Player;
 use super::roll::Roll;
 use super::swim::Swim;
@@ -37,6 +38,7 @@ pub fn control(
     camera: Res<CameraYaw>,
     swim: Res<Swim>,
     health: Res<Health>,
+    jump: Res<Jump>,
     mut hop: ResMut<Hop>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -46,7 +48,7 @@ pub fn control(
         let grounded_now = grounded(collision.as_deref(), player.pos);
         let left_ground = hop.prev_grounded && !grounded_now;
         hop.prev_grounded = grounded_now;
-        if swim.active || health.units == 0 {
+        if swim.active || health.units == 0 || jump.active {
             hop.active = false;
             continue;
         }

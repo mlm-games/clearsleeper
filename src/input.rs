@@ -32,3 +32,7 @@ pub fn damage_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> u8
 pub fn do_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
     window_focused && held.contains(&PhysicalKey::Space)
 }
+
+pub fn target_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
+    window_focused && held.contains(&PhysicalKey::KeyL)
+}

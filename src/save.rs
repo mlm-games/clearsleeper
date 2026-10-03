@@ -76,6 +76,7 @@ impl From<SavedPlayer> for Player {
         Player {
             pos: saved.pos.into(),
             yaw: saved.yaw,
+            face: saved.yaw,
             speed: saved.speed,
             speed_y: saved.speed_y,
         }
