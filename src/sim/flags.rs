@@ -8,7 +8,7 @@ const KIND_SHIFT: u32 = 24;
 const HOLD_KIND: u32 = 1;
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct BitSet([u64; 4]);
+pub struct BitSet(pub [u64; 4]);
 
 impl BitSet {
     pub fn test(&self, bit: u8) -> bool {

@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use clearsleeper::save::{SaveGame, read_save, write_save};
+use clearsleeper::sim::flags::{EventFlags, Switches};
 use clearsleeper::sim::intent::CameraYaw;
+use clearsleeper::sim::pickup::Rupees;
 use clearsleeper::{App, SIM_HZ};
 use repose_core::input::PhysicalKey;
 use repose_core::runtime::Scheduler;
@@ -54,11 +56,34 @@ fn golden_loaded_session_continues_identically() {
 }
 
 #[test]
+fn golden_progression_survives_a_reload() {
+    let mut app = App::new();
+    app.sim.world.resource_mut::<Rupees>().count = 42;
+    app.sim.world.resource_mut::<EventFlags>().0.set(5);
+    app.sim.world.resource_mut::<Switches>().0.set(9);
+    let save = app.save();
+
+    let mut restored = App::new();
+    assert_eq!(restored.sim.world.resource::<Rupees>().count, 0);
+    restored.load(&save).unwrap();
+    assert_eq!(
+        restored.sim.world.resource::<Rupees>().count,
+        42,
+        "the purse comes back with the player"
+    );
+    assert!(
+        restored.sim.world.resource::<EventFlags>().0.test(5),
+        "the story flags ride along"
+    );
+    assert!(
+        restored.sim.world.resource::<Switches>().0.test(9),
+        "the stage switches ride along"
+    );
+}
+
+#[test]
 fn golden_save_file_round_trip() {
-    let path = std::env::temp_dir().join(format!(
-        "clearsleeper_save_{}.json",
-        std::process::id()
-    ));
+    let path = std::env::temp_dir().join(format!("clearsleeper_save_{}.json", std::process::id()));
     let mut app = App::new();
     for _ in 0..6 {
         frame(&mut app, &[PhysicalKey::KeyS]);

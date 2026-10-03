@@ -4,11 +4,13 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
+use crate::sim::flags::{BitSet, EventFlags, Switches};
 use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
+use crate::sim::pickup::Rupees;
 use crate::sim::player::Player;
-use crate::App;
+use crate::{App, assets};
 
 pub const SAVE_VERSION: u32 = 1;
 pub const DEFAULT_NAME: &str = "Link";
@@ -29,6 +31,16 @@ pub struct SaveGame {
     pub area: SavedArea,
     #[serde(default)]
     pub health: SavedHealth,
+    #[serde(default)]
+    pub stage: String,
+    #[serde(default)]
+    pub rooms: Vec<u8>,
+    #[serde(default)]
+    pub rupees: u32,
+    #[serde(default)]
+    pub events: [u64; 4],
+    #[serde(default)]
+    pub switches: [u64; 4],
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -130,11 +142,16 @@ impl App {
         let camera_yaw = world.resource::<CameraYaw>().0;
         let area = *world.resource::<Area>();
         let mut query = world.query::<&Player>();
-        let player = *query
-            .iter(world)
-            .next()
-            .expect("player exists at boot");
+        let player = *query.iter(world).next().expect("player exists at boot");
         let health = *world.resource::<Health>();
+        let rupees = world.resource::<Rupees>().count;
+        let events = world.resource::<EventFlags>().0.0;
+        let switches = world.resource::<Switches>().0.0;
+        let stage = self
+            .stage
+            .as_ref()
+            .map(|tables| tables.name().to_owned())
+            .unwrap_or_default();
         SaveGame {
             version: SAVE_VERSION,
             name: self.name.clone(),
@@ -143,6 +160,11 @@ impl App {
             player: (&player).into(),
             area: (&area).into(),
             health: (&health).into(),
+            stage,
+            rooms: self.rooms.clone(),
+            rupees,
+            events,
+            switches,
         }
     }
 
@@ -155,16 +177,34 @@ impl App {
             );
         }
         self.name = save.name.clone();
+        {
+            let world = &mut self.sim.world;
+            *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
+            world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
+            *world.resource_mut::<Health>() = save.health.clone().into();
+            *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
+            *world.resource_mut::<EventFlags>() = EventFlags(BitSet(save.events));
+            *world.resource_mut::<Switches>() = Switches(BitSet(save.switches));
+        }
+        let current = self
+            .stage
+            .as_ref()
+            .map(|tables| tables.name().to_owned())
+            .unwrap_or_default();
+        if !save.stage.is_empty() && save.stage != current {
+            if let Some(tables) = assets::load_stage_tables(&save.stage) {
+                self.swap_stage(
+                    tables,
+                    save.rooms.clone(),
+                    save.area.spawn.into(),
+                    save.area.yaw,
+                );
+            }
+        }
         let world = &mut self.sim.world;
-        *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
-        world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
         *world.resource_mut::<Area>() = save.area.clone().into();
-        *world.resource_mut::<Health>() = save.health.clone().into();
         let mut query = world.query::<&mut Player>();
-        let mut player = query
-            .iter_mut(world)
-            .next()
-            .expect("player exists at boot");
+        let mut player = query.iter_mut(world).next().expect("player exists at boot");
         *player = save.player.clone().into();
         Ok(())
     }

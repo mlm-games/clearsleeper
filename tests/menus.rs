@@ -45,6 +45,11 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
             yaw: 0.0,
         },
         health: SavedHealth { units: 7, max: 16 },
+        stage: String::new(),
+        rooms: Vec::new(),
+        rupees: 0,
+        events: [0; 4],
+        switches: [0; 4],
     }
 }
 
