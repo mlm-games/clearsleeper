@@ -344,6 +344,8 @@ impl App {
                     enemy.profile.body_height,
                     enemy.profile.body_half,
                 )
+            } else if entity.contains::<sim::balloon::Balloon>() {
+                (view::ActorKind::Balloon, 0, 36.0, 18.0)
             } else if entity.contains::<sim::talk::Talk>() {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else {

@@ -1,5 +1,6 @@
 pub mod actor;
 pub mod area;
+pub mod balloon;
 pub mod collision;
 pub mod combat;
 pub mod death;
@@ -60,6 +61,9 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             } else {
                 world.spawn(actor);
             }
+        } else if source.name == balloon::BALLOON_ACTOR {
+            let (state, hit_points) = balloon::spawn(source.parameters);
+            world.spawn((actor, state, hit_points, enemy::Hurt::default()));
         } else if pickup::is_pickup(&source.name) {
             world.spawn((actor, pickup::Pickup::spawn(source.parameters)));
         } else if source.name == talk::TALK_ACTOR {
@@ -160,6 +164,7 @@ pub fn build(
                 combat::control.in_set(WwSimSet::Execute),
                 item::control.in_set(WwSimSet::Execute),
                 enemy::control.in_set(WwSimSet::Execute),
+                balloon::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (
