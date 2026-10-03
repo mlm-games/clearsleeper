@@ -24,6 +24,7 @@ fn marker(app: &mut App, switch: u32) {
             pos: Vec3::ZERO,
             angle: [0, 0, 0],
             set_id: 0,
+            room: -1,
         },
         state,
     ));
@@ -40,6 +41,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
                 pos,
                 angle: [0, 0, 0],
                 set_id: 0,
+                room: -1,
             },
             state,
             hit_points,

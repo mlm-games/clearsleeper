@@ -8,4 +8,5 @@ pub struct Actor {
     pub pos: Vec3,
     pub angle: [i16; 3],
     pub set_id: u16,
+    pub room: i8,
 }

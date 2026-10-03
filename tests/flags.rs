@@ -24,6 +24,7 @@ fn spawn_switch(app: &mut App, parameters: u32) -> Entity {
                 pos: Vec3::ZERO,
                 angle: [0; 3],
                 set_id: 0,
+                room: -1,
             },
             EventSwitch::spawn(parameters),
         ))

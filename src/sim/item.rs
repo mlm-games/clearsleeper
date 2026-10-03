@@ -222,6 +222,7 @@ pub fn control(
     intent: Res<UseIntent>,
     mut health: ResMut<Health>,
     mut held: ResMut<Held>,
+    mut zones: ResMut<super::flags::ZoneActors>,
     players: Query<&Player>,
     gates: Gates,
     mut shots: Shots,
@@ -249,7 +250,7 @@ pub fn control(
         }
     }
 
-    let mut dead: Vec<Entity> = Vec::new();
+    let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
     let mut chain: Vec<Entity> = Vec::new();
     let mut burst: Vec<Entity> = Vec::new();
     for (entity, mut bomb) in &mut shots.bombs {
@@ -291,7 +292,7 @@ pub fn control(
                     hurt.0 = BOMB_FLINCH;
                 }
                 if hp.0 <= 0 {
-                    dead.push(foe_entity);
+                    dead.push((foe_entity, foe.room, foe.set_id));
                 }
             }
         }
@@ -306,7 +307,8 @@ pub fn control(
             bomb.fuse = 0;
         }
     }
-    for entity in dead {
+    for (entity, room, set_id) in dead {
+        zones.mark_done(room, set_id);
         let _ = commands.entity(entity).despawn();
     }
 

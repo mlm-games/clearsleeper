@@ -23,6 +23,7 @@ fn ship(app: &mut App, pos: Vec3, yaw: i16, parameters: u32, home_x: i16) -> boo
             pos,
             angle: [home_x, yaw, 0],
             set_id: 0,
+            room: -1,
         },
         warship::spawn(yaw),
     ));

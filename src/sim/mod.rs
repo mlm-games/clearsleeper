@@ -17,6 +17,7 @@ pub mod gull;
 pub mod health;
 pub mod hop;
 pub mod intent;
+pub mod inventory;
 pub mod item;
 pub mod jump;
 pub mod layer;
@@ -58,6 +59,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         pos: Vec3::from_array(source.pos),
         angle: source.angle,
         set_id: source.set_id,
+        room: source.room,
     };
     if source.name == ship::SHIP_ACTOR {
         world.spawn((actor, ship::Ship::default())).id()
@@ -155,6 +157,8 @@ pub fn build(
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::OrderFlags::default());
+    sim.world.insert_resource(flags::ZoneActors::default());
+    sim.world.insert_resource(inventory::Equipped::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Arrivals::default());

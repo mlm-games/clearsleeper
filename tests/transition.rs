@@ -199,6 +199,7 @@ fn golden_swap_stage_teleports_and_rebuilds() {
         pos: Vec3::ZERO,
         angle: [0; 3],
         set_id: 0,
+        room: -1,
     });
     app.sim.world.resource_mut::<Swim>().active = true;
     app.sim.world.resource_mut::<Health>().units = 7;

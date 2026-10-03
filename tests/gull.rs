@@ -31,6 +31,7 @@ fn bird(app: &mut App, pos: Vec3, parameters: u32) -> bevy_ecs::entity::Entity {
         pos,
         angle: [0, 0, 0],
         set_id: 0,
+        room: -1,
     };
     let state = gull::spawn(parameters, &actor);
     app.sim.world.spawn((actor, state)).id()

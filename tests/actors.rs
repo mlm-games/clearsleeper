@@ -93,6 +93,7 @@ fn golden_sim_spawns_stage_actors() {
             pos: Vec3::new(19200.0, 0.0, -2200.0),
             angle: [0, 0, 0],
             set_id: 0xFFFF,
+            room: -1,
         }
     );
     assert_eq!(
@@ -103,6 +104,7 @@ fn golden_sim_spawns_stage_actors() {
             pos: Vec3::ZERO,
             angle: [0, -3094, 0],
             set_id: 0xFFFF,
+            room: -1,
         }
     );
 

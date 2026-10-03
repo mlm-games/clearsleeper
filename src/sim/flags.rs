@@ -202,6 +202,55 @@ impl Arrivals {
     }
 }
 
+const NO_SET_ID: u16 = 0xFFFF;
+const SET_ID_WORDS: usize = 16;
+const SET_ID_MAX: usize = SET_ID_WORDS * 32;
+const ROOM_COUNT: usize = 64;
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZoneActors {
+    bits: [[u32; SET_ID_WORDS]; ROOM_COUNT],
+}
+
+impl Default for ZoneActors {
+    fn default() -> Self {
+        Self {
+            bits: [[0_u32; SET_ID_WORDS]; ROOM_COUNT],
+        }
+    }
+}
+
+impl ZoneActors {
+    pub fn is_done(&self, room: i8, set_id: u16) -> bool {
+        let Some((word, mask)) = self.slot(room, set_id) else {
+            return false;
+        };
+        self.bits[usize::from(room as u8)][word] & mask != 0
+    }
+
+    pub fn mark_done(&mut self, room: i8, set_id: u16) {
+        let Some((word, mask)) = self.slot(room, set_id) else {
+            return;
+        };
+        self.bits[usize::from(room as u8)][word] |= mask;
+    }
+
+    pub fn clear(&mut self) {
+        self.bits = [[0_u32; SET_ID_WORDS]; ROOM_COUNT];
+    }
+
+    fn slot(&self, room: i8, set_id: u16) -> Option<(usize, u32)> {
+        if room < 0 || set_id == NO_SET_ID {
+            return None;
+        }
+        let id = usize::from(set_id);
+        if id >= SET_ID_MAX {
+            return None;
+        }
+        Some((id / 32, 1 << (id % 32)))
+    }
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventSwitch {
     pub event: u16,

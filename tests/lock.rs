@@ -34,6 +34,7 @@ fn spawn_actor(app: &mut App, pos: Vec3) -> Entity {
             pos,
             angle: [0; 3],
             set_id: 0,
+            room: -1,
         })
         .id()
 }
@@ -321,6 +322,7 @@ fn golden_ship_is_not_a_lock_candidate() {
             pos: Vec3::new(0.0, 0.0, 50.0),
             angle: [0; 3],
             set_id: 0,
+            room: -1,
         },
         Ship::default(),
     ));

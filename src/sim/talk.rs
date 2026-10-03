@@ -7,6 +7,7 @@ use super::event::{ActiveEvent, EventList};
 use super::flags::{Arrivals, OrderFlags, StoryBits};
 use super::health::Health;
 use super::intent::{DoIntent, MoveIntent};
+use super::inventory::{Equipped, BOW_SLOT};
 use super::layer::SEA;
 use super::player::Player;
 
@@ -18,6 +19,7 @@ const MINIGAME_TYPE_MASK: u32 = 0xFF;
 const MINIGAME_TYPE: u32 = 1;
 const DRAGON_ROOST: i8 = 13;
 const TALK_RANGE: f32 = 400.0;
+const SURFACE_RANGE: f32 = 4000.0;
 const DEFAULT_MESSAGE: u16 = 1;
 const BLANK_MESSAGE: i16 = 0;
 const MISSING_MESSAGE: i16 = -1;
@@ -286,12 +288,18 @@ fn complete(
     }
 }
 
-fn context(stories: StoryBits, arrivals: Arrivals, sea: bool, actors: &Query<&Actor>) -> Context {
+fn context(
+    stories: StoryBits,
+    arrivals: Arrivals,
+    sea: bool,
+    bow: bool,
+    actors: &Query<&Actor>,
+) -> Context {
     Context {
         stories,
         arrivals,
         sea,
-        has_bow: false,
+        has_bow: bow,
         timer_active: false,
         minigame_tag: any_minigame_tag(actors),
         accepted: false,
@@ -302,6 +310,15 @@ fn talking(player: &Player, actor: &Actor) -> bool {
     let dx = player.pos.x - actor.pos.x;
     let dz = player.pos.z - actor.pos.z;
     dx * dx + dz * dz <= TALK_RANGE * TALK_RANGE
+}
+
+fn away(player: Option<&Player>, actor: &Actor) -> bool {
+    let Some(player) = player else {
+        return false;
+    };
+    let dx = player.pos.x - actor.pos.x;
+    let dz = player.pos.z - actor.pos.z;
+    dx * dx + dz * dz > SURFACE_RANGE * SURFACE_RANGE
 }
 
 fn any_minigame_tag(actors: &Query<&Actor>) -> bool {
@@ -321,6 +338,7 @@ pub fn control(
     arrivals: Res<Arrivals>,
     stage: Res<StageName>,
     list: Res<EventList>,
+    equipped: Res<Equipped>,
     mut active: ResMut<ActiveEvent>,
     mut talks: Query<(Entity, &mut Talk, &Actor)>,
     actors: Query<&Actor>,
@@ -329,7 +347,7 @@ pub fn control(
     let pressed = do_intent.0 && !dialogue.held;
     dialogue.held = do_intent.0;
     if pressed {
-        let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
+        let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
         if dialogue.open {
             let Some((_, mut talk, _)) = dialogue
                 .speaker
@@ -375,15 +393,18 @@ pub fn control(
             }
         }
     }
-    for (entity, mut talk, _) in &mut talks {
+    for (entity, mut talk, actor) in &mut talks {
         if talk.order == 0 {
+            if talk.gone && away(players.iter().next(), actor) {
+                talk.gone = false;
+            }
             continue;
         }
         let order = talk.order;
         let Some(index) = ordered(&list, order) else {
             talk.order = 0;
             if complete(&mut talk, order, &mut stories, &mut order_flags) {
-                let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
+                let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);
                 dialogue.message = opening(&talk, &ctx);
@@ -397,7 +418,7 @@ pub fn control(
             active.end(index);
             talk.order = 0;
             if complete(&mut talk, order, &mut stories, &mut order_flags) {
-                let ctx = context(*stories, *arrivals, stage.0 == SEA, &actors);
+                let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);
                 dialogue.message = opening(&talk, &ctx);

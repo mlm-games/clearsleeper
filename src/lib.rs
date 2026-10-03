@@ -513,6 +513,7 @@ impl App {
             .insert_resource(sim::event::ActiveEvent::default());
         sim::clear_actors(&mut self.sim.world);
         self.room_actors.clear();
+        self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::spawn_actors(&mut self.sim.world, &tables);
         if !rooms.is_empty() {
@@ -564,8 +565,10 @@ impl App {
         for entity in std::mem::take(&mut self.room_actors) {
             let _ = self.sim.world.despawn(entity);
         }
+        let zones = *self.sim.world.resource::<sim::flags::ZoneActors>();
         self.room_actors = actors
             .iter()
+            .filter(|source| !zones.is_done(source.room, source.set_id))
             .map(|source| sim::spawn_actor(&mut self.sim.world, source))
             .collect();
     }

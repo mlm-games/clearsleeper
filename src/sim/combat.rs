@@ -137,9 +137,12 @@ pub fn control(
         ),
         Without<Ship>,
     >,
-    mut combat: ResMut<Combat>,
+    (mut combat, mut zones, mut events): (
+        ResMut<Combat>,
+        ResMut<super::flags::ZoneActors>,
+        ResMut<SimEvents>,
+    ),
     mut players: Query<&mut Player>,
-    mut events: ResMut<SimEvents>,
     mut commands: Commands,
 ) {
     let pressed = item.0 && !combat.held;
@@ -201,7 +204,7 @@ pub fn control(
             } else {
                 NORMAL_POWER
             };
-            let mut dead: Vec<Entity> = Vec::new();
+            let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for (entity, actor, hp, mut hurt) in actors.iter_mut() {
                 let Some(mut hp) = hp else {
                     continue;
@@ -215,11 +218,12 @@ pub fn control(
                     }
                     events.list.push(SimEvent::Hit);
                     if hp.0 <= 0 {
-                        dead.push(entity);
+                        dead.push((entity, actor.room, actor.set_id));
                     }
                 }
             }
-            for entity in dead {
+            for (entity, room, set_id) in dead {
+                zones.mark_done(room, set_id);
                 let _ = commands.entity(entity).despawn();
             }
         }

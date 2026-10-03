@@ -51,6 +51,7 @@ fn brazier(app: &mut App, pos: Vec3, parameters: u32) {
             pos,
             angle: [0, 0, 0],
             set_id: 0,
+            room: -1,
         },
         state,
     ));

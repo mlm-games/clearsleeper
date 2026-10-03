@@ -68,7 +68,7 @@ impl Pickup {
                 | FIRST_BOMB..=LAST_BOMB
                 | FIRST_ARROW..=LAST_ARROW
                 | BOOMERANG
-        )
+        ) || super::inventory::slot_of(self.item).is_some()
     }
 }
 
@@ -102,6 +102,8 @@ pub fn control(
     mut health: ResMut<Health>,
     mut rupees: ResMut<Rupees>,
     mut held: ResMut<Held>,
+    mut zones: ResMut<super::flags::ZoneActors>,
+    mut equipped: ResMut<super::inventory::Equipped>,
     mut events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
@@ -125,7 +127,9 @@ pub fn control(
             continue;
         }
         apply(pickup.item, &mut health, &mut rupees, &mut held);
+        equipped.collect(pickup.item);
         events.list.push(SimEvent::Collect);
+        zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(entity).despawn();
     }
 }
