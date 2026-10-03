@@ -1,6 +1,7 @@
 pub mod actor;
 pub mod area;
 pub mod balloon;
+pub mod cleared;
 pub mod collision;
 pub mod combat;
 pub mod death;
@@ -61,6 +62,8 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             } else {
                 world.spawn(actor);
             }
+        } else if source.name == cleared::CLEARED_ACTOR {
+            world.spawn((actor, cleared::spawn(source.parameters, world.resource())));
         } else if source.name == balloon::BALLOON_ACTOR {
             let (state, hit_points) = balloon::spawn(source.parameters);
             world.spawn((actor, state, hit_points, enemy::Hurt::default()));
@@ -178,6 +181,7 @@ pub fn build(
                 sea::sea_tick.in_set(WwSimSet::Execute),
                 health::apply_damage.in_set(WwSimSet::Execute),
                 death::check.in_set(WwSimSet::Execute),
+                cleared::control.in_set(WwSimSet::Execute),
                 frame::advance.in_set(WwSimSet::After),
             )
                 .chain(),
