@@ -16,7 +16,9 @@ const VALUE_LEN: usize = 4;
 const TYPE_FLOAT: i32 = 0;
 const TYPE_INT: i32 = 3;
 const TYPE_STRING: i32 = 4;
+const STAFF_NORMAL: i32 = 0;
 const STAFF_ALL: i32 = 1;
+const STAFF_CAMERA: i32 = 2;
 const STAFF_TIMEKEEPER: i32 = 4;
 const STAFF_DIRECTOR: i32 = 6;
 const STAFF_MESSAGE: i32 = 7;
@@ -58,6 +60,67 @@ const SOUND_ACTIONS: &[&str] = &[
     "BGMSTOP",
 ];
 const PACKAGE_ACTIONS: &[&str] = &["WAIT", "PLAY", "PLAY2"];
+const CAMERA_ACTIONS: &[&str] = &[
+    "PAUSE",
+    "WAIT",
+    "TALK",
+    "FIXEDPOS",
+    "FIXEDFRM",
+    "UNITRANS",
+    "WATCHACTOR",
+    "RESTOREPOS",
+    "GETITEM",
+    "GAMEOVER",
+    "TURNTOACTOR",
+    "ROLLING",
+    "TACT",
+    "WINDDIR",
+    "TORNADO",
+    "STYLE",
+    "SAVE",
+    "LOAD",
+    "USEITEM0",
+    "USEITEM1",
+    "FIXEDFRMS",
+    "BSPLINE",
+    "POSSESSED",
+    "TWOACTOR0",
+    "STOKER",
+    "UNIBRAKE",
+    "UNIACCELE",
+    "MAPTOOL",
+];
+const SOLDIER_INSTANT: &[&str] = &[
+    "EFFECT",
+    "EQUIP",
+    "UNEQUIP",
+    "MINIGAME_WAIT",
+    "PARTNER_SHIP",
+];
+const SOLDIER_PENDING: &[&str] = &[
+    "MOVE_TO_ACTOR",
+    "TURN_TO_ACTOR",
+    "MOVE_TO_POS",
+    "TURN_TO_POS",
+    "SWIM",
+    "JUMP",
+    "APPEAR",
+    "DIVE",
+    "DISAPPEAR",
+    "JUMP_MAPOPEN",
+    "TURN",
+    "TALK_MSG",
+    "CONTINUE_TALK",
+    "MINIGAME",
+    "MINIGAME_WARP",
+    "MINIGAME_RETURN",
+    "MINIGAME_END",
+    "MINIGAME_PL_TURN",
+    "MINIGAME_PL_UP",
+    "EATESA",
+    "EATESA1ST",
+];
+const LINK_INSTANT: &[i32] = &[1, 4, 6, 14, 17, 18, 20, 23, 39, 42, 43, 44, 51, 55];
 
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct EventList {
@@ -145,6 +208,7 @@ struct StaffRun {
     staff: usize,
     cut: i32,
     timer: i16,
+    frames: u16,
     advance: u8,
     wipe: u8,
     has_action: bool,
@@ -532,6 +596,126 @@ pub fn control(
             special_proc(run, &list, &mut flags, &mut story, &mut next);
         }
     }
+    for running in active.running.iter_mut() {
+        if running.stage != Stage::Play {
+            continue;
+        }
+        for run in running.staffs.iter_mut() {
+            staff_cut(run, &list, &mut flags);
+        }
+    }
+}
+
+fn staff_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(staff) = list.staffs.get(run.staff) else {
+        return;
+    };
+    if staff.kind == STAFF_CAMERA {
+        camera_cut(run, list, flags);
+    } else if staff.kind == STAFF_NORMAL {
+        match staff.name.as_str() {
+            "NpcSo" => soldier_cut(run, list, flags),
+            "Link" => link_cut(run, list, flags),
+            "Ship" => ship_cut(run, list, flags),
+            _ => {}
+        }
+    }
+}
+
+fn soldier_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "WAIT" => {
+            if run.advance > 0 {
+                wait_start(run, list);
+            }
+            if run.timer > 0 {
+                run.timer -= 1;
+            }
+            if run.timer == 0 {
+                cut_end(run, list, flags);
+            }
+        }
+        "SET_ANM" => match list.cut_text(run.cut as usize, "Name") {
+            Some(name) if matches!(name, "WAIT" | "TALK" | "JUMP" | "SWIM") => {
+                cut_end(run, list, flags)
+            }
+            Some(_) => {}
+            None => cut_end(run, list, flags),
+        },
+        name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
+        name if SOLDIER_PENDING.contains(&name) => {}
+        _ => cut_end(run, list, flags),
+    }
+}
+
+fn link_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if leading_digits(&cut.name, 3).is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
+        cut_end(run, list, flags);
+    }
+}
+
+fn ship_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if matches!(leading_digits(&cut.name, 2), Some(0 | 5 | 8)) {
+        cut_end(run, list, flags);
+    }
+}
+
+fn leading_digits(name: &str, width: usize) -> Option<i32> {
+    let digits = name.as_bytes().get(..width)?;
+    let mut value = 0_i32;
+    for digit in digits {
+        if !digit.is_ascii_digit() {
+            return None;
+        }
+        value = value * 10 + i32::from(digit - b'0');
+    }
+    Some(value)
+}
+
+fn camera_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let action = act_index(run, list, CAMERA_ACTIONS);
+    let cut = run.cut as usize;
+    let timer = match action {
+        0 | 1 | 3 | 4 | 5 | 11 => list.cut_number(cut, "Timer"),
+        8 => Some(
+            list.cut_number(cut, "Timer")
+                .unwrap_or_else(|| item_timer(list, cut)),
+        ),
+        9 | 10 | 12 | 16 | 23 | -1 => {
+            cut_end(run, list, flags);
+            return;
+        }
+        _ => return,
+    };
+    if run.advance > 0 {
+        run.frames = 0;
+    }
+    match timer {
+        Some(timer) if timer >= 0 => {
+            if i32::from(run.frames) >= timer {
+                cut_end(run, list, flags);
+            }
+            run.frames = run.frames.saturating_add(1);
+        }
+        _ => cut_end(run, list, flags),
+    }
+}
+
+fn item_timer(list: &EventList, cut: usize) -> i32 {
+    if list.cut_number(cut, "Type").unwrap_or(0) == 1 {
+        17
+    } else {
+        12
+    }
 }
 
 fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
@@ -544,6 +728,7 @@ fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
                 staff: *index as usize,
                 cut: staff.first_cut as i32,
                 timer: 0,
+                frames: 0,
                 advance: 2,
                 wipe: 0,
                 has_action: false,
@@ -607,6 +792,7 @@ fn advance_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) -> 
 fn advance_to(run: &mut StaffRun, cut: i32) {
     run.cut = cut;
     run.timer = 0;
+    run.frames = 0;
     run.wipe = 0;
     run.advance = 1;
     run.has_action = false;

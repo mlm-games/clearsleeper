@@ -550,3 +550,134 @@ fn golden_director_next_demands_a_stage_name() {
     );
     assert_eq!(active.cut_of(0, 0), Some(0), "and the cut hangs");
 }
+
+#[test]
+fn golden_soldier_wait_counts_down_and_unknown_cuts_end_at_once() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Talk", &[0], [8, -1, -1])],
+        vec![staff("NpcSo", 0, 0)],
+        vec![
+            named_cut("WAIT", [-1, -1, -1], 7, 0, 1),
+            named_cut("STOP", [-1, -1, -1], 8, u32::MAX, -1),
+        ],
+        vec![record("Timer", 3, 0, -1)],
+        Vec::new(),
+        vec![2_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        "the event takes the order"
+    );
+    tick(&mut app);
+    assert_eq!(
+        active(&app).stage_of(0),
+        Some(Stage::Play),
+        "the event plays"
+    );
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "the wait is first");
+    assert!(!flags(&app).test(7), "the wait is still counting");
+    tick(&mut app);
+    assert!(flags(&app).test(7), "the wait ran out");
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "and advances next tick");
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(1), "the wait passed");
+    assert!(flags(&app).test(8), "an unknown soldier cut ends at once");
+    tick(&mut app);
+    assert!(active(&app).end_check(0), "the event closes");
+}
+
+#[test]
+fn golden_camera_cuts_wait_out_timers_or_end_at_once() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Shot", &[0], [7, -1, -1])],
+        vec![staff("CAMERA", 2, 0)],
+        vec![
+            named_cut("UNITRANS", [-1, -1, -1], 5, 0, 1),
+            named_cut("FIXEDFRM", [-1, -1, -1], 6, u32::MAX, 2),
+            named_cut("HAXX", [-1, -1, -1], 7, u32::MAX, -1),
+        ],
+        vec![record("Timer", 3, 0, -1)],
+        Vec::new(),
+        vec![3_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        "the event takes the order"
+    );
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "the unit cut is first");
+    assert!(!flags(&app).test(5), "the camera counts its frames");
+    tick(&mut app);
+    tick(&mut app);
+    tick(&mut app);
+    assert!(flags(&app).test(5), "the unit cut waits out its timer");
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "and advances next tick");
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(1), "the frame cut follows");
+    assert!(flags(&app).test(6), "a frameless cut ends at once");
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(2), "and moved on");
+    assert!(flags(&app).test(7), "an unknown camera cut ends at once");
+    tick(&mut app);
+    assert!(active(&app).end_check(0), "the event closes");
+}
+
+#[test]
+fn golden_link_and_ship_cuts_end_or_wait_on_their_locomotion() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Sail", &[0, 1], [3, 5, -1])],
+        vec![staff("Link", 0, 0), staff("Ship", 0, 2)],
+        vec![
+            named_cut("006n_talk", [-1, -1, -1], 2, u32::MAX, 1),
+            named_cut("003n_dash", [-1, -1, -1], 3, u32::MAX, -1),
+            named_cut("05keep", [-1, -1, -1], 4, u32::MAX, 3),
+            named_cut("01move", [-1, -1, -1], 5, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        "the event takes the order"
+    );
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "the talk cut is first");
+    assert!(flags(&app).test(2), "the talk cut ends at once");
+    assert_eq!(active(&app).cut_of(0, 1), Some(2), "the ship cut is first");
+    assert!(flags(&app).test(4), "the ship holds at once");
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(1), "the talk moved on");
+    assert_eq!(active(&app).cut_of(0, 1), Some(3), "the ship moved on");
+    for _ in 0..3 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(1),
+        "the dash waits on locomotion"
+    );
+    assert_eq!(
+        active(&app).cut_of(0, 1),
+        Some(3),
+        "the sail waits on the ship"
+    );
+    assert!(
+        !flags(&app).test(3) && !flags(&app).test(5),
+        "neither pending cut ever ends"
+    );
+    assert_eq!(
+        active(&app).stage_of(0),
+        Some(Stage::Play),
+        "and the event never closes"
+    );
+}
