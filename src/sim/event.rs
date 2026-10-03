@@ -1,7 +1,14 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
+use super::actor::Actor;
 use super::flags::{EventFlags, StoryBits};
+use super::player::Player;
+use super::sea::Sea;
+use super::ship::{Ship, SHIP_ACTOR};
 use super::transition::{NextStage, Target};
+use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
+use super::water;
 
 pub const EVENT_LIST_ENTRY: &str = "dat/event_list.dat";
 
@@ -14,6 +21,7 @@ const DATA_LEN: usize = 64;
 const NAME_LEN: usize = 32;
 const VALUE_LEN: usize = 4;
 const TYPE_FLOAT: i32 = 0;
+const TYPE_VEC: i32 = 1;
 const TYPE_INT: i32 = 3;
 const TYPE_STRING: i32 = 4;
 const STAFF_NORMAL: i32 = 0;
@@ -98,17 +106,6 @@ const SOLDIER_INSTANT: &[&str] = &[
     "PARTNER_SHIP",
 ];
 const SOLDIER_PENDING: &[&str] = &[
-    "MOVE_TO_ACTOR",
-    "TURN_TO_ACTOR",
-    "MOVE_TO_POS",
-    "TURN_TO_POS",
-    "SWIM",
-    "JUMP",
-    "APPEAR",
-    "DIVE",
-    "DISAPPEAR",
-    "JUMP_MAPOPEN",
-    "TURN",
     "TALK_MSG",
     "CONTINUE_TALK",
     "MINIGAME",
@@ -201,6 +198,7 @@ struct Running {
     index: usize,
     stage: Stage,
     staffs: Vec<StaffRun>,
+    actor: Entity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -213,10 +211,20 @@ struct StaffRun {
     wipe: u8,
     has_action: bool,
     action: i32,
+    prev_delta: i16,
+    aim_vel: i16,
+    speed: f32,
+    phase: i32,
+    model_offset: f32,
+    offset_target: f32,
+    offset_step: f32,
+    offset_scale: f32,
+    attn: Vec3,
+    target: Option<Entity>,
 }
 
 impl ActiveEvent {
-    pub fn order(&mut self, list: &EventList, index: usize) -> bool {
+    pub fn order(&mut self, list: &EventList, index: usize, actor: Entity) -> bool {
         if list.event(index).is_none() {
             return false;
         }
@@ -230,6 +238,7 @@ impl ActiveEvent {
                 index,
                 stage: Stage::Order,
                 staffs: Vec::new(),
+                actor,
             },
         );
         true
@@ -550,6 +559,20 @@ impl EventList {
         let stop = raw.iter().position(|&byte| byte == 0).unwrap_or(raw.len());
         std::str::from_utf8(&raw[..stop]).ok()
     }
+
+    pub fn cut_vec(&self, cut: usize, key: &str) -> Option<Vec3> {
+        let cut = self.cuts.get(cut)?;
+        let record = self.record_of(cut.first_data, key)?;
+        if record.kind != TYPE_VEC {
+            return None;
+        }
+        let at = record.index.max(0) as usize;
+        Some(Vec3::new(
+            *self.floats.get(at)?,
+            *self.floats.get(at + 1)?,
+            *self.floats.get(at + 2)?,
+        ))
+    }
 }
 
 pub fn control(
@@ -558,6 +581,10 @@ pub fn control(
     mut flags: ResMut<EventFlags>,
     mut story: ResMut<StoryBits>,
     mut next: ResMut<NextStage>,
+    sea: Option<Res<Sea>>,
+    mut actors: Query<(Entity, &mut Actor)>,
+    players: Query<(Entity, &Player)>,
+    mut ships: Query<&mut Ship>,
 ) {
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
@@ -600,13 +627,32 @@ pub fn control(
         if running.stage != Stage::Play {
             continue;
         }
+        let owner = running.actor;
         for run in running.staffs.iter_mut() {
-            staff_cut(run, &list, &mut flags);
+            staff_cut(
+                run,
+                &list,
+                &mut flags,
+                owner,
+                &mut actors,
+                &players,
+                &mut ships,
+                sea.as_deref(),
+            );
         }
     }
 }
 
-fn staff_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn staff_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+    ships: &mut Query<&mut Ship>,
+    sea: Option<&Sea>,
+) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
     };
@@ -614,18 +660,28 @@ fn staff_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
         match staff.name.as_str() {
-            "NpcSo" => soldier_cut(run, list, flags),
+            "NpcSo" => soldier_cut(run, list, flags, owner, actors, players, sea),
             "Link" => link_cut(run, list, flags),
-            "Ship" => ship_cut(run, list, flags),
+            "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
     }
 }
 
-fn soldier_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn soldier_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+    sea: Option<&Sea>,
+) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
+    let step = run.offset_scale * (run.offset_target - run.model_offset);
+    run.model_offset += step.clamp(-run.offset_step, run.offset_step);
     match cut.name.as_str() {
         "WAIT" => {
             if run.advance > 0 {
@@ -645,6 +701,21 @@ fn soldier_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
             Some(_) => {}
             None => cut_end(run, list, flags),
         },
+        "MOVE_TO_ACTOR" | "MOVE_TO_POS" => move_cut(run, list, flags, owner, actors, players),
+        "TURN_TO_ACTOR" | "TURN_TO_POS" => turn_cut(
+            run,
+            list,
+            flags,
+            owner,
+            actors,
+            players,
+            cut.name == "TURN_TO_ACTOR",
+        ),
+        "SWIM" => swim_cut(run, list, flags, owner, actors),
+        "JUMP" => jump_cut(run, list, flags, owner, actors, sea),
+        "APPEAR" | "DIVE" | "DISAPPEAR" => offset_cut(run, list, flags, &cut.name),
+        "JUMP_MAPOPEN" => mapopen_cut(run, list, flags, owner, actors),
+        "TURN" => soldier_turn(run, list, flags, owner, actors),
         name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
         name if SOLDIER_PENDING.contains(&name) => {}
         _ => cut_end(run, list, flags),
@@ -660,12 +731,55 @@ fn link_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     }
 }
 
-fn ship_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn ship_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    ships: &mut Query<&mut Ship>,
+) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     if matches!(leading_digits(&cut.name, 2), Some(0 | 5 | 8)) {
         cut_end(run, list, flags);
+        return;
+    }
+    if leading_digits(&cut.name, 2) != Some(1) {
+        return;
+    }
+    let Some(target) = list.cut_vec(run.cut as usize, "pos") else {
+        return;
+    };
+    let Some((ship_id, _, _)) = ship_pos(actors) else {
+        return;
+    };
+    let Ok((_, mut body)) = actors.get_mut(ship_id) else {
+        return;
+    };
+    let Ok(mut sail) = ships.get_mut(ship_id) else {
+        return;
+    };
+    let dist = abs_xz(target - body.pos);
+    if dist < 10.0 {
+        sail.speed = 0.0;
+        cut_end(run, list, flags);
+    } else if let Some(speed) = list.cut_float(run.cut as usize, "speed") {
+        if speed <= -0.5 {
+            if speed < -1.5 {
+                add_calc(&mut sail.speed, 0.0, 0.1, 1.0, 0.1);
+            } else {
+                add_calc(&mut sail.speed, 0.0, 0.05, 0.1, 0.015);
+            }
+        } else {
+            sail.speed = (dist * 0.2).min(speed);
+        }
+    } else {
+        sail.speed = dist * 0.2;
+    }
+    if dist > 1.0 {
+        let angle = target_angle_y(body.pos, target);
+        body.angle[1] = add_calc_angle_s(body.angle[1], angle, 3, 0x2000, 0x80);
     }
 }
 
@@ -679,6 +793,405 @@ fn leading_digits(name: &str, width: usize) -> Option<i32> {
         value = value * 10 + i32::from(digit - b'0');
     }
     Some(value)
+}
+
+fn move_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+) {
+    let cut = run.cut as usize;
+    let is_actor = list
+        .cuts
+        .get(cut)
+        .is_some_and(|cut| cut.name == "MOVE_TO_ACTOR");
+    let (target, yaw) = if is_actor {
+        let Some(found) = resolve_target(run, list, cut, owner, actors, players) else {
+            cut_end(run, list, flags);
+            return;
+        };
+        match read_pos(found, actors, players) {
+            Some(value) => value,
+            None => {
+                cut_end(run, list, flags);
+                return;
+            }
+        }
+    } else {
+        (list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO), 0)
+    };
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    let offset = if is_actor {
+        list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO)
+    } else {
+        Vec3::ZERO
+    };
+    let del = list.cut_float(cut, "DelDistance").unwrap_or(0.0);
+    let speed = list.cut_float(cut, "Speed").unwrap_or(2.0);
+    let mut stop = target + offset;
+    let angle = if is_actor {
+        let add = list.cut_number(cut, "ShapeAngle").unwrap_or(0);
+        if add != 0 {
+            (yaw as i32 + add as i32) as i16
+        } else {
+            target_angle_y(me.pos, target)
+        }
+    } else {
+        target_angle_y(me.pos, target)
+    };
+    stop.x -= del * from_s16(angle).sin();
+    stop.z -= del * from_s16(angle).cos();
+    if speed == 0.0 {
+        me.pos = stop;
+        cut_end(run, list, flags);
+        return;
+    }
+    let dist = abs_xz(stop - me.pos);
+    add_calc(&mut me.pos.x, stop.x, 0.1, speed, 0.0);
+    add_calc(&mut me.pos.z, stop.z, 0.1, speed, 0.0);
+    if dist < 5.0 {
+        cut_end(run, list, flags);
+    }
+}
+
+fn turn_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+    is_actor: bool,
+) {
+    let cut = run.cut as usize;
+    if run.advance > 0 {
+        run.timer = list.cut_number(cut, "Timer").unwrap_or(1) as i16;
+        run.prev_delta = 0;
+        run.aim_vel = 0;
+    }
+    let aim = if is_actor {
+        let Some(found) = resolve_target(run, list, cut, owner, actors, players) else {
+            cut_end(run, list, flags);
+            return;
+        };
+        let Some((pos, yaw)) = read_pos(found, actors, players) else {
+            cut_end(run, list, flags);
+            return;
+        };
+        let offset = list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
+        let name = list.cut_text(cut, "ActorName");
+        if matches!(name, None | Some("Player")) {
+            pos + offset
+        } else {
+            let add = list.cut_number(cut, "AddAngle").unwrap_or(0);
+            let del = list.cut_float(cut, "DelDistance").unwrap_or(0.0);
+            if add != 0 && del != 0.0 {
+                let angle = (yaw as i32 + add as i32) as i16;
+                Vec3::new(
+                    pos.x - del * from_s16(angle).sin(),
+                    pos.y,
+                    pos.z - del * from_s16(angle).cos(),
+                )
+            } else {
+                pos + offset
+            }
+        }
+    } else {
+        list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO)
+    };
+    run.attn = aim;
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    let turn_speed = list.cut_number(cut, "TurnSpeed").unwrap_or(0);
+    let ramp = if turn_speed != 0 {
+        turn_speed as i16
+    } else {
+        0x150
+    };
+    run.aim_vel = add_calc_angle_s(run.aim_vel, ramp, 4, 0x800, -1);
+    let angle = target_angle_y(me.pos, aim);
+    me.angle[1] = turn_body(me.angle[1], angle, run.aim_vel);
+    let delta = angle as i32 - me.angle[1] as i32;
+    let temp = delta.unsigned_abs() as f32;
+    if (run.prev_delta as f32) == temp && temp < 5376.0 && run.timer > 0 {
+        run.timer -= 1;
+    }
+    run.prev_delta = temp as i16;
+    if run.timer == 0 {
+        cut_end(run, list, flags);
+    }
+}
+
+fn swim_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+) {
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    let dist = abs_xz(run.attn - me.pos);
+    let angle = target_angle_y(me.pos, run.attn);
+    me.angle[1] = add_calc_angle_s(me.angle[1], angle, 8, 0x400, -1);
+    add_calc(&mut run.speed, 7.0, 0.3, 4.0, 0.0);
+    let yaw = from_s16(me.angle[1]);
+    me.pos.x += yaw.sin() * run.speed;
+    me.pos.z += yaw.cos() * run.speed;
+    if dist < 150.0 {
+        run.speed = 0.0;
+        cut_end(run, list, flags);
+    }
+}
+
+fn jump_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    sea: Option<&Sea>,
+) {
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    if run.advance > 0 {
+        let (_, surface) = water::probe(sea, me.pos.x, me.pos.z);
+        me.pos.y = surface;
+        me.angle[0] = -8000;
+        run.timer = 15;
+        run.offset_target = -40.0;
+        run.offset_step = 10.0;
+        run.offset_scale = 0.3;
+    }
+    let (_, surface) = water::probe(sea, me.pos.x, me.pos.z);
+    if run.timer > 0 {
+        run.timer -= 1;
+    }
+    if run.timer == 0 && me.pos.y <= surface {
+        cut_end(run, list, flags);
+    }
+}
+
+fn soldier_turn(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+) {
+    if run.advance > 0 {
+        run.timer = 30;
+    }
+    let Some((_, ship, yaw)) = ship_pos(actors) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    let index = yaw.wrapping_add(0x4000);
+    let mut target = ship;
+    target.x += from_s16(index).sin() * -300.0;
+    target.z += from_s16(index).cos() * -300.0;
+    let angle = target_angle_y(me.pos, target);
+    me.angle[1] = add_calc_angle_s(me.angle[1], angle, 8, 0x400, -1);
+    let gap = me.angle[1].wrapping_sub(angle).unsigned_abs();
+    if run.timer > 0 {
+        run.timer -= 1;
+    }
+    if run.timer == 0 || gap <= 0x400 {
+        cut_end(run, list, flags);
+    }
+}
+
+fn mapopen_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+) {
+    if run.advance > 0 {
+        run.phase = 0;
+        run.offset_target = -1.0;
+        run.offset_step = 20.0;
+        run.offset_scale = 0.1;
+    }
+    let Some((_, ship, yaw)) = ship_pos(actors) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    let Ok((_, mut me)) = actors.get_mut(owner) else {
+        return;
+    };
+    let index = yaw.wrapping_add(0x4000);
+    match run.phase {
+        0 => {
+            run.model_offset = run.offset_target;
+            run.phase = 1;
+        }
+        1 => {
+            let mut goal = ship;
+            goal.x += from_s16(index).sin() * -120.0;
+            goal.z += from_s16(index).cos() * -120.0;
+            if chase_xz(&mut me.pos, goal, 15.0) {
+                me.angle[1] = me.angle[1].wrapping_add(i16::MIN);
+                run.phase = 2;
+            }
+        }
+        2 => {
+            let mut goal = ship;
+            goal.x += from_s16(index).sin() * -300.0;
+            goal.z += from_s16(index).cos() * -300.0;
+            if chase_xz(&mut me.pos, goal, 15.0) {
+                run.speed = 0.0;
+                cut_end(run, list, flags);
+                run.offset_target = -150.0;
+                run.offset_step = 10.0;
+                run.offset_scale = 0.3;
+                run.phase = 0;
+            }
+        }
+        _ => {}
+    }
+}
+
+fn offset_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, name: &str) {
+    if run.advance > 0 {
+        if name == "APPEAR" {
+            run.offset_target = 110.0;
+            run.offset_step = 22.0;
+            run.offset_scale = 0.4;
+        } else {
+            run.offset_target = -150.0;
+            run.offset_step = 10.0;
+            run.offset_scale = 0.3;
+        }
+    }
+    if (run.model_offset - run.offset_target).abs() < 10.0 {
+        cut_end(run, list, flags);
+    }
+}
+
+fn resolve_target(
+    run: &mut StaffRun,
+    list: &EventList,
+    cut: usize,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+) -> Option<Entity> {
+    let set_id = list.cut_number(cut, "SetId").unwrap_or(0);
+    if set_id != 0 {
+        if let Some(found) = actors.iter_mut().find_map(|(entity, actor)| {
+            (i32::from(actor.set_id) == set_id).then_some(entity)
+        }) {
+            run.target = Some(found);
+            return run.target;
+        }
+        if let Some(name) = list.cut_text(cut, "ActorName") {
+            if let Some(found) = nearest(name, owner, actors) {
+                run.target = Some(found);
+            }
+        }
+        return run.target;
+    }
+    match list.cut_text(cut, "ActorName") {
+        None | Some("Player") => {
+            if let Some((entity, _)) = players.iter().next() {
+                run.target = Some(entity);
+            }
+        }
+        Some(name) => {
+            if let Some(found) = nearest(name, owner, actors) {
+                run.target = Some(found);
+            }
+        }
+    }
+    run.target
+}
+
+fn nearest(
+    name: &str,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+) -> Option<Entity> {
+    let origin = actors.get_mut(owner).ok().map(|(_, actor)| actor.pos);
+    let mut best: Option<(Entity, f32)> = None;
+    for (entity, actor) in actors.iter_mut() {
+        if actor.name != name {
+            continue;
+        }
+        let dist = match origin {
+            Some(origin) => (actor.pos - origin).length(),
+            None => 0.0,
+        };
+        if best.map_or(true, |(_, shortest)| dist < shortest) {
+            best = Some((entity, dist));
+        }
+    }
+    best.map(|(entity, _)| entity)
+}
+
+fn read_pos(
+    target: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &Query<(Entity, &Player)>,
+) -> Option<(Vec3, i16)> {
+    if let Ok((_, actor)) = actors.get_mut(target) {
+        return Some((actor.pos, actor.angle[1]));
+    }
+    players
+        .get(target)
+        .ok()
+        .map(|(_, player)| (player.pos, to_s16(player.yaw)))
+}
+
+fn ship_pos(actors: &mut Query<(Entity, &mut Actor)>) -> Option<(Entity, Vec3, i16)> {
+    actors.iter_mut().find_map(|(entity, actor)| {
+        (actor.name == SHIP_ACTOR).then_some((entity, actor.pos, actor.angle[1]))
+    })
+}
+
+fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
+    to_s16((to.x - from.x).atan2(to.z - from.z))
+}
+
+fn abs_xz(delta: Vec3) -> f32 {
+    (delta.x * delta.x + delta.z * delta.z).sqrt()
+}
+
+fn turn_body(yaw: i16, target: i16, vel: i16) -> i16 {
+    let before = yaw.wrapping_sub(target);
+    let after = add_calc_angle_s(before, 0, 4, vel, 0x60);
+    if after.unsigned_abs() > 4 {
+        yaw.wrapping_add(after.wrapping_sub(before))
+    } else {
+        target
+    }
+}
+
+fn chase_xz(pos: &mut Vec3, target: Vec3, step: f32) -> bool {
+    let delta = Vec3::new(pos.x - target.x, 0.0, pos.z - target.z);
+    let dist = delta.length();
+    if step != 0.0 {
+        if dist < 8e-11 || dist <= step {
+            pos.x = target.x;
+            pos.z = target.z;
+            return true;
+        }
+        *pos -= delta * (step / dist);
+        return false;
+    }
+    dist < 8e-11
 }
 
 fn camera_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
@@ -733,6 +1246,16 @@ fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
                 wipe: 0,
                 has_action: false,
                 action: -1,
+                prev_delta: 0,
+                aim_vel: 0,
+                speed: 0.0,
+                phase: 0,
+                model_offset: 0.0,
+                offset_target: 0.0,
+                offset_step: 0.0,
+                offset_scale: 0.0,
+                attn: Vec3::ZERO,
+                target: None,
             })
         })
         .collect();

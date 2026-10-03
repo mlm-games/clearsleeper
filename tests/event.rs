@@ -1,12 +1,14 @@
 use std::time::Duration;
 
-use bevy_ecs::prelude::World;
+use bevy_ecs::prelude::{Entity, World};
 use bevy_ecs::system::RunSystemOnce;
 use clearsleeper::assets;
+use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::event::{ActiveEvent, EVENT_LIST_ENTRY, EventList, Stage, Value};
 use clearsleeper::sim::flags::{EventFlags, StoryBits};
 use clearsleeper::sim::transition::{NextStage, Target};
 use clearsleeper::{App, SIM_HZ};
+use glam::Vec3;
 
 const HEADER_LEN: usize = 0x40;
 const STAFF_LEN: usize = 80;
@@ -168,7 +170,7 @@ fn run_control(list: &EventList) -> World {
     world.insert_resource(StoryBits::default());
     world.insert_resource(NextStage::default());
     assert!(
-        world.resource_mut::<ActiveEvent>().order(list, 0),
+        world.resource_mut::<ActiveEvent>().order(list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     world
@@ -306,7 +308,7 @@ fn golden_order_starts_plays_and_closes() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
         "the event exists and takes the order"
     );
     assert_eq!(
@@ -315,7 +317,7 @@ fn golden_order_starts_plays_and_closes() {
         "and waits for the next tick"
     );
     assert!(
-        !app.sim.world.resource_mut::<ActiveEvent>().order(&list, 9),
+        !app.sim.world.resource_mut::<ActiveEvent>().order(&list, 9, Entity::PLACEHOLDER),
         "unknown indices are refused"
     );
     app.sim.world.resource_mut::<EventFlags>().set(100);
@@ -366,7 +368,7 @@ fn golden_timekeeper_counts_down_before_the_chain_moves() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0);
+    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER);
     tick(&mut app);
     assert_eq!(active(&app).cut_of(0, 0), Some(0), "counting down");
     assert!(!flags(&app).test(5), "the first frame loads the timer");
@@ -408,7 +410,7 @@ fn golden_cut_start_flags_hold_the_chain_until_they_are_set() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0);
+    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER);
     tick(&mut app);
     assert_eq!(
         active(&app).cut_of(0, 0),
@@ -568,7 +570,7 @@ fn golden_soldier_wait_counts_down_and_unknown_cuts_end_at_once() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -607,7 +609,7 @@ fn golden_camera_cuts_wait_out_timers_or_end_at_once() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -647,7 +649,7 @@ fn golden_link_and_ship_cuts_end_or_wait_on_their_locomotion() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -680,4 +682,146 @@ fn golden_link_and_ship_cuts_end_or_wait_on_their_locomotion() {
         Some(Stage::Play),
         "and the event never closes"
     );
+}
+
+#[test]
+fn golden_soldier_turn_and_move_cuts_turn_then_walk_to_the_player() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Walk", &[0], [8, -1, -1])],
+        vec![staff("NpcSo", 0, 0)],
+        vec![
+            named_cut("TURN_TO_ACTOR", [-1, -1, -1], 6, u32::MAX, 1),
+            named_cut("MOVE_TO_ACTOR", [-1, -1, -1], 7, u32::MAX, 2),
+            named_cut("STOP", [-1, -1, -1], 8, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    let mut players = app.sim.world.query::<&mut clearsleeper::sim::player::Player>();
+    {
+        let mut player = players.iter_mut(&mut app.sim.world).next().unwrap();
+        player.pos = Vec3::ZERO;
+        player.yaw = 0.0;
+    }
+    let soldier = app
+        .sim
+        .world
+        .spawn(Actor {
+            name: "So".to_owned(),
+            parameters: 0,
+            pos: Vec3::new(200.0, 0.0, 0.0),
+            angle: [0; 3],
+            set_id: 0,
+            room: 0,
+        })
+        .id();
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, soldier);
+    for _ in 0..400 {
+        if flags(&app).test(8) {
+            break;
+        }
+        tick(&mut app);
+    }
+    assert!(flags(&app).test(7), "the walk cut reached the player");
+    assert!(flags(&app).test(8), "and the chain finished");
+    let actor = app
+        .sim
+        .world
+        .get::<Actor>(soldier)
+        .expect("the soldier lives");
+    assert!(
+        actor.pos.x < 6.0 && actor.pos.x > -1.0,
+        "the soldier stopped next to the player at {}",
+        actor.pos.x
+    );
+    assert_eq!(
+        actor.angle[1], -16384,
+        "the turn ended facing the player"
+    );
+    tick(&mut app);
+    assert!(active(&app).end_check(0), "the event closes");
+}
+
+#[test]
+fn golden_soldier_offset_and_mapopen_cuts_resolve_through_the_ship() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Vanish", &[0], [9, -1, -1])],
+        vec![staff("NpcSo", 0, 0)],
+        vec![
+            named_cut("APPEAR", [-1, -1, -1], 6, u32::MAX, 1),
+            named_cut("DIVE", [-1, -1, -1], 7, u32::MAX, 2),
+            named_cut("JUMP_MAPOPEN", [-1, -1, -1], 8, u32::MAX, 3),
+            named_cut("STOP", [-1, -1, -1], 9, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    let stale = {
+        let mut query = app.sim.world.query::<(Entity, &Actor)>();
+        query
+            .iter(&app.sim.world)
+            .filter(|(_, actor)| actor.name == "Ship")
+            .map(|(entity, _)| entity)
+            .collect::<Vec<_>>()
+    };
+    for entity in stale {
+        let _ = app.sim.world.despawn(entity);
+    }
+    app.sim.world.spawn(Actor {
+        name: "Ship".to_owned(),
+        parameters: 0,
+        pos: Vec3::new(220.0, 0.0, 0.0),
+        angle: [0; 3],
+        set_id: 0,
+        room: 0,
+    });
+    let soldier = app
+        .sim
+        .world
+        .spawn(Actor {
+            name: "So".to_owned(),
+            parameters: 0,
+            pos: Vec3::new(100.0, 0.0, 0.0),
+            angle: [0; 3],
+            set_id: 0,
+            room: 0,
+        })
+        .id();
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, soldier);
+    for _ in 0..300 {
+        if flags(&app).test(9) {
+            break;
+        }
+        tick(&mut app);
+    }
+    assert!(flags(&app).test(6), "the rise finishes converging");
+    assert!(flags(&app).test(7), "the dive follows it down");
+    assert!(flags(&app).test(8), "the chase reaches the ship");
+    assert!(flags(&app).test(9), "and the chain finished");
+    let actor = app
+        .sim
+        .world
+        .get::<Actor>(soldier)
+        .expect("the soldier lives");
+    assert!(
+        (actor.pos.x + 80.0).abs() < 0.01,
+        "the chase ended at the ship's far side at {}",
+        actor.pos.x
+    );
+    tick(&mut app);
+    assert!(active(&app).end_check(0), "the event closes");
 }

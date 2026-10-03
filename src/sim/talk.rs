@@ -435,7 +435,7 @@ pub fn control(
             continue;
         };
         if active.stage_of(index).is_none() {
-            active.order(&list, index);
+            active.order(&list, index, entity);
         }
         if active.end_check(index) {
             active.end(index);
