@@ -27,6 +27,7 @@ pub mod talk;
 pub mod transition;
 pub mod walk;
 pub mod water;
+pub mod warship;
 
 use bevy_ecs::prelude::*;
 use glam::Vec3;
@@ -62,6 +63,10 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             } else {
                 world.spawn(actor);
             }
+        } else if source.name == warship::SHIP_ACTOR
+            && warship::is_switched(source.parameters, source.angle[0], world.resource())
+        {
+            world.spawn((actor, warship::spawn(source.angle[1])));
         } else if source.name == cleared::CLEARED_ACTOR {
             world.spawn((actor, cleared::spawn(source.parameters, world.resource())));
         } else if source.name == balloon::BALLOON_ACTOR {
@@ -179,6 +184,7 @@ pub fn build(
                 area::clamp_to_area.in_set(WwSimSet::Execute),
                 transition::check.in_set(WwSimSet::Execute),
                 sea::sea_tick.in_set(WwSimSet::Execute),
+                warship::control.in_set(WwSimSet::Execute),
                 health::apply_damage.in_set(WwSimSet::Execute),
                 death::check.in_set(WwSimSet::Execute),
                 cleared::control.in_set(WwSimSet::Execute),

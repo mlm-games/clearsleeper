@@ -329,6 +329,16 @@ impl App {
                 });
                 continue;
             }
+            if let Some(shot) = entity.get::<sim::warship::Cannon>() {
+                out.push(view::ActorView {
+                    pos: shot.pos,
+                    kind: view::ActorKind::Cannon,
+                    item: 0,
+                    height: 24.0,
+                    half: 24.0,
+                });
+                continue;
+            }
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
@@ -346,6 +356,9 @@ impl App {
                 )
             } else if entity.contains::<sim::balloon::Balloon>() {
                 (view::ActorKind::Balloon, 0, 36.0, 18.0)
+            } else if entity.contains::<sim::warship::Warship>() {
+                let (height, half) = sim::warship::BODY;
+                (view::ActorKind::Warship, 0, height, half)
             } else if entity.contains::<sim::talk::Talk>() {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else {
