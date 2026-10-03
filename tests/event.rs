@@ -1,8 +1,11 @@
 use std::time::Duration;
 
+use bevy_ecs::prelude::World;
+use bevy_ecs::system::RunSystemOnce;
 use clearsleeper::assets;
 use clearsleeper::sim::event::{ActiveEvent, EVENT_LIST_ENTRY, EventList, Stage, Value};
-use clearsleeper::sim::flags::EventFlags;
+use clearsleeper::sim::flags::{EventFlags, StoryBits};
+use clearsleeper::sim::transition::{NextStage, Target};
 use clearsleeper::{App, SIM_HZ};
 
 const HEADER_LEN: usize = 0x40;
@@ -155,6 +158,23 @@ fn active(app: &App) -> &ActiveEvent {
 
 fn flags(app: &App) -> EventFlags {
     *app.sim.world.resource::<EventFlags>()
+}
+
+fn run_control(list: &EventList) -> World {
+    let mut world = World::new();
+    world.insert_resource(list.clone());
+    world.insert_resource(ActiveEvent::default());
+    world.insert_resource(EventFlags::default());
+    world.insert_resource(StoryBits::default());
+    world.insert_resource(NextStage::default());
+    assert!(
+        world.resource_mut::<ActiveEvent>().order(list, 0),
+        "the event takes the order"
+    );
+    world
+        .run_system_once(clearsleeper::sim::event::control)
+        .expect("the interpreter runs");
+    world
 }
 
 #[test]
@@ -434,4 +454,99 @@ fn golden_cut_parameters_come_from_the_current_cut() {
     );
     assert_eq!(list.cut_number(9, "Timer"), None, "no cut, no answer");
     assert_eq!(list.cut_number(0, "Missing"), None, "no key, no answer");
+}
+
+#[test]
+fn golden_cut_strings_come_from_the_text_blob() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Warp", &[0], [-1, -1, -1])],
+        vec![staff("director", 6, 0)],
+        vec![
+            named_cut("NEXT", [-1, -1, -1], -1, 0, -1),
+            named_cut("NEXT", [-1, -1, -1], -1, 2, -1),
+        ],
+        vec![
+            record("Stage", 4, 0, 1),
+            record("Timer", 3, 0, -1),
+            record("Stage", 4, 4, -1),
+        ],
+        Vec::new(),
+        vec![9_i32.to_be_bytes().to_vec()],
+        b"sea\0island\0",
+    ))
+    .expect("fixture parses");
+    assert_eq!(list.cut_text(0, "Stage"), Some("sea"));
+    assert_eq!(
+        list.cut_text(1, "Stage"),
+        Some("island"),
+        "the second cut reads its own slice of the blob"
+    );
+    assert_eq!(list.cut_text(0, "Timer"), None, "a number is not a string");
+    assert_eq!(list.cut_text(0, "Missing"), None, "no key, no answer");
+    assert_eq!(list.cut_text(9, "Stage"), None, "no cut, no answer");
+}
+
+#[test]
+fn golden_director_next_queues_the_stage_change() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Warp", &[0], [-1, -1, -1])],
+        vec![staff("director", 6, 0)],
+        vec![named_cut("NEXT", [-1, -1, -1], -1, 0, -1)],
+        vec![
+            record("Stage", 4, 0, 1),
+            record("StartCode", 3, 0, 2),
+            record("RoomNo", 3, 1, -1),
+        ],
+        Vec::new(),
+        vec![2_i32.to_be_bytes().to_vec(), 7_i32.to_be_bytes().to_vec()],
+        b"sea\0",
+    ))
+    .expect("fixture parses");
+    let world = run_control(&list);
+    let next = world.resource::<NextStage>();
+    assert_eq!(
+        next.target,
+        Some(Target {
+            stage: "sea".to_owned(),
+            room: 7,
+            start: 2,
+        }),
+        "the director queues the retail stage target"
+    );
+    assert_eq!(next.exit, None, "and leaves the walk-in exits alone");
+    let active = world.resource::<ActiveEvent>();
+    assert_eq!(
+        active.stage_of(0),
+        Some(Stage::Play),
+        "the swap has not run yet"
+    );
+    assert_eq!(
+        active.cut_of(0, 0),
+        Some(0),
+        "the transition cut hangs until the stage changes"
+    );
+}
+
+#[test]
+fn golden_director_next_demands_a_stage_name() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Warp", &[0], [-1, -1, -1])],
+        vec![staff("director", 6, 0)],
+        vec![named_cut("NEXT", [-1, -1, -1], -1, 0, -1)],
+        vec![record("StartCode", 3, 0, -1)],
+        Vec::new(),
+        vec![2_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let world = run_control(&list);
+    let next = world.resource::<NextStage>();
+    assert_eq!(next.target, None, "no stage name, no transition");
+    let active = world.resource::<ActiveEvent>();
+    assert_eq!(
+        active.stage_of(0),
+        Some(Stage::Play),
+        "so the event lives on"
+    );
+    assert_eq!(active.cut_of(0, 0), Some(0), "and the cut hangs");
 }

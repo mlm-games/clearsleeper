@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::flags::{EventFlags, StoryBits};
+use super::transition::{NextStage, Target};
 
 pub const EVENT_LIST_ENTRY: &str = "dat/event_list.dat";
 
@@ -474,6 +475,17 @@ impl EventList {
             Value::Raw(_) | Value::Text => None,
         }
     }
+
+    pub fn cut_text(&self, cut: usize, key: &str) -> Option<&str> {
+        let cut = self.cuts.get(cut)?;
+        let record = self.record_of(cut.first_data, key)?;
+        if record.kind != TYPE_STRING {
+            return None;
+        }
+        let raw = self.text.get(record.index as usize..)?;
+        let stop = raw.iter().position(|&byte| byte == 0).unwrap_or(raw.len());
+        std::str::from_utf8(&raw[..stop]).ok()
+    }
 }
 
 pub fn control(
@@ -481,6 +493,7 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     mut flags: ResMut<EventFlags>,
     mut story: ResMut<StoryBits>,
+    mut next: ResMut<NextStage>,
 ) {
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
@@ -516,7 +529,7 @@ pub fn control(
             continue;
         }
         for run in running.staffs.iter_mut() {
-            special_proc(run, &list, &mut flags, &mut story);
+            special_proc(run, &list, &mut flags, &mut story, &mut next);
         }
     }
 }
@@ -639,6 +652,7 @@ fn special_proc(
     list: &EventList,
     flags: &mut EventFlags,
     story: &mut StoryBits,
+    next: &mut NextStage,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -646,7 +660,7 @@ fn special_proc(
     match staff.kind {
         STAFF_ALL | STAFF_CREATE | STAFF_LIGHT => cut_end(run, list, flags),
         STAFF_TIMEKEEPER => timekeeper(run, list, flags),
-        STAFF_DIRECTOR => director(run, list, flags),
+        STAFF_DIRECTOR => director(run, list, flags, next),
         STAFF_MESSAGE => message(run, list, flags),
         STAFF_SOUND => sound(run, list, flags),
         STAFF_PACKAGE => package(run, list, flags, story),
@@ -670,11 +684,27 @@ fn timekeeper(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     }
 }
 
-fn director(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn cut_target(run: &StaffRun, list: &EventList) -> Option<Target> {
+    let stage = list.cut_text(run.cut as usize, "Stage")?.to_owned();
+    let start = list.cut_number(run.cut as usize, "StartCode")?;
+    let start = u8::try_from(start).ok()?;
+    let room = match list.cut_number(run.cut as usize, "RoomNo") {
+        Some(room) => u8::try_from(room).ok()?,
+        None => 0,
+    };
+    Some(Target { stage, room, start })
+}
+
+fn director(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, next: &mut NextStage) {
     let action = act_index(run, list, DIRECTOR_ACTIONS);
     if run.advance > 0 {
         match action {
             0 | 4 => wait_start(run, list),
+            1 => {
+                if let Some(target) = cut_target(run, list) {
+                    next.target = Some(target);
+                }
+            }
             6 => {
                 run.wipe = if list
                     .cut_float(run.cut as usize, "Rate")

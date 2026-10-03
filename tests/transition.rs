@@ -36,7 +36,7 @@ fn teleport(app: &mut App, pos: Vec3) {
 }
 
 fn next_stage(app: &App) -> NextStage {
-    *app.sim.world.resource::<NextStage>()
+    app.sim.world.resource::<NextStage>().clone()
 }
 
 fn floor_quad(y: f32) -> ([[f32; 3]; 4], [[u16; 3]; 2]) {
@@ -145,7 +145,10 @@ fn golden_exit_poly_stages_a_transition() {
     step(&mut app);
     assert_eq!(
         next_stage(&app),
-        NextStage(Some(3)),
+        NextStage {
+            exit: Some(3),
+            target: None
+        },
         "standing on an exit poly stages its exit id"
     );
 
@@ -153,7 +156,7 @@ fn golden_exit_poly_stages_a_transition() {
     step(&mut app);
     assert_eq!(
         next_stage(&app),
-        NextStage(None),
+        NextStage::default(),
         "walking off the exit clears the pending stage"
     );
 
@@ -161,7 +164,7 @@ fn golden_exit_poly_stages_a_transition() {
     step(&mut app);
     assert_eq!(
         next_stage(&app),
-        NextStage(None),
+        NextStage::default(),
         "ground with no exit poly stages nothing"
     );
 }
@@ -179,7 +182,7 @@ fn golden_dead_body_stages_no_transition() {
     step(&mut app);
     assert_eq!(
         next_stage(&app),
-        NextStage(None),
+        NextStage::default(),
         "the corpse stays put through its final rest"
     );
 }
@@ -199,7 +202,10 @@ fn golden_swap_stage_teleports_and_rebuilds() {
     });
     app.sim.world.resource_mut::<Swim>().active = true;
     app.sim.world.resource_mut::<Health>().units = 7;
-    *app.sim.world.resource_mut::<NextStage>() = NextStage(Some(9));
+    *app.sim.world.resource_mut::<NextStage>() = NextStage {
+        exit: Some(9),
+        target: None,
+    };
     {
         let mut query = app.sim.world.query::<&mut Player>();
         let mut player = query.iter_mut(&mut app.sim.world).next().unwrap();
@@ -222,7 +228,7 @@ fn golden_swap_stage_teleports_and_rebuilds() {
         app.sim.world.get_resource::<Sea>().is_none(),
         "an interior stage carries no sea"
     );
-    assert_eq!(next_stage(&app), NextStage(None));
+    assert_eq!(next_stage(&app), NextStage::default());
     let area = app.sim.world.resource::<Area>();
     assert_eq!(area.spawn, Vec3::new(5.0, 0.0, 7.0));
     assert_eq!(area.yaw, 1.5);
@@ -263,7 +269,7 @@ fn golden_apply_exit_keeps_the_stage_when_the_target_is_missing() {
     );
     assert_eq!(
         next_stage(&app),
-        NextStage(None),
+        NextStage::default(),
         "the shell consumes the pending exit"
     );
     let player = player(&app);

@@ -451,23 +451,22 @@ impl App {
     }
 
     fn apply_exit(&mut self) {
-        let Some(exit_id) = self
-            .sim
-            .world
-            .resource_mut::<sim::transition::NextStage>()
-            .0
-            .take()
-        else {
-            return;
-        };
-        let Some(dest) = self
-            .stage
-            .as_ref()
-            .and_then(|tables| tables.exit(exit_id))
-            .cloned()
-        else {
-            log::warn!("clearsleeper: exit {exit_id} has no destination");
-            return;
+        let next =
+            std::mem::take(&mut *self.sim.world.resource_mut::<sim::transition::NextStage>());
+        let dest = match (next.target, next.exit) {
+            (Some(target), _) => target,
+            (None, Some(exit_id)) => {
+                let Some(exit) = self.stage.as_ref().and_then(|tables| tables.exit(exit_id)) else {
+                    log::warn!("clearsleeper: exit {exit_id} has no destination");
+                    return;
+                };
+                sim::transition::Target {
+                    stage: exit.stage.clone(),
+                    room: exit.room,
+                    start: exit.start,
+                }
+            }
+            (None, None) => return,
         };
         let Some(tables) = assets::load_stage_tables(&dest.stage) else {
             return;
@@ -491,7 +490,7 @@ impl App {
         let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
         let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
         *self.sim.world.resource_mut::<sim::transition::NextStage>() =
-            sim::transition::NextStage(None);
+            sim::transition::NextStage::default();
         {
             let mut area = self.sim.world.resource_mut::<sim::area::Area>();
             area.spawn = spawn;
