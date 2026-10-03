@@ -12,6 +12,7 @@ pub mod hop;
 pub mod intent;
 pub mod jump;
 pub mod lock;
+pub mod pickup;
 pub mod player;
 pub mod roll;
 pub mod sea;
@@ -47,6 +48,8 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         } else if source.name == enemy::ENEMY_ACTOR {
             let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
             world.spawn((actor, state, hit_points));
+        } else if pickup::is_pickup(&source.name) {
+            world.spawn((actor, pickup::Pickup::spawn(source.parameters)));
         } else {
             world.spawn((actor, combat::HitPoints::default()));
         }
@@ -84,6 +87,7 @@ pub fn build(
     sim.world.insert_resource(lock::Lock::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
+    sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -115,26 +119,33 @@ pub fn build(
     },));
     sim.add_chained_systems(
         (
-            death::freeze.in_set(WwSimSet::Execute),
-            ground::ground_check.in_set(WwSimSet::Execute),
-            water::water_probe.in_set(WwSimSet::Execute),
-            swim::control.in_set(WwSimSet::Execute),
-            lock::control.in_set(WwSimSet::Execute),
-            jump::control.in_set(WwSimSet::Execute),
-            roll::control.in_set(WwSimSet::Execute),
-            hop::control.in_set(WwSimSet::Execute),
-            combat::control.in_set(WwSimSet::Execute),
-            enemy::control.in_set(WwSimSet::Execute),
-            collision::remember_move_from.in_set(WwSimSet::Execute),
-            walk::walk.in_set(WwSimSet::Execute),
-            swim::surface.in_set(WwSimSet::Execute),
-            ship::control.in_set(WwSimSet::Execute),
-            area::clamp_to_area.in_set(WwSimSet::Execute),
-            transition::check.in_set(WwSimSet::Execute),
-            sea::sea_tick.in_set(WwSimSet::Execute),
-            health::apply_damage.in_set(WwSimSet::Execute),
-            death::check.in_set(WwSimSet::Execute),
-            frame::advance.in_set(WwSimSet::After),
+            (
+                death::freeze.in_set(WwSimSet::Execute),
+                ground::ground_check.in_set(WwSimSet::Execute),
+                water::water_probe.in_set(WwSimSet::Execute),
+                swim::control.in_set(WwSimSet::Execute),
+                lock::control.in_set(WwSimSet::Execute),
+                jump::control.in_set(WwSimSet::Execute),
+                roll::control.in_set(WwSimSet::Execute),
+                hop::control.in_set(WwSimSet::Execute),
+                combat::control.in_set(WwSimSet::Execute),
+                enemy::control.in_set(WwSimSet::Execute),
+            )
+                .chain(),
+            (
+                pickup::control.in_set(WwSimSet::Execute),
+                collision::remember_move_from.in_set(WwSimSet::Execute),
+                walk::walk.in_set(WwSimSet::Execute),
+                swim::surface.in_set(WwSimSet::Execute),
+                ship::control.in_set(WwSimSet::Execute),
+                area::clamp_to_area.in_set(WwSimSet::Execute),
+                transition::check.in_set(WwSimSet::Execute),
+                sea::sea_tick.in_set(WwSimSet::Execute),
+                health::apply_damage.in_set(WwSimSet::Execute),
+                death::check.in_set(WwSimSet::Execute),
+                frame::advance.in_set(WwSimSet::After),
+            )
+                .chain(),
         )
             .chain(),
     );
