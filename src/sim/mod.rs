@@ -25,6 +25,7 @@ pub mod lock;
 pub mod pickup;
 pub mod player;
 pub mod roll;
+pub mod scenery;
 pub mod select;
 pub mod sea;
 pub mod ship;
@@ -107,6 +108,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if flags::is_event_switch(&source.name) {
         let switch = flags::EventSwitch::spawn(source.parameters);
         world.spawn((actor, switch)).id()
+    } else if scenery::is_scenery(&source.name) {
+        world.spawn((actor, scenery::Scenery)).id()
     } else {
         world.spawn(actor).id()
     }

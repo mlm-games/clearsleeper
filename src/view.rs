@@ -29,6 +29,7 @@ pub enum ActorKind {
     Cannon,
     Fire,
     Gull,
+    Scenery,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
