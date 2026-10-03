@@ -8,6 +8,7 @@ pub mod death;
 pub mod ending;
 pub mod enemy;
 pub mod events;
+pub mod fire;
 pub mod flags;
 pub mod frame;
 pub mod ground;
@@ -67,6 +68,8 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             && warship::is_switched(source.parameters, source.angle[0], world.resource())
         {
             world.spawn((actor, warship::spawn(source.angle[1])));
+        } else if source.name == fire::FIRE_ACTOR {
+            world.spawn((actor, fire::spawn(source.parameters, world.resource())));
         } else if source.name == cleared::CLEARED_ACTOR {
             world.spawn((actor, cleared::spawn(source.parameters, world.resource())));
         } else if source.name == balloon::BALLOON_ACTOR {
@@ -173,6 +176,7 @@ pub fn build(
                 item::control.in_set(WwSimSet::Execute),
                 enemy::control.in_set(WwSimSet::Execute),
                 balloon::control.in_set(WwSimSet::Execute),
+                fire::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (

@@ -339,6 +339,22 @@ impl App {
                 });
                 continue;
             }
+            if let Some(fire) = entity.get::<sim::fire::Fire>() {
+                let Some(actor) = entity.get::<sim::actor::Actor>() else {
+                    continue;
+                };
+                if !fire.lit {
+                    continue;
+                }
+                out.push(view::ActorView {
+                    pos: actor.pos,
+                    kind: view::ActorKind::Fire,
+                    item: 0,
+                    height: 30.0,
+                    half: 12.0,
+                });
+                continue;
+            }
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
