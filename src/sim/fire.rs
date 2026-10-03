@@ -32,7 +32,7 @@ pub fn spawn(parameters: u32, switches: &Switches) -> Fire {
         kind = 2;
     }
     Fire {
-        lit: !(switch != 0xFF && switches.0.test(switch)),
+        lit: !(switch != 0xFF && switches.test(switch)),
         switch,
         room: kind == ROOM_TYPE,
     }
@@ -51,7 +51,7 @@ pub fn control(
     };
     let fighting = foes.iter().next().is_some();
     for (actor, mut fire) in &mut fires {
-        if fire.switch != 0xFF && switches.0.test(fire.switch) {
+        if fire.switch != 0xFF && switches.test(fire.switch) {
             fire.lit = false;
             continue;
         }

@@ -49,7 +49,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
 }
 
 fn switch(app: &App, bit: u8) -> bool {
-    app.sim.world.resource::<Switches>().0.test(bit)
+    app.sim.world.resource::<Switches>().test(bit)
 }
 
 #[test]

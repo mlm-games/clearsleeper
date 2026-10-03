@@ -81,7 +81,7 @@ fn golden_switch_keeps_a_warship_at_anchor() {
         app.sim.world.resource::<Switches>(),
     );
     assert!(away, "a clear away-switch lets it sail");
-    app.sim.world.resource_mut::<Switches>().0.set(4);
+    app.sim.world.resource_mut::<Switches>().set(4);
     assert!(
         !warship::is_switched(
             GONE_WITH_AWAY_SWITCH,

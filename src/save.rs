@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
-use crate::sim::flags::{BitSet, EventFlags, Switches};
+use crate::sim::flags::{EventFlags, StoryBits, Switches};
 use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
@@ -16,6 +16,24 @@ use crate::{App, assets};
 pub const SAVE_VERSION: u32 = 1;
 pub const DEFAULT_NAME: &str = "Link";
 pub const SLOTS: usize = 3;
+const FLAG_WORDS: usize = 320;
+const STORY_BYTES: usize = 0x100;
+
+fn padded_words(saved: &[u32]) -> [u32; FLAG_WORDS] {
+    let mut out = [0_u32; FLAG_WORDS];
+    for (slot, word) in out.iter_mut().zip(saved) {
+        *slot = *word;
+    }
+    out
+}
+
+fn padded_bytes(saved: &[u8]) -> [u8; STORY_BYTES] {
+    let mut out = [0_u8; STORY_BYTES];
+    for (slot, byte) in out.iter_mut().zip(saved) {
+        *slot = *byte;
+    }
+    out
+}
 
 fn default_name() -> String {
     DEFAULT_NAME.to_string()
@@ -39,9 +57,11 @@ pub struct SaveGame {
     #[serde(default)]
     pub rupees: u32,
     #[serde(default)]
-    pub events: [u64; 4],
+    pub events: Vec<u32>,
     #[serde(default)]
-    pub switches: [u64; 4],
+    pub switches: [u32; 4],
+    #[serde(default)]
+    pub story: Vec<u8>,
     #[serde(default)]
     pub held_item: u8,
     #[serde(default)]
@@ -150,8 +170,9 @@ impl App {
         let player = *query.iter(world).next().expect("player exists at boot");
         let health = *world.resource::<Health>();
         let rupees = world.resource::<Rupees>().count;
-        let events = world.resource::<EventFlags>().0.0;
-        let switches = world.resource::<Switches>().0.0;
+        let events = world.resource::<EventFlags>().words().to_vec();
+        let switches = world.resource::<Switches>().words();
+        let story = world.resource::<StoryBits>().bytes.to_vec();
         let held = *world.resource::<Held>();
         let stage = self
             .stage
@@ -170,6 +191,7 @@ impl App {
             rooms: self.rooms.clone(),
             rupees,
             events,
+            story,
             switches,
             held_item: held.item,
             held_count: held.count,
@@ -191,8 +213,11 @@ impl App {
             world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
             *world.resource_mut::<Health>() = save.health.clone().into();
             *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
-            *world.resource_mut::<EventFlags>() = EventFlags(BitSet(save.events));
-            *world.resource_mut::<Switches>() = Switches(BitSet(save.switches));
+            *world.resource_mut::<EventFlags>() =
+                EventFlags::from_words(padded_words(save.events.as_slice()));
+            *world.resource_mut::<Switches>() = Switches::from_words(save.switches);
+            let mut stories = world.resource_mut::<StoryBits>();
+            stories.bytes = padded_bytes(save.story.as_slice());
             let mut held = world.resource_mut::<Held>();
             held.item = save.held_item;
             held.count = save.held_count;

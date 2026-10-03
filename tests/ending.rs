@@ -19,7 +19,6 @@ fn complete(app: &mut App) {
     app.sim
         .world
         .resource_mut::<Switches>()
-        .0
         .set(ending::COMPLETE_SWITCH);
 }
 

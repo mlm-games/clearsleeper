@@ -24,7 +24,7 @@ pub fn control(
     mut players: Query<&mut Player>,
 ) {
     if !ending.running {
-        if !switches.0.test(COMPLETE_SWITCH) {
+        if !switches.test(COMPLETE_SWITCH) {
             return;
         }
         ending.running = true;

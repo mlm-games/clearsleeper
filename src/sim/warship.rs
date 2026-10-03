@@ -52,10 +52,10 @@ pub struct Cannon {
 pub fn is_switched(parameters: u32, home_x: i16, switches: &Switches) -> bool {
     let away = ((parameters >> SWITCH_SHIFT) & 0xFF) as u8;
     let home = (home_x as u16 & HOME_SWITCH_MASK) as u8;
-    if away != 0xFF && switches.0.test(away) {
+    if away != 0xFF && switches.test(away) {
         return false;
     }
-    home != 0xFF && !switches.0.test(home)
+    home != 0xFF && !switches.test(home)
 }
 
 pub fn spawn(home_yaw: i16) -> Warship {

@@ -20,7 +20,7 @@ pub fn spawn(parameters: u32, switches: &Switches) -> Cleared {
     Cleared {
         switch,
         countdown: COUNTDOWN,
-        done: switches.0.test(switch),
+        done: switches.test(switch),
     }
 }
 
@@ -40,7 +40,7 @@ pub fn control(
         }
         marker.countdown = marker.countdown.saturating_sub(1);
         if marker.countdown == 0 {
-            switches.0.set(marker.switch);
+            switches.set(marker.switch);
             marker.done = true;
         }
     }

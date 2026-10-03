@@ -141,6 +141,7 @@ pub fn build(
     sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
+    sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(ending::Ending::default());
     sim.world.insert_resource(event::EventList::default());

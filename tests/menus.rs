@@ -48,8 +48,9 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
         stage: String::new(),
         rooms: Vec::new(),
         rupees: 0,
-        events: [0; 4],
+        events: Vec::new(),
         switches: [0; 4],
+        story: Vec::new(),
         held_item: 0,
         held_count: 0,
     }

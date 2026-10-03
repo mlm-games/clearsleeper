@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use clearsleeper::save::{SaveGame, read_save, write_save};
-use clearsleeper::sim::flags::{EventFlags, Switches};
+use clearsleeper::sim::flags::{EventFlags, StoryBits, Switches};
 use clearsleeper::sim::intent::CameraYaw;
 use clearsleeper::sim::pickup::Rupees;
 use clearsleeper::{App, SIM_HZ};
@@ -59,8 +59,9 @@ fn golden_loaded_session_continues_identically() {
 fn golden_progression_survives_a_reload() {
     let mut app = App::new();
     app.sim.world.resource_mut::<Rupees>().count = 42;
-    app.sim.world.resource_mut::<EventFlags>().0.set(5);
-    app.sim.world.resource_mut::<Switches>().0.set(9);
+    app.sim.world.resource_mut::<StoryBits>().set(0x2F08);
+    app.sim.world.resource_mut::<EventFlags>().set(5);
+    app.sim.world.resource_mut::<Switches>().set(9);
     let save = app.save();
 
     let mut restored = App::new();
@@ -72,11 +73,15 @@ fn golden_progression_survives_a_reload() {
         "the purse comes back with the player"
     );
     assert!(
-        restored.sim.world.resource::<EventFlags>().0.test(5),
-        "the story flags ride along"
+        restored.sim.world.resource::<StoryBits>().test(0x2F08),
+        "the story bits ride along"
     );
     assert!(
-        restored.sim.world.resource::<Switches>().0.test(9),
+        restored.sim.world.resource::<EventFlags>().test(5),
+        "and so do the event flags"
+    );
+    assert!(
+        restored.sim.world.resource::<Switches>().test(9),
         "the stage switches ride along"
     );
 }
