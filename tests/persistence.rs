@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use clearsleeper::save::{SaveGame, read_save, write_save};
-use clearsleeper::sim::flags::{EventFlags, StoryBits, Switches};
+use clearsleeper::sim::flags::{Arrivals, EventFlags, StoryBits, Switches};
 use clearsleeper::sim::intent::CameraYaw;
 use clearsleeper::sim::pickup::Rupees;
 use clearsleeper::{App, SIM_HZ};
@@ -62,6 +62,7 @@ fn golden_progression_survives_a_reload() {
     app.sim.world.resource_mut::<StoryBits>().set(0x2F08);
     app.sim.world.resource_mut::<EventFlags>().set(5);
     app.sim.world.resource_mut::<Switches>().set(9);
+    app.sim.world.resource_mut::<Arrivals>().set(5);
     let save = app.save();
 
     let mut restored = App::new();
@@ -83,6 +84,10 @@ fn golden_progression_survives_a_reload() {
     assert!(
         restored.sim.world.resource::<Switches>().test(9),
         "the stage switches ride along"
+    );
+    assert!(
+        restored.sim.world.resource::<Arrivals>().is_arrived(5),
+        "and so do the chart arrivals"
     );
 }
 

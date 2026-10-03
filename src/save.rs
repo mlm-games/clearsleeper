@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
-use crate::sim::flags::{EventFlags, StoryBits, Switches};
+use crate::sim::flags::{Arrivals, EventFlags, StoryBits, Switches};
 use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
@@ -19,6 +19,7 @@ pub const DEFAULT_NAME: &str = "Link";
 pub const SLOTS: usize = 3;
 const FLAG_WORDS: usize = 320;
 const STORY_BYTES: usize = 0x100;
+const ARRIVAL_BYTES: usize = 49;
 
 fn padded_words(saved: &[u32]) -> [u32; FLAG_WORDS] {
     let mut out = [0_u32; FLAG_WORDS];
@@ -30,6 +31,14 @@ fn padded_words(saved: &[u32]) -> [u32; FLAG_WORDS] {
 
 fn padded_bytes(saved: &[u8]) -> [u8; STORY_BYTES] {
     let mut out = [0_u8; STORY_BYTES];
+    for (slot, byte) in out.iter_mut().zip(saved) {
+        *slot = *byte;
+    }
+    out
+}
+
+fn padded_arrivals(saved: &[u8]) -> [u8; ARRIVAL_BYTES] {
+    let mut out = [0_u8; ARRIVAL_BYTES];
     for (slot, byte) in out.iter_mut().zip(saved) {
         *slot = *byte;
     }
@@ -61,6 +70,8 @@ pub struct SaveGame {
     pub events: Vec<u32>,
     #[serde(default)]
     pub switches: [u32; 4],
+    #[serde(default)]
+    pub arrivals: Vec<u8>,
     #[serde(default)]
     pub story: Vec<u8>,
     #[serde(default)]
@@ -174,6 +185,7 @@ impl App {
         let events = world.resource::<EventFlags>().words().to_vec();
         let switches = world.resource::<Switches>().words();
         let story = world.resource::<StoryBits>().bytes.to_vec();
+        let arrivals = world.resource::<Arrivals>().bytes();
         let held = *world.resource::<Held>();
         let stage = self
             .stage
@@ -194,6 +206,7 @@ impl App {
             events,
             story,
             switches,
+            arrivals: arrivals.to_vec(),
             held_item: held.item,
             held_count: held.count,
         }
@@ -217,6 +230,8 @@ impl App {
             *world.resource_mut::<EventFlags>() =
                 EventFlags::from_words(padded_words(save.events.as_slice()));
             *world.resource_mut::<Switches>() = Switches::from_words(save.switches);
+            *world.resource_mut::<Arrivals>() =
+                Arrivals::from_bytes(padded_arrivals(save.arrivals.as_slice()));
             let mut stories = world.resource_mut::<StoryBits>();
             stories.bytes = padded_bytes(save.story.as_slice());
             let mut held = world.resource_mut::<Held>();

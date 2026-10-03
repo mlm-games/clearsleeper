@@ -50,6 +50,7 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
         rupees: 0,
         events: Vec::new(),
         switches: [0; 4],
+        arrivals: Vec::new(),
         story: Vec::new(),
         held_item: 0,
         held_count: 0,

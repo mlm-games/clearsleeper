@@ -186,6 +186,20 @@ impl Arrivals {
             .get(index)
             .is_some_and(|value| value & ARRIVE_BIT != 0)
     }
+
+    pub fn set(&mut self, index: usize) {
+        if let Some(value) = self.bits.get_mut(index) {
+            *value |= ARRIVE_BIT;
+        }
+    }
+
+    pub fn bytes(&self) -> [u8; ISLE_COUNT] {
+        self.bits
+    }
+
+    pub fn from_bytes(bytes: [u8; ISLE_COUNT]) -> Self {
+        Self { bits: bytes }
+    }
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
