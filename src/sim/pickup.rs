@@ -47,6 +47,14 @@ impl Pickup {
         }
     }
 
+    pub fn size(&self) -> f32 {
+        match self.item {
+            HEART_PIECE => 14.0,
+            HEART_CONTAINER => 20.0,
+            _ => 10.0,
+        }
+    }
+
     fn takes(&self) -> bool {
         matches!(
             self.item,

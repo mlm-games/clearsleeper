@@ -40,10 +40,7 @@ fn golden_snapshot_builds_world_frame() {
     assert_eq!(ground.tri_count(), 2);
     assert_eq!(
         ground.bounds(),
-        Some((
-            [-800.0, 0.0, -600.0],
-            [800.0, 0.0, 600.0],
-        ))
+        Some(([-800.0, 0.0, -600.0], [800.0, 0.0, 600.0],))
     );
 
     let walls = frame.groups[1].bounds().expect("walls have geometry");
@@ -345,10 +342,7 @@ fn golden_sea_view_builds_wave_mesh() {
     assert!(group.depth_test);
     assert_eq!(
         group.bounds(),
-        Some((
-            [0.0, 1.0, 0.0],
-            [1600.0, 2.0, 1600.0],
-        ))
+        Some(([0.0, 1.0, 0.0], [1600.0, 2.0, 1600.0],))
     );
     assert_eq!(
         group.normals[8],
@@ -361,8 +355,7 @@ fn golden_sea_view_builds_wave_mesh() {
         group.normals[12]
     );
     for normal in &group.normals {
-        let length =
-            normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+        let length = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
         assert!((length - 1.0).abs() < 1e-5, "normal not unit: {normal:?}");
     }
 }
@@ -411,16 +404,22 @@ fn golden_actor_layer_draws_every_kind() {
                 pos: Vec3::new(30.0, 0.0, 0.0),
                 kind: ActorKind::Enemy,
                 item: 0,
+                height: 24.0,
+                half: 12.0,
             },
             ActorView {
                 pos: Vec3::new(-40.0, 0.0, 10.0),
                 kind: ActorKind::Pickup,
                 item: 0,
+                height: 10.0,
+                half: 10.0,
             },
             ActorView {
                 pos: Vec3::new(0.0, 0.0, 60.0),
                 kind: ActorKind::Ship,
                 item: 0,
+                height: 26.0,
+                half: 44.0,
             },
         ],
     };

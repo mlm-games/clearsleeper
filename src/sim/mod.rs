@@ -51,6 +51,13 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         } else if source.name == enemy::ENEMY_ACTOR {
             let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
             world.spawn((actor, state, hit_points));
+        } else if source.name == enemy::LANCE_ACTOR {
+            if let Some((state, hit_points)) = enemy::spawn_lance(source.parameters, source.angle[1])
+            {
+                world.spawn((actor, state, hit_points));
+            } else {
+                world.spawn(actor);
+            }
         } else if pickup::is_pickup(&source.name) {
             world.spawn((actor, pickup::Pickup::spawn(source.parameters)));
         } else if source.name == talk::TALK_ACTOR {

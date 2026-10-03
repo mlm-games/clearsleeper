@@ -27,6 +27,8 @@ pub struct ActorView {
     pub pos: Vec3,
     pub kind: ActorKind,
     pub item: u8,
+    pub height: f32,
+    pub half: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,30 +139,26 @@ fn pickup_look(item: u8) -> (Rgb, f32) {
     }
 }
 
-fn actor_look(actor: &ActorView) -> (Rgb, f32, f32) {
+fn actor_look(actor: &ActorView) -> Rgb {
     match actor.kind {
-        ActorKind::Enemy => (ENEMY, 24.0, 12.0),
-        ActorKind::Talker => (TALKER, 30.0, 12.0),
-        ActorKind::Ship => (SHIP, 26.0, 44.0),
-        ActorKind::Pickup => {
-            let (color, size) = pickup_look(actor.item);
-            (color, size, size)
-        }
+        ActorKind::Enemy => ENEMY,
+        ActorKind::Talker => TALKER,
+        ActorKind::Ship => SHIP,
+        ActorKind::Pickup => pickup_look(actor.item).0,
     }
 }
 
 fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let mut group = MeshGroup::default();
     for actor in &snapshot.actors {
-        let (color, height, half) = actor_look(actor);
         group.push_box(
             actor.pos.x,
             actor.pos.y,
             actor.pos.z,
-            half,
-            height,
-            half,
-            color,
+            actor.half,
+            actor.height,
+            actor.half,
+            actor_look(actor),
             eye,
         );
     }

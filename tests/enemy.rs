@@ -47,6 +47,34 @@ fn spawn_enemy(app: &mut App, pos: Vec3, yaw: i16, parameters: u32) -> Entity {
         .id()
 }
 
+fn spawn_lance(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
+    let (state, hit_points) = enemy::spawn_lance(0, yaw).expect("a standing lance");
+    app.sim
+        .world
+        .spawn((
+            Actor {
+                name: enemy::LANCE_ACTOR.to_owned(),
+                parameters: 0,
+                pos,
+                angle: [0, yaw, 0],
+                set_id: 0,
+            },
+            state,
+            hit_points,
+        ))
+        .id()
+}
+
+fn spawn_fallen_lance(app: &mut App, pos: Vec3, yaw: i16) {
+    app.sim.world.spawn(Actor {
+        name: enemy::LANCE_ACTOR.to_owned(),
+        parameters: 0x0F,
+        pos,
+        angle: [0, yaw, 0],
+        set_id: 0,
+    });
+}
+
 fn enemy(app: &App, entity: Entity) -> Enemy {
     *app.sim.world.get::<Enemy>(entity).expect("enemy component")
 }
@@ -155,7 +183,10 @@ fn golden_planted_variant_ramps_up() {
         tick(&mut app);
     }
     assert_eq!(state(&app, foe), EnemyState::Chase);
-    assert!(!enemy(&app, foe).armed, "the planted variant fights bare");
+    assert!(
+        enemy(&app, foe).profile.lunge > 0.0,
+        "the planted variant fights bare"
+    );
     for _ in 0..5 {
         tick(&mut app);
     }
@@ -300,5 +331,58 @@ fn golden_sword_breaks_the_foe() {
         hearts(&app),
         12,
         "the surprised foe never gets its own swing in"
+    );
+}
+
+#[test]
+fn golden_lance_spots_farther_than_a_boko() {
+    let mut app = App::new();
+    let foe = spawn_lance(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
+    tick(&mut app);
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Alert,
+        "the lance watches 1250 units out, past a boko's 1000"
+    );
+}
+
+#[test]
+fn golden_lance_thrust_costs_a_quarter() {
+    let mut app = App::new();
+    let foe = spawn_lance(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 120.0));
+    for _ in 0..31 {
+        tick(&mut app);
+    }
+    assert_eq!(state(&app, foe), EnemyState::Chase);
+    tick(&mut app);
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Attack,
+        "inside 312 units the lance commits"
+    );
+    for _ in 0..45 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Attack,
+        "the thrust runs 46 ticks"
+    );
+    tick(&mut app);
+    assert_eq!(state(&app, foe), EnemyState::Chase);
+    assert_eq!(hearts(&app), 11, "the spear point takes a quarter heart");
+}
+
+#[test]
+fn golden_fallen_lance_never_stirs() {
+    let mut app = App::new();
+    let count = app.sim.world.iter_entities().count();
+    spawn_fallen_lance(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    assert_eq!(
+        app.sim.world.iter_entities().count(),
+        count + 1,
+        "the fallen pose is scenery, not a foe"
     );
 }

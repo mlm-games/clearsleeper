@@ -8,49 +8,113 @@ use super::player::Player;
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 
 pub const ENEMY_ACTOR: &str = "Bk";
+pub const LANCE_ACTOR: &str = "mo2";
 
 const ALERT_TICKS: u32 = 30;
 const SIGHT_WANDER: f32 = 1000.0;
 const SIGHT_STAND: f32 = 500.0;
-const HEIGHT_EYE: f32 = 60.0;
+const SIGHT_LANCE: f32 = 1250.0;
 const HEIGHT_CENTER: f32 = 50.0;
-const HEIGHT_LIMIT: f32 = 300.0;
-const CONE_LIMIT: u16 = 0x6590;
-const BOX_SIDE: f32 = 500.0;
-const BOX_UP: f32 = 300.0;
-const BOX_NEAR: f32 = -125.0;
-const BOX_FAR: f32 = 500.0;
-const TURN_SCALE: i16 = 4;
-const TURN_MAX: i16 = 0x800;
-const HOME_TURN_SCALE: i16 = 2;
-const HOME_TURN_MAX: i16 = 0x800;
-const CHASE_SPEED: f32 = 90.0;
-const RAMP_SPEED: f32 = 45.0;
-const RAMP_STEP: f32 = 5.0;
 const MOVE_SCALE: f32 = 0.25;
-const ATTACK_RANGE: f32 = 240.0;
-const REATTACK_RANGE: f32 = 400.0;
-const GIVE_UP_RANGE: f32 = 475.0;
-const COOLDOWN_TICKS: u32 = 35;
-const KICK_SPEED: f32 = 70.0;
-const DECEL_STEP: f32 = 20.0;
 const HIT_OFFSET: f32 = 20.0;
-const SWORD_RADIUS: f32 = 60.0;
-const KICK_RADIUS: f32 = 25.0;
 const ATTACK_POWER: u8 = 1;
-const SWORD_WINDOW: (f32, f32) = (23.0, 26.0);
-const KICK_WINDOW: (f32, f32) = (0.0, 20.0);
-const SWORD_TRACK: f32 = 10.0;
-const KICK_TRACK: f32 = 0.0;
-const SWORD_STEPS: [u32; 3] = [16, 6, 22];
-const KICK_STEPS: [u32; 2] = [23, 8];
-const SWORD_SPEEDS: [f32; 3] = [1.2, 1.0, 1.0];
-const KICK_SPEEDS: [f32; 2] = [1.0, 1.0];
 const STAND_KINDS: [u32; 3] = [4, 0xA, 0xB];
 const PLANTED_KIND: u32 = 0xB;
 const STRONG_BIT: u32 = 0x20;
 const STRONG_HP: i32 = 7;
 const BASE_HP: i32 = 5;
+const LANCE_HP: i32 = 10;
+const LANCE_FALLEN: u32 = 0xF;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct Profile {
+    pub steps: &'static [u32],
+    pub speeds: &'static [f32],
+    pub window: (f32, f32),
+    pub track: f32,
+    pub radius: f32,
+    pub chase_speed: f32,
+    pub ramp_step: f32,
+    pub lunge: f32,
+    pub decel: f32,
+    pub attack_range: f32,
+    pub reattack_range: f32,
+    pub give_up_range: f32,
+    pub cooldown: u32,
+    pub cone: u16,
+    pub height_limit: f32,
+    pub box_side: f32,
+    pub box_up: f32,
+    pub box_near: f32,
+    pub box_far: f32,
+    pub body_height: f32,
+    pub body_half: f32,
+}
+
+const SWORD_PROFILE: Profile = Profile {
+    steps: &[16, 6, 22],
+    speeds: &[1.2, 1.0, 1.0],
+    window: (23.0, 26.0),
+    track: 10.0,
+    radius: 60.0,
+    chase_speed: 90.0,
+    ramp_step: 0.0,
+    lunge: 0.0,
+    decel: 20.0,
+    attack_range: 240.0,
+    reattack_range: 400.0,
+    give_up_range: 475.0,
+    cooldown: 35,
+    cone: 0x6590,
+    height_limit: 300.0,
+    box_side: 500.0,
+    box_up: 300.0,
+    box_near: -125.0,
+    box_far: 500.0,
+    body_height: 24.0,
+    body_half: 12.0,
+};
+
+const BARE_PROFILE: Profile = Profile {
+    radius: 25.0,
+    steps: &[23, 8],
+    speeds: &[1.0, 1.0],
+    window: (0.0, 20.0),
+    track: 0.0,
+    chase_speed: 45.0,
+    ramp_step: 5.0,
+    lunge: 70.0,
+    ..SWORD_PROFILE
+};
+
+const LANCE: Profile = Profile {
+    steps: &[18, 11, 17],
+    speeds: &[1.0, 1.0, 1.0],
+    window: (17.0, 27.0),
+    track: 14.0,
+    radius: 100.0,
+    chase_speed: 70.0,
+    ramp_step: 20.0,
+    lunge: 0.0,
+    decel: 20.0,
+    attack_range: 312.5,
+    reattack_range: 575.0,
+    give_up_range: 650.0,
+    cooldown: 15,
+    cone: 0x31C4,
+    height_limit: 400.0,
+    box_side: 500.0,
+    box_up: 130.0,
+    box_near: -125.0,
+    box_far: 500.0,
+    body_height: 44.0,
+    body_half: 20.0,
+};
+
+const TURN_SCALE: i16 = 4;
+const TURN_MAX: i16 = 0x800;
+const HOME_TURN_SCALE: i16 = 2;
+const EYE_HEIGHT: f32 = 60.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyState {
@@ -62,7 +126,7 @@ pub enum EnemyState {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Enemy {
-    pub armed: bool,
+    pub profile: Profile,
     pub always_sees: bool,
     pub sight: f32,
     pub home_yaw: i16,
@@ -95,7 +159,7 @@ pub fn spawn(parameters: u32, home_yaw: i16) -> (Enemy, HitPoints) {
     };
     (
         Enemy {
-            armed,
+            profile: if armed { SWORD_PROFILE } else { BARE_PROFILE },
             always_sees: kind == 0xA,
             sight,
             home_yaw,
@@ -115,49 +179,54 @@ pub fn spawn(parameters: u32, home_yaw: i16) -> (Enemy, HitPoints) {
     )
 }
 
-fn visible(enemy: &Enemy, actor: &Actor, yaw: i16, player_pos: Vec3) -> bool {
+pub fn spawn_lance(parameters: u32, home_yaw: i16) -> Option<(Enemy, HitPoints)> {
+    if parameters & 0xF == LANCE_FALLEN {
+        return None;
+    }
+    Some((
+        Enemy {
+            profile: LANCE,
+            always_sees: false,
+            sight: SIGHT_LANCE,
+            home_yaw,
+            state: EnemyState::Wait,
+            alert: 0,
+            cooldown: 0,
+            closing: false,
+            speed: 0.0,
+            heading: home_yaw,
+            track: 0.0,
+            clock: 0.0,
+            step: 0,
+            step_tick: 0,
+            struck: false,
+        },
+        HitPoints(LANCE_HP),
+    ))
+}
+
+fn visible(profile: &Profile, enemy: &Enemy, actor: &Actor, yaw: i16, player_pos: Vec3) -> bool {
     if enemy.always_sees {
         return true;
     }
     let dx = player_pos.x - actor.pos.x;
     let dy = player_pos.y - actor.pos.y;
     let dz = player_pos.z - actor.pos.z;
-    let eye = actor.pos.y + HEIGHT_EYE;
-    if (player_pos.y + HEIGHT_CENTER - eye).abs() > HEIGHT_LIMIT {
+    let eye = actor.pos.y + EYE_HEIGHT;
+    if (player_pos.y + HEIGHT_CENTER - eye).abs() > profile.height_limit {
         return false;
     }
     let angle = to_s16(dx.atan2(dz));
-    if yaw.wrapping_sub(angle).unsigned_abs() < CONE_LIMIT {
+    if yaw.wrapping_sub(angle).unsigned_abs() < profile.cone {
         return true;
     }
     let (sin, cos) = from_s16(yaw).sin_cos();
     let local_x = dx * cos - dz * sin;
     let local_z = dx * sin + dz * cos;
-    local_x.abs() < BOX_SIDE && dy.abs() < BOX_UP && local_z > BOX_NEAR && local_z < BOX_FAR
-}
-
-fn step_ticks(armed: bool, step: usize) -> u32 {
-    if armed {
-        SWORD_STEPS[step]
-    } else {
-        KICK_STEPS[step]
-    }
-}
-
-fn step_speed(armed: bool, step: usize) -> f32 {
-    if armed {
-        SWORD_SPEEDS[step]
-    } else {
-        KICK_SPEEDS[step]
-    }
-}
-
-fn step_total(armed: bool) -> usize {
-    if armed {
-        SWORD_STEPS.len()
-    } else {
-        KICK_STEPS.len()
-    }
+    local_x.abs() < profile.box_side
+        && dy.abs() < profile.box_up
+        && local_z > profile.box_near
+        && local_z < profile.box_far
 }
 
 fn advance(actor: &mut Actor, enemy: &Enemy) {
@@ -169,7 +238,7 @@ fn advance(actor: &mut Actor, enemy: &Enemy) {
 fn begin(enemy: &mut Enemy, angle: i16) {
     enemy.state = EnemyState::Attack;
     enemy.heading = angle;
-    enemy.track = if enemy.armed { SWORD_TRACK } else { KICK_TRACK };
+    enemy.track = enemy.profile.track;
     enemy.clock = 0.0;
     enemy.step = 0;
     enemy.step_tick = 0;
@@ -177,11 +246,13 @@ fn begin(enemy: &mut Enemy, angle: i16) {
 }
 
 fn finish(enemy: &mut Enemy, actor: &Actor, player: &Player, dist: f32) {
-    enemy.cooldown = COOLDOWN_TICKS;
+    let profile = enemy.profile;
+    enemy.cooldown = profile.cooldown;
     enemy.clock = 0.0;
     enemy.step = 0;
     enemy.step_tick = 0;
-    if dist < REATTACK_RANGE && visible(enemy, actor, actor.angle[1], player.pos) {
+    let seen = visible(&profile, enemy, actor, actor.angle[1], player.pos);
+    if dist < profile.reattack_range && seen {
         enemy.state = EnemyState::Chase;
     } else {
         enemy.state = EnemyState::Wait;
@@ -190,6 +261,7 @@ fn finish(enemy: &mut Enemy, actor: &Actor, player: &Player, dist: f32) {
 }
 
 fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Health) {
+    let profile = enemy.profile;
     if enemy.cooldown > 0 {
         enemy.cooldown -= 1;
     }
@@ -201,14 +273,9 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
         EnemyState::Wait => {
             enemy.speed = 0.0;
             enemy.closing = false;
-            actor.angle[1] = add_calc_angle_s(
-                actor.angle[1],
-                enemy.home_yaw,
-                HOME_TURN_SCALE,
-                HOME_TURN_MAX,
-                0,
-            );
-            if dist < enemy.sight && visible(enemy, actor, actor.angle[1], player.pos) {
+            actor.angle[1] =
+                add_calc_angle_s(actor.angle[1], enemy.home_yaw, HOME_TURN_SCALE, TURN_MAX, 0);
+            if dist < enemy.sight && visible(&profile, enemy, actor, actor.angle[1], player.pos) {
                 enemy.state = EnemyState::Alert;
                 enemy.alert = ALERT_TICKS;
             }
@@ -222,55 +289,57 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
         }
         EnemyState::Chase => {
             actor.angle[1] = add_calc_angle_s(actor.angle[1], bearing, TURN_SCALE, TURN_MAX, 0);
-            if enemy.armed && enemy.cooldown == 0 {
-                enemy.speed = CHASE_SPEED;
+            if profile.ramp_step > 0.0 {
+                add_calc(
+                    &mut enemy.speed,
+                    profile.chase_speed,
+                    1.0,
+                    profile.ramp_step,
+                    0.0,
+                );
             } else {
-                add_calc(&mut enemy.speed, RAMP_SPEED, 1.0, RAMP_STEP, 0.0);
+                enemy.speed = profile.chase_speed;
             }
-            if dist <= GIVE_UP_RANGE {
+            if dist <= profile.give_up_range {
                 enemy.closing = true;
             }
-            if dist > enemy.sight || (enemy.closing && dist > GIVE_UP_RANGE) {
+            if dist > enemy.sight || (enemy.closing && dist > profile.give_up_range) {
                 enemy.state = EnemyState::Wait;
                 enemy.speed = 0.0;
                 enemy.closing = false;
-            } else if dist < ATTACK_RANGE && enemy.cooldown == 0 {
+            } else if dist < profile.attack_range && enemy.cooldown == 0 {
                 begin(enemy, bearing);
             }
             advance(actor, enemy);
         }
         EnemyState::Attack => {
-            let armed = enemy.armed;
-            if enemy.clock == 0.0 && !armed {
-                enemy.speed = KICK_SPEED;
+            if enemy.clock == 0.0 && profile.lunge > 0.0 {
+                enemy.speed = profile.lunge;
             }
-            add_calc(&mut enemy.speed, 0.0, 1.0, DECEL_STEP, 0.0);
-            enemy.clock += step_speed(armed, enemy.step);
+            add_calc(&mut enemy.speed, 0.0, 1.0, profile.decel, 0.0);
+            enemy.clock += profile.speeds[enemy.step];
             if enemy.clock < enemy.track {
                 enemy.heading = bearing;
             }
             actor.angle[1] =
                 add_calc_angle_s(actor.angle[1], enemy.heading, TURN_SCALE, TURN_MAX, 0);
-            if !enemy.struck {
-                let (low, high) = if armed { SWORD_WINDOW } else { KICK_WINDOW };
-                if enemy.clock >= low && enemy.clock <= high {
-                    let yaw = from_s16(actor.angle[1]);
-                    let center_x = actor.pos.x + HIT_OFFSET * yaw.sin();
-                    let center_z = actor.pos.z + HIT_OFFSET * yaw.cos();
-                    let reach = if armed { SWORD_RADIUS } else { KICK_RADIUS };
-                    let hit_x = player.pos.x - center_x;
-                    let hit_z = player.pos.z - center_z;
-                    if hit_x * hit_x + hit_z * hit_z <= reach * reach {
-                        enemy.struck = true;
-                        health.damage(ATTACK_POWER);
-                    }
+            let (low, high) = profile.window;
+            if !enemy.struck && enemy.clock >= low && enemy.clock <= high {
+                let yaw = from_s16(actor.angle[1]);
+                let center_x = actor.pos.x + HIT_OFFSET * yaw.sin();
+                let center_z = actor.pos.z + HIT_OFFSET * yaw.cos();
+                let hit_x = player.pos.x - center_x;
+                let hit_z = player.pos.z - center_z;
+                if hit_x * hit_x + hit_z * hit_z <= profile.radius * profile.radius {
+                    enemy.struck = true;
+                    health.damage(ATTACK_POWER);
                 }
             }
             enemy.step_tick += 1;
-            if enemy.step_tick == step_ticks(armed, enemy.step) {
+            if enemy.step_tick == profile.steps[enemy.step] {
                 enemy.step += 1;
                 enemy.step_tick = 0;
-                if enemy.step == step_total(armed) {
+                if enemy.step == profile.steps.len() {
                     finish(enemy, actor, player, dist);
                 }
             }

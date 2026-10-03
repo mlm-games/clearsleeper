@@ -282,14 +282,20 @@ impl App {
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
-            let (kind, item) = if entity.contains::<sim::ship::Ship>() {
-                (view::ActorKind::Ship, 0)
+            let (kind, item, height, half) = if entity.contains::<sim::ship::Ship>() {
+                (view::ActorKind::Ship, 0, 26.0, 44.0)
             } else if let Some(pickup) = entity.get::<sim::pickup::Pickup>() {
-                (view::ActorKind::Pickup, pickup.item)
-            } else if entity.contains::<sim::enemy::Enemy>() {
-                (view::ActorKind::Enemy, 0)
+                let size = pickup.size();
+                (view::ActorKind::Pickup, pickup.item, size, size)
+            } else if let Some(enemy) = entity.get::<sim::enemy::Enemy>() {
+                (
+                    view::ActorKind::Enemy,
+                    0,
+                    enemy.profile.body_height,
+                    enemy.profile.body_half,
+                )
             } else if entity.contains::<sim::talk::Talk>() {
-                (view::ActorKind::Talker, 0)
+                (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else {
                 continue;
             };
@@ -297,6 +303,8 @@ impl App {
                 pos: actor.pos,
                 kind,
                 item,
+                height,
+                half,
             });
         }
         out
