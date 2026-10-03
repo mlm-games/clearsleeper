@@ -154,11 +154,16 @@ pub fn build(
     sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
+    sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Arrivals::default());
     sim.world.insert_resource(ending::Ending::default());
-    sim.world.insert_resource(event::EventList::default());
+    let event_list = tables
+        .and_then(|tables| crate::assets::load_event_list(tables.name()))
+        .unwrap_or_default();
+    sim.world.insert_resource(event_list);
+    sim.world.insert_resource(event::ActiveEvent::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -199,6 +204,7 @@ pub fn build(
                 death::freeze.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
+                event::control.in_set(WwSimSet::Execute),
                 ending::control.in_set(WwSimSet::Execute),
                 ground::ground_check.in_set(WwSimSet::Execute),
                 water::water_probe.in_set(WwSimSet::Execute),

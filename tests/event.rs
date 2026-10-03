@@ -1,5 +1,9 @@
+use std::time::Duration;
+
 use clearsleeper::assets;
-use clearsleeper::sim::event::{EVENT_LIST_ENTRY, EventList, Value};
+use clearsleeper::sim::event::{ActiveEvent, EVENT_LIST_ENTRY, EventList, Stage, Value};
+use clearsleeper::sim::flags::EventFlags;
+use clearsleeper::{App, SIM_HZ};
 
 const HEADER_LEN: usize = 0x40;
 const STAFF_LEN: usize = 80;
@@ -35,11 +39,75 @@ fn cut(first_data: u32, next: i32) -> Vec<u8> {
     out
 }
 
+fn event_record(name: &str, staffs: &[u32], finish: [i32; 3]) -> Vec<u8> {
+    let mut out = vec![0_u8; 176];
+    let label = name32(name);
+    out[..32].copy_from_slice(&label);
+    for (slot, index) in staffs.iter().enumerate() {
+        let at = 0x2C + slot * 4;
+        out[at..at + 4].copy_from_slice(&index.to_be_bytes());
+    }
+    out[0x7C..0x80].copy_from_slice(&(staffs.len() as i32).to_be_bytes());
+    for (slot, flag) in finish.iter().enumerate() {
+        let at = 0x88 + slot * 4;
+        out[at..at + 4].copy_from_slice(&flag.to_be_bytes());
+    }
+    out
+}
+
+fn named_cut(
+    name: &str,
+    start_flags: [i32; 3],
+    flag_id: i32,
+    first_data: u32,
+    next: i32,
+) -> Vec<u8> {
+    let mut out = name32(name);
+    out.resize(CUT_LEN, 0);
+    for (slot, flag) in start_flags.iter().enumerate() {
+        let at = 0x28 + slot * 4;
+        out[at..at + 4].copy_from_slice(&flag.to_be_bytes());
+    }
+    out[0x34..0x38].copy_from_slice(&flag_id.to_be_bytes());
+    out[0x38..0x3C].copy_from_slice(&first_data.to_be_bytes());
+    out[0x3C..0x40].copy_from_slice(&next.to_be_bytes());
+    out
+}
+
 fn record(name: &str, kind: u32, index: u32, next: i32) -> Vec<u8> {
     let mut out = name32(name);
     out[0x24..0x28].copy_from_slice(&kind.to_be_bytes());
     out[0x28..0x2C].copy_from_slice(&index.to_be_bytes());
     out[0x30..0x34].copy_from_slice(&next.to_be_bytes());
+    out
+}
+
+fn assemble(
+    events: Vec<Vec<u8>>,
+    staffs: Vec<Vec<u8>>,
+    cuts: Vec<Vec<u8>>,
+    data: Vec<Vec<u8>>,
+    floats: Vec<Vec<u8>>,
+    ints: Vec<Vec<u8>>,
+    text: &[u8],
+) -> Vec<u8> {
+    let parts = [events, staffs, cuts, data, floats, ints];
+    let mut tops = Vec::with_capacity(7);
+    let mut body = Vec::new();
+    let mut top = HEADER_LEN;
+    for part in &parts {
+        tops.push((top as u32, part.len() as u32));
+        for entry in part {
+            body.extend_from_slice(entry);
+        }
+        top += part.iter().map(Vec::len).sum::<usize>();
+    }
+    tops.push((top as u32, text.len() as u32));
+    let mut out = header([
+        tops[0], tops[1], tops[2], tops[3], tops[4], tops[5], tops[6],
+    ]);
+    out.extend(body);
+    out.extend(text);
     out
 }
 
@@ -69,6 +137,24 @@ fn sample() -> Vec<u8> {
     data.extend(12201_i32.to_be_bytes().to_vec());
     data.extend(b"name".to_vec());
     data
+}
+
+fn tick(app: &mut App) {
+    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+}
+
+fn boot(list: EventList) -> App {
+    let mut app = App::new();
+    app.sim.world.insert_resource(list);
+    app
+}
+
+fn active(app: &App) -> &ActiveEvent {
+    app.sim.world.resource::<ActiveEvent>()
+}
+
+fn flags(app: &App) -> EventFlags {
+    *app.sim.world.resource::<EventFlags>()
 }
 
 #[test]
@@ -123,7 +209,7 @@ fn golden_short_files_are_rejected() {
 
 #[test]
 fn golden_event_entry_name_matches_the_retail_archive() {
-    assert_eq!(EVENT_LIST_ENTRY, "event_list.dat");
+    assert_eq!(EVENT_LIST_ENTRY, "dat/event_list.dat");
 }
 
 #[test]
@@ -144,4 +230,208 @@ fn golden_great_sea_script_parses_from_the_disc() {
         Some(12201),
         "and it names the line it speaks"
     );
+    let meet = list
+        .event_index("SO_1ST_MEET")
+        .expect("the soldier's opening scene is scripted");
+    let event = list.event(meet).expect("the index resolves");
+    assert_eq!(event.staffs.len(), 3, "npc, link and camera");
+    assert_eq!(event.finish_flags, [7623, -1, -1]);
+    let gannon = list
+        .event_index("FROM_GANON")
+        .expect("the return from the tower is scripted");
+    assert_eq!(list.event(gannon).unwrap().finish_flags, [8824, 8831, -1]);
+    assert_eq!(
+        list.event_index("END_CHECK"),
+        None,
+        "no sea event carries that name"
+    );
+}
+
+#[test]
+fn golden_event_records_expose_their_orders() {
+    let list = EventList::parse(&assemble(
+        vec![
+            event_record("First", &[0], [1, -1, -1]),
+            event_record("Second", &[], [2, -1, -1]),
+        ],
+        vec![staff("walker", 0, 0)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    assert_eq!(list.event_index("First"), Some(0));
+    assert_eq!(list.event_index("Second"), Some(1));
+    assert_eq!(list.event_index("Missing"), None);
+    let first = list.event(0).expect("the index resolves");
+    assert_eq!(first.name, "First");
+    assert_eq!(first.staffs, vec![0]);
+    assert_eq!(first.finish_flags, [1, -1, -1]);
+    assert_eq!(list.event(7), None);
+}
+
+#[test]
+fn golden_order_starts_plays_and_closes() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("One", &[0], [7, -1, -1])],
+        vec![staff("guard", 1, 0)],
+        vec![named_cut("zero", [-1, -1, -1], 7, u32::MAX, -1)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0),
+        "the event exists and takes the order"
+    );
+    assert_eq!(
+        active(&app).stage_of(0),
+        Some(Stage::Order),
+        "and waits for the next tick"
+    );
+    assert!(
+        !app.sim.world.resource_mut::<ActiveEvent>().order(&list, 9),
+        "unknown indices are refused"
+    );
+    app.sim.world.resource_mut::<EventFlags>().set(100);
+    tick(&mut app);
+    assert!(active(&app).start_check(0), "one tick moves it into play");
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(0),
+        "the staff starts at its first cut"
+    );
+    assert!(
+        !flags(&app).test(100),
+        "starting an event clears the flag space"
+    );
+    assert!(
+        flags(&app).test(7),
+        "the all-purpose staff ends its cut every frame"
+    );
+    tick(&mut app);
+    assert!(
+        active(&app).end_check(0),
+        "the finish flag was set, so the event closes"
+    );
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().end(0),
+        "the order tears it down"
+    );
+    assert_eq!(active(&app).stage_of(0), None);
+    assert!(
+        !app.sim.world.resource_mut::<ActiveEvent>().end(0),
+        "and it is gone"
+    );
+}
+
+#[test]
+fn golden_timekeeper_counts_down_before_the_chain_moves() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Tick", &[0], [6, -1, -1])],
+        vec![staff("clock", 4, 0)],
+        vec![
+            named_cut("COUNTDOWN", [-1, -1, -1], 5, 0, 1),
+            named_cut("WAIT", [-1, -1, -1], 6, u32::MAX, -1),
+        ],
+        vec![record("Timer", 3, 0, -1)],
+        Vec::new(),
+        vec![3_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0);
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "counting down");
+    assert!(!flags(&app).test(5), "the first frame loads the timer");
+    tick(&mut app);
+    tick(&mut app);
+    assert!(!flags(&app).test(5), "two more frames of countdown");
+    tick(&mut app);
+    assert!(flags(&app).test(5), "three frames later the wait cut ends");
+    tick(&mut app);
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(1),
+        "the chain advances once the flag lands"
+    );
+    assert!(
+        flags(&app).test(6),
+        "and the wait cut ends on the same tick"
+    );
+    tick(&mut app);
+    assert!(
+        active(&app).end_check(0),
+        "the finish flag closes the event"
+    );
+}
+
+#[test]
+fn golden_cut_start_flags_hold_the_chain_until_they_are_set() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Gate", &[0], [44, -1, -1])],
+        vec![staff("walker", 0, 0)],
+        vec![
+            named_cut("step", [-1, -1, -1], 8, u32::MAX, 1),
+            named_cut("hold", [9, -1, -1], -1, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0);
+    tick(&mut app);
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(0),
+        "the next cut waits on its start flag"
+    );
+    assert!(!flags(&app).test(8), "nothing has released the chain");
+    app.sim.world.resource_mut::<EventFlags>().set(9);
+    tick(&mut app);
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(1),
+        "the satisfied start flag moves the chain"
+    );
+    assert!(
+        flags(&app).test(8),
+        "and the old cut's flag lands on the way out"
+    );
+}
+
+#[test]
+fn golden_cut_parameters_come_from_the_current_cut() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Timed", &[0], [1, -1, -1])],
+        vec![staff("clock", 4, 0)],
+        vec![
+            named_cut("COUNTDOWN", [-1, -1, -1], 2, 0, 1),
+            named_cut("WAIT", [-1, -1, -1], 3, 1, -1),
+        ],
+        vec![record("Timer", 3, 0, 1), record("Rate", 0, 0, -1)],
+        vec![0.5_f32.to_be_bytes().to_vec()],
+        vec![9_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    assert_eq!(list.cut_number(0, "Timer"), Some(9));
+    assert_eq!(list.cut_number(0, "Rate"), Some(0), "a float reads as int");
+    assert_eq!(list.cut_float(0, "Rate"), Some(0.5));
+    assert_eq!(
+        list.cut_number(1, "Timer"),
+        None,
+        "the second cut has its own chain"
+    );
+    assert_eq!(list.cut_number(9, "Timer"), None, "no cut, no answer");
+    assert_eq!(list.cut_number(0, "Missing"), None, "no key, no answer");
 }

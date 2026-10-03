@@ -3,7 +3,7 @@ use glam::Vec2;
 
 use super::actor::Actor;
 use super::area::StageName;
-use super::flags::{Arrivals, EventFlags, StoryBits};
+use super::flags::{Arrivals, OrderFlags, StoryBits};
 use super::health::Health;
 use super::intent::{DoIntent, MoveIntent};
 use super::layer::SEA;
@@ -21,7 +21,7 @@ const DEFAULT_MESSAGE: u16 = 1;
 const BLANK_MESSAGE: i16 = 0;
 const MISSING_MESSAGE: i16 = -1;
 
-const TALK_END_FLAG: u32 = 0x0008;
+const TALK_END_FLAG: u16 = 0x0008;
 const SPOKEN_FLAG: u16 = 0x0901;
 const BOW_EVENT_FLAG: u16 = 0x3A10;
 
@@ -213,8 +213,8 @@ pub fn advance(message: u16, talk: &Talk, ctx: &Context) -> Step {
     }
 }
 
-fn vanish(talk: &mut Talk, stories: &mut StoryBits, event_flags: &mut EventFlags) {
-    event_flags.set(TALK_END_FLAG);
+fn vanish(talk: &mut Talk, stories: &mut StoryBits, order_flags: &mut OrderFlags) {
+    order_flags.set(TALK_END_FLAG);
     stories.set(SPOKEN_FLAG);
     talk.map_done = false;
     talk.bow_done = false;
@@ -242,7 +242,7 @@ pub fn control(
     mut intent: ResMut<MoveIntent>,
     mut dialogue: ResMut<Dialogue>,
     mut stories: ResMut<StoryBits>,
-    mut event_flags: ResMut<EventFlags>,
+    mut order_flags: ResMut<OrderFlags>,
     arrivals: Res<Arrivals>,
     stage: Res<StageName>,
     mut talks: Query<(Entity, &mut Talk, &Actor)>,
@@ -276,25 +276,25 @@ pub fn control(
                 Step::Done(scene) => match scene {
                     Some(Scene::MapOpen) => {
                         talk.map_done = true;
-                        event_flags.set(TALK_END_FLAG);
+                        order_flags.set(TALK_END_FLAG);
                         dialogue.message = opening(&talk, &ctx);
                     }
                     Some(Scene::Bow) => {
                         talk.bow_done = true;
-                        event_flags.set(TALK_END_FLAG);
+                        order_flags.set(TALK_END_FLAG);
                         let message = opening(&talk, &ctx);
                         stories.set(BOW_EVENT_FLAG);
                         dialogue.message = message;
                     }
                     Some(Scene::GetRupee) => {
                         talk.rupee_done = true;
-                        event_flags.set(TALK_END_FLAG);
+                        order_flags.set(TALK_END_FLAG);
                         dialogue.message = opening(&talk, &ctx);
                     }
                     Some(Scene::FirstEnd) | None => {
                         dialogue.open = false;
                         dialogue.speaker = None;
-                        vanish(&mut talk, &mut stories, &mut event_flags);
+                        vanish(&mut talk, &mut stories, &mut order_flags);
                     }
                 },
             }

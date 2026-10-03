@@ -506,6 +506,12 @@ impl App {
         self.sim
             .world
             .insert_resource(sim::area::StageName(tables.name().to_owned()));
+        self.sim
+            .world
+            .insert_resource(assets::load_event_list(tables.name()).unwrap_or_default());
+        self.sim
+            .world
+            .insert_resource(sim::event::ActiveEvent::default());
         sim::clear_actors(&mut self.sim.world);
         self.room_actors.clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();

@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy_ecs::prelude::{Entity, With};
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::area::StageName;
-use clearsleeper::sim::flags::{Arrivals, EventFlags, StoryBits};
+use clearsleeper::sim::flags::{Arrivals, OrderFlags, StoryBits};
 use clearsleeper::sim::player::Player;
 use clearsleeper::sim::talk::{self, Context, Dialogue, Scene, Step, Talk, advance, opening};
 use clearsleeper::{App, SIM_HZ};
@@ -75,8 +75,8 @@ fn stories(app: &App) -> StoryBits {
     *app.sim.world.resource::<StoryBits>()
 }
 
-fn event_flags(app: &App) -> EventFlags {
-    *app.sim.world.resource::<EventFlags>()
+fn order_flags(app: &App) -> OrderFlags {
+    *app.sim.world.resource::<OrderFlags>()
 }
 
 fn fresh_context() -> Context {
@@ -135,7 +135,7 @@ fn golden_talk_ladder_walks_the_arrived_island() {
         "closing the box marks the soldier spoken to"
     );
     assert!(
-        event_flags(&app).test(0x0008),
+        order_flags(&app).has(0x0008),
         "the conversation end raises the talk event flag"
     );
     assert!(talker(&mut app).gone, "the soldier dives away afterwards");
@@ -189,7 +189,7 @@ fn golden_talk_ladder_meets_then_vanishes_at_dragon_roost() {
         "the map event records the map done"
     );
     assert!(
-        event_flags(&app).test(0x0008),
+        order_flags(&app).has(0x0008),
         "the map event raises the talk event flag"
     );
     press(&mut app);

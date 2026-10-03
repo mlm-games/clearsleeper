@@ -106,6 +106,21 @@ impl EventFlags {
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OrderFlags {
+    bits: u16,
+}
+
+impl OrderFlags {
+    pub fn set(&mut self, bits: u16) {
+        self.bits |= bits;
+    }
+
+    pub fn has(&self, bits: u16) -> bool {
+        self.bits & bits != 0
+    }
+}
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Switches {
     words: [u32; SWITCH_BITS as usize / 32],
 }
