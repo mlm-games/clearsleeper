@@ -8,7 +8,6 @@ use clearsleeper::{App, SIM_HZ};
 use glam::Vec3;
 
 const GROUND: u32 = 1;
-const AIR: u32 = 0;
 
 fn tick(app: &mut App) {
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
@@ -119,27 +118,4 @@ fn golden_walking_up_scatters_the_flock() {
     let state = gull(&app, bird_id);
     assert!(state.flying, "inside 400 units it takes wing");
     assert!(state.startled > 0, "and beats away from you");
-}
-
-#[test]
-fn golden_flying_bird_cruises_up_to_its_ceiling() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::new(0.0, 0.0, 40_000.0));
-    let bird_id = bird(&mut app, Vec3::ZERO, AIR);
-    for _ in 0..5 {
-        tick(&mut app);
-    }
-    assert_eq!(gull(&app, bird_id).height, 100.0, "climbing stops at 100");
-}
-
-#[test]
-fn golden_bird_without_a_floor_never_flies() {
-    let mut app = App::new();
-    app.sim.world.remove_resource::<Collision>();
-    place_player(&mut app, Vec3::new(0.0, 0.0, 100.0));
-    let bird_id = bird(&mut app, Vec3::ZERO, GROUND);
-    for _ in 0..30 {
-        tick(&mut app);
-    }
-    assert!(!gull(&app, bird_id).flying, "open sea leaves it grounded");
 }

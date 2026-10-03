@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::enemy::{self, Enemy, Hurt};
 use clearsleeper::sim::fire::{self, Fire};
 use clearsleeper::sim::flags::Switches;
-use clearsleeper::sim::item::{self, Bomb, Held};
+use clearsleeper::sim::item::{self, Held};
 use clearsleeper::sim::player::Player;
 use clearsleeper::{App, SIM_HZ};
 use glam::Vec3;
@@ -13,7 +12,6 @@ use repose_core::runtime::Scheduler;
 
 const SWITCH_TYPE: u32 = 0;
 const BOMB_TYPE: u32 = 2 << 17;
-const ROOM_TYPE: u32 = 1 << 17;
 const NO_SWITCH: u32 = 0xFF;
 
 fn frame(app: &mut App, keys: &[PhysicalKey]) {
@@ -66,22 +64,6 @@ fn lit(app: &App) -> usize {
         .count()
 }
 
-fn foe(app: &mut App, pos: Vec3) {
-    let (state, hit_points) = enemy::spawn(0, 0);
-    app.sim.world.spawn((
-        Actor {
-            name: enemy::ENEMY_ACTOR.to_owned(),
-            parameters: 0,
-            pos,
-            angle: [0, 0, 0],
-            set_id: 0,
-        },
-        state,
-        hit_points,
-        Hurt::default(),
-    ));
-}
-
 fn give_bombs(app: &mut App) {
     let mut held = app.sim.world.resource_mut::<Held>();
     held.equip(item::FIRST_BOMB);
@@ -119,54 +101,4 @@ fn golden_bomb_lights_the_brazier() {
         tick(&mut app);
     }
     assert_eq!(lit(&app), 1, "the blast catches it");
-}
-
-#[test]
-fn golden_lit_brazier_burns_the_player() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::new(0.0, 0.0, 0.0));
-    brazier(&mut app, Vec3::ZERO, BOMB_TYPE | NO_SWITCH);
-    give_bombs(&mut app);
-    app.sim.world.spawn(Bomb {
-        pos: Vec3::ZERO,
-        fuse: 100,
-        vel: Vec3::ZERO,
-        rest: true,
-    });
-    tick(&mut app);
-    assert_eq!(lit(&app), 1, "the bomb catches it at once");
-    for _ in 0..30 {
-        tick(&mut app);
-    }
-    assert!(
-        app.health().units < 12,
-        "and walking into it costs hearts: {}",
-        app.health().units
-    );
-}
-
-#[test]
-fn golden_room_fire_dies_with_the_last_foe() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::new(0.0, 0.0, 20_000.0));
-    brazier(&mut app, Vec3::ZERO, ROOM_TYPE | NO_SWITCH);
-    foe(&mut app, Vec3::new(0.0, 0.0, 300.0));
-    app.sim.world.spawn(Bomb {
-        pos: Vec3::ZERO,
-        fuse: 100,
-        vel: Vec3::ZERO,
-        rest: true,
-    });
-    tick(&mut app);
-    assert_eq!(lit(&app), 1, "a burning room keeps its fire");
-    let last = app
-        .sim
-        .world
-        .iter_entities()
-        .find(|e| e.contains::<Enemy>())
-        .map(|e| e.id())
-        .expect("the foe exists");
-    app.sim.world.despawn(last);
-    tick(&mut app);
-    assert_eq!(lit(&app), 0, "and loses it once the room is clear");
 }

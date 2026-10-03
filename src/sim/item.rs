@@ -125,15 +125,6 @@ impl Held {
             _ => None,
         }
     }
-
-    pub fn label(&self) -> &'static str {
-        match self.kind() {
-            Some(Kind::Bomb) => "bomb",
-            Some(Kind::Arrow) => "arrow",
-            Some(Kind::Boomerang) => "boomerang",
-            None => "none",
-        }
-    }
 }
 
 #[derive(SystemParam)]

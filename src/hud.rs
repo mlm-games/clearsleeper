@@ -6,7 +6,7 @@ use repose_core::{Color, Modifier, Sp, Transform, UnitExt, View};
 use repose_ui::{Box as UiBox, Row, Text, TextStyle, ViewExt, ZStack};
 
 use crate::sim::health::Health;
-use crate::sim::item::Held;
+use crate::sim::item::{Held, Kind};
 
 const HEART_SIZE: f32 = 24.0;
 const HEART_GAP: f32 = 5.0;
@@ -116,6 +116,7 @@ pub fn hearts_strip(health: Health, size: f32) -> View {
 }
 
 const PURSE_HEX: &str = "#3FA94B";
+const PURSE_ROW: f32 = 28.0;
 
 pub fn status_view(health: Health, rupees: u32, held: Option<Held>) -> View {
     let mut stack = vec![hearts_view(health), purse_view(rupees)];
@@ -149,12 +150,17 @@ fn held_view(held: Held) -> View {
         Some(kind) => crate::view::item_hex(kind),
         None => "#2E3138",
     };
-    let label = held.label();
+    let label = match held.kind() {
+        Some(Kind::Bomb) => "bomb",
+        Some(Kind::Arrow) => "arrow",
+        Some(Kind::Boomerang) => "boomerang",
+        None => "none",
+    };
     Row(Modifier::new()
         .absolute()
         .offset(
             Some(HUD_PAD.dp()),
-            Some((HUD_PAD + HEART_SIZE + HEART_GAP + 28.0).dp()),
+            Some((HUD_PAD + HEART_SIZE + HEART_GAP + PURSE_ROW).dp()),
             None,
             None,
         )

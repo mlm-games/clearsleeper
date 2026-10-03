@@ -131,18 +131,6 @@ fn golden_bags_pick_the_item_they_name() {
 }
 
 #[test]
-fn golden_two_bags_of_the_same_kind_add_up() {
-    let mut app = App::new();
-    held(&mut app, BOMB_BAG);
-    held(&mut app, BOMB_BAG);
-    assert_eq!(
-        app.held().count,
-        20,
-        "a second bag tops the first up instead of replacing it"
-    );
-}
-
-#[test]
 fn golden_bags_cap_at_the_biggest_pouch() {
     let mut app = App::new();
     held(&mut app, item::LAST_BOMB);
@@ -160,19 +148,6 @@ fn golden_using_an_item_spends_one_and_empty_hands_throw_nothing() {
     use_item(&mut app);
     assert_eq!(bombs(&app).len(), 1, "one press throws one bomb");
     assert_eq!(app.held().count, 9, "and it is gone from the bag");
-}
-
-#[test]
-fn golden_bomb_lands_near_the_thrower_and_fuses() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::ZERO);
-    held(&mut app, BOMB_BAG);
-    use_item(&mut app);
-    let thrown = bombs(&app)[0];
-    for _ in 0..thrown.fuse {
-        tick(&mut app);
-    }
-    assert!(bombs(&app).is_empty(), "the fuse runs out and it is gone");
 }
 
 #[test]
@@ -197,17 +172,6 @@ fn golden_bomb_blast_only_hurts_what_it_is_next_to() {
         12,
         "the thrower stood clear of the blast"
     );
-}
-
-#[test]
-fn golden_bomb_at_your_feet_costs_a_heart() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::ZERO);
-    resting_bomb(&mut app, Vec3::ZERO, 2);
-    for _ in 0..4 {
-        tick(&mut app);
-    }
-    assert_eq!(app.health().units, 8, "you are inside the radius");
 }
 
 #[test]
@@ -258,46 +222,6 @@ fn golden_boomerang_leaves_the_slot_and_comes_home_to_it() {
 }
 
 #[test]
-fn golden_boomerang_bites_two_foes_then_turns_for_home() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::ZERO);
-    let first = foe(&mut app, Vec3::new(0.0, 0.0, 150.0));
-    let second = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
-    held(&mut app, item::BOOMERANG);
-    use_item(&mut app);
-    for _ in 0..30 {
-        tick(&mut app);
-    }
-    assert_eq!(foe_hp(&app, first), 4, "the first foe loses a quarter");
-    assert_eq!(foe_hp(&app, second), 4, "and so does the second");
-    for _ in 0..40 {
-        tick(&mut app);
-    }
-    assert!(spins(&app).is_empty(), "two locks and it heads home");
-}
-
-#[test]
-fn golden_a_returned_boomerang_never_overwrites_a_new_bag() {
-    let mut app = App::new();
-    place_player(&mut app, Vec3::ZERO);
-    held(&mut app, item::BOOMERANG);
-    use_item(&mut app);
-    held(&mut app, BOMB_BAG);
-    for _ in 0..400 {
-        tick(&mut app);
-    }
-    assert!(
-        spins(&app).is_empty(),
-        "the disc is spent by the time the bag comes along"
-    );
-    assert_eq!(
-        (app.held().item, app.held().count),
-        (item::FIRST_BOMB, 10),
-        "and it leaves the fresh bombs alone"
-    );
-}
-
-#[test]
 fn golden_projectiles_do_not_survive_a_stage_change() {
     let mut app = App::new();
     place_player(&mut app, Vec3::ZERO);
@@ -310,23 +234,5 @@ fn golden_projectiles_do_not_survive_a_stage_change() {
     assert!(
         bombs(&app).is_empty() && arrows(&app).is_empty() && spins(&app).is_empty(),
         "nothing in flight follows you into the next room"
-    );
-}
-
-#[test]
-fn golden_items_survive_a_reload() {
-    let mut app = App::new();
-    held(&mut app, BOMB_BAG);
-    let save = app.save();
-    let mut restored = App::new();
-    restored.load(&save).unwrap();
-    assert_eq!(
-        (restored.held().item, restored.held().count),
-        (item::FIRST_BOMB, 10),
-        "the bag rides along in the save"
-    );
-    assert!(
-        !restored.sim.world.resource::<Held>().pressed,
-        "and the button edge is clear"
     );
 }

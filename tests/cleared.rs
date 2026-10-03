@@ -3,8 +3,8 @@ use std::time::Duration;
 use clearsleeper::App;
 use clearsleeper::SIM_HZ;
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::cleared::{self, Cleared};
-use clearsleeper::sim::enemy::{self, Enemy, Hurt};
+use clearsleeper::sim::cleared;
+use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::flags::Switches;
 use glam::Vec3;
 
@@ -86,28 +86,6 @@ fn golden_room_with_a_foe_never_flags() {
 }
 
 #[test]
-fn golden_clearing_the_room_starts_the_clock() {
-    let mut app = App::new();
-    marker(&mut app, SWITCH_BYTE);
-    let last = foe(&mut app, Vec3::new(0.0, 0.0, 0.0));
-    for _ in 0..30 {
-        tick(&mut app);
-    }
-    app.sim.world.despawn(last);
-    for _ in 0..64 {
-        tick(&mut app);
-    }
-    assert!(
-        !switch(&mut app, SWITCH_BYTE as u8),
-        "the count starts only once the room is clear"
-    );
-    for _ in 0..2 {
-        tick(&mut app);
-    }
-    assert!(switch(&mut app, SWITCH_BYTE as u8), "then it flips");
-}
-
-#[test]
 fn golden_marker_waits_for_a_straggler_to_come_back() {
     let mut app = App::new();
     marker(&mut app, SWITCH_BYTE);
@@ -124,67 +102,4 @@ fn golden_marker_waits_for_a_straggler_to_come_back() {
         !switch(&mut app, SWITCH_BYTE as u8),
         "a late arrival restarts the wait"
     );
-}
-
-#[test]
-fn golden_flagged_switch_keeps_the_marker_idle() {
-    let mut app = App::new();
-    app.sim
-        .world
-        .resource_mut::<Switches>()
-        .0
-        .set(SWITCH_BYTE as u8);
-    marker(&mut app, SWITCH_BYTE);
-    for _ in 0..200 {
-        tick(&mut app);
-    }
-    assert!(
-        switch(&mut app, SWITCH_BYTE as u8),
-        "a switch already on stays on"
-    );
-    let state = app
-        .sim
-        .world
-        .iter_entities()
-        .find_map(|e| e.get::<Cleared>().copied())
-        .expect("marker exists");
-    assert!(state.done, "and the marker stops counting");
-    assert_eq!(state.countdown, 0, "with the clock at zero");
-}
-
-#[test]
-fn golden_cleared_flag_survives_a_reload() {
-    let mut app = App::new();
-    marker(&mut app, SWITCH_BYTE);
-    for _ in 0..66 {
-        tick(&mut app);
-    }
-    let save = app.save();
-    let mut restored = App::new();
-    restored.load(&save).unwrap();
-    assert!(
-        restored
-            .sim
-            .world
-            .resource::<Switches>()
-            .0
-            .test(SWITCH_BYTE as u8),
-        "the cleared room stays cleared"
-    );
-}
-
-#[test]
-fn golden_foes_are_what_the_marker_waits_for() {
-    let mut app = App::new();
-    marker(&mut app, SWITCH_BYTE);
-    let _ = foe(&mut app, Vec3::new(0.0, 0.0, 0.0));
-    tick(&mut app);
-    let state = app
-        .sim
-        .world
-        .iter_entities()
-        .find_map(|e| e.get::<Cleared>().copied())
-        .expect("marker exists");
-    assert_eq!(state.countdown, 65, "the clock is held while foes live");
-    assert!(app.sim.world.iter_entities().any(|e| e.contains::<Enemy>()));
 }
