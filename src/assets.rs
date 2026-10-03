@@ -470,6 +470,27 @@ pub fn load_room_mesh(stage: &str) -> Option<crate::bdl::RoomMesh> {
     }
 }
 
+pub fn load_event_list(stage: &str) -> Option<crate::sim::event::EventList> {
+    match event_list_from_assets(stage) {
+        Ok(list) => Some(list),
+        Err(error) => {
+            log::warn!("clearsleeper: event list unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn event_list_from_assets(stage: &str) -> Result<crate::sim::event::EventList, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let map = root.read_archive(&stage_map(stage))?;
+    let path = root.root().join(stage_map(stage));
+    let data = map.read(crate::sim::event::EVENT_LIST_ENTRY)?;
+    crate::sim::event::EventList::parse(data).map_err(|_| AssetError::Corrupt {
+        path,
+        detail: "event list header is malformed",
+    })
+}
+
 pub fn load_stage_tables(stage: &str) -> Option<crate::dzs::StageTables> {
     match stage_tables_from_assets(stage) {
         Ok(tables) => Some(tables),

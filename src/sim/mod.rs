@@ -7,6 +7,7 @@ pub mod combat;
 pub mod death;
 pub mod ending;
 pub mod enemy;
+pub mod event;
 pub mod events;
 pub mod fire;
 pub mod flags;
@@ -142,6 +143,7 @@ pub fn build(
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(ending::Ending::default());
+    sim.world.insert_resource(event::EventList::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
