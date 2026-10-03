@@ -10,6 +10,11 @@ pub struct SimEvents {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimEvent {
     Footstep,
+    Slash,
+    Hit,
+    Explode,
+    Collect,
+    Hurt,
     GameOver,
     Restart,
     Credits,

@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
+use super::events::{SimEvent, SimEvents};
 use super::health::Health;
 use super::item::{BOOMERANG, FIRST_ARROW, FIRST_BOMB, Held, LAST_ARROW, LAST_BOMB};
 use super::player::Player;
@@ -101,6 +102,7 @@ pub fn control(
     mut health: ResMut<Health>,
     mut rupees: ResMut<Rupees>,
     mut held: ResMut<Held>,
+    mut events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
     mut commands: Commands,
@@ -123,6 +125,7 @@ pub fn control(
             continue;
         }
         apply(pickup.item, &mut health, &mut rupees, &mut held);
+        events.list.push(SimEvent::Collect);
         let _ = commands.entity(entity).despawn();
     }
 }

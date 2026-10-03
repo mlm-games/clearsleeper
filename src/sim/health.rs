@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
 
+use super::events::{SimEvent, SimEvents};
 use super::intent::DamageIntent;
 
 /// Hearts in quarter-units: 12 = three hearts at boot, `max` is the container cap.
@@ -25,8 +26,13 @@ impl Health {
     }
 }
 
-pub fn apply_damage(intent: Res<DamageIntent>, mut health: ResMut<Health>) {
+pub fn apply_damage(
+    intent: Res<DamageIntent>,
+    mut health: ResMut<Health>,
+    mut events: ResMut<SimEvents>,
+) {
     if intent.0 > 0 {
         health.damage(intent.0);
+        events.list.push(SimEvent::Hurt);
     }
 }

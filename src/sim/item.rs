@@ -6,6 +6,7 @@ use super::actor::Actor;
 use super::collision::Collision;
 use super::combat::{Combat, HitPoints};
 use super::enemy::Hurt;
+use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
@@ -244,6 +245,7 @@ pub fn control(
     gates: Gates,
     mut shots: Shots,
     mut foes: Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), Without<Ship>>,
+    mut events: ResMut<SimEvents>,
     mut commands: Commands,
 ) {
     let pressed = intent.0 && !held.pressed;
@@ -304,6 +306,7 @@ pub fn control(
             }
         }
         health.damage(BOMB_POWER);
+        events.list.push(SimEvent::Explode);
         let _ = commands.entity(entity).despawn();
     }
     for entity in chain {

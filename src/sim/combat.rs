@@ -3,6 +3,7 @@ use bevy_ecs::prelude::*;
 use super::actor::Actor;
 use super::collision::Collision;
 use super::enemy;
+use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
@@ -138,6 +139,7 @@ pub fn control(
     >,
     mut combat: ResMut<Combat>,
     mut players: Query<&mut Player>,
+    mut events: ResMut<SimEvents>,
     mut commands: Commands,
 ) {
     let pressed = item.0 && !combat.held;
@@ -162,6 +164,7 @@ pub fn control(
                 continue;
             }
             start(&mut combat, player, &intent, &camera, &lock);
+            events.list.push(SimEvent::Slash);
             continue;
         }
         let (duration, lunge_base, decel_max) = cut(combat.kind);
@@ -210,6 +213,7 @@ pub fn control(
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = FLINCH_TICKS;
                     }
+                    events.list.push(SimEvent::Hit);
                     if hp.0 <= 0 {
                         dead.push(entity);
                     }

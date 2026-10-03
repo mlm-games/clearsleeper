@@ -226,13 +226,20 @@ impl App {
         self.audio.update(dt.as_secs_f32());
         self.audio.take_finished();
         for event in self.drain_events() {
-            match event {
-                sim::events::SimEvent::Footstep => {
-                    self.audio.play(audio::FOOTSTEP_CUE);
-                }
-                sim::events::SimEvent::GameOver => {}
-                sim::events::SimEvent::Restart => {}
-                sim::events::SimEvent::Credits | sim::events::SimEvent::CreditsDone => {}
+            let cue = match event {
+                sim::events::SimEvent::Footstep => Some(audio::FOOTSTEP_CUE),
+                sim::events::SimEvent::Slash => Some(audio::SLASH_CUE),
+                sim::events::SimEvent::Hit => Some(audio::HIT_CUE),
+                sim::events::SimEvent::Explode => Some(audio::BOOM_CUE),
+                sim::events::SimEvent::Collect => Some(audio::PICKUP_CUE),
+                sim::events::SimEvent::Hurt => Some(audio::HURT_CUE),
+                sim::events::SimEvent::GameOver
+                | sim::events::SimEvent::Restart
+                | sim::events::SimEvent::Credits
+                | sim::events::SimEvent::CreditsDone => None,
+            };
+            if let Some(cue) = cue {
+                self.audio.play(cue);
             }
         }
     }
