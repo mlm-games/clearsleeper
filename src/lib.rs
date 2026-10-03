@@ -214,6 +214,7 @@ impl App {
                 }
                 sim::events::SimEvent::GameOver => {}
                 sim::events::SimEvent::Restart => {}
+                sim::events::SimEvent::Credits | sim::events::SimEvent::CreditsDone => {}
             }
         }
     }

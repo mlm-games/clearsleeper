@@ -4,6 +4,7 @@ pub mod collision;
 pub mod combat;
 pub mod death;
 pub mod enemy;
+pub mod ending;
 pub mod events;
 pub mod flags;
 pub mod frame;
@@ -101,6 +102,7 @@ pub fn build(
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::Switches::default());
+    sim.world.insert_resource(ending::Ending::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -136,6 +138,7 @@ pub fn build(
                 death::freeze.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
+                ending::control.in_set(WwSimSet::Execute),
                 ground::ground_check.in_set(WwSimSet::Execute),
                 water::water_probe.in_set(WwSimSet::Execute),
                 swim::control.in_set(WwSimSet::Execute),

@@ -12,6 +12,8 @@ pub enum SimEvent {
     Footstep,
     GameOver,
     Restart,
+    Credits,
+    CreditsDone,
 }
 
 /// Walk distance accumulated toward the next footstep.
