@@ -7,6 +7,7 @@ use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
 use crate::hud;
 use crate::save::{SLOTS, SaveGame};
 use crate::sim::health::Health;
+use crate::sim::intent::GameOverChoice;
 
 const TITLE_HEX: &str = "#F4EAD5";
 const DIM_HEX: &str = "#9FB2C8";
@@ -20,6 +21,7 @@ pub enum Screen {
     Title,
     FileSelect,
     Playing,
+    GameOver,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +47,7 @@ pub enum SlotInfo {
 pub enum Action {
     Load(usize),
     New(usize),
+    GameOver(GameOverChoice),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +88,16 @@ impl Menu {
                     });
                 }
                 (Screen::FileSelect, Cmd::Back) => self.screen = Screen::Title,
+                (Screen::GameOver, Cmd::Up) => self.slot = self.slot.saturating_sub(1),
+                (Screen::GameOver, Cmd::Down) => self.slot = self.slot.min(1),
+                (Screen::GameOver, Cmd::Confirm) => {
+                    let choice = if self.slot == 0 {
+                        GameOverChoice::Continue
+                    } else {
+                        GameOverChoice::Quit
+                    };
+                    return Some(Action::GameOver(choice));
+                }
                 _ => {}
             }
         }
@@ -158,6 +171,39 @@ pub fn file_select_view(menu: &Menu) -> View {
             Modifier::new()
                 .gap(10.dp())
                 .padding(24.dp())
+                .background(Color::from_hex(PANEL_HEX).with_alpha(PANEL_ALPHA))
+                .hit_passthrough(),
+        )
+        .child(children),
+    )
+}
+
+pub fn game_over_view(menu: &Menu) -> View {
+    let mut children = vec![
+        Text("Game Over")
+            .size(Sp(48.0))
+            .color(Color::from_hex(TITLE_HEX)),
+    ];
+    for (slot, label) in [(0, "Continue"), (1, "Return to title")] {
+        let cursor = menu.slot == slot;
+        let marker = if cursor { "> " } else { "  " };
+        let color = if cursor {
+            Color::from_hex(CURSOR_HEX)
+        } else {
+            Color::from_hex(TITLE_HEX)
+        };
+        children.push(Text(format!("{marker}{label}")).size(Sp(24.0)).color(color));
+    }
+    children.push(
+        Text("Space: choose")
+            .size(Sp(15.0))
+            .color(Color::from_hex(DIM_HEX)),
+    );
+    Center(Modifier::new().fill_max_size().hit_passthrough()).child(
+        Column(
+            Modifier::new()
+                .gap(14.dp())
+                .padding(28.dp())
                 .background(Color::from_hex(PANEL_HEX).with_alpha(PANEL_ALPHA))
                 .hit_passthrough(),
         )

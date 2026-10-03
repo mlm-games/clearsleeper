@@ -38,6 +38,7 @@ pub fn build(
     sim.world.insert_resource(intent::CameraYaw::default());
     sim.world.insert_resource(intent::DamageIntent::default());
     sim.world.insert_resource(intent::DoIntent::default());
+    sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(events::SimEvents::default());
     sim.world.insert_resource(events::Stride::default());
@@ -45,6 +46,7 @@ pub fn build(
     sim.world.insert_resource(swim::Swim::default());
     sim.world.insert_resource(roll::Roll::default());
     sim.world.insert_resource(hop::Hop::default());
+    sim.world.insert_resource(death::GameOver::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
         area.spawn = stage.spawn;

@@ -134,6 +134,13 @@ impl App {
                 None => self.start_new(slot),
             },
             Some(menus::Action::New(slot)) => self.start_new(slot),
+            Some(menus::Action::GameOver(choice)) => {
+                *self.sim.world.resource_mut::<sim::intent::GameOverChoice>() = choice;
+                self.menu.screen = match choice {
+                    sim::intent::GameOverChoice::Quit => menus::Screen::Title,
+                    _ => menus::Screen::Playing,
+                };
+            }
             None => {}
         }
     }
@@ -186,6 +193,7 @@ impl App {
                 sim::events::SimEvent::Footstep => {
                     self.audio.play(audio::FOOTSTEP_CUE);
                 }
+                sim::events::SimEvent::GameOver => {}
                 sim::events::SimEvent::Restart => {}
             }
         }
@@ -260,6 +268,11 @@ impl App {
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
         let steps = self.sim.step(dt);
+        let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
+        if game_over && self.menu.screen == menus::Screen::Playing {
+            self.menu.screen = menus::Screen::GameOver;
+            self.menu.slot = 0;
+        }
         self.sync_rooms();
         steps
     }
@@ -378,6 +391,7 @@ pub fn root_view(
         menus::Screen::Playing => hud::hearts_view(app.health()),
         menus::Screen::Title => menus::title_view(),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
+        menus::Screen::GameOver => menus::game_over_view(&app.menu),
     };
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
 }

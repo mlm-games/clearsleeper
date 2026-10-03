@@ -7,10 +7,15 @@ use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
-use super::intent::MoveIntent;
+use super::intent::{GameOverChoice, MoveIntent};
 use super::player::Player;
 use super::roll::Roll;
 use super::swim::Swim;
+
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct GameOver {
+    pub active: bool,
+}
 
 pub fn freeze(
     health: Res<Health>,
@@ -33,21 +38,35 @@ pub fn check(
     mut swim: ResMut<Swim>,
     mut roll: ResMut<Roll>,
     mut hop: ResMut<Hop>,
+    mut game_over: ResMut<GameOver>,
+    mut choice: ResMut<GameOverChoice>,
     mut events: ResMut<SimEvents>,
     mut players: Query<&mut Player>,
 ) {
     for mut player in &mut players {
         let player = &mut *player;
+        if game_over.active {
+            if *choice == GameOverChoice::None {
+                continue;
+            }
+            respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
+            health.units = health.max.min(12);
+            game_over.active = false;
+            *choice = GameOverChoice::None;
+            continue;
+        }
         if health.units == 0 {
             if swim.active || grounded(collision.as_deref(), player.pos) {
-                respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
-                health.units = health.max.min(12);
+                game_over.active = true;
+                events.list.push(SimEvent::GameOver);
             }
             continue;
         }
         if swim.active && swim.air == 0 {
             health.damage(1);
-            respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
+            if health.units > 0 {
+                respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
+            }
         }
     }
 }

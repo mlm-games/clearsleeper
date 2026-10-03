@@ -15,3 +15,11 @@ pub struct DamageIntent(pub u8);
 
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct DoIntent(pub bool);
+
+#[derive(Resource, Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameOverChoice {
+    #[default]
+    None,
+    Continue,
+    Quit,
+}

@@ -1,8 +1,11 @@
 use std::time::Duration;
 
+use clearsleeper::menus::Screen;
 use clearsleeper::sim::area::Area;
 use clearsleeper::sim::collision::Collision;
+use clearsleeper::sim::death::GameOver;
 use clearsleeper::sim::events::SimEvent;
+use clearsleeper::sim::intent::GameOverChoice;
 use clearsleeper::sim::player::Player;
 use clearsleeper::sim::sea::{Sea, SeaTables};
 use clearsleeper::sim::swim::Swim;
@@ -27,6 +30,15 @@ fn swim(app: &App) -> Swim {
 
 fn spawn(app: &App) -> Vec3 {
     app.sim.world.resource::<Area>().spawn
+}
+
+fn game_over(app: &App) -> GameOver {
+    *app.sim.world.resource::<GameOver>()
+}
+
+fn stage_choice(app: &mut App, choice: GameOverChoice) {
+    *app.sim.world.resource_mut::<GameOverChoice>() = choice;
+    app.stage_damage(0);
 }
 
 fn teleport(app: &mut App, pos: Vec3) {
@@ -151,7 +163,7 @@ fn golden_drown_restarts_costs_a_quarter_and_clears_swim() {
 }
 
 #[test]
-fn golden_lethal_damage_on_the_ground_respawns_at_spawn() {
+fn golden_lethal_damage_opens_game_over_then_continues() {
     let mut app = App::new();
     teleport(&mut app, Vec3::new(500.0, 0.0, 500.0));
     set_yaw(&mut app, 1.0);
@@ -159,15 +171,31 @@ fn golden_lethal_damage_on_the_ground_respawns_at_spawn() {
     app.stage_damage(12);
     tick(&mut app);
 
+    assert_eq!(app.health().units, 0, "lethal damage lands");
+    assert!(game_over(&app).active, "death opens the game over menu");
+    assert_eq!(
+        app.menu.screen,
+        Screen::GameOver,
+        "the shell shows the menu"
+    );
     let p = player(&app);
-    assert_eq!(p.pos, spawn(&app), "death returns to the spawn point");
+    assert_eq!(p.pos.x, 500.0, "the body waits where it fell");
+    assert_eq!(p.pos.z, 500.0, "the body waits where it fell");
+    assert_eq!(app.drain_events(), vec![SimEvent::GameOver]);
+
+    stage_choice(&mut app, GameOverChoice::Continue);
+    tick(&mut app);
+
+    let p = player(&app);
+    assert_eq!(p.pos, spawn(&app), "continue restarts at the spawn point");
     assert_eq!(p.yaw, 0.0, "respawn restores the area yaw");
     assert_eq!(app.health().units, 12, "continue restarts at three hearts");
+    assert!(!game_over(&app).active, "the menu hands play back");
     assert_eq!(app.drain_events(), vec![SimEvent::Restart]);
 }
 
 #[test]
-fn golden_airborne_death_falls_frozen_then_respawns() {
+fn golden_airborne_death_falls_frozen_then_opens_game_over() {
     let mut app = App::new();
     teleport(&mut app, Vec3::new(500.0, 200.0, 500.0));
     app.stage_axis(Vec2::new(0.0, 1.0));
@@ -178,6 +206,7 @@ fn golden_airborne_death_falls_frozen_then_respawns() {
     assert_eq!(app.health().units, 0, "lethal damage lands");
     assert_eq!(p.pos.y, 197.5, "the death tick still falls");
     assert_eq!(p.pos.z, 503.5, "the death tick still walks");
+    assert!(!game_over(&app).active, "the menu waits for the landing");
     let frozen_z = p.pos.z;
 
     app.stage_damage(0);
@@ -188,21 +217,36 @@ fn golden_airborne_death_falls_frozen_then_respawns() {
     assert_eq!(p.speed, 0.0, "death freezes the walk drive");
     assert_eq!(p.pos.z, frozen_z, "the held stick moves nothing");
 
-    let mut respawn = None;
+    let mut landed = false;
     for _ in 0..40 {
         tick(&mut app);
-        if app.health().units == 12 {
-            respawn = Some(player(&app).pos);
+        if game_over(&app).active {
+            landed = true;
             break;
         }
     }
-    let pos = respawn.expect("the fall lands and restarts");
-    assert_eq!(pos, spawn(&app), "the fall restarts at the spawn point");
+    assert!(landed, "the fall lands and opens the menu");
+    assert_eq!(
+        app.menu.screen,
+        Screen::GameOver,
+        "the shell shows the menu"
+    );
+    assert!(player(&app).pos.y <= 0.0, "the body rests on the ground");
+    assert_eq!(app.drain_events(), vec![SimEvent::GameOver]);
+
+    stage_choice(&mut app, GameOverChoice::Continue);
+    tick(&mut app);
+    assert_eq!(
+        player(&app).pos,
+        spawn(&app),
+        "the fall restarts at the spawn point"
+    );
+    assert_eq!(app.health().units, 12);
     assert_eq!(app.drain_events(), vec![SimEvent::Restart]);
 }
 
 #[test]
-fn golden_lethal_damage_while_swimming_respawns_without_falling() {
+fn golden_lethal_damage_while_swimming_opens_game_over() {
     let mut app = swim_app();
     teleport(&mut app, Vec3::new(0.0, -500.0, 0.0));
     tick(&mut app);
@@ -212,9 +256,17 @@ fn golden_lethal_damage_while_swimming_respawns_without_falling() {
     app.stage_damage(12);
     tick(&mut app);
 
-    assert!(!swim(&app).active, "death ends swimming at once");
+    assert_eq!(app.health().units, 0, "lethal damage lands");
+    assert!(game_over(&app).active, "open water counts as landed");
+    assert!(swim(&app).active, "the body waits in the water");
+    assert_eq!(app.drain_events(), vec![SimEvent::GameOver]);
+
+    stage_choice(&mut app, GameOverChoice::Continue);
+    tick(&mut app);
+
+    assert!(!swim(&app).active, "continue leaves the water");
     let p = player(&app);
-    assert_eq!(p.pos, spawn(&app), "swim death restarts at the spawn point");
+    assert_eq!(p.pos, spawn(&app), "continue restarts at the spawn point");
     assert_eq!(app.health().units, 12);
     assert_eq!(app.drain_events(), vec![SimEvent::Restart]);
 }
