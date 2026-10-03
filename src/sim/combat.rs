@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::collision::Collision;
+use super::enemy;
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
@@ -26,6 +27,7 @@ const SWORD_OFFSET: f32 = 20.0;
 const SWORD_RADIUS: f32 = 20.0;
 const NORMAL_POWER: i32 = 1;
 const FINISH_POWER: i32 = 2;
+const FLINCH_TICKS: u32 = 10;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CutKind {
@@ -125,7 +127,15 @@ pub fn control(
     jump: Res<Jump>,
     lock: Res<Lock>,
     ships: Query<&Ship>,
-    mut actors: Query<(Entity, &Actor, Option<&mut HitPoints>), Without<Ship>>,
+    mut actors: Query<
+        (
+            Entity,
+            &Actor,
+            Option<&mut HitPoints>,
+            Option<&mut enemy::Hurt>,
+        ),
+        Without<Ship>,
+    >,
     mut combat: ResMut<Combat>,
     mut players: Query<&mut Player>,
     mut commands: Commands,
@@ -189,7 +199,7 @@ pub fn control(
                 NORMAL_POWER
             };
             let mut dead: Vec<Entity> = Vec::new();
-            for (entity, actor, hp) in actors.iter_mut() {
+            for (entity, actor, hp, mut hurt) in actors.iter_mut() {
                 let Some(mut hp) = hp else {
                     continue;
                 };
@@ -197,6 +207,9 @@ pub fn control(
                 let dz = actor.pos.z - center_z;
                 if dx * dx + dz * dz <= SWORD_RADIUS * SWORD_RADIUS {
                     hp.0 -= power;
+                    if let Some(hurt) = hurt.as_deref_mut() {
+                        hurt.0 = FLINCH_TICKS;
+                    }
                     if hp.0 <= 0 {
                         dead.push(entity);
                     }

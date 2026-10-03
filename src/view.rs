@@ -23,6 +23,7 @@ pub enum ActorKind {
     Bomb,
     Arrow,
     Boomerang,
+    Spear,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -153,6 +154,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Bomb => BOMB,
         ActorKind::Arrow => ARROW,
         ActorKind::Boomerang => BOOM,
+        ActorKind::Spear => ARROW,
         ActorKind::Pickup => pickup_look(actor.item).0,
     }
 }

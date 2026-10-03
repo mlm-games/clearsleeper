@@ -111,7 +111,37 @@ const LANCE: Profile = Profile {
     body_half: 20.0,
 };
 
+const LANCE_BARE: Profile = Profile {
+    steps: &[12, 11, 11],
+    speeds: &[1.0, 1.0, 1.0],
+    window: (3.0, 8.0),
+    track: 0.0,
+    radius: 50.0,
+    chase_speed: 70.0,
+    ramp_step: 20.0,
+    lunge: 0.0,
+    decel: 20.0,
+    attack_range: 312.5,
+    reattack_range: 575.0,
+    give_up_range: 650.0,
+    cooldown: 15,
+    cone: 0x31C4,
+    height_limit: 400.0,
+    box_side: 500.0,
+    box_up: 130.0,
+    box_near: -125.0,
+    box_far: 500.0,
+    body_height: 44.0,
+    body_half: 20.0,
+};
+
 const TURN_SCALE: i16 = 4;
+const THROW_FORWARD: f32 = 25.0;
+const THROW_LIFT: f32 = 25.0;
+const THROW_GRAVITY: f32 = -2.5;
+const THROW_LIFE: u32 = 120;
+const THROW_REACH: f32 = 20.0;
+const THROW_POWER: u8 = 1;
 const TURN_MAX: i16 = 0x800;
 const HOME_TURN_SCALE: i16 = 2;
 const EYE_HEIGHT: f32 = 60.0;
@@ -124,10 +154,22 @@ pub enum EnemyState {
     Attack,
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Hurt(pub u32);
+
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct Spear {
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub life: u32,
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Enemy {
     pub profile: Profile,
     pub always_sees: bool,
+    pub armed: bool,
+    pub lance: bool,
     pub sight: f32,
     pub home_yaw: i16,
     pub state: EnemyState,
@@ -161,6 +203,8 @@ pub fn spawn(parameters: u32, home_yaw: i16) -> (Enemy, HitPoints) {
         Enemy {
             profile: if armed { SWORD_PROFILE } else { BARE_PROFILE },
             always_sees: kind == 0xA,
+            armed,
+            lance: false,
             sight,
             home_yaw,
             state: EnemyState::Wait,
@@ -187,6 +231,8 @@ pub fn spawn_lance(parameters: u32, home_yaw: i16) -> Option<(Enemy, HitPoints)>
         Enemy {
             profile: LANCE,
             always_sees: false,
+            armed: true,
+            lance: true,
             sight: SIGHT_LANCE,
             home_yaw,
             state: EnemyState::Wait,
@@ -351,12 +397,73 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
 pub fn control(
     mut health: ResMut<Health>,
     players: Query<&Player>,
-    mut enemies: Query<(&mut Enemy, &mut Actor)>,
+    mut hurts: Query<&mut Hurt>,
+    mut enemies: Query<(Entity, &mut Enemy, &mut Actor)>,
+    mut spears: Query<(Entity, &mut Spear)>,
+    mut commands: Commands,
 ) {
     let Some(player) = players.iter().next() else {
         return;
     };
-    for (mut enemy, mut actor) in &mut enemies {
-        tick(&mut enemy, &mut actor, player, &mut health);
+    for (entity, mut enemy, mut actor) in &mut enemies {
+        let mut stunned = false;
+        let mut recovering = false;
+        if let Ok(mut hurt) = hurts.get_mut(entity) {
+            if hurt.0 > 0 {
+                hurt.0 -= 1;
+                stunned = true;
+                recovering = hurt.0 == 0;
+            }
+        }
+        if stunned {
+            enemy.speed = 0.0;
+            enemy.clock = 0.0;
+            enemy.step = 0;
+            enemy.step_tick = 0;
+            enemy.state = if recovering {
+                EnemyState::Chase
+            } else {
+                EnemyState::Wait
+            };
+            enemy.closing = false;
+        } else {
+            tick(&mut enemy, &mut actor, player, &mut health);
+        }
+        if recovering && enemy.armed && enemy.lance {
+            let dx = player.pos.x - actor.pos.x;
+            let dz = player.pos.z - actor.pos.z;
+            let dist = (dx * dx + dz * dz).sqrt();
+            if dist > enemy.profile.attack_range {
+                enemy.armed = false;
+                enemy.profile = LANCE_BARE;
+                let length = dist.max(1.0);
+                commands.spawn(Spear {
+                    pos: actor.pos,
+                    vel: Vec3::new(
+                        THROW_FORWARD * dx / length,
+                        THROW_LIFT,
+                        THROW_FORWARD * dz / length,
+                    ),
+                    life: THROW_LIFE,
+                });
+            }
+        }
+    }
+    for (entity, mut spear) in &mut spears {
+        spear.vel.y += THROW_GRAVITY;
+        let step = spear.vel;
+        spear.pos += step;
+        let dx = player.pos.x - spear.pos.x;
+        let dz = player.pos.z - spear.pos.z;
+        let dy = player.pos.y - spear.pos.y;
+        spear.life = spear.life.saturating_sub(1);
+        if dx * dx + dz * dz + dy * dy <= THROW_REACH * THROW_REACH {
+            health.damage(THROW_POWER);
+            let _ = commands.entity(entity).despawn();
+            continue;
+        }
+        if spear.life == 0 || spear.pos.y < player.pos.y - 500.0 {
+            let _ = commands.entity(entity).despawn();
+        }
     }
 }

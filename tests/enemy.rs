@@ -3,11 +3,13 @@ use std::time::Duration;
 use bevy_ecs::prelude::Entity;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::combat::{Combat, HitPoints};
-use clearsleeper::sim::enemy::{self, Enemy, EnemyState};
+use clearsleeper::sim::enemy::{self, Enemy, EnemyState, Hurt, Spear};
 use clearsleeper::sim::health::Health;
 use clearsleeper::sim::player::Player;
 use clearsleeper::{App, SIM_HZ};
 use glam::Vec3;
+use repose_core::input::PhysicalKey;
+use repose_core::runtime::Scheduler;
 
 const WANDERER: u32 = 0;
 const STRONGER: u32 = 0x20;
@@ -45,6 +47,28 @@ fn spawn_enemy(app: &mut App, pos: Vec3, yaw: i16, parameters: u32) -> Entity {
             hit_points,
         ))
         .id()
+}
+
+fn hurt(app: &App, entity: Entity) -> u32 {
+    app.sim.world.entity(entity).get::<Hurt>().unwrap().0
+}
+
+fn armed(app: &App, entity: Entity) -> bool {
+    app.sim.world.entity(entity).get::<Enemy>().unwrap().armed
+}
+
+fn swing(app: &mut App) {
+    app.stage_polled(&keys(&[PhysicalKey::KeyB]));
+    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+    app.stage_polled(&keys(&[]));
+    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+}
+
+fn keys(held: &[PhysicalKey]) -> Scheduler {
+    let mut sched = Scheduler::default();
+    sched.window_focused = true;
+    sched.held_keys = held.iter().cloned().collect();
+    sched
 }
 
 fn spawn_lance(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
@@ -384,5 +408,139 @@ fn golden_fallen_lance_never_stirs() {
         app.sim.world.iter_entities().count(),
         count + 1,
         "the fallen pose is scenery, not a foe"
+    );
+}
+
+fn spears(app: &App) -> Vec<Spear> {
+    app.sim
+        .world
+        .iter_entities()
+        .filter_map(|e| e.get::<Spear>().copied())
+        .collect()
+}
+
+fn spawn_lance_with_hurt(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
+    let (state, hit_points) = enemy::spawn_lance(0, yaw).expect("a standing lance");
+    app.sim
+        .world
+        .spawn((
+            Actor {
+                name: enemy::LANCE_ACTOR.to_owned(),
+                parameters: 0,
+                pos,
+                angle: [0, yaw, 0],
+                set_id: 0,
+            },
+            state,
+            hit_points,
+            Hurt::default(),
+        ))
+        .id()
+}
+
+#[test]
+fn golden_hit_flattens_a_foe_for_a_few_ticks() {
+    let mut app = App::new();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 120.0));
+    for _ in 0..31 {
+        tick(&mut app);
+    }
+    assert_eq!(state(&app, foe), EnemyState::Chase);
+    tick(&mut app);
+    assert_eq!(state(&app, foe), EnemyState::Attack, "it commits");
+    swing(&mut app);
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Wait,
+        "the blade stops it cold"
+    );
+    assert_eq!(hurt(&app, foe), 9, "and the stagger runs ten ticks");
+    for _ in 0..8 {
+        tick(&mut app);
+    }
+    assert_eq!(hurt(&app, foe), 0, "then it shakes it off");
+    assert_eq!(state(&app, foe), EnemyState::Chase, "and comes back at you");
+}
+
+#[test]
+fn golden_lance_throws_its_spear_when_struck_at_range() {
+    let mut app = App::new();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    assert_eq!(spears(&app).len(), 1, "the spear goes overhand");
+    assert!(!armed(&app, foe), "and the lance is bare for it now");
+}
+
+#[test]
+fn golden_lance_keeps_its_spear_when_struck_up_close() {
+    let mut app = App::new();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    assert!(spears(&app).is_empty(), "no throw from the blade's reach");
+    assert!(armed(&app, foe), "the lance keeps its spear");
+}
+
+#[test]
+fn golden_thrown_spear_costs_a_quarter() {
+    let mut app = App::new();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    for _ in 0..40 {
+        tick(&mut app);
+    }
+    assert_eq!(hearts(&app), 11, "the spear point takes a quarter heart");
+    assert!(spears(&app).is_empty(), "and it is spent on the ground");
+}
+
+#[test]
+fn golden_bare_lance_punches() {
+    let mut app = App::new();
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    for _ in 0..15 {
+        tick(&mut app);
+    }
+    let _ = foe;
+    assert!(
+        spears(&app).is_empty(),
+        "the bare lance has already thrown its spear"
+    );
+    assert_eq!(
+        enemy(&app, foe).profile.window,
+        (3.0, 8.0),
+        "and works with its fists instead"
     );
 }

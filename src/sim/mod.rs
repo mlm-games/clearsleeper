@@ -51,12 +51,12 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             world.spawn((actor, ship::Ship::default()));
         } else if source.name == enemy::ENEMY_ACTOR {
             let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
-            world.spawn((actor, state, hit_points));
+            world.spawn((actor, state, hit_points, enemy::Hurt::default()));
         } else if source.name == enemy::LANCE_ACTOR {
             if let Some((state, hit_points)) =
                 enemy::spawn_lance(source.parameters, source.angle[1])
             {
-                world.spawn((actor, state, hit_points));
+                world.spawn((actor, state, hit_points, enemy::Hurt::default()));
             } else {
                 world.spawn(actor);
             }

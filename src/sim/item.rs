@@ -5,6 +5,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::collision::Collision;
 use super::combat::{Combat, HitPoints};
+use super::enemy::Hurt;
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
@@ -46,6 +47,9 @@ const BOOM_RETURN_TICKS: u32 = 60;
 const BOOM_REACH: f32 = 30.0;
 const BOOM_POWER: i32 = 1;
 const THROW_OFFSET: f32 = 20.0;
+const BOMB_FLINCH: u32 = 10;
+const ARROW_FLINCH: u32 = 10;
+const BOOM_FLINCH: u32 = 6;
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Held {
@@ -239,7 +243,7 @@ pub fn control(
     players: Query<&Player>,
     gates: Gates,
     mut shots: Shots,
-    mut foes: Query<(Entity, &Actor, &mut HitPoints), Without<Ship>>,
+    mut foes: Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), Without<Ship>>,
     mut commands: Commands,
 ) {
     let pressed = intent.0 && !held.pressed;
@@ -288,9 +292,12 @@ pub fn control(
                 chain.push(*other);
             }
         }
-        for (foe_entity, foe, mut hp) in &mut foes {
+        for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
             if near(bomb.pos, foe.pos, BOMB_RADIUS) {
                 hp.0 -= BOMB_POWER as i32;
+                if let Some(hurt) = hurt.as_deref_mut() {
+                    hurt.0 = BOMB_FLINCH;
+                }
                 if hp.0 <= 0 {
                     dead.push(foe_entity);
                 }
@@ -314,9 +321,12 @@ pub fn control(
         arrow.vel.y = (arrow.vel.y + ARROW_GRAVITY).max(ARROW_FALL);
         let step = arrow.vel;
         arrow.pos += step;
-        for (_, foe, mut hp) in &mut foes {
+        for (_, foe, mut hp, mut hurt) in &mut foes {
             if segment(from, foe.pos, ARROW_REACH) {
                 hp.0 -= ARROW_POWER;
+                if let Some(hurt) = hurt.as_deref_mut() {
+                    hurt.0 = ARROW_FLINCH;
+                }
                 spent.push(entity);
                 break;
             }
@@ -341,9 +351,12 @@ pub fn control(
         let step = boom.vel;
         boom.pos += step;
         if !boom.returning {
-            for (foe_entity, foe, mut hp) in &mut foes {
+            for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
                 if !boom.struck.contains(&foe_entity) && segment(from, foe.pos, BOOM_REACH) {
                     hp.0 -= BOOM_POWER;
+                    if let Some(hurt) = hurt.as_deref_mut() {
+                        hurt.0 = BOOM_FLINCH;
+                    }
                     boom.struck.push(foe_entity);
                 }
             }

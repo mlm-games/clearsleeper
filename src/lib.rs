@@ -319,6 +319,16 @@ impl App {
                 });
                 continue;
             }
+            if let Some(spear) = entity.get::<sim::enemy::Spear>() {
+                out.push(view::ActorView {
+                    pos: spear.pos,
+                    kind: view::ActorKind::Spear,
+                    item: 0,
+                    height: 4.0,
+                    half: 4.0,
+                });
+                continue;
+            }
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
