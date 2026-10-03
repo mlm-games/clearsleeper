@@ -1,6 +1,7 @@
 pub mod actor;
 pub mod area;
 pub mod collision;
+pub mod combat;
 pub mod death;
 pub mod events;
 pub mod frame;
@@ -43,7 +44,7 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         if source.name == ship::SHIP_ACTOR {
             world.spawn((actor, ship::Ship::default()));
         } else {
-            world.spawn(actor);
+            world.spawn((actor, combat::HitPoints::default()));
         }
     }
 }
@@ -67,6 +68,7 @@ pub fn build(
     sim.world.insert_resource(intent::DamageIntent::default());
     sim.world.insert_resource(intent::DoIntent::default());
     sim.world.insert_resource(intent::TargetIntent::default());
+    sim.world.insert_resource(intent::ItemIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(events::SimEvents::default());
@@ -77,6 +79,7 @@ pub fn build(
     sim.world.insert_resource(hop::Hop::default());
     sim.world.insert_resource(lock::Lock::default());
     sim.world.insert_resource(jump::Jump::default());
+    sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -116,6 +119,7 @@ pub fn build(
             jump::control.in_set(WwSimSet::Execute),
             roll::control.in_set(WwSimSet::Execute),
             hop::control.in_set(WwSimSet::Execute),
+            combat::control.in_set(WwSimSet::Execute),
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
             swim::surface.in_set(WwSimSet::Execute),

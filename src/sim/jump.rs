@@ -4,6 +4,7 @@ use std::f32::consts::PI;
 use bevy_ecs::prelude::*;
 
 use super::collision::Collision;
+use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
@@ -37,14 +38,14 @@ pub struct Jump {
     held: bool,
 }
 
-enum Direction {
+pub(super) enum Direction {
     Forward,
     Left,
     Right,
     Back,
 }
 
-fn direction(desired: i16, face: i16) -> Direction {
+pub(super) fn direction(desired: i16, face: i16) -> Direction {
     let diff = desired.wrapping_sub(face);
     if diff.unsigned_abs() > 0x6000 {
         Direction::Back
@@ -65,6 +66,7 @@ pub fn control(
     health: Res<Health>,
     swim: Res<Swim>,
     lock: Res<Lock>,
+    combat: Res<Combat>,
     mut roll: ResMut<Roll>,
     mut jump: ResMut<Jump>,
     mut players: Query<&mut Player>,
@@ -73,7 +75,7 @@ pub fn control(
     jump.held = do_intent.0;
     for mut player in &mut players {
         let player = &mut *player;
-        if swim.active || health.units == 0 {
+        if swim.active || health.units == 0 || combat.active {
             jump.active = false;
             continue;
         }

@@ -98,6 +98,7 @@ impl App {
         self.stage_damage(input::damage_from_keys(held, sched.window_focused));
         self.stage_do(input::do_from_keys(held, sched.window_focused));
         self.stage_target(input::target_from_keys(held, sched.window_focused));
+        self.stage_item(input::item_from_keys(held, sched.window_focused));
         self.stage_menu(held, sched.window_focused);
     }
 
@@ -107,6 +108,7 @@ impl App {
             self.stage_damage(0);
             self.stage_do(false);
             self.stage_target(false);
+            self.stage_item(false);
         }
         let cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
@@ -179,6 +181,10 @@ impl App {
 
     pub fn stage_do(&mut self, held: bool) {
         self.sim.world.resource_mut::<sim::intent::DoIntent>().0 = held;
+    }
+
+    pub fn stage_item(&mut self, held: bool) {
+        self.sim.world.resource_mut::<sim::intent::ItemIntent>().0 = held;
     }
 
     pub fn stage_target(&mut self, held: bool) {

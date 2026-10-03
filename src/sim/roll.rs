@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::collision::Collision;
+use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
@@ -32,6 +33,7 @@ pub fn control(
     swim: Res<Swim>,
     health: Res<Health>,
     lock: Res<Lock>,
+    combat: Res<Combat>,
     collision: Option<Res<Collision>>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -50,7 +52,13 @@ pub fn control(
                 continue;
             }
         }
-        if roll.active || !pressed || swim.active || health.units == 0 || lock.target.is_some() {
+        if roll.active
+            || !pressed
+            || swim.active
+            || health.units == 0
+            || lock.target.is_some()
+            || combat.active
+        {
             continue;
         }
         let stick = intent.axis.length().min(1.0);

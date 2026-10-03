@@ -36,3 +36,7 @@ pub fn do_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
 pub fn target_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
     window_focused && held.contains(&PhysicalKey::KeyL)
 }
+
+pub fn item_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
+    window_focused && held.contains(&PhysicalKey::KeyB)
+}

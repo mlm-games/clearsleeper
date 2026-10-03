@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::collision::Collision;
+use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, MoveIntent};
@@ -39,6 +40,7 @@ pub fn control(
     swim: Res<Swim>,
     health: Res<Health>,
     jump: Res<Jump>,
+    combat: Res<Combat>,
     mut hop: ResMut<Hop>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -48,7 +50,7 @@ pub fn control(
         let grounded_now = grounded(collision.as_deref(), player.pos);
         let left_ground = hop.prev_grounded && !grounded_now;
         hop.prev_grounded = grounded_now;
-        if swim.active || health.units == 0 || jump.active {
+        if swim.active || health.units == 0 || jump.active || combat.active {
             hop.active = false;
             continue;
         }

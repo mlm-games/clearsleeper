@@ -5,6 +5,7 @@ use std::f32::consts::TAU;
 use bevy_ecs::prelude::*;
 use glam::Vec2;
 
+use super::combat::Combat;
 use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
@@ -142,6 +143,10 @@ pub(crate) fn facing_error(intent: &MoveIntent, camera: &CameraYaw, yaw: f32) ->
     angle_distance(target_yaw(intent, camera), to_s16(yaw))
 }
 
+pub(super) fn turn_toward(value: i16, target: i16) -> i16 {
+    add_calc_angle_s(value, target, TURN_SCALE, TURN_PARAM, TURN_RATE)
+}
+
 pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
@@ -149,6 +154,7 @@ pub fn walk(
     hop: Res<Hop>,
     roll: Res<Roll>,
     jump: Res<Jump>,
+    combat: Res<Combat>,
     ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -167,6 +173,8 @@ pub fn walk(
             roll_tick(player);
         } else if jump.active {
             jump_tick(player, &jump);
+        } else if combat.active {
+            swing_tick(player);
         } else {
             walk_tick(player, &intent, &camera, &mut stride, &mut events);
         }
@@ -226,6 +234,18 @@ fn jump_tick(player: &mut Player, jump: &Jump) {
     player.pos.x += speed_f * player.yaw.sin();
     player.pos.z += speed_f * player.yaw.cos();
     player.speed_y = (player.speed_y + gravity).max(MAX_FALL_SPEED);
+    player.pos.y += player.speed_y;
+}
+
+fn swing_tick(player: &mut Player) {
+    let speed_f = if player.speed.abs() < SPEED_F_EPS {
+        0.0
+    } else {
+        player.speed
+    };
+    player.pos.x += speed_f * player.yaw.sin();
+    player.pos.z += speed_f * player.yaw.cos();
+    player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
     player.pos.y += player.speed_y;
 }
 
