@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::combat::HitPoints;
 use super::health::Health;
 use super::intent::{MoveIntent, TargetIntent};
 use super::jump::Jump;
@@ -51,7 +52,10 @@ fn weight(player: &Player, pos: Vec3) -> f32 {
     (pos - player.pos).length() * (WEIGHT_RATIO + WEIGHT_RATIO * turns * turns) / WEIGHT_DIVISOR
 }
 
-fn pick(player: &Player, actors: &Query<(Entity, &Actor), Without<Ship>>) -> Option<Entity> {
+fn pick(
+    player: &Player,
+    actors: &Query<(Entity, &Actor), (Without<Ship>, With<HitPoints>)>,
+) -> Option<Entity> {
     let mut best: Option<(Entity, f32)> = None;
     for (entity, actor) in actors.iter() {
         if !in_window(player, actor.pos, LOCK_REACH) {
@@ -71,7 +75,7 @@ pub fn control(
     health: Res<Health>,
     swim: Res<Swim>,
     jump: Res<Jump>,
-    actors: Query<(Entity, &Actor), Without<Ship>>,
+    actors: Query<(Entity, &Actor), (Without<Ship>, With<HitPoints>)>,
     mut lock: ResMut<Lock>,
     mut players: Query<&mut Player>,
 ) {

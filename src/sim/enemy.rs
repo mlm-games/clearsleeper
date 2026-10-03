@@ -215,7 +215,7 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
         }
         EnemyState::Alert => {
             enemy.speed = 0.0;
-            enemy.alert -= 1;
+            enemy.alert = enemy.alert.saturating_sub(1);
             if enemy.alert == 0 {
                 enemy.state = EnemyState::Chase;
             }

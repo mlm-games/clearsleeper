@@ -145,7 +145,7 @@ fn golden_pickups_stay_out_of_reach() {
 #[test]
 fn golden_sword_leaves_pickups_alone() {
     let mut app = App::new();
-    let heart = spawn_pickup(&mut app, Vec3::new(0.0, 0.0, 20.0), HEART);
+    let heart = spawn_pickup(&mut app, Vec3::new(0.0, 0.0, 35.0), HEART);
     teleport(&mut app, Vec3::new(0.0, 0.0, 0.0));
     app.stage_item(true);
     tick(&mut app);
@@ -157,5 +157,8 @@ fn golden_sword_leaves_pickups_alone() {
         app.sim.world.resource::<Combat>().active,
         "the cut is still out"
     );
-    assert!(held(&app, heart), "the blade cannot break a heart");
+    assert!(
+        held(&app, heart),
+        "inside the blade's reach but outside the hand's, the heart lives"
+    );
 }

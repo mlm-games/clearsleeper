@@ -6,7 +6,7 @@ use super::player::Player;
 
 pub const ITEM_ACTORS: [&str; 3] = ["item", "Sitem", "Bitem"];
 
-const NO_GET_TICKS: u32 = 16;
+const NO_GET_TICKS: u8 = 16;
 const MAX_LIFE: u8 = 0x50;
 const HEART_ITEMS: u8 = 0x00;
 const FIRST_RUPEE: u8 = 0x01;
@@ -14,7 +14,7 @@ const LAST_RUPEE: u8 = 0x06;
 const SILVER_RUPEE: u8 = 0x0F;
 const HEART_PIECE: u8 = 0x07;
 const HEART_CONTAINER: u8 = 0x08;
-const RUPEE_VALUES: [u32; 6] = [1, 5, 10, 20, 50, 100];
+const RUPEE_VALUES: [u32; LAST_RUPEE as usize - FIRST_RUPEE as usize + 1] = [1, 5, 10, 20, 50, 100];
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Rupees {
@@ -24,7 +24,7 @@ pub struct Rupees {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pickup {
     pub item: u8,
-    pub timer: u32,
+    pub timer: u8,
 }
 
 pub fn is_pickup(name: &str) -> bool {
@@ -58,8 +58,12 @@ impl Pickup {
 fn apply(item: u8, health: &mut Health, rupees: &mut Rupees) {
     match item {
         HEART_ITEMS => health.heal(4),
-        FIRST_RUPEE..=LAST_RUPEE => rupees.count += RUPEE_VALUES[(item - FIRST_RUPEE) as usize],
-        SILVER_RUPEE => rupees.count += 200,
+        FIRST_RUPEE..=LAST_RUPEE => {
+            rupees.count = rupees
+                .count
+                .saturating_add(RUPEE_VALUES[(item - FIRST_RUPEE) as usize]);
+        }
+        SILVER_RUPEE => rupees.count = rupees.count.saturating_add(200),
         HEART_PIECE => {
             health.max = health.max.saturating_add(1).min(MAX_LIFE);
             health.units = health.units.min(heart_floor(health.max));
@@ -86,8 +90,11 @@ pub fn control(
     let Some(player) = players.iter().next() else {
         return;
     };
+    if health.units == 0 {
+        return;
+    }
     for (entity, mut pickup, actor) in &mut items {
-        pickup.timer += 1;
+        pickup.timer = pickup.timer.saturating_add(1).min(NO_GET_TICKS);
         if pickup.timer < NO_GET_TICKS || !pickup.takes() {
             continue;
         }

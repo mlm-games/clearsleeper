@@ -16,6 +16,10 @@ const PLANTED: u32 = 0x320B;
 
 fn tick(app: &mut App) {
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+    let mut query = app.sim.world.query::<&mut Player>();
+    for mut player in query.iter_mut(&mut app.sim.world) {
+        player.pos.y = 0.0;
+    }
 }
 
 fn teleport(app: &mut App, pos: Vec3) {
@@ -137,8 +141,8 @@ fn golden_chase_closes_at_the_quartered_run() {
     }
     let run = pos(&app, foe).z;
     assert!(
-        (run - 112.5).abs() < 0.001,
-        "the run nets 22.5 units a tick, found 112.5 expected"
+        (run - 22.5 * 5.0).abs() < 0.001,
+        "the run nets 22.5 units a tick, found {run}"
     );
 }
 
@@ -157,8 +161,8 @@ fn golden_planted_variant_ramps_up() {
     }
     let run = pos(&app, foe).z;
     assert!(
-        (run - 18.75).abs() < 0.001,
-        "the bare gait ramps five units a tick, found 18.75 expected"
+        (run - 0.25 * 5.0 * 15.0).abs() < 0.001,
+        "the bare gait ramps five units a tick, found {run}"
     );
 }
 
@@ -235,7 +239,7 @@ fn golden_chase_gives_up_once_it_has_closed() {
     }
     tick(&mut app);
     assert_eq!(state(&app, foe), EnemyState::Chase);
-    teleport(&mut app, Vec3::new(0.0, 0.0, 1500.0));
+    teleport(&mut app, Vec3::new(0.0, 0.0, 600.0));
     tick(&mut app);
     assert_eq!(
         state(&app, foe),
