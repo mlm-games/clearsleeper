@@ -30,6 +30,7 @@ pub mod select;
 pub mod sea;
 pub mod ship;
 pub mod swim;
+pub mod tag;
 pub mod talk;
 pub mod transition;
 pub mod walk;
@@ -110,6 +111,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, switch)).id()
     } else if scenery::is_scenery(&source.name) {
         world.spawn((actor, scenery::Scenery)).id()
+    } else if tag::is_tag(&source.name) {
+        let marker = tag::Tag::spawn(source.parameters, actor.pos, source.angle[1]);
+        world.spawn((actor, marker)).id()
     } else {
         world.spawn(actor).id()
     }

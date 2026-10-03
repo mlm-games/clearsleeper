@@ -11,13 +11,10 @@ use super::inventory::{Equipped, BOW_SLOT};
 use super::layer::SEA;
 use super::player::Player;
 use super::select::Select;
+use super::tag::Tag;
 
 pub const TALK_ACTOR: &str = "NpcSo";
 
-const TAG_ACTOR: &str = "TagSo";
-const MINIGAME_TYPE_SHIFT: u32 = 16;
-const MINIGAME_TYPE_MASK: u32 = 0xFF;
-const MINIGAME_TYPE: u32 = 1;
 const DRAGON_ROOST: i8 = 13;
 const TALK_RANGE: f32 = 400.0;
 const SURFACE_RANGE: f32 = 4000.0;
@@ -295,7 +292,7 @@ fn context(
     sea: bool,
     bow: bool,
     accepted: bool,
-    actors: &Query<&Actor>,
+    tags: &Query<&Tag>,
 ) -> Context {
     Context {
         stories,
@@ -303,7 +300,7 @@ fn context(
         sea,
         has_bow: bow,
         timer_active: false,
-        minigame_tag: any_minigame_tag(actors),
+        minigame_tag: any_minigame_tag(tags),
         accepted,
     }
 }
@@ -323,11 +320,8 @@ fn away(player: Option<&Player>, actor: &Actor) -> bool {
     dx * dx + dz * dz > SURFACE_RANGE * SURFACE_RANGE
 }
 
-fn any_minigame_tag(actors: &Query<&Actor>) -> bool {
-    actors.iter().any(|actor| {
-        actor.name == TAG_ACTOR
-            && ((actor.parameters >> MINIGAME_TYPE_SHIFT) & MINIGAME_TYPE_MASK) == MINIGAME_TYPE
-    })
+fn any_minigame_tag(tags: &Query<&Tag>) -> bool {
+    tags.iter().any(|tag| tag.minigame)
 }
 
 pub fn control(
@@ -344,7 +338,7 @@ pub fn control(
     mut select: ResMut<Select>,
     mut active: ResMut<ActiveEvent>,
     mut talks: Query<(Entity, &mut Talk, &Actor)>,
-    actors: Query<&Actor>,
+    tags: Query<&Tag>,
     mut players: Query<&mut Player>,
 ) {
     let pressed = do_intent.0 && !dialogue.held;
@@ -356,7 +350,7 @@ pub fn control(
             stage.0 == SEA,
             equipped.has(BOW_SLOT),
             select.accepted(),
-            &actors,
+            &tags,
         );
         if dialogue.open {
             let Some((_, mut talk, _)) = dialogue
@@ -426,7 +420,7 @@ pub fn control(
                     stage.0 == SEA,
                     equipped.has(BOW_SLOT),
                     select.accepted(),
-                    &actors,
+                    &tags,
                 );
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);
@@ -447,7 +441,7 @@ pub fn control(
                     stage.0 == SEA,
                     equipped.has(BOW_SLOT),
                     select.accepted(),
-                    &actors,
+                    &tags,
                 );
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);

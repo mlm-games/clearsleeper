@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-pub const SCENERY_ACTORS: [&str; 16] = [
+pub const SCENERY_ACTORS: [&str; 23] = [
     "kusax1",
     "kusax7",
     "kusax21",
@@ -17,6 +17,13 @@ pub const SCENERY_ACTORS: [&str; 16] = [
     "kotubo",
     "ootubo1",
     "koisi1",
+    "Oyashi",
+    "Pirates",
+    "bridge",
+    "Ojtree",
+    "Mhsg15",
+    "Kui",
+    "Pitfall",
 ];
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
