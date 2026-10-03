@@ -8,6 +8,7 @@ use crate::sim::flags::{BitSet, EventFlags, Switches};
 use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
+use crate::sim::item::Held;
 use crate::sim::pickup::Rupees;
 use crate::sim::player::Player;
 use crate::{App, assets};
@@ -41,6 +42,10 @@ pub struct SaveGame {
     pub events: [u64; 4],
     #[serde(default)]
     pub switches: [u64; 4],
+    #[serde(default)]
+    pub held_item: u8,
+    #[serde(default)]
+    pub held_count: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -147,6 +152,7 @@ impl App {
         let rupees = world.resource::<Rupees>().count;
         let events = world.resource::<EventFlags>().0.0;
         let switches = world.resource::<Switches>().0.0;
+        let held = *world.resource::<Held>();
         let stage = self
             .stage
             .as_ref()
@@ -165,6 +171,8 @@ impl App {
             rupees,
             events,
             switches,
+            held_item: held.item,
+            held_count: held.count,
         }
     }
 
@@ -185,6 +193,9 @@ impl App {
             *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
             *world.resource_mut::<EventFlags>() = EventFlags(BitSet(save.events));
             *world.resource_mut::<Switches>() = Switches(BitSet(save.switches));
+            let mut held = world.resource_mut::<Held>();
+            held.item = save.held_item;
+            held.count = save.held_count;
         }
         let current = self
             .stage

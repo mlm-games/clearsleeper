@@ -20,6 +20,8 @@ pub enum ActorKind {
     Pickup,
     Talker,
     Ship,
+    Bomb,
+    Arrow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -124,6 +126,8 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
 const ENEMY: Rgb = [0.55, 0.26, 0.16];
 const TALKER: Rgb = [0.32, 0.42, 0.82];
 const SHIP: Rgb = [0.58, 0.44, 0.24];
+const BOMB: Rgb = [0.18, 0.18, 0.22];
+const ARROW: Rgb = [0.86, 0.82, 0.66];
 const HEART: Rgb = [0.86, 0.20, 0.22];
 const RUPEE: Rgb = [0.24, 0.72, 0.32];
 const RELIC: Rgb = [0.90, 0.52, 0.86];
@@ -144,6 +148,8 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Enemy => ENEMY,
         ActorKind::Talker => TALKER,
         ActorKind::Ship => SHIP,
+        ActorKind::Bomb => BOMB,
+        ActorKind::Arrow => ARROW,
         ActorKind::Pickup => pickup_look(actor.item).0,
     }
 }

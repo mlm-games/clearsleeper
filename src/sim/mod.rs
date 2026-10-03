@@ -12,6 +12,7 @@ pub mod ground;
 pub mod health;
 pub mod hop;
 pub mod intent;
+pub mod item;
 pub mod jump;
 pub mod lock;
 pub mod pickup;
@@ -52,7 +53,8 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
             world.spawn((actor, state, hit_points));
         } else if source.name == enemy::LANCE_ACTOR {
-            if let Some((state, hit_points)) = enemy::spawn_lance(source.parameters, source.angle[1])
+            if let Some((state, hit_points)) =
+                enemy::spawn_lance(source.parameters, source.angle[1])
             {
                 world.spawn((actor, state, hit_points));
             } else {
@@ -94,6 +96,7 @@ pub fn build(
     sim.world.insert_resource(intent::DoIntent::default());
     sim.world.insert_resource(intent::TargetIntent::default());
     sim.world.insert_resource(intent::ItemIntent::default());
+    sim.world.insert_resource(intent::UseIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(events::SimEvents::default());
@@ -106,6 +109,7 @@ pub fn build(
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(pickup::Rupees::default());
+    sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::Switches::default());
@@ -154,6 +158,7 @@ pub fn build(
                 roll::control.in_set(WwSimSet::Execute),
                 hop::control.in_set(WwSimSet::Execute),
                 combat::control.in_set(WwSimSet::Execute),
+                item::control.in_set(WwSimSet::Execute),
                 enemy::control.in_set(WwSimSet::Execute),
             )
                 .chain(),

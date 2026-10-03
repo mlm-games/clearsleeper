@@ -40,3 +40,7 @@ pub fn target_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bo
 pub fn item_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
     window_focused && held.contains(&PhysicalKey::KeyB)
 }
+
+pub fn use_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> bool {
+    window_focused && held.contains(&PhysicalKey::KeyJ)
+}

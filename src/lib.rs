@@ -99,6 +99,7 @@ impl App {
         self.stage_do(input::do_from_keys(held, sched.window_focused));
         self.stage_target(input::target_from_keys(held, sched.window_focused));
         self.stage_item(input::item_from_keys(held, sched.window_focused));
+        self.stage_use(input::use_from_keys(held, sched.window_focused));
         self.stage_menu(held, sched.window_focused);
     }
 
@@ -168,7 +169,10 @@ impl App {
     }
 
     pub fn stage_axis(&mut self, axis: glam::Vec2) {
-        self.sim.world.resource_mut::<sim::intent::MoveIntent>().axis = axis;
+        self.sim
+            .world
+            .resource_mut::<sim::intent::MoveIntent>()
+            .axis = axis;
     }
 
     pub fn stage_camera_yaw(&mut self, yaw: f32) {
@@ -187,11 +191,12 @@ impl App {
         self.sim.world.resource_mut::<sim::intent::ItemIntent>().0 = held;
     }
 
+    pub fn stage_use(&mut self, held: bool) {
+        self.sim.world.resource_mut::<sim::intent::UseIntent>().0 = held;
+    }
+
     pub fn stage_target(&mut self, held: bool) {
-        self.sim
-            .world
-            .resource_mut::<sim::intent::TargetIntent>()
-            .0 = held;
+        self.sim.world.resource_mut::<sim::intent::TargetIntent>().0 = held;
     }
 
     pub fn health(&self) -> sim::health::Health {
@@ -200,6 +205,11 @@ impl App {
 
     pub fn rupees(&self) -> u32 {
         self.sim.world.resource::<sim::pickup::Rupees>().count
+    }
+
+    pub fn held(&self) -> (u8, u8) {
+        let held = self.sim.world.resource::<sim::item::Held>();
+        (held.item, held.count)
     }
 
     pub fn dialogue(&self) -> sim::talk::Dialogue {
@@ -279,6 +289,26 @@ impl App {
     fn actor_views(&self) -> Vec<view::ActorView> {
         let mut out = Vec::new();
         for entity in self.sim.world.iter_entities() {
+            if let Some(bomb) = entity.get::<sim::item::Bomb>() {
+                out.push(view::ActorView {
+                    pos: bomb.pos,
+                    kind: view::ActorKind::Bomb,
+                    item: 0,
+                    height: 12.0,
+                    half: 6.0,
+                });
+                continue;
+            }
+            if let Some(arrow) = entity.get::<sim::item::Arrow>() {
+                out.push(view::ActorView {
+                    pos: arrow.pos,
+                    kind: view::ActorKind::Arrow,
+                    item: 0,
+                    height: 3.0,
+                    half: 3.0,
+                });
+                continue;
+            }
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
@@ -431,7 +461,9 @@ impl App {
                 self.sim.world.insert_resource(collision);
             }
             None => {
-                self.sim.world.remove_resource::<sim::collision::Collision>();
+                self.sim
+                    .world
+                    .remove_resource::<sim::collision::Collision>();
                 let default = sim::area::Area::default();
                 let mut area = self.sim.world.resource_mut::<sim::area::Area>();
                 area.bounds_min = default.bounds_min;
@@ -493,8 +525,8 @@ pub fn run() {
 
     let mut app = App::new_live();
     let mut last = Instant::now();
-    let root = move
-    |sched: &mut repose_core::runtime::Scheduler, ctx: &repose_core::RenderContext| {
+    let root = move |sched: &mut repose_core::runtime::Scheduler,
+                     ctx: &repose_core::RenderContext| {
         let now = Instant::now();
         let dt = now.duration_since(last).min(Duration::from_secs_f32(0.25));
         last = now;
@@ -513,7 +545,8 @@ pub fn run() {
                 Some((a.parse().ok()?, b.parse().ok()?))
             })
             .unwrap_or((1280, 720));
-        repame_shell::run_desktop("clearsleeper", size, root).expect("clearsleeper failed to start");
+        repame_shell::run_desktop("clearsleeper", size, root)
+            .expect("clearsleeper failed to start");
     }
     #[cfg(target_arch = "wasm32")]
     {
@@ -540,7 +573,14 @@ pub fn root_view(
         },
     );
     let overlay = match app.menu.screen {
-        menus::Screen::Playing => hud::status_view(app.health(), app.rupees()),
+        menus::Screen::Playing => {
+            let (item, count) = app.held();
+            hud::status_view(
+                app.health(),
+                app.rupees(),
+                (count > 0).then_some((item, count)),
+            )
+        }
         menus::Screen::Title => menus::title_view(),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),

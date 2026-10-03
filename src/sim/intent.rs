@@ -22,6 +22,9 @@ pub struct TargetIntent(pub bool);
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct ItemIntent(pub bool);
 
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct UseIntent(pub bool);
+
 #[derive(Resource, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameOverChoice {
     #[default]

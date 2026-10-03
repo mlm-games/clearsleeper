@@ -116,25 +116,58 @@ pub fn hearts_strip(health: Health, size: f32) -> View {
 
 const PURSE_HEX: &str = "#3FA94B";
 
-pub fn status_view(health: Health, rupees: u32) -> View {
-    ZStack(Modifier::new().fill_max_size().hit_passthrough()).child([
-        hearts_view(health),
-        Row(Modifier::new()
-            .absolute()
-            .offset(
-                Some(HUD_PAD.dp()),
-                Some((HUD_PAD + HEART_SIZE + HEART_GAP).dp()),
-                None,
-                None,
-            )
-            .gap(4.0.dp())
-            .hit_passthrough())
-        .child([
-            rupee_gem(HEART_SIZE * 0.75),
-            Text(format!("{rupees}"))
-                .size(Sp(20.0))
-                .color(Color::from_hex("#F2EDE3")),
-        ]),
+pub fn status_view(health: Health, rupees: u32, held: Option<(u8, u8)>) -> View {
+    let mut stack = vec![hearts_view(health), purse_view(rupees)];
+    if let Some((kind, count)) = held {
+        stack.push(held_view(kind, count));
+    }
+    ZStack(Modifier::new().fill_max_size().hit_passthrough()).child(stack)
+}
+
+fn purse_view(rupees: u32) -> View {
+    Row(Modifier::new()
+        .absolute()
+        .offset(
+            Some(HUD_PAD.dp()),
+            Some((HUD_PAD + HEART_SIZE + HEART_GAP).dp()),
+            None,
+            None,
+        )
+        .gap(4.0.dp())
+        .hit_passthrough())
+    .child([
+        rupee_gem(HEART_SIZE * 0.75),
+        Text(format!("{rupees}"))
+            .size(Sp(20.0))
+            .color(Color::from_hex("#F2EDE3")),
+    ])
+}
+
+fn held_view(kind: u8, count: u8) -> View {
+    let (hex, label) = match kind {
+        0 => ("#2E3138", "none"),
+        _ if kind <= crate::sim::item::LAST_BOMB => ("#2E3138", "bomb"),
+        _ => ("#C9C4B4", "arrow"),
+    };
+    Row(Modifier::new()
+        .absolute()
+        .offset(
+            Some(HUD_PAD.dp()),
+            Some((HUD_PAD + HEART_SIZE + HEART_GAP + 28.0).dp()),
+            None,
+            None,
+        )
+        .gap(4.0.dp())
+        .hit_passthrough())
+    .child([
+        UiBox(
+            Modifier::new()
+                .size(14.0.dp(), 14.0.dp())
+                .background(Color::from_hex(hex)),
+        ),
+        Text(format!("{label} {count}"))
+            .size(Sp(16.0))
+            .color(Color::from_hex("#F2EDE3")),
     ])
 }
 

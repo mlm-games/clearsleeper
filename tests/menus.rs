@@ -50,6 +50,8 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
         rupees: 0,
         events: [0; 4],
         switches: [0; 4],
+        held_item: 0,
+        held_count: 0,
     }
 }
 

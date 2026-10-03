@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::health::Health;
+use super::item::{FIRST_ARROW, FIRST_BOMB, Held, LAST_ARROW, LAST_BOMB};
 use super::player::Player;
 
 pub const ITEM_ACTORS: [&str; 3] = ["item", "Sitem", "Bitem"];
@@ -58,12 +59,18 @@ impl Pickup {
     fn takes(&self) -> bool {
         matches!(
             self.item,
-            HEART_ITEMS | FIRST_RUPEE..=LAST_RUPEE | SILVER_RUPEE | HEART_PIECE | HEART_CONTAINER
+            HEART_ITEMS
+                | FIRST_RUPEE..=LAST_RUPEE
+                | SILVER_RUPEE
+                | HEART_PIECE
+                | HEART_CONTAINER
+                | FIRST_BOMB..=LAST_BOMB
+                | FIRST_ARROW..=LAST_ARROW
         )
     }
 }
 
-fn apply(item: u8, health: &mut Health, rupees: &mut Rupees) {
+fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
     match item {
         HEART_ITEMS => health.heal(4),
         FIRST_RUPEE..=LAST_RUPEE => {
@@ -80,6 +87,7 @@ fn apply(item: u8, health: &mut Health, rupees: &mut Rupees) {
             health.max = health.max.saturating_add(4).min(MAX_LIFE);
             health.units = health.max;
         }
+        FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW => held.equip(item),
         _ => {}
     }
 }
@@ -91,6 +99,7 @@ fn heart_floor(max: u8) -> u8 {
 pub fn control(
     mut health: ResMut<Health>,
     mut rupees: ResMut<Rupees>,
+    mut held: ResMut<Held>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
     mut commands: Commands,
@@ -112,7 +121,7 @@ pub fn control(
         if dx * dx + dz * dz > radius * radius {
             continue;
         }
-        apply(pickup.item, &mut health, &mut rupees);
+        apply(pickup.item, &mut health, &mut rupees, &mut held);
         let _ = commands.entity(entity).despawn();
     }
 }
