@@ -116,7 +116,6 @@ pub fn hearts_strip(health: Health, size: f32) -> View {
 
 const PURSE_HEX: &str = "#3FA94B";
 
-/// Top-left hearts with the purse tucked under them.
 pub fn status_view(health: Health, rupees: u32) -> View {
     ZStack(Modifier::new().fill_max_size().hit_passthrough()).child([
         hearts_view(health),
