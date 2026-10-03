@@ -10,6 +10,7 @@ use super::intent::{DoIntent, MoveIntent};
 use super::inventory::{Equipped, BOW_SLOT};
 use super::layer::SEA;
 use super::player::Player;
+use super::select::Select;
 
 pub const TALK_ACTOR: &str = "NpcSo";
 
@@ -293,6 +294,7 @@ fn context(
     arrivals: Arrivals,
     sea: bool,
     bow: bool,
+    accepted: bool,
     actors: &Query<&Actor>,
 ) -> Context {
     Context {
@@ -302,7 +304,7 @@ fn context(
         has_bow: bow,
         timer_active: false,
         minigame_tag: any_minigame_tag(actors),
-        accepted: false,
+        accepted,
     }
 }
 
@@ -339,6 +341,7 @@ pub fn control(
     stage: Res<StageName>,
     list: Res<EventList>,
     equipped: Res<Equipped>,
+    mut select: ResMut<Select>,
     mut active: ResMut<ActiveEvent>,
     mut talks: Query<(Entity, &mut Talk, &Actor)>,
     actors: Query<&Actor>,
@@ -347,7 +350,14 @@ pub fn control(
     let pressed = do_intent.0 && !dialogue.held;
     dialogue.held = do_intent.0;
     if pressed {
-        let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
+        let ctx = context(
+            *stories,
+            *arrivals,
+            stage.0 == SEA,
+            equipped.has(BOW_SLOT),
+            select.accepted(),
+            &actors,
+        );
         if dialogue.open {
             let Some((_, mut talk, _)) = dialogue
                 .speaker
@@ -355,11 +365,17 @@ pub fn control(
             else {
                 dialogue.open = false;
                 dialogue.speaker = None;
+                select.open = false;
                 return;
             };
             let step = advance(dialogue.message, &talk, &ctx);
             match step {
-                Step::Next(message) => dialogue.message = message,
+                Step::Next(message) => {
+                    dialogue.message = message;
+                    if message == BOW_OFFER || message == BOW_OFFER_AGAIN {
+                        select.begin();
+                    }
+                }
                 Step::Done(Some(scene)) => {
                     let order = scene.order();
                     if ordered(&list, order).is_some() {
@@ -404,7 +420,14 @@ pub fn control(
         let Some(index) = ordered(&list, order) else {
             talk.order = 0;
             if complete(&mut talk, order, &mut stories, &mut order_flags) {
-                let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
+                let ctx = context(
+                    *stories,
+                    *arrivals,
+                    stage.0 == SEA,
+                    equipped.has(BOW_SLOT),
+                    select.accepted(),
+                    &actors,
+                );
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);
                 dialogue.message = opening(&talk, &ctx);
@@ -418,7 +441,14 @@ pub fn control(
             active.end(index);
             talk.order = 0;
             if complete(&mut talk, order, &mut stories, &mut order_flags) {
-                let ctx = context(*stories, *arrivals, stage.0 == SEA, equipped.has(BOW_SLOT), &actors);
+                let ctx = context(
+                    *stories,
+                    *arrivals,
+                    stage.0 == SEA,
+                    equipped.has(BOW_SLOT),
+                    select.accepted(),
+                    &actors,
+                );
                 dialogue.open = true;
                 dialogue.speaker = Some(entity);
                 dialogue.message = opening(&talk, &ctx);
@@ -426,6 +456,7 @@ pub fn control(
         }
     }
     if !dialogue.open {
+        select.open = false;
         return;
     }
     intent.axis = Vec2::ZERO;

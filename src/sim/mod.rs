@@ -25,6 +25,7 @@ pub mod lock;
 pub mod pickup;
 pub mod player;
 pub mod roll;
+pub mod select;
 pub mod sea;
 pub mod ship;
 pub mod swim;
@@ -159,6 +160,7 @@ pub fn build(
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
+    sim.world.insert_resource(select::Select::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Arrivals::default());
@@ -206,6 +208,7 @@ pub fn build(
         (
             (
                 death::freeze.in_set(WwSimSet::Execute),
+                select::control.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
                 event::control.in_set(WwSimSet::Execute),
