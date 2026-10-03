@@ -198,6 +198,14 @@ impl App {
         *self.sim.world.resource::<sim::health::Health>()
     }
 
+    pub fn rupees(&self) -> u32 {
+        self.sim.world.resource::<sim::pickup::Rupees>().count
+    }
+
+    pub fn dialogue(&self) -> sim::talk::Dialogue {
+        *self.sim.world.resource::<sim::talk::Dialogue>()
+    }
+
     /// Take every sim event waiting for presentation.
     pub fn drain_events(&mut self) -> Vec<sim::events::SimEvent> {
         std::mem::take(&mut self.sim.world.resource_mut::<sim::events::SimEvents>().list)
@@ -524,7 +532,7 @@ pub fn root_view(
         },
     );
     let overlay = match app.menu.screen {
-        menus::Screen::Playing => hud::hearts_view(app.health()),
+        menus::Screen::Playing => hud::status_view(app.health(), app.rupees()),
         menus::Screen::Title => menus::title_view(),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),

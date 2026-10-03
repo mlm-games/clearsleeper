@@ -2,8 +2,8 @@
 
 use std::f32::consts::{FRAC_PI_4, SQRT_2};
 
-use repose_core::{Color, Modifier, Transform, UnitExt, View};
-use repose_ui::{Box as UiBox, Row, ViewExt, ZStack};
+use repose_core::{Color, Modifier, Sp, Transform, UnitExt, View};
+use repose_ui::{Box as UiBox, Row, Text, TextStyle, ViewExt, ZStack};
 
 use crate::sim::health::Health;
 
@@ -71,11 +71,7 @@ fn heart_shapes(color: Color, size: f32) -> Vec<View> {
                 .offset(Some(left.dp()), Some(0.0.dp()), None, None),
         )
     };
-    vec![
-        diamond,
-        lobe_at(0.0),
-        lobe_at(size - lobe),
-    ]
+    vec![diamond, lobe_at(0.0), lobe_at(size - lobe)]
 }
 
 fn heart(state: HeartState, size: f32) -> View {
@@ -106,18 +102,53 @@ fn heart(state: HeartState, size: f32) -> View {
 
 /// Top-left heart row; passthrough keeps orbit drags alive underneath.
 pub fn hearts_view(health: Health) -> View {
-    Row(
-        Modifier::new()
-            .absolute()
-            .offset(Some(HUD_PAD.dp()), Some(HUD_PAD.dp()), None, None)
-            .gap(HEART_GAP.dp())
-            .hit_passthrough(),
-    )
+    Row(Modifier::new()
+        .absolute()
+        .offset(Some(HUD_PAD.dp()), Some(HUD_PAD.dp()), None, None)
+        .gap(HEART_GAP.dp())
+        .hit_passthrough())
     .child(heart_cells(health, HEART_SIZE))
 }
 
 pub fn hearts_strip(health: Health, size: f32) -> View {
     Row(Modifier::new().gap(HEART_GAP.dp()).hit_passthrough()).child(heart_cells(health, size))
+}
+
+const PURSE_HEX: &str = "#3FA94B";
+
+/// Top-left hearts with the purse tucked under them.
+pub fn status_view(health: Health, rupees: u32) -> View {
+    ZStack(Modifier::new().fill_max_size().hit_passthrough()).child([
+        hearts_view(health),
+        Row(Modifier::new()
+            .absolute()
+            .offset(
+                Some(HUD_PAD.dp()),
+                Some((HUD_PAD + HEART_SIZE + HEART_GAP).dp()),
+                None,
+                None,
+            )
+            .gap(4.0.dp())
+            .hit_passthrough())
+        .child([
+            rupee_gem(HEART_SIZE * 0.75),
+            Text(format!("{rupees}"))
+                .size(Sp(20.0))
+                .color(Color::from_hex("#F2EDE3")),
+        ]),
+    ])
+}
+
+fn rupee_gem(size: f32) -> View {
+    UiBox(
+        Modifier::new()
+            .size(size.dp(), size.dp())
+            .background(Color::from_hex(PURSE_HEX))
+            .transform(Transform {
+                rotate: FRAC_PI_4,
+                ..Transform::identity()
+            }),
+    )
 }
 
 fn heart_cells(health: Health, size: f32) -> Vec<View> {
