@@ -3,6 +3,7 @@ pub mod area;
 pub mod collision;
 pub mod combat;
 pub mod death;
+pub mod enemy;
 pub mod events;
 pub mod frame;
 pub mod ground;
@@ -43,6 +44,9 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         };
         if source.name == ship::SHIP_ACTOR {
             world.spawn((actor, ship::Ship::default()));
+        } else if source.name == enemy::ENEMY_ACTOR {
+            let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
+            world.spawn((actor, state, hit_points));
         } else {
             world.spawn((actor, combat::HitPoints::default()));
         }
@@ -120,6 +124,7 @@ pub fn build(
             roll::control.in_set(WwSimSet::Execute),
             hop::control.in_set(WwSimSet::Execute),
             combat::control.in_set(WwSimSet::Execute),
+            enemy::control.in_set(WwSimSet::Execute),
             collision::remember_move_from.in_set(WwSimSet::Execute),
             walk::walk.in_set(WwSimSet::Execute),
             swim::surface.in_set(WwSimSet::Execute),
