@@ -14,6 +14,21 @@ const WALL_THICKNESS: f32 = 8.0;
 const PLAYER_HALF: f32 = 8.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorKind {
+    Enemy,
+    Pickup,
+    Talker,
+    Ship,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActorView {
+    pub pos: Vec3,
+    pub kind: ActorKind,
+    pub item: u8,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
@@ -26,6 +41,7 @@ pub struct SceneSnapshot {
     pub tick: u64,
     pub sky: [f32; 4],
     pub sea: Option<SeaView>,
+    pub actors: Vec<ActorView>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,13 +67,13 @@ pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
     }
 }
 
-pub fn build_frame(
-    snapshot: &SceneSnapshot,
-    cam: OrbitCamera,
-    room: Option<&RoomMesh>,
-) -> Frame3d {
+pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
     let cam = OrbitCamera {
-        target: Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z),
+        target: Vec3::new(
+            snapshot.player_pos.x,
+            snapshot.ground_y,
+            snapshot.player_pos.z,
+        ),
         ..cam
     };
     let mut frame = Frame3d {
@@ -72,19 +88,21 @@ pub fn build_frame(
             for group in &room.groups {
                 frame.push(room_group(room, group, snapshot.tick));
             }
-            frame.uploads.extend(
-                room.textures
-                    .iter()
-                    .enumerate()
-                    .map(|(page, texture)| SceneUpload {
-                        page: page as u32,
-                        x: 0,
-                        y: 0,
-                        w: texture.width,
-                        h: texture.height,
-                        rgba: texture.rgba.clone(),
-                    }),
-            );
+            frame
+                .uploads
+                .extend(
+                    room.textures
+                        .iter()
+                        .enumerate()
+                        .map(|(page, texture)| SceneUpload {
+                            page: page as u32,
+                            x: 0,
+                            y: 0,
+                            w: texture.width,
+                            h: texture.height,
+                            rgba: texture.rgba.clone(),
+                        }),
+                );
         }
         None => frame.push(ground_group(snapshot)),
     }
@@ -95,7 +113,59 @@ pub fn build_frame(
         frame.push(walls_group(snapshot, eye));
     }
     frame.push(player_group(snapshot, eye));
+    if !snapshot.actors.is_empty() {
+        frame.push(actors_group(snapshot, eye));
+    }
     frame
+}
+
+const ENEMY: Rgb = [0.55, 0.26, 0.16];
+const TALKER: Rgb = [0.32, 0.42, 0.82];
+const SHIP: Rgb = [0.58, 0.44, 0.24];
+const HEART: Rgb = [0.86, 0.20, 0.22];
+const RUPEE: Rgb = [0.24, 0.72, 0.32];
+const RELIC: Rgb = [0.90, 0.52, 0.86];
+const PIECE_SIZES: [f32; 2] = [14.0, 20.0];
+
+fn pickup_look(item: u8) -> (Rgb, f32) {
+    match item {
+        0 => (HEART, 10.0),
+        0x01..=0x06 | 0x0F => (RUPEE, 10.0),
+        0x07 => (RELIC, PIECE_SIZES[0]),
+        0x08 => (RELIC, PIECE_SIZES[1]),
+        _ => (RELIC, 10.0),
+    }
+}
+
+fn actor_look(actor: &ActorView) -> (Rgb, f32, f32) {
+    match actor.kind {
+        ActorKind::Enemy => (ENEMY, 24.0, 12.0),
+        ActorKind::Talker => (TALKER, 30.0, 12.0),
+        ActorKind::Ship => (SHIP, 26.0, 44.0),
+        ActorKind::Pickup => {
+            let (color, size) = pickup_look(actor.item);
+            (color, size, size)
+        }
+    }
+}
+
+fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
+    let mut group = MeshGroup::default();
+    for actor in &snapshot.actors {
+        let (color, height, half) = actor_look(actor);
+        group.push_box(
+            actor.pos.x,
+            actor.pos.y,
+            actor.pos.z,
+            half,
+            height,
+            half,
+            color,
+            eye,
+        );
+    }
+    group.depth_test = true;
+    group
 }
 
 fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
@@ -152,8 +222,8 @@ fn sea_group(sea: &SeaView, eye: Vec3) -> MeshGroup {
                 first[2] * second[0] - first[0] * second[2],
                 first[0] * second[1] - first[1] * second[0],
             ];
-            let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2])
-                .sqrt();
+            let length =
+                (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
             let normal = [normal[0] / length, normal[1] / length, normal[2] / length];
             let base = group.positions.len() as u32;
             group.positions.extend(corners);

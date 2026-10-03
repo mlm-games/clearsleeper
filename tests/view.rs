@@ -3,7 +3,9 @@ use std::time::Duration;
 
 use clearsleeper::bdl::{AnimBinding, RoomGroup, RoomMesh, RoomTexture};
 use clearsleeper::btk::{Entry, Key, TextureAnimation};
-use clearsleeper::view::{SceneSnapshot, SeaView, build_frame, sim_yaw_for_camera};
+use clearsleeper::view::{
+    ActorKind, ActorView, SceneSnapshot, SeaView, build_frame, sim_yaw_for_camera,
+};
 use clearsleeper::{App, SIM_HZ};
 use glam::{Vec2, Vec3};
 use repame_view3d::{OrbitCamera, SceneFilter};
@@ -21,6 +23,7 @@ fn golden_snapshot_builds_world_frame() {
         tick: 0,
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
+        actors: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -106,6 +109,7 @@ fn room_mesh_replaces_placeholder_ground() {
         tick: 0,
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
+        actors: Vec::new(),
     };
     let room = RoomMesh {
         groups: vec![RoomGroup {
@@ -158,6 +162,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         tick: 0,
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
+        actors: Vec::new(),
     };
     let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
     let normals = vec![[0.0, 1.0, 0.0]; 3];
@@ -259,6 +264,7 @@ fn room_group_applies_texture_animation_to_uvs() {
         tick: 0,
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
+        actors: Vec::new(),
     };
     let room = RoomMesh {
         groups: vec![
@@ -324,6 +330,7 @@ fn golden_sea_view_builds_wave_mesh() {
             heights: vec![1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0],
             color: [0.5, 0.6, 0.7],
         }),
+        actors: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -378,9 +385,55 @@ fn sea_group_culls_beyond_the_far_plane() {
             heights: vec![1.0; 9],
             color: [0.5, 0.6, 0.7],
         }),
+        actors: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
     assert_eq!(frame.groups.len(), 3);
     assert_eq!(frame.groups[1].tri_count(), 0);
+}
+
+#[test]
+fn golden_actor_layer_draws_every_kind() {
+    let snapshot = SceneSnapshot {
+        player_pos: Vec3::new(0.0, 0.0, 0.0),
+        player_yaw: 0.0,
+        player_face: 0.0,
+        bounds_min: Vec2::new(-100.0, -100.0),
+        bounds_max: Vec2::new(100.0, 100.0),
+        ground_y: 0.0,
+        walls: true,
+        tick: 0,
+        sky: [0.44, 0.70, 0.94, 1.0],
+        sea: None,
+        actors: vec![
+            ActorView {
+                pos: Vec3::new(30.0, 0.0, 0.0),
+                kind: ActorKind::Enemy,
+                item: 0,
+            },
+            ActorView {
+                pos: Vec3::new(-40.0, 0.0, 10.0),
+                kind: ActorKind::Pickup,
+                item: 0,
+            },
+            ActorView {
+                pos: Vec3::new(0.0, 0.0, 60.0),
+                kind: ActorKind::Ship,
+                item: 0,
+            },
+        ],
+    };
+
+    let frame = build_frame(&snapshot, OrbitCamera::default(), None);
+
+    assert_eq!(frame.groups.len(), 4, "the actor layer joins the frame");
+    let actors = frame.groups.last().expect("actor layer");
+    assert!(actors.tri_count() > 0, "each actor puts geometry on screen");
+    let (min, max) = actors.bounds().expect("actors have geometry");
+    assert!(
+        min[0] <= -40.0 && max[0] >= 30.0,
+        "the spread covers foe and cargo: {min:?} {max:?}"
+    );
+    assert!(max[2] >= 60.0, "the ship reaches its berth: {max:?}");
 }

@@ -264,7 +264,34 @@ impl App {
                 .and_then(dzs::StageTables::boot_sky)
                 .unwrap_or(view::SKY),
             sea: self.sea_view(),
+            actors: self.actor_views(),
         }
+    }
+
+    fn actor_views(&self) -> Vec<view::ActorView> {
+        let mut out = Vec::new();
+        for entity in self.sim.world.iter_entities() {
+            let Some(actor) = entity.get::<sim::actor::Actor>() else {
+                continue;
+            };
+            let (kind, item) = if entity.contains::<sim::ship::Ship>() {
+                (view::ActorKind::Ship, 0)
+            } else if let Some(pickup) = entity.get::<sim::pickup::Pickup>() {
+                (view::ActorKind::Pickup, pickup.item)
+            } else if entity.contains::<sim::enemy::Enemy>() {
+                (view::ActorKind::Enemy, 0)
+            } else if entity.contains::<sim::talk::Talk>() {
+                (view::ActorKind::Talker, 0)
+            } else {
+                continue;
+            };
+            out.push(view::ActorView {
+                pos: actor.pos,
+                kind,
+                item,
+            });
+        }
+        out
     }
 
     fn sea_view(&self) -> Option<view::SeaView> {
