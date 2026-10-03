@@ -1,4 +1,4 @@
-use clearsleeper::sim::collision::{Collision, DzbError};
+use clearsleeper::sim::collision::{Collision, DzbError, NO_EXIT};
 use glam::{Vec2, Vec3};
 
 fn dzb(verts: &[[f32; 3]], tris: &[[u16; 3]]) -> Vec<u8> {
@@ -185,4 +185,47 @@ fn rejects_truncated_tables_and_bad_indices() {
     assert_eq!(Collision::parse(&bytes).unwrap_err(), DzbError::VertexIndex);
     bytes[0x20..0x24].copy_from_slice(&u32::MAX.to_be_bytes());
     assert_eq!(Collision::parse(&bytes).unwrap_err(), DzbError::BadTable);
+}
+
+fn dzb_exit(verts: &[[f32; 3]], tris: &[[u16; 3]], exits: &[u8]) -> Vec<u8> {
+    let mut data = dzb(verts, tris);
+    let info_offset = data.len() as u32;
+    for &exit in exits {
+        data.extend_from_slice(&((exit as u32) << 13).to_be_bytes());
+        data.extend_from_slice(&[0_u8; 12]);
+    }
+    data[0x28..0x2C].copy_from_slice(&(exits.len() as u32).to_be_bytes());
+    data[0x2C..0x30].copy_from_slice(&info_offset.to_be_bytes());
+    let tri_offset = 0x34 + (verts.len() as u32) * 12;
+    for index in 0..tris.len() {
+        let at = (tri_offset + index as u32 * 10 + 6) as usize;
+        data[at..at + 2].copy_from_slice(&(index as u16).to_be_bytes());
+    }
+    data
+}
+
+#[test]
+fn golden_exit_at_reads_the_poly_underfoot() {
+    let (verts, tris) = floor_quad(0.0);
+    let collision = Collision::parse(&dzb_exit(&verts, &tris, &[7, NO_EXIT])).unwrap();
+    assert_eq!(collision.exit_at(1.0, 9.0), Some(7));
+    assert_eq!(collision.exit_at(9.0, 1.0), Some(NO_EXIT));
+    assert_eq!(collision.exit_at(50.0, 50.0), None, "off the mesh");
+}
+
+#[test]
+fn golden_append_carries_exit_ids() {
+    let (verts, tris) = floor_quad(0.0);
+    let mut collision = Collision::parse(&dzb_exit(&verts, &tris, &[2, 2])).unwrap();
+    let ledge = [
+        [20.0, 10.0, 0.0],
+        [20.0, 10.0, 10.0],
+        [30.0, 10.0, 10.0],
+        [30.0, 10.0, 0.0],
+    ];
+    collision
+        .append(Collision::parse(&dzb_exit(&ledge, &tris, &[4, 4])).unwrap())
+        .unwrap();
+    assert_eq!(collision.exit_at(1.0, 9.0), Some(2));
+    assert_eq!(collision.exit_at(21.0, 9.0), Some(4));
 }

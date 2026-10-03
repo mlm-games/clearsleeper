@@ -13,6 +13,7 @@ pub mod roll;
 pub mod sea;
 pub mod ship;
 pub mod swim;
+pub mod transition;
 pub mod walk;
 pub mod water;
 
@@ -26,6 +27,31 @@ pub enum WwSimSet {
     Input,
     Execute,
     After,
+}
+
+pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) {
+    for source in tables.actors() {
+        let actor = actor::Actor {
+            name: source.name.clone(),
+            parameters: source.parameters,
+            pos: Vec3::from_array(source.pos),
+            angle: source.angle,
+            set_id: source.set_id,
+        };
+        if source.name == ship::SHIP_ACTOR {
+            world.spawn((actor, ship::Ship::default()));
+        } else {
+            world.spawn(actor);
+        }
+    }
+}
+
+pub(crate) fn clear_actors(world: &mut World) {
+    let mut query = world.query::<(Entity, &actor::Actor)>();
+    let stale: Vec<Entity> = query.iter(world).map(|(entity, _)| entity).collect();
+    for entity in stale {
+        let _ = world.despawn(entity);
+    }
 }
 
 pub fn build(
@@ -47,6 +73,7 @@ pub fn build(
     sim.world.insert_resource(roll::Roll::default());
     sim.world.insert_resource(hop::Hop::default());
     sim.world.insert_resource(death::GameOver::default());
+    sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
         area.spawn = stage.spawn;
@@ -61,20 +88,7 @@ pub fn build(
         sim.world.insert_resource(sea::Sea::new(sea_tables));
     }
     if let Some(tables) = tables {
-        for source in tables.actors() {
-            let actor = actor::Actor {
-                name: source.name.clone(),
-                parameters: source.parameters,
-                pos: Vec3::from_array(source.pos),
-                angle: source.angle,
-                set_id: source.set_id,
-            };
-            if source.name == ship::SHIP_ACTOR {
-                sim.world.spawn((actor, ship::Ship::default()));
-            } else {
-                sim.world.spawn(actor);
-            }
-        }
+        spawn_actors(&mut sim.world, tables);
     }
     let spawn = area.spawn;
     let yaw = area.yaw;
@@ -99,6 +113,7 @@ pub fn build(
             swim::surface.in_set(WwSimSet::Execute),
             ship::control.in_set(WwSimSet::Execute),
             area::clamp_to_area.in_set(WwSimSet::Execute),
+            transition::check.in_set(WwSimSet::Execute),
             sea::sea_tick.in_set(WwSimSet::Execute),
             health::apply_damage.in_set(WwSimSet::Execute),
             death::check.in_set(WwSimSet::Execute),

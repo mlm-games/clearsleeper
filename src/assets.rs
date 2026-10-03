@@ -4,10 +4,10 @@ pub const ASSETS_ENV: &str = "CS_ASSETS";
 
 const YAZ0_MAGIC: [u8; 4] = *b"Yaz0";
 const RARC_MAGIC: [u8; 4] = *b"RARC";
-const STAGE_DIR: &str = "files/res/Stage/sea";
-const STAGE_MAP: &str = "files/res/Stage/sea/Stage.arc";
-const STAGE_SPAWN_POINT: i32 = 128;
+const STAGE_ROOT: &str = "files/res/Stage";
+pub const STAGE_SPAWN_POINT: u8 = 128;
 const STAGE_START_ROOM: u8 = 44;
+pub const SEA_STAGE: &str = "sea";
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
     "bdl/model1.bdl",
@@ -450,8 +450,8 @@ impl Archive {
     }
 }
 
-pub fn load_stage() -> Option<crate::sim::collision::StageData> {
-    match stage_from_assets() {
+pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
+    match stage_from_assets(stage) {
         Ok(stage) => Some(stage),
         Err(error) => {
             log::warn!("clearsleeper: stage assets unavailable ({error})");
@@ -460,8 +460,8 @@ pub fn load_stage() -> Option<crate::sim::collision::StageData> {
     }
 }
 
-pub fn load_room_mesh() -> Option<crate::bdl::RoomMesh> {
-    match room_mesh_from_assets() {
+pub fn load_room_mesh(stage: &str) -> Option<crate::bdl::RoomMesh> {
+    match room_mesh_from_assets(stage) {
         Ok(mesh) => Some(mesh),
         Err(error) => {
             log::warn!("clearsleeper: room mesh unavailable ({error})");
@@ -470,11 +470,21 @@ pub fn load_room_mesh() -> Option<crate::bdl::RoomMesh> {
     }
 }
 
-pub fn load_stage_tables() -> Option<crate::dzs::StageTables> {
-    match stage_tables_from_assets() {
+pub fn load_stage_tables(stage: &str) -> Option<crate::dzs::StageTables> {
+    match stage_tables_from_assets(stage) {
         Ok(tables) => Some(tables),
         Err(error) => {
             log::warn!("clearsleeper: stage tables unavailable ({error})");
+            None
+        }
+    }
+}
+
+pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<(glam::Vec3, f32)> {
+    match stage_spawn_from_assets(stage, room, point) {
+        Ok(spawn) => Some(spawn),
+        Err(error) => {
+            log::warn!("clearsleeper: stage spawn unavailable ({error})");
             None
         }
     }
@@ -522,13 +532,17 @@ fn sea_shade(bti: &[u8]) -> Option<f32> {
     Some(total as f32 / (15.0 * pixels as f32))
 }
 
-pub fn start_set(tables: &crate::dzs::StageTables) -> Vec<u8> {
-    let set = tables.load_set(STAGE_START_ROOM);
+pub fn room_set_for(tables: &crate::dzs::StageTables, room: u8) -> Vec<u8> {
+    let set = tables.load_set(room);
     if set.is_empty() {
-        vec![STAGE_START_ROOM]
+        vec![room]
     } else {
         set.to_vec()
     }
+}
+
+pub fn start_set(tables: &crate::dzs::StageTables) -> Vec<u8> {
+    room_set_for(tables, STAGE_START_ROOM)
 }
 
 pub struct RoomSet {
@@ -548,34 +562,40 @@ pub fn load_room_set(tables: &crate::dzs::StageTables, rooms: &[u8]) -> Option<R
     }
 }
 
-fn stage_tables_from_assets() -> Result<crate::dzs::StageTables, AssetError> {
-    let root = AssetRoot::from_env()?;
-    stage_tables(&root)
+fn stage_map(stage: &str) -> String {
+    format!("{STAGE_ROOT}/{stage}/Stage.arc")
 }
 
-fn stage_tables(root: &AssetRoot) -> Result<crate::dzs::StageTables, AssetError> {
-    let map = root.read_archive(STAGE_MAP)?;
-    let path = root.root().join(STAGE_MAP);
+fn stage_tables_from_assets(stage: &str) -> Result<crate::dzs::StageTables, AssetError> {
+    let root = AssetRoot::from_env()?;
+    stage_tables(&root, stage)
+}
+
+fn stage_tables(root: &AssetRoot, stage: &str) -> Result<crate::dzs::StageTables, AssetError> {
+    let map = root.read_archive(&stage_map(stage))?;
+    let path = root.root().join(stage_map(stage));
     let data = map.read("dzs/stage.dzs")?;
-    crate::dzs::parse(data).map_err(|error| AssetError::Corrupt {
-        path,
-        detail: error.as_str(),
-    })
+    crate::dzs::parse(data)
+        .map(|tables| tables.with_name(stage))
+        .map_err(|error| AssetError::Corrupt {
+            path,
+            detail: error.as_str(),
+        })
 }
 
-fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
+fn stage_from_assets(stage: &str) -> Result<crate::sim::collision::StageData, AssetError> {
     let root = AssetRoot::from_env()?;
-    let tables = stage_tables(&root)?;
+    let tables = stage_tables(&root, stage)?;
     let rooms = start_set(&tables);
     let set = room_set_from_assets(&root, &tables, &rooms)?;
     let collision = set.collision.ok_or_else(|| AssetError::Corrupt {
-        path: root.root().join(room_path(STAGE_START_ROOM)),
+        path: root.root().join(room_path(stage, STAGE_START_ROOM)),
         detail: "room set has no collision",
     })?;
-    let relative = room_path(STAGE_START_ROOM);
+    let relative = room_path(stage, STAGE_START_ROOM);
     let path = root.root().join(&relative);
     let room = root.read_archive(&relative)?;
-    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path)?;
+    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path, STAGE_SPAWN_POINT)?;
     Ok(crate::sim::collision::StageData {
         spawn,
         yaw,
@@ -583,13 +603,25 @@ fn stage_from_assets() -> Result<crate::sim::collision::StageData, AssetError> {
     })
 }
 
-fn room_mesh_from_assets() -> Result<crate::bdl::RoomMesh, AssetError> {
+fn stage_spawn_from_assets(
+    stage: &str,
+    room: u8,
+    point: u8,
+) -> Result<(glam::Vec3, f32), AssetError> {
     let root = AssetRoot::from_env()?;
-    let tables = stage_tables(&root)?;
+    let relative = room_path(stage, room);
+    let path = root.root().join(&relative);
+    let archive = root.read_archive(&relative)?;
+    stage_spawn(archive.read("dzr/room.dzr")?, path, point)
+}
+
+fn room_mesh_from_assets(stage: &str) -> Result<crate::bdl::RoomMesh, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let tables = stage_tables(&root, stage)?;
     let rooms = start_set(&tables);
     let set = room_set_from_assets(&root, &tables, &rooms)?;
     set.mesh.ok_or_else(|| AssetError::Corrupt {
-        path: root.root().join(room_path(STAGE_START_ROOM)),
+        path: root.root().join(room_path(stage, STAGE_START_ROOM)),
         detail: "room set has no geometry",
     })
 }
@@ -602,7 +634,7 @@ fn room_set_from_assets(
     let mut collision: Option<crate::sim::collision::Collision> = None;
     let mut mesh: Option<crate::bdl::RoomMesh> = None;
     for &room in rooms {
-        let relative = room_path(room);
+        let relative = room_path(tables.name(), room);
         let path = root.root().join(&relative);
         let archive = root.read_archive(&relative)?;
         match archive.read("dzb/room.dzb") {
@@ -671,11 +703,11 @@ fn table_placement(tables: &crate::dzs::StageTables, room: u8) -> ([f32; 2], f32
     }
 }
 
-fn room_path(room: u8) -> String {
-    format!("{STAGE_DIR}/Room{room}.arc")
+fn room_path(stage: &str, room: u8) -> String {
+    format!("{STAGE_ROOT}/{stage}/Room{room}.arc")
 }
 
-pub fn stage_spawn(data: &[u8], path: PathBuf) -> Result<(glam::Vec3, f32), AssetError> {
+pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<(glam::Vec3, f32), AssetError> {
     let corrupt = |detail: &'static str| AssetError::Corrupt {
         path: path.clone(),
         detail,
@@ -709,7 +741,7 @@ pub fn stage_spawn(data: &[u8], path: PathBuf) -> Result<(glam::Vec3, f32), Asse
     for index in 0..count as usize {
         let at = offset as usize + index * 0x20;
         let angle_z = read_i16(data, at + 0x1C).ok_or_else(|| corrupt("dzr truncated"))?;
-        if i32::from(angle_z as u8) != STAGE_SPAWN_POINT {
+        if angle_z as u8 != point {
             continue;
         }
         let spawn = glam::Vec3::new(

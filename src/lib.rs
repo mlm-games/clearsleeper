@@ -61,9 +61,13 @@ impl App {
             log::warn!("clearsleeper: cue bank failed to load ({e})");
         }
         let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        let stage = assets::load_stage_tables();
-        sim::build(&mut sim, assets::load_stage(), stage.as_ref());
-        let room = assets::load_room_mesh();
+        let stage = assets::load_stage_tables(assets::SEA_STAGE);
+        sim::build(
+            &mut sim,
+            assets::load_stage(assets::SEA_STAGE),
+            stage.as_ref(),
+        );
+        let room = assets::load_room_mesh(assets::SEA_STAGE);
         let sea_shade = assets::load_sea_shade().unwrap_or(0.0);
         let rooms = stage.as_ref().map(assets::start_set).unwrap_or_default();
         let spawn = sim.world.resource::<sim::area::Area>().spawn;
@@ -273,14 +277,118 @@ impl App {
             self.menu.screen = menus::Screen::GameOver;
             self.menu.slot = 0;
         }
+        self.apply_exit();
         self.sync_rooms();
         steps
+    }
+
+    pub fn stage(&self) -> Option<&dzs::StageTables> {
+        self.stage.as_ref()
+    }
+
+    fn apply_exit(&mut self) {
+        let Some(exit_id) = self
+            .sim
+            .world
+            .resource_mut::<sim::transition::NextStage>()
+            .0
+            .take()
+        else {
+            return;
+        };
+        let Some(dest) = self
+            .stage
+            .as_ref()
+            .and_then(|tables| tables.exit(exit_id))
+            .cloned()
+        else {
+            log::warn!("clearsleeper: exit {exit_id} has no destination");
+            return;
+        };
+        let Some(tables) = assets::load_stage_tables(&dest.stage) else {
+            return;
+        };
+        let rooms = assets::room_set_for(&tables, dest.room);
+        let Some((spawn, yaw)) = assets::load_stage_spawn(&dest.stage, dest.room, dest.start)
+        else {
+            return;
+        };
+        self.swap_stage(tables, rooms, spawn, yaw);
+    }
+
+    pub fn swap_stage(
+        &mut self,
+        tables: dzs::StageTables,
+        rooms: Vec<u8>,
+        spawn: glam::Vec3,
+        yaw: f32,
+    ) {
+        let has_sea = tables.has_sea_actor();
+        let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+        if !has_sea {
+            if let Some(set) = assets::load_room_set(&tables, &rooms) {
+                self.install_room_set(set, frame);
+            }
+        }
+        *self.sim.world.resource_mut::<sim::transition::NextStage>() =
+            sim::transition::NextStage(None);
+        {
+            let mut area = self.sim.world.resource_mut::<sim::area::Area>();
+            area.spawn = spawn;
+            area.yaw = yaw;
+        }
+        if has_sea {
+            let sea = sim::sea::Sea::new(sim::sea::SeaTables::new(|room| tables.wave_max(room)));
+            self.sim.world.insert_resource(sea);
+        } else {
+            self.sim.world.remove_resource::<sim::sea::Sea>();
+        }
+        sim::clear_actors(&mut self.sim.world);
+        sim::spawn_actors(&mut self.sim.world, &tables);
+        *self.sim.world.resource_mut::<sim::swim::Swim>() = sim::swim::Swim::default();
+        *self.sim.world.resource_mut::<sim::roll::Roll>() = sim::roll::Roll::default();
+        *self.sim.world.resource_mut::<sim::hop::Hop>() = sim::hop::Hop::default();
+        let mut query = self.sim.world.query::<&mut sim::player::Player>();
+        if let Some(mut player) = query.iter_mut(&mut self.sim.world).next() {
+            player.pos = spawn;
+            player.yaw = yaw;
+            player.speed = 0.0;
+            player.speed_y = 0.0;
+        }
+        *self.sim.world.resource_mut::<sim::collision::MoveFrom>() =
+            sim::collision::MoveFrom(spawn);
+        self.stage = Some(tables);
+        self.rooms = rooms;
+    }
+
+    fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
+        match set.collision {
+            Some(collision) => {
+                let (bounds_min, bounds_max) = collision.bounds();
+                let mut area = self.sim.world.resource_mut::<sim::area::Area>();
+                area.bounds_min = bounds_min;
+                area.bounds_max = bounds_max;
+                self.sim.world.insert_resource(collision);
+            }
+            None => {
+                self.sim.world.remove_resource::<sim::collision::Collision>();
+                let default = sim::area::Area::default();
+                let mut area = self.sim.world.resource_mut::<sim::area::Area>();
+                area.bounds_min = default.bounds_min;
+                area.bounds_max = default.bounds_max;
+            }
+        }
+        self.room = set.mesh;
+        self.room_tick = frame;
     }
 
     pub fn sync_rooms(&mut self) {
         let Some(tables) = self.stage.as_ref() else {
             return;
         };
+        if !tables.has_sea_actor() {
+            return;
+        }
         let player = self
             .sim
             .world
@@ -302,24 +410,8 @@ impl App {
         }
         let rooms = requested.to_vec();
         if let Some(set) = assets::load_room_set(tables, &rooms) {
-            match set.collision {
-                Some(collision) => {
-                    let (bounds_min, bounds_max) = collision.bounds();
-                    let mut area = self.sim.world.resource_mut::<sim::area::Area>();
-                    area.bounds_min = bounds_min;
-                    area.bounds_max = bounds_max;
-                    self.sim.world.insert_resource(collision);
-                }
-                None => {
-                    self.sim.world.remove_resource::<sim::collision::Collision>();
-                    let default = sim::area::Area::default();
-                    let mut area = self.sim.world.resource_mut::<sim::area::Area>();
-                    area.bounds_min = default.bounds_min;
-                    area.bounds_max = default.bounds_max;
-                }
-            }
-            self.room = set.mesh;
-            self.room_tick = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+            let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+            self.install_room_set(set, frame);
         }
         self.rooms = rooms;
     }

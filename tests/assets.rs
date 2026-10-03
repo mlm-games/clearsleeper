@@ -1,7 +1,9 @@
 use std::io::Write as _;
 use std::time::Duration;
 
-use clearsleeper::assets::{AssetError, AssetRoot, Archive, stage_spawn, yaz0_decode};
+use clearsleeper::assets::{
+    Archive, AssetError, AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, stage_spawn, yaz0_decode,
+};
 use clearsleeper::btk::TexSrt;
 use glam::Vec3;
 
@@ -131,7 +133,7 @@ fn real_disc_archives_load_through_cs_assets() {
         .unwrap();
     assert_eq!(room.read("dzb/room.dzb").unwrap().len(), 124_416);
 
-    let stage = clearsleeper::assets::load_stage().expect("stage loads from disc");
+    let stage = clearsleeper::assets::load_stage(SEA_STAGE).expect("stage loads from disc");
     assert!(
         (stage.spawn - Vec3::new(-194_845.4, 145.0, 314_242.8)).length() < 1.0,
         "unexpected spawn {:?}",
@@ -152,7 +154,7 @@ fn golden_room_mesh_matches_disc_geometry() {
         eprintln!("CS_ASSETS is not set; skipping real-disc room mesh check");
         return;
     };
-    let mesh = clearsleeper::assets::load_room_mesh().expect("room mesh loads from disc");
+    let mesh = clearsleeper::assets::load_room_mesh(SEA_STAGE).expect("room mesh loads from disc");
     assert_eq!(mesh.groups.len(), 17);
     assert_eq!(mesh.textures.len(), 18);
     let pages = [
@@ -310,7 +312,7 @@ fn golden_room_mesh_matches_disc_geometry() {
     assert!((minimum[2] - 250_000.0).abs() < 0.5, "z min {}", minimum[2]);
     assert!((maximum[2] - 350_000.0).abs() < 0.5, "z max {}", maximum[2]);
 
-    let stage = clearsleeper::assets::load_stage().expect("stage loads from disc");
+    let stage = clearsleeper::assets::load_stage(SEA_STAGE).expect("stage loads from disc");
     let spawn = [stage.spawn.x, stage.spawn.z];
     let mut top: Option<(f32, f32)> = None;
     for group in &mesh.groups {
@@ -428,7 +430,7 @@ fn golden_stage_tables_match_disc() {
         return;
     };
     let tables =
-        clearsleeper::assets::load_stage_tables().expect("stage tables load from disc");
+        clearsleeper::assets::load_stage_tables(SEA_STAGE).expect("stage tables load from disc");
     assert_eq!(tables.placements().len(), 50);
     assert_eq!(tables.room_groups().len(), 50);
 
@@ -522,7 +524,7 @@ fn golden_boot_palette_and_sea_match_disc() {
         return;
     };
     let tables =
-        clearsleeper::assets::load_stage_tables().expect("stage tables load from disc");
+        clearsleeper::assets::load_stage_tables(SEA_STAGE).expect("stage tables load from disc");
     assert_eq!(tables.boot_time(), 165.0);
     assert!(tables.has_sea_actor());
     assert_eq!(tables.wave_max(44), 0);
@@ -640,7 +642,7 @@ fn golden_dzr_spawn_selects_entry_by_point() {
     push_spawn_entry(&mut data, 100.0, 200.0, 300.0, 0, 0);
     push_spawn_entry(&mut data, -194_845.4, 145.0, 314_242.8, 4187, -128);
 
-    let (spawn, yaw) = stage_spawn(&data, "golden.dzr".into()).unwrap();
+    let (spawn, yaw) = stage_spawn(&data, "golden.dzr".into(), STAGE_SPAWN_POINT).unwrap();
     assert_eq!(spawn, Vec3::new(-194_845.4, 145.0, 314_242.8));
     let expected_yaw = 4187.0 * std::f32::consts::TAU / 65_536.0;
     assert!((yaw - expected_yaw).abs() < 1e-6);
@@ -649,7 +651,7 @@ fn golden_dzr_spawn_selects_entry_by_point() {
     no_plyr.extend_from_slice(&0_u32.to_be_bytes());
     assert!(
         matches!(
-            stage_spawn(&no_plyr, "golden.dzr".into()),
+            stage_spawn(&no_plyr, "golden.dzr".into(), STAGE_SPAWN_POINT),
             Err(AssetError::Corrupt { .. })
         ),
         "expected corrupt without spawn chunk"
@@ -663,7 +665,7 @@ fn golden_dzr_spawn_selects_entry_by_point() {
     push_spawn_entry(&mut wrong_point, 1.0, 2.0, 3.0, 7, 0);
     assert!(
         matches!(
-            stage_spawn(&wrong_point, "golden.dzr".into()),
+            stage_spawn(&wrong_point, "golden.dzr".into(), STAGE_SPAWN_POINT),
             Err(AssetError::Corrupt { detail, .. })
                 if detail == "dzr spawn point missing"
         ),

@@ -14,6 +14,9 @@ const GROUND_NY: f32 = 0.5;
 const ROOF_NY: f32 = -0.8;
 const ACTOR_HEIGHT: f32 = 60.0;
 const PLANE_MIN_MAGNITUDE: f32 = 0.02;
+const EXIT_MASK: u32 = 0x0007E000;
+const EXIT_SHIFT: u32 = 13;
+pub const NO_EXIT: u8 = 0x3F;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DzbError {
@@ -45,6 +48,7 @@ pub struct Collision {
     verts: Vec<Vec3>,
     tris: Vec<[u16; 3]>,
     planes: Vec<Plane>,
+    exits: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -174,8 +178,17 @@ impl Collision {
             ));
         }
 
+        let info_count = u32_at(data, 0x28).ok_or(DzbError::Truncated)?;
+        let info_offset = u32_at(data, 0x2C).ok_or(DzbError::Truncated)?;
+        let mut info0 = Vec::with_capacity(info_count as usize);
+        for index in 0..info_count as usize {
+            let at = info_offset as usize + index * INFO_STRIDE;
+            info0.push(u32_at(data, at).ok_or(DzbError::Truncated)?);
+        }
+
         let mut tris = Vec::with_capacity(tri_count as usize);
         let mut planes = Vec::with_capacity(tri_count as usize);
+        let mut exits = Vec::with_capacity(tri_count as usize);
         for index in 0..tri_count as usize {
             let at = tri_offset as usize + index * TRI_STRIDE;
             let ids = [
@@ -186,6 +199,11 @@ impl Collision {
             if ids.iter().any(|&id| usize::from(id) >= verts.len()) {
                 return Err(DzbError::VertexIndex);
             }
+            let info_id = u16_at(data, at + 6).ok_or(DzbError::Truncated)?;
+            exits.push(match info0.get(usize::from(info_id)) {
+                Some(info) => ((info & EXIT_MASK) >> EXIT_SHIFT) as u8,
+                None => NO_EXIT,
+            });
             tris.push(ids);
             planes.push(plane(
                 verts[usize::from(ids[0])],
@@ -198,6 +216,7 @@ impl Collision {
             verts,
             tris,
             planes,
+            exits,
         })
     }
 
@@ -219,6 +238,7 @@ impl Collision {
             ]
         }));
         self.planes.extend(other.planes);
+        self.exits.extend(other.exits);
         self.verts.extend(other.verts);
         Ok(())
     }
@@ -237,8 +257,8 @@ impl Collision {
         (min, max)
     }
 
-    pub fn ground_at(&self, x: f32, z: f32) -> Option<f32> {
-        let mut highest: Option<f32> = None;
+    fn ground_hit(&self, x: f32, z: f32) -> Option<(f32, usize)> {
+        let mut highest: Option<(f32, usize)> = None;
         for (index, tri) in self.tris.iter().enumerate() {
             let surface = self.planes[index];
             if surface.normal.y < GROUND_NY {
@@ -252,9 +272,24 @@ impl Collision {
             }
             let y = -(surface.d + surface.normal.x * x + surface.normal.z * z)
                 / surface.normal.y;
-            highest = Some(highest.map_or(y, |current| current.max(y)));
+            let replace = match highest {
+                Some((current, _)) => y > current,
+                None => true,
+            };
+            if replace {
+                highest = Some((y, index));
+            }
         }
         highest
+    }
+
+    pub fn ground_at(&self, x: f32, z: f32) -> Option<f32> {
+        self.ground_hit(x, z).map(|(y, _)| y)
+    }
+
+    pub fn exit_at(&self, x: f32, z: f32) -> Option<u8> {
+        let (_, index) = self.ground_hit(x, z)?;
+        self.exits.get(index).copied()
     }
 
     fn wall(surface: Plane) -> bool {

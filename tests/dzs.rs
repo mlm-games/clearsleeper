@@ -205,3 +205,42 @@ fn rejects_truncated_and_malformed_stage_streams() {
     write_u32(&mut bad_actr, 72, 0xFFFF_0000);
     assert_eq!(dzs::parse(&bad_actr).unwrap_err(), DzsError::BadTable);
 }
+
+fn exits() -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1_u32.to_be_bytes());
+    data.extend_from_slice(b"SCLS");
+    data.extend_from_slice(&2_u32.to_be_bytes());
+    data.extend_from_slice(&16_u32.to_be_bytes());
+    data.extend_from_slice(b"House01\0");
+    data.push(3);
+    data.push(0);
+    data.push(1);
+    data.push(0);
+    data.extend_from_slice(b"sea\0\0\0\0\0");
+    data.push(128);
+    data.push(5);
+    data.push(15);
+    data.push(0);
+    data
+}
+
+#[test]
+fn golden_scls_exit_table_parses_destinations() {
+    let tables = dzs::parse(&exits()).unwrap();
+    let house = tables.exit(0).expect("first exit resolves");
+    assert_eq!(house.stage, "House01");
+    assert_eq!(house.start, 3);
+    assert_eq!(house.room, 0);
+    assert_eq!(house.wipe, 1);
+    let sea = tables.exit(1).expect("second exit resolves");
+    assert_eq!(sea.stage, "sea");
+    assert_eq!(sea.start, 128);
+    assert_eq!(sea.room, 5);
+    assert_eq!(sea.wipe, 15);
+    assert!(
+        tables.exit(2).is_none(),
+        "ids past the table do not resolve"
+    );
+    assert_eq!(tables.with_name("House01").name(), "House01");
+}

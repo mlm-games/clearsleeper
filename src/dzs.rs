@@ -8,6 +8,7 @@ const SEA_CHART_MIN: i32 = 1;
 const SEA_CHART_MAX: i32 = 7;
 const SEA_CHART_SIDE: i32 = 7;
 const STAG_LEN: usize = 0x20;
+const EXIT_LEN: usize = 0x0C;
 const ENVR_LEN: usize = 0x08;
 const COLO_LEN: usize = 0x0C;
 const PALE_LEN: usize = 0x2C;
@@ -73,6 +74,14 @@ pub struct StageActor {
     pub set_id: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StageExit {
+    pub stage: String,
+    pub start: u8,
+    pub room: u8,
+    pub wipe: u8,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StageTables {
     placements: Vec<Placement>,
@@ -83,6 +92,8 @@ pub struct StageTables {
     palettes: Vec<PaletteEntry>,
     skies: Vec<[u8; 3]>,
     actors: Vec<StageActor>,
+    exits: Vec<StageExit>,
+    name: String,
     has_sea: bool,
 }
 
@@ -147,6 +158,10 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_actors(data, count, offset)?,
         None => Vec::new(),
     };
+    let exits = match locate(b"SCLS") {
+        Some((count, offset)) => parse_exits(data, count, offset)?,
+        None => Vec::new(),
+    };
     let has_sea = actors.iter().any(|actor| actor.name == SEA_ACTOR);
     Ok(StageTables {
         placements,
@@ -157,6 +172,8 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         palettes,
         skies,
         actors,
+        exits,
+        name: String::new(),
         has_sea,
     })
 }
@@ -245,6 +262,29 @@ fn parse_palette(data: &[u8], at: usize) -> Result<PaletteEntry, DzsError> {
     })
 }
 
+fn parse_exits(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageExit>, DzsError> {
+    let end = table_end(offset as usize, count as usize, EXIT_LEN)?;
+    if end > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    let mut exits = Vec::with_capacity(count as usize);
+    for index in 0..count as usize {
+        let at = offset as usize + index * EXIT_LEN;
+        let name: [u8; 8] = read_array(data, at)?;
+        let stop = name
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(name.len());
+        exits.push(StageExit {
+            stage: String::from_utf8_lossy(&name[..stop]).into_owned(),
+            start: read_u8(data, at + 8)?,
+            room: read_u8(data, at + 9)?,
+            wipe: read_u8(data, at + 0xA)?,
+        });
+    }
+    Ok(exits)
+}
+
 fn parse_actors(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageActor>, DzsError> {
     let end = table_end(offset as usize, count as usize, ACTOR_LEN)?;
     if end > data.len() {
@@ -280,6 +320,19 @@ fn parse_actors(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageActor>,
 impl StageTables {
     pub fn actors(&self) -> &[StageActor] {
         &self.actors
+    }
+
+    pub fn exit(&self, id: u8) -> Option<&StageExit> {
+        self.exits.get(usize::from(id))
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name = name.to_owned();
+        self
     }
 
     pub fn placements(&self) -> &[Placement] {
