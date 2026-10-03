@@ -58,18 +58,16 @@ fn drop(actor: &Actor, payload: Payload, commands: &mut Commands) {
 }
 
 pub fn control(
-    mut balloons: Query<(Entity, &mut Balloon, &Actor, &mut Hurt)>,
+    mut balloons: Query<(&mut Balloon, &Actor, &mut HitPoints)>,
     mut commands: Commands,
 ) {
-    for (entity, mut balloon, actor, mut hurt) in &mut balloons {
-        if hurt.0 == 0 {
+    for (mut balloon, actor, hit_points) in &mut balloons {
+        if hit_points.0 > 0 {
             continue;
         }
-        hurt.0 = 0;
         let Some(payload) = balloon.payload.take() else {
             continue;
         };
         drop(actor, payload, &mut commands);
-        let _ = commands.entity(entity).despawn();
     }
 }

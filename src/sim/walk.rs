@@ -3,10 +3,10 @@
 use std::f32::consts::TAU;
 
 use bevy_ecs::prelude::*;
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 
 use super::combat::Combat;
-use super::events::{SimEvent, SimEvents, Stride, STRIDE_UNITS};
+use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
 use super::jump::{BACK_GRAVITY, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
@@ -14,8 +14,8 @@ use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::{
-    Swim, BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE,
-    SWIM_MAX_SPEED, SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE,
+    BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE, SWIM_MAX_SPEED,
+    SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE, Swim,
 };
 
 const STICK_GATE: f32 = 0.05;
@@ -49,6 +49,21 @@ pub(crate) fn from_s16(units: i16) -> f32 {
 
 fn angle_distance(a: i16, b: i16) -> u16 {
     a.wrapping_sub(b).unsigned_abs()
+}
+
+pub(crate) fn within(from: Vec3, to: Vec3, radius: f32) -> bool {
+    (to - from).length_squared() <= radius * radius
+}
+
+pub(crate) fn swept(from: Vec3, to: Vec3, radius: f32) -> bool {
+    let travel = to - from;
+    let length = travel.length();
+    if length < 1e-4 {
+        return within(from, to, radius);
+    }
+    let dir = travel / length;
+    let along = ((from - to).dot(dir)).clamp(0.0, length);
+    within(from + dir * along, to, radius)
 }
 
 pub(super) fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f32) {
@@ -117,13 +132,7 @@ fn set_normal_speed(
         (max_step, 0.0)
     };
     if drive.abs() < ACCEL_EPSILON {
-        add_calc(
-            &mut player.speed,
-            decel_target,
-            scale,
-            step_cap,
-            min_step,
-        );
+        add_calc(&mut player.speed, decel_target, scale, step_cap, min_step);
     } else {
         player.speed += drive;
         if player.speed > desired {
@@ -263,13 +272,20 @@ fn walk_tick(
         let target = target_yaw(intent, camera);
         let yaw = to_s16(player.yaw);
         if angle_distance(target, yaw) > REVERSAL_LIMIT {
-            player.yaw =
-                from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, REVERSAL_PARAM, REVERSAL_RATE));
+            player.yaw = from_s16(add_calc_angle_s(
+                yaw,
+                target,
+                TURN_SCALE,
+                REVERSAL_PARAM,
+                REVERSAL_RATE,
+            ));
             0.0
         } else {
             let max_step = ((TURN_PARAM as f32 * stick_sq) as i16).max(TURN_PARAM_FLOOR);
             let min_step = ((TURN_RATE as f32 * stick_sq) as i16).max(TURN_RATE_FLOOR);
-            player.yaw = from_s16(add_calc_angle_s(yaw, target, TURN_SCALE, max_step, min_step));
+            player.yaw = from_s16(add_calc_angle_s(
+                yaw, target, TURN_SCALE, max_step, min_step,
+            ));
             let mut drive = (from_s16(target) - player.yaw).cos();
             if player.speed > 0.5 * MAX_NORMAL_SPEED {
                 drive = drive.max(0.7);

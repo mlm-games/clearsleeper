@@ -140,6 +140,15 @@ const BALLOON: Rgb = [0.86, 0.44, 0.52];
 const WARSHIP: Rgb = [0.30, 0.26, 0.32];
 const EMBER: Rgb = [0.94, 0.52, 0.18];
 const SEAGULL: Rgb = [0.94, 0.94, 0.90];
+const SPEAR: Rgb = [0.70, 0.66, 0.52];
+
+pub fn item_hex(kind: crate::sim::item::Kind) -> &'static str {
+    match kind {
+        crate::sim::item::Kind::Bomb => "#2E3138",
+        crate::sim::item::Kind::Arrow => "#C9C4B4",
+        crate::sim::item::Kind::Boomerang => "#B84C85",
+    }
+}
 const HEART: Rgb = [0.86, 0.20, 0.22];
 const RUPEE: Rgb = [0.24, 0.72, 0.32];
 const RELIC: Rgb = [0.90, 0.52, 0.86];
@@ -151,6 +160,9 @@ fn pickup_look(item: u8) -> (Rgb, f32) {
         0x01..=0x06 | 0x0F => (RUPEE, 10.0),
         0x07 => (RELIC, PIECE_SIZES[0]),
         0x08 => (RELIC, PIECE_SIZES[1]),
+        0x0B..=0x0E => (BOMB, 12.0),
+        0x10..=0x12 => (ARROW, 10.0),
+        0x2D => (BOOM, 14.0),
         _ => (RELIC, 10.0),
     }
 }
@@ -163,7 +175,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Bomb => BOMB,
         ActorKind::Arrow => ARROW,
         ActorKind::Boomerang => BOOM,
-        ActorKind::Spear => ARROW,
+        ActorKind::Spear => SPEAR,
         ActorKind::Balloon => BALLOON,
         ActorKind::Warship => WARSHIP,
         ActorKind::Cannon => BOMB,
@@ -180,9 +192,9 @@ fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
             actor.pos.x,
             actor.pos.y,
             actor.pos.z,
-            actor.half,
+            actor.half * 2.0,
             actor.height,
-            actor.half,
+            actor.half * 2.0,
             actor_look(actor),
             eye,
         );

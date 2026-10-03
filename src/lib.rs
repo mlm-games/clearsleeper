@@ -110,6 +110,7 @@ impl App {
             self.stage_do(false);
             self.stage_target(false);
             self.stage_item(false);
+            self.stage_use(false);
         }
         let cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
@@ -207,9 +208,8 @@ impl App {
         self.sim.world.resource::<sim::pickup::Rupees>().count
     }
 
-    pub fn held(&self) -> (u8, u8) {
-        let held = self.sim.world.resource::<sim::item::Held>();
-        (held.item, held.count)
+    pub fn held(&self) -> sim::item::Held {
+        *self.sim.world.resource::<sim::item::Held>()
     }
 
     pub fn dialogue(&self) -> sim::talk::Dialogue {
@@ -634,8 +634,12 @@ pub fn root_view(
     );
     let overlay = match app.menu.screen {
         menus::Screen::Playing => {
-            let held = *app.sim.world.resource::<sim::item::Held>();
-            hud::status_view(app.health(), app.rupees(), (held.count > 0).then_some(held))
+            let held = app.held();
+            hud::status_view(
+                app.health(),
+                app.rupees(),
+                held.kind().is_some().then_some(held),
+            )
         }
         menus::Screen::Title => menus::title_view(),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),

@@ -3,7 +3,7 @@ use std::time::Duration;
 use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::combat::HitPoints;
-use clearsleeper::sim::enemy;
+use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::item::{self, Arrow, Bomb, Boomerang, Held, Kind};
 use clearsleeper::sim::player::Player;
 use glam::Vec3;
@@ -12,8 +12,8 @@ use repose_core::runtime::Scheduler;
 
 use clearsleeper::SIM_HZ;
 
-const BOMB_ITEM: u8 = item::FIRST_BOMB + 1;
-const ARROW_ITEM: u8 = item::FIRST_ARROW;
+const BOMB_BAG: u8 = item::FIRST_BOMB + 1;
+const ARROW_BAG: u8 = item::FIRST_ARROW;
 
 fn frame(app: &mut App, keys: &[PhysicalKey]) {
     let mut sched = Scheduler::default();
@@ -27,20 +27,23 @@ fn tick(app: &mut App) {
     frame(app, &[]);
 }
 
-fn use_button(app: &mut App) {
+fn use_item(app: &mut App) {
     frame(app, &[PhysicalKey::KeyJ]);
     frame(app, &[]);
 }
 
-fn player(app: &App) -> Player {
-    app.sim
-        .world
-        .iter_entities()
-        .find_map(|e| e.get::<Player>().copied())
-        .expect("player exists at boot")
+fn place_player(app: &mut App, pos: Vec3) {
+    let mut query = app.sim.world.query::<&mut Player>();
+    for mut found in query.iter_mut(&mut app.sim.world) {
+        found.pos = pos;
+        found.yaw = 0.0;
+        found.face = 0.0;
+        found.speed = 0.0;
+        found.speed_y = 0.0;
+    }
 }
 
-fn hold(app: &mut App, item: u8) {
+fn held(app: &mut App, item: u8) {
     let mut held = app.sim.world.resource_mut::<Held>();
     held.equip(item);
 }
@@ -70,7 +73,7 @@ fn spins(app: &App) -> Vec<Boomerang> {
 }
 
 fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
-    let (state, hp) = enemy::spawn(0, 0);
+    let (state, hit_points) = enemy::spawn(0, 0);
     app.sim
         .world
         .spawn((
@@ -82,7 +85,8 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
                 set_id: 0,
             },
             state,
-            hp,
+            hit_points,
+            Hurt::default(),
         ))
         .id()
 }
@@ -91,202 +95,238 @@ fn foe_hp(app: &App, entity: bevy_ecs::entity::Entity) -> i32 {
     app.sim.world.entity(entity).get::<HitPoints>().unwrap().0
 }
 
+fn resting_bomb(app: &mut App, pos: Vec3, fuse: u32) {
+    app.sim.world.spawn((
+        Bomb {
+            pos,
+            fuse,
+            vel: Vec3::ZERO,
+            rest: true,
+        },
+        item::InFlight,
+    ));
+}
+
 #[test]
-fn golden_bomb_bag_fills_the_hand() {
+fn golden_bags_pick_the_item_they_name() {
     let mut app = App::new();
-    assert_eq!(app.held(), (0, 0), "you start with empty hands");
-    hold(&mut app, BOMB_ITEM);
     assert_eq!(
-        app.held(),
+        (app.held().item, app.held().count),
+        (0, 0),
+        "you start with empty hands"
+    );
+    held(&mut app, BOMB_BAG);
+    assert_eq!(
+        (app.held().item, app.held().count),
         (item::FIRST_BOMB, 10),
         "the 10-bomb bag equips bombs"
     );
     assert_eq!(app.sim.world.resource::<Held>().kind(), Some(Kind::Bomb));
-}
-
-#[test]
-fn golden_arrow_bag_replaces_the_bombs() {
-    let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
-    hold(&mut app, ARROW_ITEM);
+    held(&mut app, ARROW_BAG);
     assert_eq!(
-        app.held(),
+        (app.held().item, app.held().count),
         (item::FIRST_ARROW, 10),
-        "the last bag in hand wins"
+        "and the last bag in hand wins"
     );
 }
 
 #[test]
-fn golden_use_button_throws_a_bomb_and_spends_one() {
+fn golden_two_bags_of_the_same_kind_add_up() {
     let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
-    use_button(&mut app);
-    assert_eq!(bombs(&app).len(), 1, "the bag empties one bomb");
-    assert_eq!(app.held().1, 9, "and counts it gone");
-    use_button(&mut app);
-    assert_eq!(bombs(&app).len(), 2, "each press throws one more");
+    held(&mut app, BOMB_BAG);
+    held(&mut app, BOMB_BAG);
+    assert_eq!(
+        app.held().count,
+        20,
+        "a second bag tops the first up instead of replacing it"
+    );
 }
 
 #[test]
-fn golden_empty_hands_throw_nothing() {
+fn golden_bags_cap_at_the_biggest_pouch() {
     let mut app = App::new();
-    use_button(&mut app);
+    held(&mut app, item::LAST_BOMB);
+    held(&mut app, item::LAST_BOMB);
+    assert_eq!(app.held().count, 30, "the pouch tops out at thirty");
+}
+
+#[test]
+fn golden_using_an_item_spends_one_and_empty_hands_throw_nothing() {
+    let mut app = App::new();
+    use_item(&mut app);
     assert!(bombs(&app).is_empty(), "no bag, no bomb");
     assert!(arrows(&app).is_empty(), "no bag, no arrow");
+    held(&mut app, BOMB_BAG);
+    use_item(&mut app);
+    assert_eq!(bombs(&app).len(), 1, "one press throws one bomb");
+    assert_eq!(app.held().count, 9, "and it is gone from the bag");
 }
 
 #[test]
-fn golden_bomb_fuses_and_bursts() {
+fn golden_bomb_lands_near_the_thrower_and_fuses() {
     let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
-    use_button(&mut app);
+    place_player(&mut app, Vec3::ZERO);
+    held(&mut app, BOMB_BAG);
+    use_item(&mut app);
     let thrown = bombs(&app)[0];
     for _ in 0..thrown.fuse {
         tick(&mut app);
     }
-    assert!(
-        bombs(&app).is_empty(),
-        "the fuse runs out and the bomb is gone"
-    );
+    assert!(bombs(&app).is_empty(), "the fuse runs out and it is gone");
 }
 
 #[test]
-fn golden_bomb_blast_takes_a_heart_and_a_half() {
+fn golden_bomb_blast_only_hurts_what_it_is_next_to() {
     let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
+    place_player(&mut app, Vec3::ZERO);
     let victim = foe(&mut app, Vec3::new(0.0, 0.0, 300.0));
-    use_button(&mut app);
+    let bystander = foe(&mut app, Vec3::new(0.0, 0.0, 900.0));
+    held(&mut app, BOMB_BAG);
+    use_item(&mut app);
     for _ in 0..100 {
         tick(&mut app);
     }
     assert_eq!(
         foe_hp(&app, victim),
         1,
-        "a blast of four quarters halves a five-heart foe"
+        "four quarters come off the near foe"
     );
-    assert_eq!(app.health().units, 8, "and hurts the bomber too");
-}
-
-#[test]
-fn golden_bomb_chain_sets_off_the_next_one() {
-    let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
-    use_button(&mut app);
-    tick(&mut app);
-    app.sim.world.spawn(Bomb {
-        pos: player(&app).pos + Vec3::new(0.0, 0.0, 120.0),
-        fuse: 100,
-        vel: Vec3::ZERO,
-        rest: true,
-    });
-    for _ in 0..100 {
-        tick(&mut app);
-    }
-    assert!(
-        bombs(&app).is_empty(),
-        "the second bomb goes off with the first"
-    );
-}
-
-#[test]
-fn golden_arrow_sticks_when_it_misses() {
-    let mut app = App::new();
-    hold(&mut app, ARROW_ITEM);
-    use_button(&mut app);
-    assert_eq!(arrows(&app).len(), 1, "the bow looses one shaft");
-    for _ in 0..6 {
-        tick(&mut app);
-    }
-    assert!(arrows(&app).is_empty(), "it lands and stays put");
-}
-
-#[test]
-fn golden_arrow_finishes_a_foe() {
-    let mut app = App::new();
-    hold(&mut app, ARROW_ITEM);
-    let victim = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
-    use_button(&mut app);
-    tick(&mut app);
-    tick(&mut app);
+    assert_eq!(foe_hp(&app, bystander), 5, "and the far one is untouched");
     assert_eq!(
-        foe_hp(&app, victim),
-        3,
-        "an arrow bites two quarters out of a five-heart foe"
+        app.health().units,
+        12,
+        "the thrower stood clear of the blast"
     );
+}
+
+#[test]
+fn golden_bomb_at_your_feet_costs_a_heart() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    resting_bomb(&mut app, Vec3::ZERO, 2);
     for _ in 0..4 {
         tick(&mut app);
     }
-    assert_eq!(foe_hp(&app, victim), 1, "and only that once");
+    assert_eq!(app.health().units, 8, "you are inside the radius");
 }
 
 #[test]
-fn golden_arrow_runs_out() {
+fn golden_one_bomb_sets_off_the_next() {
     let mut app = App::new();
-    hold(&mut app, ARROW_ITEM);
-    for _ in 0..10 {
-        use_button(&mut app);
+    place_player(&mut app, Vec3::new(0.0, 0.0, 40_000.0));
+    resting_bomb(&mut app, Vec3::ZERO, 2);
+    resting_bomb(&mut app, Vec3::new(0.0, 0.0, 150.0), 100);
+    for _ in 0..4 {
+        tick(&mut app);
     }
-    assert_eq!(app.held().1, 0, "the quiver empties");
-    use_button(&mut app);
-    assert!(arrows(&app).is_empty(), "an empty quiver fires nothing");
+    assert!(bombs(&app).is_empty(), "the second goes off with the first");
+}
+
+#[test]
+fn golden_arrow_bites_two_quarters_and_then_sticks() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    let victim = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
+    held(&mut app, ARROW_BAG);
+    use_item(&mut app);
+    tick(&mut app);
+    tick(&mut app);
+    assert_eq!(foe_hp(&app, victim), 3, "the shaft takes two quarters");
+    for _ in 0..6 {
+        tick(&mut app);
+    }
+    assert!(arrows(&app).is_empty(), "and it is spent in the ground");
+}
+
+#[test]
+fn golden_boomerang_leaves_the_slot_and_comes_home_to_it() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    held(&mut app, item::BOOMERANG);
+    use_item(&mut app);
+    assert_eq!(spins(&app).len(), 1, "the spin leaves the hand");
+    assert_eq!(app.held().count, 0, "and the slot is empty while it flies");
+    for _ in 0..400 {
+        tick(&mut app);
+    }
+    assert!(spins(&app).is_empty(), "the spin comes home");
+    assert_eq!(
+        (app.held().item, app.held().count),
+        (item::BOOMERANG, 1),
+        "into the empty slot again"
+    );
+}
+
+#[test]
+fn golden_boomerang_bites_two_foes_then_turns_for_home() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    let first = foe(&mut app, Vec3::new(0.0, 0.0, 150.0));
+    let second = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
+    held(&mut app, item::BOOMERANG);
+    use_item(&mut app);
+    for _ in 0..30 {
+        tick(&mut app);
+    }
+    assert_eq!(foe_hp(&app, first), 4, "the first foe loses a quarter");
+    assert_eq!(foe_hp(&app, second), 4, "and so does the second");
+    for _ in 0..40 {
+        tick(&mut app);
+    }
+    assert!(spins(&app).is_empty(), "two locks and it heads home");
+}
+
+#[test]
+fn golden_a_returned_boomerang_never_overwrites_a_new_bag() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    held(&mut app, item::BOOMERANG);
+    use_item(&mut app);
+    held(&mut app, BOMB_BAG);
+    for _ in 0..400 {
+        tick(&mut app);
+    }
+    assert!(
+        spins(&app).is_empty(),
+        "the disc is spent by the time the bag comes along"
+    );
+    assert_eq!(
+        (app.held().item, app.held().count),
+        (item::FIRST_BOMB, 10),
+        "and it leaves the fresh bombs alone"
+    );
+}
+
+#[test]
+fn golden_projectiles_do_not_survive_a_stage_change() {
+    let mut app = App::new();
+    place_player(&mut app, Vec3::ZERO);
+    held(&mut app, BOMB_BAG);
+    use_item(&mut app);
+    assert_eq!(bombs(&app).len(), 1);
+    let tables = clearsleeper::assets::load_stage_tables(clearsleeper::assets::SEA_STAGE)
+        .expect("the home stage loads");
+    app.swap_stage(tables, Vec::new(), Vec3::ZERO, 0.0);
+    assert!(
+        bombs(&app).is_empty() && arrows(&app).is_empty() && spins(&app).is_empty(),
+        "nothing in flight follows you into the next room"
+    );
 }
 
 #[test]
 fn golden_items_survive_a_reload() {
     let mut app = App::new();
-    hold(&mut app, BOMB_ITEM);
+    held(&mut app, BOMB_BAG);
     let save = app.save();
     let mut restored = App::new();
     restored.load(&save).unwrap();
     assert_eq!(
-        restored.held(),
+        (restored.held().item, restored.held().count),
         (item::FIRST_BOMB, 10),
         "the bag rides along in the save"
     );
-}
-
-#[test]
-fn golden_boomerang_comes_back_to_the_hand() {
-    let mut app = App::new();
-    hold(&mut app, item::BOOMERANG);
-    use_button(&mut app);
-    assert_eq!(spins(&app).len(), 1, "the spin leaves the hand");
-    assert_eq!(app.held().1, 1, "and the hand keeps it");
-    for _ in 0..400 {
-        tick(&mut app);
-    }
-    assert!(spins(&app).is_empty(), "the spin comes home");
-    assert_eq!(app.held(), (item::BOOMERANG, 1), "still in hand");
-}
-
-#[test]
-fn golden_boomerang_bites_two_foes_and_returns() {
-    let mut app = App::new();
-    hold(&mut app, item::BOOMERANG);
-    let first = foe(&mut app, Vec3::new(0.0, 0.0, 150.0));
-    let second = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
-    use_button(&mut app);
-    for _ in 0..30 {
-        tick(&mut app);
-    }
-    assert_eq!(foe_hp(&app, first), 4, "the first foe loses a quarter");
-    assert_eq!(foe_hp(&app, second), 4, "so does the second");
-    for _ in 0..40 {
-        tick(&mut app);
-    }
-    assert!(spins(&app).is_empty(), "two locks and it turns for home");
-}
-
-#[test]
-fn golden_boomerang_recalls_on_the_second_press() {
-    let mut app = App::new();
-    hold(&mut app, item::BOOMERANG);
-    use_button(&mut app);
-    assert!(!spins(&app)[0].returning, "it flies out first");
-    use_button(&mut app);
-    assert!(spins(&app)[0].returning, "a second press calls it back");
-    for _ in 0..20 {
-        tick(&mut app);
-    }
-    assert!(spins(&app).is_empty(), "and it is home");
+    assert!(
+        !restored.sim.world.resource::<Held>().pressed,
+        "and the button edge is clear"
+    );
 }

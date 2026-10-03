@@ -26,3 +26,10 @@ pub fn grounded(collision: Option<&Collision>, pos: Vec3) -> bool {
     };
     matches!(surface, Some(ground) if pos.y <= ground)
 }
+
+pub fn surface(collision: Option<&Collision>, pos: Vec3) -> Option<f32> {
+    match collision {
+        Some(collision) => collision.ground_at(pos.x, pos.z),
+        None => Some(0.0),
+    }
+}

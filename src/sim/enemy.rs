@@ -4,9 +4,10 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::collision::Collision;
 use super::combat::HitPoints;
+use super::ground::grounded;
 use super::health::Health;
 use super::player::Player;
-use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
+use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16, within};
 
 pub const ENEMY_ACTOR: &str = "Bk";
 pub const LANCE_ACTOR: &str = "mo2";
@@ -309,9 +310,6 @@ fn finish(enemy: &mut Enemy, actor: &Actor, player: &Player, dist: f32) {
 
 fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Health) {
     let profile = enemy.profile;
-    if enemy.cooldown > 0 {
-        enemy.cooldown -= 1;
-    }
     let dx = player.pos.x - actor.pos.x;
     let dz = player.pos.z - actor.pos.z;
     let dist = (dx * dx + dz * dz).sqrt();
@@ -408,6 +406,7 @@ pub fn control(
         return;
     };
     let floored = collision.is_some();
+    let solid = collision.as_deref();
     for (entity, mut enemy, mut actor) in &mut enemies {
         let mut stunned = false;
         let mut recovering = false;
@@ -434,6 +433,9 @@ pub fn control(
         } else {
             enemy.speed = 0.0;
         }
+        if enemy.cooldown > 0 {
+            enemy.cooldown -= 1;
+        }
         if recovering && enemy.armed && enemy.lance {
             let dx = player.pos.x - actor.pos.x;
             let dz = player.pos.z - actor.pos.z;
@@ -458,16 +460,13 @@ pub fn control(
         spear.vel.y += THROW_GRAVITY;
         let step = spear.vel;
         spear.pos += step;
-        let dx = player.pos.x - spear.pos.x;
-        let dz = player.pos.z - spear.pos.z;
-        let dy = player.pos.y - spear.pos.y;
         spear.life = spear.life.saturating_sub(1);
-        if dx * dx + dz * dz + dy * dy <= THROW_REACH * THROW_REACH {
+        if within(spear.pos, player.pos, THROW_REACH) {
             health.damage(THROW_POWER);
             let _ = commands.entity(entity).despawn();
             continue;
         }
-        if spear.life == 0 || spear.pos.y < player.pos.y - 500.0 {
+        if spear.life == 0 || grounded(solid, spear.pos) {
             let _ = commands.entity(entity).despawn();
         }
     }

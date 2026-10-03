@@ -6,7 +6,7 @@ use repose_core::{Color, Modifier, Sp, Transform, UnitExt, View};
 use repose_ui::{Box as UiBox, Row, Text, TextStyle, ViewExt, ZStack};
 
 use crate::sim::health::Health;
-use crate::sim::item::{Held, Kind};
+use crate::sim::item::Held;
 
 const HEART_SIZE: f32 = 24.0;
 const HEART_GAP: f32 = 5.0;
@@ -146,9 +146,7 @@ fn purse_view(rupees: u32) -> View {
 
 fn held_view(held: Held) -> View {
     let hex = match held.kind() {
-        Some(Kind::Bomb) => "#2E3138",
-        Some(Kind::Arrow) => "#C9C4B4",
-        Some(Kind::Boomerang) => "#B84C85",
+        Some(kind) => crate::view::item_hex(kind),
         None => "#2E3138",
     };
     let label = held.label();

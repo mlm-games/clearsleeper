@@ -28,8 +28,8 @@ pub mod swim;
 pub mod talk;
 pub mod transition;
 pub mod walk;
-pub mod water;
 pub mod warship;
+pub mod water;
 
 use bevy_ecs::prelude::*;
 use glam::Vec3;
@@ -90,7 +90,7 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
             let switch = flags::EventSwitch::spawn(source.parameters);
             world.spawn((actor, switch));
         } else {
-            world.spawn((actor, combat::HitPoints::default()));
+            world.spawn(actor);
         }
     }
 }
@@ -99,6 +99,15 @@ pub(crate) fn clear_actors(world: &mut World) {
     let mut query = world.query::<(Entity, &actor::Actor)>();
     let stale: Vec<Entity> = query.iter(world).map(|(entity, _)| entity).collect();
     for entity in stale {
+        let _ = world.despawn(entity);
+    }
+    clear_shots(world);
+}
+
+pub(crate) fn clear_shots(world: &mut World) {
+    let mut query = world.query::<(Entity, &item::InFlight)>();
+    let flying: Vec<Entity> = query.iter(world).map(|(entity, _)| entity).collect();
+    for entity in flying {
         let _ = world.despawn(entity);
     }
 }

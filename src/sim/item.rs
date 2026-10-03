@@ -7,7 +7,7 @@ use super::collision::Collision;
 use super::combat::{Combat, HitPoints};
 use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
-use super::ground::grounded;
+use super::ground::{self, grounded};
 use super::health::Health;
 use super::hop::Hop;
 use super::intent::UseIntent;
@@ -17,7 +17,7 @@ use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::Swim;
 use super::talk::Dialogue;
-use super::walk::to_s16;
+use super::walk::{swept, within};
 
 pub const FIRST_BOMB: u8 = 0x0B;
 pub const LAST_BOMB: u8 = 0x0E;
@@ -27,11 +27,13 @@ pub const BOOMERANG: u8 = 0x2D;
 
 const BOMB_COUNTS: [u8; 4] = [5, 10, 20, 30];
 const ARROW_COUNTS: [u8; 3] = [10, 20, 30];
+const BOMB_CAP: u8 = 30;
+const ARROW_CAP: u8 = 30;
 
 const BOMB_FUSE: u32 = 100;
 const BOMB_RADIUS: f32 = 200.0;
 const BOMB_POWER: u8 = 4;
-const BOMB_THROW: f32 = 90.0;
+const BOMB_THROW: f32 = 50.0;
 const BOMB_LIFT: f32 = 40.0;
 const BOMB_GRAVITY: f32 = -2.5;
 const ARROW_SPEED: f32 = 200.0;
@@ -51,6 +53,9 @@ const THROW_OFFSET: f32 = 20.0;
 const BOMB_FLINCH: u32 = 10;
 const ARROW_FLINCH: u32 = 10;
 const BOOM_FLINCH: u32 = 6;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct InFlight;
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Held {
@@ -93,21 +98,23 @@ pub struct Boomerang {
 
 impl Held {
     pub fn equip(&mut self, item: u8) {
-        match item {
-            FIRST_BOMB..=LAST_BOMB => {
-                self.item = FIRST_BOMB;
-                self.count = BOMB_COUNTS[(item - FIRST_BOMB) as usize];
-            }
-            FIRST_ARROW..=LAST_ARROW => {
-                self.item = FIRST_ARROW;
-                self.count = ARROW_COUNTS[(item - FIRST_ARROW) as usize];
-            }
-            BOOMERANG => {
-                self.item = BOOMERANG;
-                self.count = 1;
-            }
-            _ => {}
+        let (slot, count) = match item {
+            FIRST_BOMB..=LAST_BOMB => (FIRST_BOMB, BOMB_COUNTS[(item - FIRST_BOMB) as usize]),
+            FIRST_ARROW..=LAST_ARROW => (FIRST_ARROW, ARROW_COUNTS[(item - FIRST_ARROW) as usize]),
+            BOOMERANG => (BOOMERANG, 1),
+            _ => return,
+        };
+        if self.item == slot {
+            let cap = match slot {
+                BOOMERANG => 1,
+                FIRST_BOMB => BOMB_CAP,
+                _ => ARROW_CAP,
+            };
+            self.count = self.count.saturating_add(count).min(cap);
+            return;
         }
+        self.item = slot;
+        self.count = count;
     }
 
     pub fn kind(&self) -> Option<Kind> {
@@ -160,11 +167,8 @@ pub struct Shots<'w, 's> {
 }
 
 impl Shots<'_, '_> {
-    fn flying(&self) -> Option<(Entity, Vec3)> {
-        self.spin
-            .iter()
-            .map(|(entity, boom)| (entity, boom.pos))
-            .next()
+    fn spinning(&self) -> bool {
+        self.spin.iter().next().is_some()
     }
 
     fn recall(&mut self) {
@@ -172,28 +176,6 @@ impl Shots<'_, '_> {
             boom.returning = true;
         }
     }
-}
-
-fn surface(collision: Option<&Collision>, pos: Vec3) -> Option<f32> {
-    match collision {
-        Some(collision) => collision.ground_at(pos.x, pos.z),
-        None => Some(0.0),
-    }
-}
-
-fn near(from: Vec3, to: Vec3, radius: f32) -> bool {
-    (to - from).length_squared() <= radius * radius
-}
-
-fn segment(from: Vec3, to: Vec3, radius: f32) -> bool {
-    let travel = to - from;
-    let length = travel.length();
-    if length < 1e-4 {
-        return near(from, to, radius);
-    }
-    let dir = travel / length;
-    let along = ((from - to).dot(dir)).clamp(0.0, length);
-    near(from + dir * along, to, radius)
 }
 
 fn launch(player: &Player, held: &mut Held, commands: &mut Commands) {
@@ -207,33 +189,41 @@ fn launch(player: &Player, held: &mut Held, commands: &mut Commands) {
     let pos = player.pos + Vec3::new(THROW_OFFSET * sin, 0.0, THROW_OFFSET * cos);
     match kind {
         Kind::Bomb => {
-            commands.spawn(Bomb {
-                pos,
-                fuse: BOMB_FUSE,
-                vel: Vec3::new(BOMB_THROW * sin, BOMB_LIFT, BOMB_THROW * cos),
-                rest: false,
-            });
-            held.count -= 1;
+            commands.spawn((
+                Bomb {
+                    pos,
+                    fuse: BOMB_FUSE,
+                    vel: Vec3::new(BOMB_THROW * sin, BOMB_LIFT, BOMB_THROW * cos),
+                    rest: false,
+                },
+                InFlight,
+            ));
         }
         Kind::Arrow => {
-            commands.spawn(Arrow {
-                pos,
-                vel: Vec3::new(ARROW_SPEED * sin, 0.0, ARROW_SPEED * cos),
-                life: ARROW_LIFE,
-            });
-            held.count -= 1;
+            commands.spawn((
+                Arrow {
+                    pos,
+                    vel: Vec3::new(ARROW_SPEED * sin, 0.0, ARROW_SPEED * cos),
+                    life: ARROW_LIFE,
+                },
+                InFlight,
+            ));
         }
         Kind::Boomerang => {
-            commands.spawn(Boomerang {
-                pos,
-                vel: Vec3::new(BOOM_SPEED * sin, 0.0, BOOM_SPEED * cos),
-                returning: false,
-                out: 0,
-                life: BOOM_LIFETIME,
-                struck: Vec::new(),
-            });
+            commands.spawn((
+                Boomerang {
+                    pos,
+                    vel: Vec3::new(BOOM_SPEED * sin, 0.0, BOOM_SPEED * cos),
+                    returning: false,
+                    out: 0,
+                    life: BOOM_LIFETIME,
+                    struck: Vec::new(),
+                },
+                InFlight,
+            ));
         }
     }
+    held.count -= 1;
 }
 
 pub fn control(
@@ -259,8 +249,7 @@ pub fn control(
             .is_some_and(|player| grounded(solid, player.pos));
 
     if pressed {
-        if let Some((entity, _)) = shots.flying() {
-            let _ = entity;
+        if shots.spinning() {
             shots.recall();
         } else if ready {
             for player in &players {
@@ -269,15 +258,15 @@ pub fn control(
         }
     }
 
-    let placed: Vec<(Entity, Vec3)> = shots.bombs.iter().map(|(e, bomb)| (e, bomb.pos)).collect();
     let mut dead: Vec<Entity> = Vec::new();
     let mut chain: Vec<Entity> = Vec::new();
+    let mut burst: Vec<Entity> = Vec::new();
     for (entity, mut bomb) in &mut shots.bombs {
         if !bomb.rest {
             bomb.vel.y += BOMB_GRAVITY;
             let step = bomb.vel;
             bomb.pos += step;
-            if let Some(floor) = surface(solid, bomb.pos)
+            if let Some(floor) = ground::surface(solid, bomb.pos)
                 && bomb.pos.y <= floor
             {
                 bomb.pos.y = floor;
@@ -286,16 +275,26 @@ pub fn control(
             }
         }
         bomb.fuse = bomb.fuse.saturating_sub(1);
-        if bomb.fuse > 0 {
-            continue;
+        if bomb.fuse == 0 {
+            burst.push(entity);
         }
-        for (other, pos) in &placed {
-            if *other != entity && near(bomb.pos, *pos, BOMB_RADIUS) {
-                chain.push(*other);
+    }
+    let owner = players.iter().next().map(|player| player.pos);
+    for &entity in &burst {
+        let Ok((_, bomb)) = shots.bombs.get(entity) else {
+            continue;
+        };
+        let blast = bomb.pos;
+        for (other, neighbour) in shots.bombs.iter() {
+            if other != entity
+                && !burst.contains(&other)
+                && within(blast, neighbour.pos, BOMB_RADIUS)
+            {
+                chain.push(other);
             }
         }
         for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
-            if near(bomb.pos, foe.pos, BOMB_RADIUS) {
+            if within(blast, foe.pos, BOMB_RADIUS) {
                 hp.0 -= BOMB_POWER as i32;
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = BOMB_FLINCH;
@@ -305,7 +304,9 @@ pub fn control(
                 }
             }
         }
-        health.damage(BOMB_POWER);
+        if owner.is_some_and(|pos| within(blast, pos, BOMB_RADIUS)) {
+            health.damage(BOMB_POWER);
+        }
         events.list.push(SimEvent::Explode);
         let _ = commands.entity(entity).despawn();
     }
@@ -324,18 +325,19 @@ pub fn control(
         arrow.vel.y = (arrow.vel.y + ARROW_GRAVITY).max(ARROW_FALL);
         let step = arrow.vel;
         arrow.pos += step;
+        let mut hit = false;
         for (_, foe, mut hp, mut hurt) in &mut foes {
-            if segment(from, foe.pos, ARROW_REACH) {
+            if swept(from, foe.pos, ARROW_REACH) {
                 hp.0 -= ARROW_POWER;
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = ARROW_FLINCH;
                 }
-                spent.push(entity);
+                hit = true;
                 break;
             }
         }
         arrow.life = arrow.life.saturating_sub(1);
-        if !spent.contains(&entity) && (arrow.life == 0 || grounded(solid, arrow.pos)) {
+        if hit || arrow.life == 0 || grounded(solid, arrow.pos) {
             spent.push(entity);
         }
     }
@@ -355,7 +357,7 @@ pub fn control(
         boom.pos += step;
         if !boom.returning {
             for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
-                if !boom.struck.contains(&foe_entity) && segment(from, foe.pos, BOOM_REACH) {
+                if !boom.struck.contains(&foe_entity) && swept(from, foe.pos, BOOM_REACH) {
                     hp.0 -= BOOM_POWER;
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = BOOM_FLINCH;
@@ -368,10 +370,11 @@ pub fn control(
             }
         }
         boom.life = boom.life.saturating_sub(1);
-        let caught = boom.returning && near(boom.pos, home.unwrap_or(Vec3::MAX), BOOM_CATCH);
-        if caught || boom.life == 0 || boom.pos.y < -1000.0 {
-            held.item = BOOMERANG;
-            held.count = 1;
+        let caught = boom.returning && home.is_some_and(|pos| within(boom.pos, pos, BOOM_CATCH));
+        if caught || boom.life == 0 {
+            if held.item == BOOMERANG {
+                held.count = 1;
+            }
             spent.push(entity);
         }
     }
@@ -379,8 +382,4 @@ pub fn control(
     for entity in spent {
         let _ = commands.entity(entity).despawn();
     }
-}
-
-pub fn yaw_of(vel: Vec3) -> i16 {
-    to_s16(vel.x.atan2(vel.z))
 }

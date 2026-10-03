@@ -196,7 +196,9 @@ impl App {
             let mut held = world.resource_mut::<Held>();
             held.item = save.held_item;
             held.count = save.held_count;
+            held.pressed = false;
         }
+        crate::sim::clear_shots(&mut self.sim.world);
         let current = self
             .stage
             .as_ref()
