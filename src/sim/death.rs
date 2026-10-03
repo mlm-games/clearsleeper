@@ -11,6 +11,7 @@ use super::intent::{GameOverChoice, MoveIntent};
 use super::player::Player;
 use super::roll::Roll;
 use super::swim::Swim;
+use super::talk::Dialogue;
 
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct GameOver {
@@ -38,6 +39,7 @@ pub fn check(
     mut swim: ResMut<Swim>,
     mut roll: ResMut<Roll>,
     mut hop: ResMut<Hop>,
+    mut dialogue: ResMut<Dialogue>,
     mut game_over: ResMut<GameOver>,
     mut choice: ResMut<GameOverChoice>,
     mut events: ResMut<SimEvents>,
@@ -49,7 +51,15 @@ pub fn check(
             if *choice == GameOverChoice::None {
                 continue;
             }
-            respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
+            respawn(
+                player,
+                &area,
+                &mut swim,
+                &mut roll,
+                &mut hop,
+                &mut dialogue,
+                &mut events,
+            );
             health.units = health.max.min(12);
             game_over.active = false;
             *choice = GameOverChoice::None;
@@ -65,7 +75,15 @@ pub fn check(
         if swim.active && swim.air == 0 {
             health.damage(1);
             if health.units > 0 {
-                respawn(player, &area, &mut swim, &mut roll, &mut hop, &mut events);
+                respawn(
+                    player,
+                    &area,
+                    &mut swim,
+                    &mut roll,
+                    &mut hop,
+                    &mut dialogue,
+                    &mut events,
+                );
             }
         }
     }
@@ -77,6 +95,7 @@ fn respawn(
     swim: &mut Swim,
     roll: &mut Roll,
     hop: &mut Hop,
+    dialogue: &mut Dialogue,
     events: &mut SimEvents,
 ) {
     player.pos = area.spawn;
@@ -89,5 +108,6 @@ fn respawn(
     roll.active = false;
     roll.frame = 0.0;
     hop.active = false;
+    *dialogue = Dialogue::default();
     events.list.push(SimEvent::Restart);
 }

@@ -53,6 +53,21 @@ fn golden_switches_start_clear() {
 }
 
 #[test]
+fn golden_arrivals_open_with_the_known_islands() {
+    let app = App::new();
+    let arrivals = *app.sim.world.resource::<flags::Arrivals>();
+    assert!(arrivals.is_arrived(0), "the fortress starts visited");
+    assert!(arrivals.is_arrived(10), "windfall starts visited");
+    assert!(arrivals.is_arrived(43), "outset starts visited");
+    assert!(!arrivals.is_arrived(12), "dragon roost starts uncharted");
+    assert!(!arrivals.is_arrived(48), "the far edge starts uncharted");
+    assert!(
+        !arrivals.is_arrived(99),
+        "a grid past the map reads uncharted"
+    );
+}
+
+#[test]
 fn golden_event_switch_follows_its_story_bit() {
     let mut app = App::new();
     spawn_switch(&mut app, TOGGLE);

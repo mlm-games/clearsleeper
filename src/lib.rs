@@ -395,7 +395,10 @@ impl App {
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)
-            } else if entity.contains::<sim::talk::Talk>() {
+            } else if let Some(talk) = entity.get::<sim::talk::Talk>() {
+                if talk.gone {
+                    continue;
+                }
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else {
                 continue;
@@ -500,8 +503,12 @@ impl App {
         } else {
             self.sim.world.remove_resource::<sim::sea::Sea>();
         }
+        self.sim
+            .world
+            .insert_resource(sim::area::StageName(tables.name().to_owned()));
         sim::clear_actors(&mut self.sim.world);
         self.room_actors.clear();
+        *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::spawn_actors(&mut self.sim.world, &tables);
         if !rooms.is_empty() {
             if let Some(set) = load_rooms(&tables, &rooms, stories) {

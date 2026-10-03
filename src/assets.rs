@@ -726,7 +726,7 @@ fn room_set_from_assets(
             }
         }
         match archive.read("dzr/room.dzr") {
-            Ok(data) => match crate::dzs::room_actors(data, layer(room)) {
+            Ok(data) => match crate::dzs::room_actors(data, room as i8, layer(room)) {
                 Ok(placed) => actors.extend(placed),
                 Err(error) => {
                     log::warn!(

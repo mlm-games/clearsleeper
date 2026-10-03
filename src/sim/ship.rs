@@ -5,6 +5,7 @@ use super::actor::Actor;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
 use super::player::Player;
 use super::sea::Sea;
+use super::talk::Dialogue;
 use super::walk::{add_calc, add_calc_angle_s, from_s16};
 use super::water;
 
@@ -52,11 +53,12 @@ pub fn control(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
     do_intent: Res<DoIntent>,
+    dialogue: Res<Dialogue>,
     mut ships: Query<(&mut Actor, &mut Ship)>,
     mut players: Query<&mut Player>,
 ) {
     for (mut actor, mut ship) in &mut ships {
-        let mut edge = do_intent.0 && !ship.held;
+        let mut edge = do_intent.0 && !ship.held && !dialogue.open;
         ship.held = do_intent.0;
         if let Some(mut player) = players.iter_mut().next() {
             let player = &mut *player;

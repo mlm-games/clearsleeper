@@ -1,7 +1,7 @@
 use super::flags::StoryBits;
 
 const DAY: u8 = 0;
-const SEA: &str = "sea";
+pub const SEA: &str = "sea";
 const FORSAKEN_FORTRESS: u8 = 1;
 const WINDFALL: u8 = 11;
 const OUTSET: u8 = 44;

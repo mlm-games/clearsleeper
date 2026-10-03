@@ -146,6 +146,33 @@ impl Switches {
     }
 }
 
+const ISLE_COUNT: usize = 49;
+const ARRIVE_BIT: u8 = 1;
+const INITIAL_ARRIVALS: [(usize, u8); 3] = [(0, 1 | 2), (10, 1 | 2), (43, 1 | 2)];
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Arrivals {
+    bits: [u8; ISLE_COUNT],
+}
+
+impl Default for Arrivals {
+    fn default() -> Self {
+        let mut bits = [0_u8; ISLE_COUNT];
+        for (index, value) in INITIAL_ARRIVALS {
+            bits[index] = value;
+        }
+        Self { bits }
+    }
+}
+
+impl Arrivals {
+    pub fn is_arrived(&self, index: usize) -> bool {
+        self.bits
+            .get(index)
+            .is_some_and(|value| value & ARRIVE_BIT != 0)
+    }
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventSwitch {
     pub event: u16,

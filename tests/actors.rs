@@ -52,6 +52,7 @@ fn golden_stage_actor_table_parses_records() {
             pos: [19200.0, 0.0, -2200.0],
             angle: [0, 0, 0],
             set_id: 0xFFFF,
+            room: dzs::NO_ROOM,
         }
     );
     assert_eq!(
@@ -62,7 +63,12 @@ fn golden_stage_actor_table_parses_records() {
             pos: [0.0, 0.0, 0.0],
             angle: [0, -3094, 0],
             set_id: 0xFFFF,
+            room: dzs::NO_ROOM,
         }
+    );
+    assert!(
+        actors.iter().all(|actor| actor.room == dzs::NO_ROOM),
+        "stage table actors belong to no room"
     );
     assert!(tables.has_sea_actor());
 }

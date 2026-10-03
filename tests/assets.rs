@@ -845,6 +845,10 @@ fn real_disc_room_actors_merge_layer_tables() {
     let names: Vec<&str> = set.actors.iter().map(|actor| actor.name.as_str()).collect();
     assert!(names.contains(&"NpcSo"), "base table carries the soldier");
     assert!(
+        set.actors.iter().all(|actor| actor.room == 44),
+        "room actors carry the room that placed them"
+    );
+    assert!(
         names.contains(&"Pirates"),
         "the start island layer table merges in"
     );

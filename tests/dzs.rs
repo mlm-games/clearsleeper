@@ -285,24 +285,28 @@ fn actor_names(actors: &[dzs::StageActor]) -> Vec<&str> {
 #[test]
 fn golden_room_actors_merge_base_and_layer_tables() {
     let data = room_layer();
-    let base = dzs::room_actors(&data, 0).unwrap();
+    let base = dzs::room_actors(&data, 13, 0).unwrap();
     assert_eq!(base[0].parameters, 0x0000_1234);
     assert_eq!(actor_names(&base), ["NpcSo", "TagSo", "Ebrock"]);
+    assert!(
+        base.iter().all(|actor| actor.room == 13),
+        "room actors carry the room that placed them"
+    );
 
-    let night = dzs::room_actors(&data, 1).unwrap();
+    let night = dzs::room_actors(&data, 13, 1).unwrap();
     assert_eq!(actor_names(&night), ["NpcSo", "TagSo", "Ebrock", "Pirates"]);
 
-    let reef = dzs::room_actors(&data, 11).unwrap();
+    let reef = dzs::room_actors(&data, 13, 11).unwrap();
     assert_eq!(actor_names(&reef), ["NpcSo", "TagSo", "Ebrock", "Kamome"]);
 
-    let past = dzs::room_actors(&data, 12).unwrap();
+    let past = dzs::room_actors(&data, 13, 12).unwrap();
     assert_eq!(actor_names(&past), ["NpcSo", "TagSo", "Ebrock"]);
 }
 
 #[test]
 fn room_actors_reject_truncated_chunk_tables() {
     assert!(matches!(
-        dzs::room_actors(&4_u32.to_be_bytes(), 0),
+        dzs::room_actors(&4_u32.to_be_bytes(), 0, 0),
         Err(dzs::DzsError::Truncated | dzs::DzsError::BadTable)
     ));
 }

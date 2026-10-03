@@ -11,6 +11,7 @@ use crate::sim::intent::CameraYaw;
 use crate::sim::item::Held;
 use crate::sim::pickup::Rupees;
 use crate::sim::player::Player;
+use crate::sim::talk::Dialogue;
 use crate::{App, assets};
 
 pub const SAVE_VERSION: u32 = 1;
@@ -222,6 +223,7 @@ impl App {
             held.item = save.held_item;
             held.count = save.held_count;
             held.pressed = false;
+            *world.resource_mut::<Dialogue>() = Dialogue::default();
         }
         crate::sim::clear_shots(&mut self.sim.world);
         let current = self

@@ -4,6 +4,9 @@ use glam::{Vec2, Vec3};
 use super::collision::{Collision, MoveFrom};
 use super::player::Player;
 
+#[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]
+pub struct StageName(pub String);
+
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct Area {
     pub bounds_min: Vec2,

@@ -17,6 +17,7 @@ const ACTOR_LEN: usize = 0x20;
 const ACTOR_NAME_LEN: usize = 8;
 const SEA_ACTOR: &str = "sea";
 pub const DEFAULT_WAVE_MAX: u8 = 10;
+pub const NO_ROOM: i8 = -1;
 const BOOT_TIME: f32 = 165.0;
 const TIME_H_SCALE: f32 = 15.0;
 const SCHEDULE: [(f32, f32, u8); 11] = [
@@ -72,6 +73,7 @@ pub struct StageActor {
     pub pos: [f32; 3],
     pub angle: [i16; 3],
     pub set_id: u16,
+    pub room: i8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,17 +136,17 @@ fn layer_chunk(layer: u8) -> Option<[u8; 4]> {
     Some([b'A', b'C', b'T', digit])
 }
 
-pub fn room_actors(data: &[u8], layer: u8) -> Result<Vec<StageActor>, DzsError> {
+pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, DzsError> {
     let nodes = chunk_nodes(data)?;
     let mut actors = Vec::new();
     for tag in [b"ACTR", b"TGOB"] {
         if let Some((count, offset)) = chunk_locate(&nodes, tag) {
-            actors.extend(parse_actors(data, count, offset)?);
+            actors.extend(parse_actors(data, count, offset, room)?);
         }
     }
     if let Some(tag) = layer_chunk(layer) {
         if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
-            actors.extend(parse_actors(data, count, offset)?);
+            actors.extend(parse_actors(data, count, offset, room)?);
         }
     }
     Ok(actors)
@@ -190,7 +192,7 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         None => Vec::new(),
     };
     let actors = match locate(b"ACTR") {
-        Some((count, offset)) => parse_actors(data, count, offset)?,
+        Some((count, offset)) => parse_actors(data, count, offset, NO_ROOM)?,
         None => Vec::new(),
     };
     let exits = match locate(b"SCLS") {
@@ -320,7 +322,12 @@ fn parse_exits(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageExit>, D
     Ok(exits)
 }
 
-fn parse_actors(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageActor>, DzsError> {
+fn parse_actors(
+    data: &[u8],
+    count: u32,
+    offset: u32,
+    room: i8,
+) -> Result<Vec<StageActor>, DzsError> {
     let end = table_end(offset as usize, count as usize, ACTOR_LEN)?;
     if end > data.len() {
         return Err(DzsError::BadTable);
@@ -347,6 +354,7 @@ fn parse_actors(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageActor>,
                 read_i16(data, at + 0x1C)?,
             ],
             set_id: read_u16(data, at + 0x1E)?,
+            room,
         });
     }
     Ok(actors)

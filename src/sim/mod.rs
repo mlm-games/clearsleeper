@@ -99,9 +99,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             .spawn((actor, pickup::Pickup::spawn(source.parameters)))
             .id()
     } else if source.name == talk::TALK_ACTOR {
-        let speaker = talk::Talk {
-            message: talk::message(source.angle[0]),
-        };
+        let speaker = talk::Talk::new(talk::message(source.angle[0]), source.room);
         world.spawn((actor, speaker)).id()
     } else if flags::is_event_switch(&source.name) {
         let switch = flags::EventSwitch::spawn(source.parameters);
@@ -158,6 +156,7 @@ pub fn build(
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
+    sim.world.insert_resource(flags::Arrivals::default());
     sim.world.insert_resource(ending::Ending::default());
     sim.world.insert_resource(event::EventList::default());
     sim.world.insert_resource(death::GameOver::default());
@@ -181,6 +180,11 @@ pub fn build(
     let spawn = area.spawn;
     let yaw = area.yaw;
     sim.world.insert_resource(area);
+    sim.world.insert_resource(area::StageName(
+        tables
+            .map(|tables| tables.name().to_owned())
+            .unwrap_or_default(),
+    ));
     sim.world.insert_resource(collision::MoveFrom(spawn));
     sim.world.spawn((player::Player {
         pos: spawn,
