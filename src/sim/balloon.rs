@@ -13,8 +13,8 @@ const PAYLOAD_PARAM: u32 = 0xFFFF05;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Payload {
-    Bokoblin,
-    Moblin,
+    Small,
+    Lance,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,16 +25,16 @@ pub struct Balloon {
 pub fn spawn(parameters: u32) -> (Balloon, HitPoints) {
     let payload = match parameters & 0xFF {
         EMPTY_KIND => None,
-        LANCE_KIND => Some(Payload::Moblin),
-        _ => Some(Payload::Bokoblin),
+        LANCE_KIND => Some(Payload::Lance),
+        _ => Some(Payload::Small),
     };
     (Balloon { payload }, HitPoints(HITS))
 }
 
 fn drop(actor: &Actor, payload: Payload, commands: &mut Commands) {
     let name = match payload {
-        Payload::Moblin => enemy::LANCE_ACTOR,
-        Payload::Bokoblin => enemy::ENEMY_ACTOR,
+        Payload::Lance => enemy::LANCE_ACTOR,
+        Payload::Small => enemy::ENEMY_ACTOR,
     };
     let child = Actor {
         name: name.to_owned(),
@@ -45,12 +45,12 @@ fn drop(actor: &Actor, payload: Payload, commands: &mut Commands) {
     };
     let yaw = actor.angle[1];
     match payload {
-        Payload::Moblin => {
+        Payload::Lance => {
             if let Some((state, hit_points)) = enemy::spawn_lance(PAYLOAD_PARAM, yaw) {
                 commands.spawn((child, state, hit_points, Hurt::default()));
             }
         }
-        Payload::Bokoblin => {
+        Payload::Small => {
             let (state, hit_points) = enemy::spawn(PAYLOAD_PARAM, yaw);
             commands.spawn((child, state, hit_points, Hurt::default()));
         }

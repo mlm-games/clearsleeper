@@ -102,9 +102,13 @@ fn golden_balloon_carries_its_rider_and_holds_two_hits() {
 }
 
 #[test]
-fn golden_balloon_kind_five_carries_a_moblin() {
+fn golden_balloon_rider_kind_comes_from_its_parameter() {
     let (state, _) = balloon::spawn(LANCE_PARAM);
-    assert_eq!(state.payload, Some(Payload::Moblin));
+    assert_eq!(
+        state.payload,
+        Some(Payload::Lance),
+        "parameter five rides out the big one"
+    );
     let (empty, _) = balloon::spawn(EMPTY_PARAM);
     assert_eq!(empty.payload, None);
 }
