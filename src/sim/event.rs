@@ -1334,6 +1334,12 @@ fn get_item_cut(
     }
 }
 
+fn cut_angle(list: &EventList, cut: usize) -> Option<i16> {
+    list.cut_number(cut, "angle")
+        .map(|angle| angle as i16)
+        .or_else(|| list.cut_float(cut, "angle").map(to_s16))
+}
+
 fn ship_cut(
     run: &mut StaffRun,
     list: &EventList,
@@ -1344,13 +1350,87 @@ fn ship_cut(
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
-    if matches!(leading_digits(&cut.name, 2), Some(0 | 5 | 8)) {
-        cut_end(run, list, flags);
-        return;
+    match leading_digits(&cut.name, 2) {
+        Some(0) | Some(8) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok((_, mut body)) = actors.get_mut(ship_id)
+            {
+                if let Some(pos) = list.cut_vec(run.cut as usize, "pos") {
+                    body.pos = pos;
+                }
+                if let Some(angle) = cut_angle(list, run.cut as usize) {
+                    body.angle[1] = angle;
+                }
+                if let Ok(mut sail) = ships.get_mut(ship_id) {
+                    if let Some(speed) = list.cut_float(run.cut as usize, "speed") {
+                        sail.speed = speed;
+                    }
+                    sail.tiller = 0;
+                }
+            }
+            cut_end(run, list, flags);
+        }
+        Some(5) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok(mut sail) = ships.get_mut(ship_id)
+            {
+                if let Some(speed) = list.cut_float(run.cut as usize, "speed") {
+                    add_calc(&mut sail.speed, speed, 0.1, 5.0, 1.0);
+                }
+                sail.tiller = 0;
+            }
+            cut_end(run, list, flags);
+        }
+        Some(4) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok(mut sail) = ships.get_mut(ship_id)
+            {
+                sail.speed = 0.0;
+            }
+            cut_end(run, list, flags);
+        }
+        Some(6) => cut_end(run, list, flags),
+        Some(7) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok((_, mut body)) = actors.get_mut(ship_id)
+                && let Some(angle) = cut_angle(list, run.cut as usize)
+            {
+                body.angle[1] = angle;
+            }
+            cut_end(run, list, flags);
+        }
+        Some(10) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok((_, body)) = actors.get(ship_id)
+                && let Ok(mut sail) = ships.get_mut(ship_id)
+            {
+                sail.speed = 0.0;
+                sail.tiller = 0;
+                sail.warp_y = body.pos.y;
+            }
+            cut_end(run, list, flags);
+        }
+        Some(11) => {
+            if let Some((ship_id, _, _)) = ship_pos(actors)
+                && let Ok((_, body)) = actors.get(ship_id)
+                && let Ok(sail) = ships.get(ship_id)
+                && body.pos.y <= sail.warp_y
+            {
+                cut_end(run, list, flags);
+            }
+        }
+        Some(1) => ship_move(run, list, flags, actors, ships),
+        _ => {}
     }
-    if leading_digits(&cut.name, 2) != Some(1) {
-        return;
-    }
+}
+
+fn ship_move(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    ships: &mut Query<&mut Ship>,
+) {
     let Some(target) = list.cut_vec(run.cut as usize, "pos") else {
         return;
     };

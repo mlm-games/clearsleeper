@@ -45,6 +45,7 @@ pub struct Ship {
     pub speed: f32,
     pub tiller: i16,
     pub riding: bool,
+    pub warp_y: f32,
     held: bool,
 }
 
