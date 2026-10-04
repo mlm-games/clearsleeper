@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use super::actor::Actor;
 use super::chest::ChestOpen;
 use super::door::DoorCut;
+use super::fire::FireLit;
 use super::flags::{EventFlags, StoryBits};
 use super::msg::{
     MsgBox, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING, MSG_CONTINUES,
@@ -787,6 +788,8 @@ fn staff_cut(
     };
     if staff.name == "TREASURE" {
         treasure_cut(run, list, flags, owner, commands);
+    } else if staff.name == "Fire" || staff.name == "Zenfire" {
+        fire_cut(run, list, flags, owner, commands);
     } else if staff.name == "SHUTTER_DOOR" {
         door_cut(run, list, flags, owner, commands);
     } else if staff.kind == STAFF_CAMERA {
@@ -806,6 +809,25 @@ fn staff_cut(
     }
 }
 
+fn fire_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    commands: &mut Commands,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    let lit = match cut.name.as_str() {
+        "ON" => true,
+        "OFF" => false,
+        _ => return,
+    };
+    commands.entity(owner).insert(FireLit(lit));
+    cut_end(run, list, flags);
+}
+
 fn door_cut(
     run: &mut StaffRun,
     list: &EventList,
@@ -820,7 +842,7 @@ fn door_cut(
         cut.name.as_str(),
         "OPEN" | "OPEN_PUSH" | "OPEN_PULL" | "OPEN_PUSH2" | "OPEN_PULL2" | "STOP_OPEN"
     );
-    if opening || matches!(cut.name.as_str(), "CLOSE" | "STOP_CLOSE") {
+    if opening || cut.name == "CLOSE" || cut.name == "STOP_CLOSE" {
         commands.entity(owner).insert(DoorCut {
             staff: run.staff,
             opening,
@@ -828,7 +850,9 @@ fn door_cut(
         });
         return;
     }
-    cut_end(run, list, flags);
+    if cut.name == "SMOKE" || cut.name == "UNLOCK" {
+        cut_end(run, list, flags);
+    }
 }
 
 fn treasure_cut(

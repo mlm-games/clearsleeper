@@ -38,11 +38,15 @@ pub fn spawn(parameters: u32, switches: &Switches) -> Fire {
     }
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FireLit(pub bool);
+
 pub fn control(
     mut health: ResMut<Health>,
     switches: Res<Switches>,
     players: Query<&Player>,
-    mut fires: Query<(&Actor, &mut Fire)>,
+    mut fires: Query<(Entity, &Actor, &mut Fire)>,
+    forced: Query<&FireLit>,
     bombs: Query<&Bomb>,
     foes: Query<(), With<Enemy>>,
 ) {
@@ -50,7 +54,11 @@ pub fn control(
         return;
     };
     let fighting = foes.iter().next().is_some();
-    for (actor, mut fire) in &mut fires {
+    for (entity, actor, mut fire) in &mut fires {
+        if let Ok(lit) = forced.get(entity) {
+            fire.lit = lit.0;
+            continue;
+        }
         if fire.switch != 0xFF && switches.test(fire.switch) {
             fire.lit = false;
             continue;
