@@ -615,7 +615,6 @@ pub fn build(
                     merchant::control.in_set(WwSimSet::Execute),
                     aryll::control.in_set(WwSimSet::Execute),
                     medli::control.in_set(WwSimSet::Execute),
-                    floormaster::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     zunari::control.in_set(WwSimSet::Execute),
@@ -671,6 +670,7 @@ pub fn build(
                     iball::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
+                    floormaster::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
