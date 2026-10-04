@@ -12,8 +12,9 @@ pub const ITEM_WIND_WAKER: u8 = 0x22;
 pub const ITEM_SKULL_HAMMER: u8 = 0x33;
 pub const FIRST_BOMB: u8 = 0x0B;
 
-const SLOT_ITEMS: [(u8, usize); 15] = [
+const SLOT_ITEMS: [(u8, usize); 16] = [
     (0x20, 0),
+    (0x78, 1),
     (0x22, 2),
     (0x25, 3),
     (0x24, 4),
