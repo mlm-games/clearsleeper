@@ -821,6 +821,8 @@ fn staff_cut(
         door_cut(run, list, flags, owner, commands);
     } else if staff.name == "MBDOOR" {
         mbdoor_cut(run, list, flags);
+    } else if let Some((messages, key)) = npc_staff(&staff.name) {
+        npc_cut(run, list, flags, owner, actors, players, talks, msg, table, messages, key);
     } else if staff.kind == STAFF_CAMERA {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
@@ -835,6 +837,62 @@ fn staff_cut(
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
+    }
+}
+
+fn npc_staff(name: &str) -> Option<(&'static [&'static str], &'static str)> {
+    match name {
+        "Tc" | "Kk1" | "Btsw" | "Sarace" | "Aj1" => Some((&[], "msg_num")),
+        "P2b" => Some((&["TALK"], "MsgNum")),
+        "Mk" | "Po" | "Roten" | "Figure" | "Bmcon1" | "Bmcon2" => {
+            Some((&["SPEAK", "MES_SET"], "MsgNo"))
+        }
+        "UkB" | "UkC" | "UkD" => Some((&["SPEAK"], "MsgNo")),
+        _ => None,
+    }
+}
+
+fn npc_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    players: &mut Query<(Entity, &mut Player)>,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    messages: &[&str],
+    msg_key: &str,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "WAIT" => {
+            if run.advance > 0 {
+                wait_start(run, list);
+            }
+            wait_proc(run, list, flags);
+        }
+        "MOVE_TO_ACTOR" | "MOVE_TO_POS" => move_cut(run, list, flags, owner, actors, players),
+        "TURN_TO_ACTOR" | "TURN_TO_POS" => {
+            turn_cut(
+                run,
+                list,
+                flags,
+                owner,
+                actors,
+                players,
+                cut.name == "TURN_TO_ACTOR",
+            );
+        }
+        "TALK_MSG" => talk_cut(run, list, flags, owner, talks, msg, table, false, "msg_num"),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true, "msg_num"),
+        name if messages.contains(&name) => {
+            talk_cut(run, list, flags, owner, talks, msg, table, false, msg_key);
+        }
+        _ => {}
     }
 }
 
