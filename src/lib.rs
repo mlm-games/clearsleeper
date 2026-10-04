@@ -664,6 +664,8 @@ impl App {
                 }
                 let (half, top) = sage.cull();
                 (view::ActorKind::Talker, 0, top, half)
+            } else if entity.contains::<sim::redead::ReDead>() {
+                (view::ActorKind::Enemy, 0, 260.0, 100.0)
             } else if let Some(gun) = entity.get::<sim::canon::Canon>() {
                 if !gun.drawn() {
                     continue;

@@ -58,6 +58,7 @@ pub mod pickup;
 pub mod pirateship;
 pub mod player;
 pub mod raft;
+pub mod redead;
 pub mod rockfall;
 pub mod roll;
 pub mod sage;
@@ -358,6 +359,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if hookshot::is_hookshot(&source.name) {
         let chain = hookshot::Hookshot::nocked(actor.pos);
         world.spawn((actor, chain)).id()
+    } else if redead::is_redead(&source.name) {
+        match redead::ReDead::spawn(source.parameters, actor.pos, actor.angle[1]) {
+            Some((state, hit_points)) => world
+                .spawn((actor, state, hit_points, enemy::Hurt::default()))
+                .id(),
+            None => world.spawn(actor).id(),
+        }
     } else if stalfos::is_stalfos(&source.name) {
         match stalfos::Stalfos::spawn(
             source.parameters,
@@ -599,6 +607,7 @@ pub fn build(
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),
+                    redead::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
