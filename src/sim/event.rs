@@ -837,6 +837,14 @@ fn staff_cut(
         );
     } else if staff.name == "Os" || staff.name == "Os1" || staff.name == "Os2" {
         os_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Hsh" {
+        hsh_cut(run, list, flags);
+    } else if staff.name == "Bs1" {
+        bs1_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Doguu" {
+        hold_cut(run, list, flags, &["MESSAGE_KOKOE", "MESSAGE_OITA", "QUAKE", "SETLIGHT"]);
+    } else if staff.name == "Warpfo" {
+        warpout_cut(run, list, flags);
     } else if staff.name == "Warpf" {
         warp_cut(run, list, flags);
     } else if people_staff(&staff.name) {
@@ -1108,6 +1116,58 @@ fn tpost_cut(
         run.talk_open = false;
         cut_end(run, list, flags);
     }
+}
+
+fn bs1_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "TALKMSG" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true, "MsgNo"),
+        "WAIT" => {
+            if run.advance > 0 {
+                wait_start(run, list);
+            }
+            wait_proc(run, list, flags);
+        }
+        _ => cut_end(run, list, flags),
+    }
+}
+
+fn hsh_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if matches!(
+        cut.name.as_str(),
+        "MsgSet" | "Talk" | "Tact" | "Appear" | "Delete"
+    ) {
+        return;
+    }
+    cut_end(run, list, flags);
+}
+
+fn warpout_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if matches!(cut.name.as_str(), "WARP1" | "WARP2" | "WARP3") {
+        if run.advance > 0 {
+            run.timer = 5;
+        }
+        wait_proc(run, list, flags);
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn hold_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, hold: &[&str]) {
