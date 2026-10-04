@@ -26,6 +26,7 @@ pub mod jump;
 pub mod layer;
 pub mod lock;
 pub mod marlon;
+pub mod msg;
 pub mod pickup;
 pub mod player;
 pub mod roll;
@@ -34,6 +35,7 @@ pub mod select;
 pub mod shop;
 pub mod sea;
 pub mod ship;
+pub mod stone;
 pub mod swim;
 pub mod tag;
 pub mod talk;
@@ -144,6 +146,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if chest::is_chest(&source.name) {
         let box_ = chest::Chest::spawn(source.parameters, source.angle[2], source.room);
         world.spawn((actor, box_)).id()
+    } else if stone::is_stone(&source.name) {
+        let rock = stone::Stone::spawn(source.parameters);
+        world.spawn((actor, rock, carry::Carryable::Stone)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -209,6 +214,9 @@ pub fn build(
         .unwrap_or_default();
     sim.world.insert_resource(event_list);
     sim.world.insert_resource(event::ActiveEvent::default());
+    sim.world.insert_resource(event::ItemPartner::default());
+    sim.world.insert_resource(msg::MsgBox::default());
+    sim.world.insert_resource(msg::MsgTable::default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -254,6 +262,7 @@ pub fn build(
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
                 event::control.in_set(WwSimSet::Execute),
+                msg::control.in_set(WwSimSet::Execute),
                 ending::control.in_set(WwSimSet::Execute),
                 ground::ground_check.in_set(WwSimSet::Execute),
                 water::water_probe.in_set(WwSimSet::Execute),

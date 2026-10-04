@@ -23,6 +23,7 @@ pub struct Carry {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Carryable {
     Tsubo,
+    Stone,
     Pig,
 }
 
