@@ -26,9 +26,17 @@ pub const ITEM_NONE: u8 = 0x3F;
 pub const TABLE_LOW: u8 = 0x20;
 pub const TABLE_HIGH: u8 = 0x3E;
 pub const ITEM_DROP: f32 = 30.0;
-pub const ITEM_SWITCH: u32 = 0xFF;
-pub const ITEM_ACTION_SHIFT: u32 = 26;
-pub const ITEM_ACTION: u32 = 1;
+pub const ACORN_SPEC_DROP: u32 = 0x4;
+pub const ACORN_SPEC_NONE: u32 = 0x3F;
+pub const ACORN_SPEC_SHIFT: u32 = 8;
+pub const ACORN_ITEM_SHIFT: u32 = 0;
+pub const ACORN_ITEM_MASK: u32 = 0x3F;
+pub const ACORN_SAVE_SHIFT: u32 = 16;
+pub const ACORN_SAVE_MASK: u32 = 0x7F;
+pub const ACORN_TYPE_SHIFT: u32 = 24;
+pub const ACORN_TYPE: u32 = 7;
+pub const ACORN_STICK_SHIFT: u32 = 31;
+pub const ACORN_STICK: u32 = 1;
 
 pub const OPAQUE: f32 = 255.0;
 pub const ITEM_TOP: f32 = 200.0;
@@ -154,10 +162,11 @@ impl Leaves {
     }
 
     fn item_parameter(&self) -> u32 {
-        u32::from(self.item)
-            | (u32::from(self.item_bit) << 8)
-            | (ITEM_SWITCH << 16)
-            | (ITEM_ACTION << ITEM_ACTION_SHIFT)
+        (u32::from(self.item) & ACORN_ITEM_MASK) << ACORN_ITEM_SHIFT
+            | (ACORN_SPEC_DROP << ACORN_SPEC_SHIFT)
+            | ((u32::from(self.item_bit) & ACORN_SAVE_MASK) << ACORN_SAVE_SHIFT)
+            | (ACORN_TYPE << ACORN_TYPE_SHIFT)
+            | (ACORN_STICK << ACORN_STICK_SHIFT)
     }
 
     fn release(&self, actor: &Actor, commands: &mut Commands) {
