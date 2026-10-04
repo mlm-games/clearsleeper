@@ -800,6 +800,13 @@ fn staff_cut(
         named_cut(run, list, flags, "WINDOW");
     } else if staff.name == "TALKMAN" {
         talkman_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "GIVEMAN" {
+        cut_end(run, list, flags);
+    } else if staff.name == "Fmaster"
+        && let Some(cut) = list.cuts.get(run.cut as usize)
+        && matches!(cut.name.as_str(), "Dummy" | "WAIT")
+    {
+        cut_end(run, list, flags);
     } else if staff.name == "SHUTTER_DOOR" {
         door_cut(run, list, flags, owner, commands);
     } else if staff.kind == STAFF_CAMERA {
