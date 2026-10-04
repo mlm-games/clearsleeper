@@ -66,6 +66,7 @@ pub mod schedule;
 pub mod select;
 pub mod shop;
 pub mod sea;
+pub mod servant;
 pub mod ship;
 pub mod shmrgrd;
 pub mod stalfos;
@@ -373,6 +374,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, cell)).id()
     } else if sage::is_sage(&source.name) {
         world.spawn((actor, sage::Sage::spawn(source.parameters))).id()
+    } else if servant::is_servant(&source.name) {
+        let statue = servant::Servant::spawn(source.parameters);
+        world.spawn((actor, statue)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -555,6 +559,7 @@ pub fn build(
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
                     sage::control.in_set(WwSimSet::Execute),
+                    servant::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
