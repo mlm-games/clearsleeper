@@ -401,6 +401,8 @@ impl App {
                 }
                 .size();
                 (view::ActorKind::Pickup, present.item, size, size)
+            } else if entity.contains::<sim::stalfos::Stalfos>() {
+                (view::ActorKind::Enemy, 0, 162.5, 125.0)
             } else if let Some(enemy) = entity.get::<sim::enemy::Enemy>() {
                 (
                     view::ActorKind::Enemy,

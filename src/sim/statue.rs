@@ -4,7 +4,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
-use super::inventory::Got;
+use super::flags::StoryBits;
 use super::player::Player;
 use super::walk;
 
@@ -59,10 +59,6 @@ pub const FADE_PIVOT: i32 = 0xA0;
 pub const FADE_SPAN: f64 = 100.0;
 pub const OPAQUE: u8 = 0xFF;
 pub const TRANSPARENT: u8 = 0;
-
-pub const SONG_BIT: u8 = 0;
-pub const EARTH_SLOT: usize = 1;
-pub const WIND_SLOT: usize = 14;
 
 const SWITCH_SHIFT: u32 = 0;
 const SWITCH_MASK: u32 = 0xFF;
@@ -169,16 +165,8 @@ impl Statue {
         self.step == STEP_IDLE
     }
 
-    pub fn slot(&self) -> usize {
-        if self.wind {
-            WIND_SLOT
-        } else {
-            EARTH_SLOT
-        }
-    }
-
-    pub fn granted(&self, got: &Got) -> bool {
-        got.has(self.slot(), SONG_BIT)
+    pub fn granted(&self, stories: &StoryBits) -> bool {
+        stories.test(self.flag())
     }
 
     pub fn shatter(&mut self) -> bool {
@@ -237,7 +225,7 @@ pub fn latched(statue: &Statue, switches: &Switches) -> bool {
 }
 
 pub fn control(
-    got: Res<Got>,
+    mut stories: ResMut<StoryBits>,
     players: Query<&Player>,
     mut statues: Query<(Entity, &Actor, &mut Statue)>,
     mut switches: ResMut<Switches>,
@@ -273,7 +261,7 @@ pub fn control(
             statue.wakes = 0;
             events.list.push(SimEvent::Bgm(statue.song()));
         }
-        if !statue.resting() || statue.granted(&got) {
+        if !statue.resting() || statue.granted(&stories) {
             continue;
         }
         let Some(player) = player else {
@@ -282,6 +270,7 @@ pub fn control(
         if in_reach(actor.pos, &player)
             && behind(actor.pos, walk::to_s16(player.face), &player)
         {
+            stories.set(statue.flag());
             statue.enter(Step::Talkable);
         }
     }
