@@ -651,6 +651,13 @@ impl App {
             } else if let Some(hoist) = entity.get::<sim::mflft::Mflft>() {
                 let (half, top) = hoist.cull();
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(crab) = entity.get::<sim::kn::Kn>() {
+                if !crab.drawn() {
+                    continue;
+                }
+                let (half, top) = crab.cull();
+                lift = crab.bury;
+                (view::ActorKind::Scenery, 0, top, half)
             } else if let Some(gun) = entity.get::<sim::canon::Canon>() {
                 if !gun.drawn() {
                     continue;

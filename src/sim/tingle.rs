@@ -99,7 +99,7 @@ pub fn control(
         let dx = player.pos.x - actor.pos.x;
         let dz = player.pos.z - actor.pos.z;
         tingle.distance = (dx * dx + dz * dz).sqrt();
-        tingle.facing = (dx.atan2(dz) / core::f32::consts::TAU * i16::MAX as f32) as i16;
+        tingle.facing = super::walk::to_s16(dx.atan2(dz));
         match tingle.mode {
             MODE_FALLEN => {
                 tingle.timer += 1;

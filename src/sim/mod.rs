@@ -44,6 +44,7 @@ pub mod intent;
 pub mod inventory;
 pub mod item;
 pub mod jump;
+pub mod kn;
 pub mod ladder;
 pub mod koisi;
 pub mod layer;
@@ -322,6 +323,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if pirateship::is_pirateship(&source.name) {
         let vessel = pirateship::Pirate::spawn(source.parameters);
         world.spawn((actor, vessel)).id()
+    } else if kn::is_kn(&source.name) {
+        let crab = kn::Kn::spawn(source.parameters, actor.pos);
+        world.spawn((actor, crab)).id()
     } else if mbdoor::is_mbdoor(&source.name) {
         let gate = mbdoor::Mbdoor::spawn(
             source.parameters,
@@ -578,6 +582,7 @@ pub fn build(
                     swpush::control.in_set(WwSimSet::Execute),
                     mflft::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
+                    kn::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),

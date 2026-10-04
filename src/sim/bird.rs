@@ -132,13 +132,4 @@ pub fn control(
     }
 }
 
-pub fn face(actor: &mut Actor, target: Vec3, home_yaw: i16) {
-    let dx = target.x - actor.pos.x;
-    let dz = target.z - actor.pos.z;
-    if dx == 0.0 && dz == 0.0 {
-        return;
-    }
-    let yaw = (dx.atan2(dz) / core::f32::consts::TAU * i16::MAX as f32) as i16;
-    actor.angle[1] = home_yaw.wrapping_add((yaw.wrapping_sub(home_yaw)) / 4);
-}
 
