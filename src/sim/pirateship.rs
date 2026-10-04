@@ -26,7 +26,6 @@ pub const CATAPULT_OFFSET: Vec3 = Vec3::new(0.0, 700.0, 850.0);
 pub const CULL_MIN: Vec3 = Vec3::new(-1400.0, -200.0, -1800.0);
 pub const CULL_MAX: Vec3 = Vec3::new(1400.0, 3300.0, 2200.0);
 
-const SAIL_SHIFT: u32 = 0;
 const SAIL_MASK: u32 = 0xF;
 const KIND_SHIFT: u32 = 0x18;
 const KIND_MASK: u32 = 0xFF;
@@ -49,7 +48,7 @@ impl Pirate {
         let kind = ((parameters >> KIND_SHIFT) & KIND_MASK) as u8;
         Self {
             kind,
-            sail: (parameters >> SAIL_SHIFT) & SAIL_MASK != 0,
+            sail: parameters & SAIL_MASK != 0,
             visible: kind != KIND_FIRST_ISLAND,
             catapult: None,
         }
@@ -108,6 +107,9 @@ pub fn control(
                 continue;
             }
             pirate.visible = true;
+        }
+        if pirate.kind == KIND_FIRST_ISLAND {
+            continue;
         }
         if stage.0 == UMIKZ_STAGE {
             events.list.push(SimEvent::Se(SE_CRUISE));
