@@ -2,7 +2,7 @@ pub const KILL_POWER: i32 = 2;
 
 pub const SWORD: i32 = 2;
 pub const MEGA_SWORD: i32 = 4;
-pub const SOUP_SWORD: i32 = 8;
+pub const SOUP_SWORD: i32 = 4;
 pub const SOUP_MEGA_SWORD: i32 = 8;
 
 pub const BOKO_STICK: i32 = 1;
@@ -46,7 +46,3 @@ pub const MASTER_SWORD_LAST: u8 = 0x3E;
 pub fn is_master_sword(item: u8) -> bool {
     (MASTER_SWORD_FIRST..=MASTER_SWORD_LAST).contains(&item)
 }
-
-pub const SOUP: bool = true;
-pub const NO_SOUP: bool = false;
-pub const SOUP_BIT: u16 = 0;
