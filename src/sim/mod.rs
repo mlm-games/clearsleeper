@@ -1,6 +1,7 @@
 pub mod actor;
 pub mod area;
 pub mod balloon;
+pub mod bird;
 pub mod carry;
 pub mod cleared;
 pub mod collision;
@@ -121,6 +122,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, marker)).id()
     } else if source.name == carry::PIG_ACTOR {
         world.spawn((actor, carry::Carryable::Pig)).id()
+    } else if source.name == bird::BIRD_ACTOR {
+        let (state, hit_points) = bird::spawn();
+        world.spawn((actor, state, hit_points)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -242,6 +246,7 @@ pub fn build(
                 balloon::control.in_set(WwSimSet::Execute),
                 fire::control.in_set(WwSimSet::Execute),
                 gull::control.in_set(WwSimSet::Execute),
+                bird::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (
