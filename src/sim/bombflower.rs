@@ -190,7 +190,7 @@ pub fn flower_control(
 pub fn crawler_control(
     collision: Option<Res<Collision>>,
     mut zones: ResMut<ZoneActors>,
-    mut crawlers: Query<(Entity, &mut Actor, &mut Crawler), Without<Bombflower>>,
+    mut crawlers: Query<(Entity, &mut Actor, &mut Crawler), With<Crawler>>,
     players: Query<&Player>,
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),

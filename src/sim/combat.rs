@@ -116,20 +116,32 @@ fn start(
     player.yaw = player.face;
 }
 
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct Sword<'w, 's> {
+    collision: Option<Res<'w, Collision>>,
+    health: Res<'w, Health>,
+    swim: Res<'w, Swim>,
+    roll: Res<'w, Roll>,
+    hop: Res<'w, Hop>,
+    jump: Res<'w, Jump>,
+    lock: Res<'w, Lock>,
+    held: Res<'w, super::item::Held>,
+    equipped: Res<'w, super::inventory::Equipped>,
+    ships: Query<'w, 's, &'static Ship>,
+}
+
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct Outcome<'w> {
+    combat: ResMut<'w, Combat>,
+    zones: ResMut<'w, super::flags::ZoneActors>,
+    events: ResMut<'w, SimEvents>,
+}
+
 pub fn control(
-    collision: Option<Res<Collision>>,
     item: Res<ItemIntent>,
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
-    health: Res<Health>,
-    swim: Res<Swim>,
-    roll: Res<Roll>,
-    hop: Res<Hop>,
-    jump: Res<Jump>,
-    lock: Res<Lock>,
-    held: Res<super::item::Held>,
-    equipped: Res<super::inventory::Equipped>,
-    ships: Query<&Ship>,
+    gates: Sword<'_, '_>,
     mut actors: Query<
         (
             Entity,
@@ -139,71 +151,67 @@ pub fn control(
         ),
         Without<Ship>,
     >,
-    (mut combat, mut zones, mut events): (
-        ResMut<Combat>,
-        ResMut<super::flags::ZoneActors>,
-        ResMut<SimEvents>,
-    ),
+    mut out: Outcome<'_>,
     mut players: Query<&mut Player>,
     mut commands: Commands,
 ) {
-    let pressed = item.0 && !combat.held;
-    combat.held = item.0;
-    let riding = ships.iter().any(|ship| ship.riding);
-    let blade = held.item;
+    let pressed = item.0 && !out.combat.held;
+    out.combat.held = item.0;
+    let riding = gates.ships.iter().any(|ship| ship.riding);
+    let blade = gates.held.item;
     let bare_hands =
-        equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
-    let soup = combat.soup;
+        gates.equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
+    let soup = out.combat.soup;
     for mut player in &mut players {
         let player = &mut *player;
-        if swim.active || health.units == 0 {
-            combat.active = false;
-            combat.combo = 0;
-            combat.queued = false;
+        if gates.swim.active || gates.health.units == 0 {
+            out.combat.active = false;
+            out.combat.combo = 0;
+            out.combat.queued = false;
             continue;
         }
-        if !combat.active {
+        if !out.combat.active {
             if !pressed
                 || bare_hands
                 || riding
-                || roll.active
-                || hop.active
-                || jump.active
-                || !grounded(collision.as_deref(), player.pos)
+                || gates.roll.active
+                || gates.hop.active
+                || gates.jump.active
+                || !grounded(gates.collision.as_deref(), player.pos)
             {
                 continue;
             }
             start(&mut combat, player, &intent, &camera, &lock);
-            events.list.push(SimEvent::Slash);
+            out.events.list.push(SimEvent::Slash);
             continue;
         }
-        let (duration, lunge_base, decel_max) = cut(combat.kind);
-        if combat.frame >= duration {
-            combat.active = false;
-            combat.combo = 0;
-            combat.queued = false;
+        let (duration, lunge_base, decel_max) = cut(out.combat.kind);
+        if out.combat.frame >= duration {
+            out.combat.active = false;
+            out.combat.combo = 0;
+            out.combat.queued = false;
             player.speed = 0.0;
             continue;
         }
-        if combat.frame >= CHAIN_FRAME
-            && combat.queued
-            && grounded(collision.as_deref(), player.pos)
+        if out.combat.frame >= CHAIN_FRAME
+            && out.combat.queued
+            && grounded(gates.collision.as_deref(), player.pos)
         {
             player.speed = 0.0;
             start(&mut combat, player, &intent, &camera, &lock);
             continue;
         }
-        if pressed && !is_finisher(combat.kind) {
-            combat.queued = true;
+        if pressed && !is_finisher(out.combat.kind) {
+            out.combat.queued = true;
         }
-        player.face = from_s16(turn_toward(to_s16(player.face), combat.heading));
+        player.face = from_s16(turn_toward(to_s16(player.face), out.combat.heading));
         player.yaw = player.face;
-        if combat.frame == LUNGE_FRAME {
+        if out.combat.frame == LUNGE_FRAME {
             player.speed = LUNGE_FACTOR * player.speed.abs() + lunge_base;
         } else {
             add_calc(&mut player.speed, 0.0, DECEL_SCALE, decel_max, DECEL_MIN);
         }
-        if combat.frame >= DAMAGE_START && combat.frame < DAMAGE_END {
+        if out.combat.frame >= DAMAGE_START && out.combat.frame < DAMAGE_END {
             let center_x = player.pos.x + SWORD_OFFSET * player.yaw.sin();
             let center_z = player.pos.z + SWORD_OFFSET * player.yaw.cos();
             let power = damage::sword_power(blade, soup);
@@ -219,17 +227,17 @@ pub fn control(
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = FLINCH_TICKS;
                     }
-                    events.list.push(SimEvent::Hit);
+                    out.events.list.push(SimEvent::Hit);
                     if hp.0 <= 0 {
                         dead.push((entity, actor.room, actor.set_id));
                     }
                 }
             }
             for (entity, room, set_id) in dead {
-                zones.mark_done(room, set_id);
+                out.zones.mark_done(room, set_id);
                 let _ = commands.entity(entity).despawn();
             }
         }
-        combat.frame += 1;
+        out.combat.frame += 1;
     }
 }

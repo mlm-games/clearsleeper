@@ -493,6 +493,18 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(vessel) = entity.get::<sim::pirateship::Pirate>() {
+                if !vessel.visible {
+                    continue;
+                }
+                let (min, max) = vessel.cull();
+                lift = min.y;
+                (
+                    view::ActorKind::Ship,
+                    0,
+                    max.y - min.y,
+                    (max.x - min.x) * 0.5,
+                )
             } else if let Some(rock) = entity.get::<sim::fallrock::FallRock>() {
                 if rock.gone {
                     continue;

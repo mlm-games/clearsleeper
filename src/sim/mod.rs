@@ -53,6 +53,7 @@ pub mod marlon;
 pub mod mflft;
 pub mod msg;
 pub mod pickup;
+pub mod pirateship;
 pub mod player;
 pub mod raft;
 pub mod rockfall;
@@ -315,6 +316,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, eye, hit_points, enemy::Hurt::default()))
             .id()
+    } else if pirateship::is_pirateship(&source.name) {
+        let vessel = pirateship::Pirate::spawn(source.parameters);
+        world.spawn((actor, vessel)).id()
     } else if canon::is_canon(&source.name) {
         match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
             Some(gun) => world.spawn((actor, gun)).id(),
@@ -563,6 +567,7 @@ pub fn build(
                     swpush::control.in_set(WwSimSet::Execute),
                     mflft::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
+                    pirateship::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
