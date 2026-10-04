@@ -24,6 +24,7 @@ pub mod item;
 pub mod jump;
 pub mod layer;
 pub mod lock;
+pub mod marlon;
 pub mod pickup;
 pub mod player;
 pub mod roll;
@@ -125,6 +126,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bird::BIRD_ACTOR {
         let (state, hit_points) = bird::spawn();
         world.spawn((actor, state, hit_points)).id()
+    } else if source.name == marlon::MARLON_ACTOR {
+        let friend = marlon::Marlon::spawn(source.parameters);
+        world.spawn((actor, friend)).id()
     } else {
         world.spawn(actor).id()
     }

@@ -392,6 +392,8 @@ impl App {
                 (view::ActorKind::Balloon, 0, 36.0, 18.0)
             } else if entity.contains::<sim::gull::Gull>() || entity.contains::<sim::bird::Bird>() {
                 (view::ActorKind::Gull, 0, 12.0, 8.0)
+            } else if entity.contains::<sim::marlon::Marlon>() {
+                (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)
