@@ -413,6 +413,16 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Scenery, 0, 20.0, 10.0)
+            } else if entity.contains::<sim::wall::Wall>() {
+                if entity
+                    .get::<sim::wall::Wall>()
+                    .is_some_and(|w| w.state == sim::wall::State::Break)
+                {
+                    continue;
+                }
+                (view::ActorKind::Scenery, 0, 40.0, 20.0)
+            } else if entity.contains::<sim::bomb::Bomb>() {
+                (view::ActorKind::Scenery, 0, 16.0, 8.0)
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)

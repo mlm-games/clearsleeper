@@ -2,6 +2,7 @@ pub mod actor;
 pub mod area;
 pub mod balloon;
 pub mod bird;
+pub mod bomb;
 pub mod chest;
 pub mod carry;
 pub mod cleared;
@@ -41,6 +42,7 @@ pub mod tag;
 pub mod talk;
 pub mod tingle;
 pub mod tsubo;
+pub mod wall;
 pub mod transition;
 pub mod walk;
 pub mod warship;
@@ -149,6 +151,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if stone::is_stone(&source.name) {
         let rock = stone::Stone::spawn(source.parameters);
         world.spawn((actor, rock, carry::Carryable::Stone)).id()
+    } else if source.name == wall::WALL_ACTOR {
+        let barrier = wall::Wall::spawn(source.parameters);
+        world.spawn((actor, barrier)).id()
+    } else if bomb::is_bomb(&source.name) {
+        let shell = bomb::Bomb::spawn(source.parameters);
+        world.spawn((actor, shell)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -257,6 +265,7 @@ pub fn build(
                 death::freeze.in_set(WwSimSet::Execute),
                 carry::control.in_set(WwSimSet::Execute),
                 tsubo::control.in_set(WwSimSet::Execute),
+                bomb::control.in_set(WwSimSet::Execute),
                 tingle::control.in_set(WwSimSet::Execute),
                 select::control.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
