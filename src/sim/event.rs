@@ -821,6 +821,8 @@ fn staff_cut(
         door_cut(run, list, flags, owner, commands);
     } else if staff.name == "MBDOOR" {
         mbdoor_cut(run, list, flags);
+    } else if staff.name == "MD_MESSAGE_TAG" {
+        mail_cut(run, list, flags, owner, talks, msg, table);
     } else if let Some((messages, key)) = npc_staff(&staff.name) {
         npc_cut(run, list, flags, owner, actors, players, talks, msg, table, messages, key);
     } else if staff.kind == STAFF_CAMERA {
@@ -837,6 +839,48 @@ fn staff_cut(
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
+    }
+}
+
+fn mail_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "msg_init" => {
+            let Ok(mut talk) = talks.get_mut(owner) else {
+                cut_end(run, list, flags);
+                return;
+            };
+            if run.advance > 0 {
+                talk.msg_curr = list.cut_number(run.cut as usize, "msg_number").unwrap_or(0) as u32;
+                talk.msg_end = -1;
+                run.talk_open = true;
+            }
+            if !run.talk_open {
+                cut_end(run, list, flags);
+                return;
+            }
+            npc_talk(&mut talk, msg, table);
+        }
+        "message" => {
+            let Ok(mut talk) = talks.get_mut(owner) else {
+                cut_end(run, list, flags);
+                return;
+            };
+            if npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED {
+                cut_end(run, list, flags);
+            }
+        }
+        _ => cut_end(run, list, flags),
     }
 }
 
