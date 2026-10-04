@@ -167,6 +167,11 @@ pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, 
             actors.extend(parse_actors(data, count, offset, room, false)?);
         }
     }
+    for tag in [b"TGSC", b"DOOR"] {
+        if let Some((count, offset)) = chunk_locate(&nodes, tag) {
+            actors.extend(parse_actors(data, count, offset, room, true)?);
+        }
+    }
     if let Some(tag) = layer_chunk(layer) {
         if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
             actors.extend(parse_actors(data, count, offset, room, false)?);
@@ -225,10 +230,15 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         }
         None => Vec::new(),
     };
-    let actors = match locate(b"ACTR") {
-        Some((count, offset)) => parse_actors(data, count, offset, NO_ROOM)?,
+    let mut actors = match locate(b"ACTR") {
+        Some((count, offset)) => parse_actors(data, count, offset, NO_ROOM, false)?,
         None => Vec::new(),
     };
+    for tag in [b"TGSC", b"SCOB", b"DOOR", b"TGDR"] {
+        if let Some((count, offset)) = locate(tag) {
+            actors.extend(parse_actors(data, count, offset, NO_ROOM, true)?);
+        }
+    }
     let exits = match locate(b"SCLS") {
         Some((count, offset)) => parse_exits(data, count, offset)?,
         None => Vec::new(),
@@ -447,7 +457,14 @@ impl StageTables {
     }
 
     pub fn event_name(&self, id: u8) -> Option<&str> {
+        if id == 0xFF {
+            return None;
+        }
         self.events.get(usize::from(id)).map(String::as_str)
+    }
+
+    pub fn event_names(&self) -> &[String] {
+        &self.events
     }
 
     pub fn exit(&self, id: u8) -> Option<&StageExit> {

@@ -778,6 +778,9 @@ impl App {
             .insert_resource(assets::load_event_list(tables.name()).unwrap_or_default());
         self.sim
             .world
+            .insert_resource(sim::event::StageEvents(tables.event_names().to_vec()));
+        self.sim
+            .world
             .insert_resource(sim::event::ActiveEvent::default());
         let mut partner = sim::event::ItemPartner::default();
         partner.max_life = self.sim.world.resource::<sim::health::Health>().max;
@@ -790,7 +793,7 @@ impl App {
         self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::spawn_actors(&mut self.sim.world, &tables);
-        install_tag_events(&mut self.sim.world, &tables);
+        Self::install_tag_events(&mut self.sim.world, tables.actors());
         if !rooms.is_empty() {
             if let Some(set) = load_rooms(&tables, &rooms, stories) {
                 self.install_room_set(set, frame);
@@ -812,8 +815,11 @@ impl App {
         self.rooms = rooms;
     }
 
-    fn install_tag_events(world: &mut World, tables: &dzs::StageTables) {
+    fn install_tag_events(world: &mut World, sources: &[dzs::StageActor]) {
     let Ok(list) = world.get_resource::<sim::event::EventList>() else {
+        return;
+    };
+    let Ok(names) = world.get_resource::<sim::event::StageEvents>() else {
         return;
     };
     let mut query =
@@ -823,10 +829,12 @@ impl App {
         .filter(|(_, actor)| sim::flags::is_tag_event(&actor.name))
         .filter_map(|(entity, actor)| {
             let event = (actor.parameters >> 24) as u8;
-            let index = tables.event_name(event).and_then(|name| list.event_index(name))?;
-            let source = tables.actors().iter().find(|source| {
-                source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits()
-            });
+            let index = names
+                .name(event)
+                .and_then(|name| list.event_index(name))?;
+            let source = sources
+                .iter()
+                .find(|source| source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits());
             let scale = source.map_or([1.0, 1.0, 1.0], |source| source.scale);
             Some((
                 entity,
@@ -844,12 +852,15 @@ impl App {
         world.entity_mut(entity).insert(tag);
     }
     let mut hints = world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::talk::Talk>>();
-    for (entity, actor) in hints.iter(world) {
-        if actor.name == "TagHt" || actor.name == "TagHt2" {
-            world
-                .entity_mut(entity)
-                .insert(sim::talk::Talk::new(actor.angle[0] as u16, actor.room));
-        }
+    let pending: Vec<(Entity, u16, i8)> = hints
+        .iter(world)
+        .filter(|(_, actor)| actor.name == "TagHt" || actor.name == "TagHt2")
+        .map(|(entity, actor)| (entity, actor.angle[0] as u16, actor.room))
+        .collect();
+    for (entity, msg, room) in pending {
+        world
+            .entity_mut(entity)
+            .insert(sim::talk::Talk::new(msg, room));
     }
 }
 
@@ -887,6 +898,7 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
             .filter(|source| !zones.is_done(source.room, source.set_id))
             .map(|source| sim::spawn_actor(&mut self.sim.world, source))
             .collect();
+        Self::install_tag_events(&mut self.sim.world, &actors);
     }
 
     pub fn sync_rooms(&mut self) {
