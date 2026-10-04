@@ -4,6 +4,7 @@ pub mod arrow;
 pub mod balloon;
 pub mod bird;
 pub mod bomb;
+pub mod bombflower;
 pub mod boomerang;
 pub mod chest;
 pub mod carry;
@@ -188,6 +189,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == ghostship::GHOSTSHIP_ACTOR {
         let wreck = ghostship::Ghostship::spawn(source.parameters, actor.angle[1] as f32);
         world.spawn((actor, wreck)).id()
+    } else if bombflower::is_flower(&source.name) {
+        let bloom = bombflower::Bombflower::spawn(source.parameters);
+        world.spawn((actor, bloom)).id()
+    } else if source.name == bombflower::BOMB_ACTOR {
+        let crawling = bombflower::Crawler::spawn(source.parameters);
+        world.spawn((actor, crawling)).id()
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters);
         world.spawn((actor, cell)).id()
@@ -306,6 +313,8 @@ pub fn build(
                     tsubo::control.in_set(WwSimSet::Execute),
                     koisi::control.in_set(WwSimSet::Execute),
                     bomb::control.in_set(WwSimSet::Execute),
+                    bombflower::flower_control.in_set(WwSimSet::Execute),
+                    bombflower::crawler_control.in_set(WwSimSet::Execute),
                     ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
