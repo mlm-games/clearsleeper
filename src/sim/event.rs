@@ -839,7 +839,7 @@ fn staff_cut(
             mailbox_msg(owner, actors),
         );
     } else if staff.name == "Os" || staff.name == "Os1" || staff.name == "Os2" {
-        os_cut(run, list, flags, owner, talks, msg, table);
+        os_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Mori1" {
         hold_cut(run, list, flags, &["CLOSE", "STOP_OPEN"]);
     } else if staff.name == "Ghrwp" {
@@ -980,9 +980,11 @@ fn os_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let cut = run.cut as usize;
     match list.cuts.get(cut).map(|cut| cut.name.as_str()) {
