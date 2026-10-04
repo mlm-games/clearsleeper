@@ -23,9 +23,9 @@ pub const BOKO_WEAPONS: [i32; 6] = [
     PGANON_SWORD,
 ];
 
-pub const ARROW: i32 = 10;
-pub const BOMB: i32 = 200;
-pub const BOMERANG: i32 = 0x3C;
+pub const ARROW: i32 = 2;
+pub const BOMB: i32 = 4;
+pub const BOMERANG: i32 = 1;
 pub const TSUBO: i32 = 3;
 pub const WATER_JUG: i32 = 4;
 
