@@ -559,7 +559,7 @@ impl App {
                 let (drop, height, radius) = wall.hull();
                 lift = drop;
                 (view::ActorKind::Scenery, 0, height, radius)
-            } else if let Some(mask) = entity.get::<sim::homen::Domen>() {
+            } else if let Some(mask) = entity.get::<sim::homen::Homen>() {
                 if !mask.drawn() {
                     continue;
                 }

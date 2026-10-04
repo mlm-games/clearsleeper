@@ -4,19 +4,22 @@ use glam::{Quat, Vec3};
 use super::actor::Actor;
 use super::collision::Collision;
 use super::enemy::{self, Enemy, Hurt};
+use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{StoryBits, Switches};
 use super::ground;
 use super::hookshot::{CAPSULE_RADIUS, Hookshot, Phase, SHOT_STEP};
 use super::inventory::Equipped;
-use super::pickup::{self, Pickup};
+use super::pickup::{ITEM_ACTORS, Pickup};
 use super::player::Player;
 use super::stream;
 use super::walk;
 
 pub const HOMEN_ACTORS: [&str; 2] = ["Homen1", "Homen2"];
 
-pub const TYPE_SLAB: u8 = 0;
+pub const HOMEN_EVENT: &str = "homen_down";
+
+pub const TYPE_L: u8 = 0;
 
 pub const NO_SWITCH: u8 = 0xFF;
 pub const NO_ITEM: u8 = 0x3F;
@@ -42,6 +45,7 @@ pub const GRAVITY: f32 = -2.0;
 pub const MAX_FALL: f32 = -36.0;
 pub const GROUND_PROBE: f32 = 100.0;
 pub const GROUND_MARGIN: f32 = 1.0;
+pub const NO_GROUND: f32 = f32::NEG_INFINITY;
 pub const FALL_SPEED: [f32; 2] = [20.0, 12.0];
 
 pub const SWING_FRAMES: i16 = 3;
@@ -50,18 +54,18 @@ pub const SWING_STEP: f32 = 20.0;
 
 pub const ITEM_FRAMES: i16 = 20;
 pub const ENEMY_FRAMES: i16 = 6;
-pub const SETTLE_FRAMES: i16 = 1;
 
 pub const TILT_RATE: [i16; 2] = [90, 120];
 pub const TILT_MAX: i16 = 2000;
 pub const TILT_LIMIT: i16 = 0x5000;
-pub const SPIN_RANGE: f32 = 0xC00 as f32;
+pub const SPIN_RANGE: f32 = 3072.0;
 pub const SPIN_SCALE: i16 = 20;
 pub const SPIN_FACE_SCALE: i16 = 10;
 pub const SPIN_MAX_STEP: i16 = 0x1000;
 pub const SPIN_FACE: i16 = 0x8000;
 
-pub const ENEMY_ROWS: usize = 6;
+pub const ENEMY_ROWS: usize = 11;
+pub const ENEMY_CHUCHU: u8 = 6;
 pub const ENEMY_PARAM: [u32; ENEMY_ROWS] = [
     0xFFFF_0000,
     0xFFFF_0020,
@@ -69,11 +73,20 @@ pub const ENEMY_PARAM: [u32; ENEMY_ROWS] = [
     0xFFFF_0060,
     0xFFFF_0080,
     0xFFFF_00A0,
+    0xFF00_0000,
+    0xFF00_0100,
+    0xFF00_0200,
+    0xFF00_0300,
+    0xFF00_0400,
 ];
 pub const ENEMY_LIFT: [Vec3; 2] = [
     Vec3::new(0.0, 300.0, 350.0),
     Vec3::new(0.0, 0.0, 25.0),
 ];
+
+pub const ITEM_SWITCH: u32 = 0xFF;
+pub const ITEM_ACTION_SHIFT: u32 = 26;
+pub const ITEM_ACTION: u32 = 1;
 
 pub const SE_MASK_S_BREAK: u32 = 0x69FF;
 pub const SE_MASK_L_BREAK: u32 = 0x6A00;
@@ -86,12 +99,19 @@ const ARG0_SHIFT: u32 = 0x08;
 const ARG0_MASK: u32 = 0x0F;
 const ITEM_SHIFT: u32 = 0x0C;
 const ITEM_MASK: u32 = 0x3F;
+const BIT_SHIFT: u32 = 0x00;
+const BIT_MASK: u32 = 0x7F;
 const ENEMY_SHIFT: u32 = 0x12;
 const ENEMY_MASK: u32 = 0x0F;
 const SWITCH_SHIFT: u32 = 0x18;
 const SWITCH_MASK: u32 = 0xFF;
 const TYPE_BIT: u32 = 1;
 const KIND_MASK: usize = 1;
+
+const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
+const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
+const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
+const RND_SEED: i32 = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -102,80 +122,96 @@ pub enum Step {
     Done,
 }
 
-#[derive(Component, Debug, Clone, PartialEq)]
-pub struct Domen {
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct Homen {
     pub kind: u8,
     pub switch_no: u8,
     pub item: u8,
+    pub item_bit: u8,
     pub enemy: u8,
-    pub step: Step,
+    pub state: Step,
     pub land: Vec3,
     pub ground_y: f32,
-    pub pitch: i16,
-    pub yaw: i16,
-    pub roll: i16,
-    pub facing: i16,
     pub tilt: i16,
     pub tilt_rate: i16,
+    pub facing: i16,
     pub swing: i16,
     pub wobble: i16,
     pub settle: i16,
     pub laid: i16,
+    pub hookshot: Option<Entity>,
+    pub foe: Option<Entity>,
+    pub carried: bool,
+    pub entered: bool,
     pub item_timer: i16,
     pub foe_timer: i16,
+    pub event_id: i16,
+    pub event_state: i16,
     pub speed: Vec3,
     pub speed_f: f32,
     pub gravity: f32,
     pub max_fall: f32,
-    pub foe: Option<Entity>,
-    pub seed: u32,
+    pub pitch: i16,
+    pub yaw: i16,
+    pub roll: i16,
+    pub seed: [i32; 3],
 }
 
-impl Domen {
-    pub fn spawn(parameters: u32, switches: &Switches, angle: [i16; 3]) -> Option<Self> {
-        let switch_no = ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8;
-        if switch_no != NO_SWITCH && switches.test(switch_no) {
-            return None;
-        }
-        Some(Self {
+impl Homen {
+    pub fn spawn(parameters: u32) -> Self {
+        Self {
             kind: (((parameters >> ARG0_SHIFT) & ARG0_MASK) & TYPE_BIT) as u8,
-            switch_no,
+            switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
             item: ((parameters >> ITEM_SHIFT) & ITEM_MASK) as u8,
+            item_bit: ((parameters >> BIT_SHIFT) & BIT_MASK) as u8,
             enemy: ((parameters >> ENEMY_SHIFT) & ENEMY_MASK) as u8,
-            step: Step::Free,
+            state: Step::Free,
             land: Vec3::ZERO,
             ground_y: 0.0,
-            pitch: angle[0],
-            yaw: angle[1],
-            roll: angle[2],
-            facing: 0,
             tilt: 0,
             tilt_rate: 0,
+            facing: 0,
             swing: 0,
             wobble: 0,
             settle: 0,
             laid: 0,
+            hookshot: None,
+            foe: None,
+            carried: false,
+            entered: false,
             item_timer: 0,
             foe_timer: 0,
+            event_id: 0,
+            event_state: 0,
             speed: Vec3::ZERO,
             speed_f: 0.0,
             gravity: 0.0,
             max_fall: 0.0,
-            foe: None,
-            seed: 0x2540_F491,
-        })
+            pitch: 0,
+            yaw: 0,
+            roll: 0,
+            seed: [RND_SEED; 3],
+        }
     }
 
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
-        (CULL_MIN[self.slot()], CULL_MAX[self.slot()])
+        let index = self.slot();
+        (
+            CULL_MIN.get(index).copied().unwrap_or(CULL_MIN[0]),
+            CULL_MAX.get(index).copied().unwrap_or(CULL_MAX[0]),
+        )
     }
 
     pub fn drawn(&self) -> bool {
-        !matches!(self.step, Step::Wait | Step::Done)
+        self.state != Step::Wait && self.state != Step::Done
+    }
+
+    pub fn latched(&self, switches: &Switches) -> bool {
+        self.switch_no != NO_SWITCH && switches.test(self.switch_no)
     }
 
     pub fn break_sound(&self) -> u32 {
-        if self.kind == TYPE_SLAB {
+        if self.kind == TYPE_L {
             SE_MASK_S_BREAK
         } else {
             SE_MASK_L_BREAK
@@ -186,82 +222,100 @@ impl Domen {
         usize::from(self.kind) & KIND_MASK
     }
 
-    fn norse(&self, set: usize) -> Vec3 {
-        NORSE[set & KIND_MASK][self.slot()]
+    fn hook_reach(&self) -> f32 {
+        HOOK_RADIUS
+            .get(self.slot())
+            .copied()
+            .unwrap_or(HOOK_RADIUS[0])
+            + CAPSULE_RADIUS
     }
 
-    fn reach(&self) -> f32 {
-        HOOK_RADIUS[self.slot()] + CAPSULE_RADIUS
+    pub fn norse_offset(&self, set: usize) -> Vec3 {
+        NORSE
+            .get(set & KIND_MASK)
+            .and_then(|row| row.get(self.slot()))
+            .copied()
+            .unwrap_or(Vec3::ZERO)
     }
 
-    fn placed(&self, offset: Vec3, pos: Vec3) -> Vec3 {
+    pub fn norse_point(&self, set: usize, pos: Vec3) -> Vec3 {
+        self.placed(self.norse_offset(set), pos)
+    }
+
+    pub fn placed(&self, offset: Vec3, pos: Vec3) -> Vec3 {
         let turn = Quat::from_rotation_z(walk::from_s16(self.roll))
             * Quat::from_rotation_y(walk::from_s16(self.yaw))
             * Quat::from_rotation_x(walk::from_s16(self.pitch));
         let hinge = Vec3::new(0.0, 0.0, HINGE);
-        if self.kind == TYPE_SLAB && self.laid == LAID {
+        if self.kind == TYPE_L && self.laid == LAID {
             pos + turn * (offset - hinge) + hinge
         } else {
             pos + turn * offset
         }
     }
 
-    fn strike(
-        &mut self,
-        pos: Vec3,
-        hooks: &Query<&Hookshot>,
-        facing: i16,
-        stories: &mut StoryBits,
-    ) -> Option<Vec3> {
-        let centre = self.placed(self.norse(0), pos);
-        let head = hooks.iter().find(|hook| {
-            hook.phase == Phase::Shot
-                && walk::swept(
-                    hook.pos,
-                    hook.pos + hook.heading * SHOT_STEP,
-                    centre,
-                    self.reach(),
-                )
-        })?;
-        self.facing = facing;
-        if self.kind == TYPE_SLAB {
-            stories.set(EVENT_BOOKED);
-        }
-        Some(head.pos)
-    }
-
-    fn summon(&mut self, actor: &Actor, commands: &mut Commands) {
-        if self.item_timer > 0 {
-            self.item_timer -= 1;
-            if self.item_timer == 0 && self.item != NO_ITEM {
-                let parameter = u32::from(self.item);
-                commands.spawn((
-                    fresh(actor, pickup::ITEM_ACTORS[0], actor.pos, parameter),
-                    Pickup::spawn(parameter),
-                ));
+    pub fn exe_event(&mut self, entity: Entity, list: &EventList, active: &mut ActiveEvent) {
+        match self.event_state {
+            1 => {
+                if self.event_id >= 0 {
+                    active.order(list, usize::from(self.event_id as u16), entity);
+                }
             }
-        }
-        if self.foe_timer > 0 {
-            self.foe_timer -= 1;
-            if self.foe_timer == 0 {
-                self.hire(actor, commands);
+            2 => {
+                if self.event_id >= 0 && active.end_check(usize::from(self.event_id as u16)) {
+                    self.event_id = -1;
+                    self.event_state = 0;
+                }
             }
+            _ => {}
         }
     }
 
-    fn hire(&mut self, actor: &Actor, commands: &mut Commands) {
-        if self.enemy == NO_ENEMY {
+    pub fn item_parameter(&self) -> u32 {
+        u32::from(self.item)
+            | (u32::from(self.item_bit) << 8)
+            | (ITEM_SWITCH << 16)
+            | (ITEM_ACTION << ITEM_ACTION_SHIFT)
+    }
+
+    pub fn make_item(&self, actor: &Actor, commands: &mut Commands) {
+        if self.item == NO_ITEM {
+            return;
+        }
+        let parameters = self.item_parameter();
+        commands.spawn((
+            Actor {
+                name: ITEM_ACTORS[0].to_owned(),
+                parameters,
+                pos: actor.pos,
+                angle: [0; 3],
+                set_id: 0,
+                room: actor.room,
+            },
+            Pickup::spawn(parameters),
+        ));
+    }
+
+    pub fn make_enemy(&mut self, actor: &Actor, commands: &mut Commands) {
+        if self.enemy == NO_ENEMY || self.enemy >= ENEMY_CHUCHU {
             return;
         }
         let Some(parameter) = ENEMY_PARAM.get(usize::from(self.enemy)).copied() else {
             return;
         };
-        let lift = self.placed(ENEMY_LIFT[self.slot()], actor.pos);
+        let lift = ENEMY_LIFT.get(self.slot()).copied().unwrap_or(ENEMY_LIFT[0]);
         let (state, hit_points) = enemy::spawn(parameter, 0);
         self.foe = Some(
             commands
                 .spawn((
-                    fresh(actor, enemy::ENEMY_ACTOR, lift, parameter),
+                    Actor {
+                        name: enemy::ENEMY_ACTOR.to_owned(),
+                        parameters: parameter,
+                        pos: self.placed(lift, actor.pos),
+                        angle: [0; 3],
+                        set_id: 0,
+                        room: actor.room,
+                    },
                     state,
                     hit_points,
                     Hurt::default(),
@@ -270,51 +324,132 @@ impl Domen {
         );
     }
 
-    fn drop_in(&mut self, pos: Vec3, head: Option<Vec3>, stories: &mut StoryBits) {
+    pub fn manage_item_timer(&mut self, actor: &Actor, commands: &mut Commands) {
+        if self.item_timer <= 0 {
+            return;
+        }
+        self.item_timer -= 1;
+        if self.item_timer == 0 {
+            self.make_item(actor, commands);
+        }
+    }
+
+    pub fn manage_enemy_timer(&mut self, actor: &Actor, commands: &mut Commands) {
+        if self.foe_timer <= 0 {
+            return;
+        }
+        self.foe_timer -= 1;
+        if self.foe_timer == 0 {
+            self.make_enemy(actor, commands);
+        }
+    }
+
+    pub fn process_init(&mut self, state: Step) -> bool {
+        self.state = state;
+        true
+    }
+
+    pub fn process_free_init(&mut self) -> bool {
+        self.foe = None;
+        true
+    }
+
+    pub fn process_free_main(
+        &mut self,
+        entity: Entity,
+        pos: Vec3,
+        player: Option<&Player>,
+        booted: bool,
+        hooks: &mut Query<(Entity, &mut Hookshot)>,
+        stories: &mut StoryBits,
+    ) {
+        if self.carried {
+            self.process_wait_falldown_init(pos, hooks, stories);
+            self.process_init(Step::WaitFalldown);
+        }
+        self.set_co_collision(entity, pos, player, booted, hooks, stories);
+    }
+
+    pub fn process_wait_falldown_init(
+        &mut self,
+        pos: Vec3,
+        hooks: &mut Query<(Entity, &mut Hookshot)>,
+        stories: &mut StoryBits,
+    ) -> bool {
+        self.carried = false;
         self.foe_timer = ENEMY_FRAMES;
         self.item_timer = ITEM_FRAMES;
         self.swing = 0;
-        if self.kind != TYPE_SLAB {
-            self.land = head.map_or(pos, |head| head - turned_y(self.norse(1), self.yaw));
+        if self.kind != TYPE_L {
+            self.land = pos;
+            if let Some(shot) = self.hookshot
+                && let Ok((_, hook)) = hooks.get(shot)
+            {
+                self.land = hook.pos - turned_y(self.norse_offset(1), self.yaw);
+            }
         }
-        if self.kind == TYPE_SLAB {
+        if self.kind == TYPE_L {
             stories.set(EVENT_DROPPED);
         }
-        self.step = Step::WaitFalldown;
+        true
     }
 
-    fn begin_fall(&mut self, pos: Vec3, solid: Option<&Collision>) {
+    pub fn process_wait_falldown_main(
+        &mut self,
+        entity: Entity,
+        actor: &mut Actor,
+        solid: Option<&Collision>,
+        player: Option<&Player>,
+        booted: bool,
+        hooks: &mut Query<(Entity, &mut Hookshot)>,
+        stories: &mut StoryBits,
+    ) {
+        if self.swing < SWING_FRAMES {
+            let land = self.land;
+            add_calc2(&mut actor.pos.x, land.x, SWING_SCALE, SWING_STEP);
+            add_calc2(&mut actor.pos.y, land.y, SWING_SCALE, SWING_STEP);
+            add_calc2(&mut actor.pos.z, land.z, SWING_SCALE, SWING_STEP);
+            self.swing += 1;
+        } else {
+            self.process_falldown_init(actor.pos, solid);
+            self.process_init(Step::Falldown);
+        }
+        self.set_co_collision(entity, actor.pos, player, booted, hooks, stories);
+    }
+
+    pub fn process_falldown_init(&mut self, pos: Vec3, solid: Option<&Collision>) -> bool {
         self.gravity = GRAVITY;
         self.max_fall = MAX_FALL;
         let probe = Vec3::new(pos.x, pos.y + GROUND_PROBE, pos.z);
-        self.ground_y = ground::surface(solid, probe).unwrap_or(0.0);
-        self.tilt_rate = TILT_RATE[self.slot()];
-        self.wobble = self.spin_target();
+        self.ground_y = ground::surface(solid, probe).unwrap_or(NO_GROUND);
+        self.tilt_rate = TILT_RATE.get(self.slot()).copied().unwrap_or(TILT_RATE[0]);
+        self.wobble = rnd_fx(&mut self.seed, SPIN_RANGE) as i16;
+        true
     }
 
-    fn spin_target(&mut self) -> i16 {
-        self.seed ^= self.seed << 13;
-        self.seed ^= self.seed >> 17;
-        self.seed ^= self.seed << 5;
-        let draw = (self.seed >> 8) as f32 / 16777216.0;
-        (draw * 2.0 * SPIN_RANGE - SPIN_RANGE) as i16
-    }
-
-    fn tumbled(&mut self, centre: Vec3, base: Vec3) -> bool {
-        if self.kind == TYPE_SLAB && self.laid != LAID {
-            if base.y - GROUND_MARGIN <= self.ground_y {
+    pub fn process_falldown_main(
+        &mut self,
+        pos: Vec3,
+        switches: &mut Switches,
+        events: &mut SimEvents,
+    ) {
+        let sp34 = self.norse_point(0, pos);
+        if self.kind == TYPE_L && self.laid != LAID {
+            let sp1c = self.placed(Vec3::ZERO, pos);
+            if sp1c.y - GROUND_MARGIN <= self.ground_y {
                 self.laid = LAID;
                 self.stall();
             }
-        } else if self.kind != TYPE_SLAB && base.y < self.ground_y {
+        } else if pos.y < self.ground_y {
             self.stall();
         }
-        if centre.y < self.ground_y {
+        if sp34.y < self.ground_y {
+            self.stall();
             self.tilt_rate = 0;
             self.tilt = 0;
-            return true;
-        }
-        if self.laid != LAID {
+            self.process_wait_init(switches, events);
+            self.process_init(Step::Wait);
+        } else if self.laid != LAID {
             stream::add_calc_angle_s2(&mut self.roll, self.wobble, SPIN_SCALE, SPIN_MAX_STEP);
             stream::add_calc_angle_s2(
                 &mut self.yaw,
@@ -324,9 +459,101 @@ impl Domen {
             );
         }
         if self.gravity != 0.0 {
-            self.speed_f = FALL_SPEED[self.slot()];
+            self.speed_f = FALL_SPEED.get(self.slot()).copied().unwrap_or(FALL_SPEED[0]);
         }
-        false
+    }
+
+    pub fn process_wait_init(&mut self, switches: &mut Switches, events: &mut SimEvents) -> bool {
+        switches.set(self.switch_no);
+        self.settle = 1;
+        events.list.push(SimEvent::Se(self.break_sound()));
+        true
+    }
+
+    pub fn process_wait_main(&mut self, events: &mut SimEvents) {
+        if self.settle > 0 {
+            self.settle -= 1;
+            if self.settle == 0 {
+                self.process_none_init(events);
+                self.process_init(Step::Done);
+            }
+        }
+    }
+
+    pub fn process_none_init(&mut self, events: &mut SimEvents) -> bool {
+        if self.kind == TYPE_L {
+            events.list.push(SimEvent::Se(SE_RIDDLE));
+        }
+        true
+    }
+
+    pub fn process_none_main(&self, foes: &Query<(), With<Enemy>>) -> bool {
+        match self.foe {
+            Some(foe) => !foes.contains(foe),
+            None => false,
+        }
+    }
+
+    pub fn adjust_hookshot(
+        &mut self,
+        entity: Entity,
+        pos: Vec3,
+        booted: bool,
+        hooks: &mut Query<(Entity, &mut Hookshot)>,
+    ) {
+        if booted {
+            return;
+        }
+        let Some(shot) = self.hookshot else {
+            return;
+        };
+        let Ok((_, mut hook)) = hooks.get_mut(shot) else {
+            return;
+        };
+        hook.anchored(pos + turned_y(self.norse_offset(1), self.yaw));
+        hook.carry = Some(entity);
+        self.hookshot = None;
+    }
+
+    pub fn set_co_collision(
+        &mut self,
+        entity: Entity,
+        pos: Vec3,
+        player: Option<&Player>,
+        booted: bool,
+        hooks: &mut Query<(Entity, &mut Hookshot)>,
+        stories: &mut StoryBits,
+    ) {
+        let centre = self.norse_point(0, pos);
+        let reach = self.hook_reach();
+        let mut struck = None;
+        for (shot, hook) in hooks.iter() {
+            if hook.phase == Phase::Shot
+                && walk::swept(
+                    hook.pos,
+                    hook.pos + hook.heading * SHOT_STEP,
+                    centre,
+                    reach,
+                )
+            {
+                struck = Some((shot, hook.pos));
+                break;
+            }
+        }
+        let Some((shot, tip)) = struck else {
+            return;
+        };
+        self.facing = player.map_or(self.facing, |player| walk::to_s16(player.face));
+        self.hookshot = Some(shot);
+        if self.kind == TYPE_L {
+            stories.set(EVENT_BOOKED);
+        }
+        if booted {
+            if let Ok((_, mut hook)) = hooks.get_mut(shot) {
+                hook.hooked(entity, pos - tip);
+            }
+            self.carried = true;
+        }
     }
 
     fn stall(&mut self) {
@@ -336,7 +563,7 @@ impl Domen {
     }
 
     fn lean(&mut self) {
-        self.tilt = (self.tilt + self.tilt_rate).min(TILT_MAX);
+        self.tilt = self.tilt.wrapping_add(self.tilt_rate).min(TILT_MAX);
         self.pitch = self.pitch.wrapping_add(self.tilt);
         if self.pitch >= TILT_LIMIT {
             self.pitch = TILT_LIMIT;
@@ -346,7 +573,7 @@ impl Domen {
     }
 
     fn fall(&mut self) -> Vec3 {
-        let (speed, speed_f) = stream::calc_speed(
+        let (speed, _) = stream::calc_speed(
             self.speed_f,
             self.yaw,
             self.speed.y,
@@ -354,23 +581,28 @@ impl Domen {
             self.max_fall,
         );
         self.speed = speed;
-        self.speed_f = speed_f;
         speed
-    }
-
-    fn angle(&self) -> [i16; 3] {
-        [self.pitch, self.yaw, self.roll]
     }
 }
 
-fn fresh(actor: &Actor, name: &str, pos: Vec3, parameters: u32) -> Actor {
-    Actor {
-        name: name.to_owned(),
-        parameters,
-        pos,
-        angle: [0; 3],
-        set_id: 0,
-        room: actor.room,
+fn rnd(seed: &mut [i32; 3]) -> f32 {
+    for lane in 0..3 {
+        seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
+    }
+    let sum = f32::from(seed[0]) / RND_SCALE[0]
+        + f32::from(seed[1]) / RND_SCALE[1]
+        + f32::from(seed[2]) / RND_SCALE[2];
+    (sum % 1.0).abs()
+}
+
+fn rnd_fx(seed: &mut [i32; 3], range: f32) -> f32 {
+    range * (rnd(seed) - 0.5) * 2.0
+}
+
+fn add_calc2(value: &mut f32, target: f32, scale: f32, max_step: f32) {
+    if *value != target {
+        let step = (scale * (target - *value)).clamp(-max_step, max_step);
+        *value += step;
     }
 }
 
@@ -378,86 +610,84 @@ fn turned_y(offset: Vec3, yaw: i16) -> Vec3 {
     Quat::from_rotation_y(walk::from_s16(yaw)) * offset
 }
 
-pub fn is_domen(name: &str) -> bool {
+pub fn is_homen(name: &str) -> bool {
     HOMEN_ACTORS.contains(&name)
 }
 
 pub fn control(
     collision: Option<Res<Collision>>,
     equipped: Res<Equipped>,
-    players: Query<&Player>,
-    hooks: Query<&Hookshot>,
-    foes: Query<(), With<Enemy>>,
+    lists: Res<EventList>,
+    mut active: ResMut<ActiveEvent>,
     mut stories: ResMut<StoryBits>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
-    mut masks: Query<(Entity, &mut Actor, &mut Domen)>,
+    players: Query<&Player>,
+    mut hooks: Query<(Entity, &mut Hookshot)>,
+    foes: Query<(), With<Enemy>>,
+    mut masks: Query<(Entity, &mut Actor, &mut Homen), Without<Player>>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
     let player = players.iter().next().copied();
     let booted = equipped.item(BOOTS_SLOT) == ITEM_IRON_BOOTS;
-    for (entity, mut actor, mut mask) in &mut masks {
-        let struck = match mask.step {
-            Step::Free | Step::WaitFalldown => mask.strike(
-                actor.pos,
-                &hooks,
-                player.map_or(0, |player| walk::to_s16(player.face)),
-                &mut stories,
-            ),
-            _ => None,
-        };
-        mask.summon(&actor, &mut commands);
-        match mask.step {
+    for (entity, actor, mask) in &mut masks {
+        let actor = &mut *actor;
+        let mask = &mut *mask;
+        if !mask.entered {
+            mask.entered = true;
+            if mask.latched(&switches) {
+                let _ = commands.entity(entity).despawn();
+                continue;
+            }
+            mask.pitch = actor.angle[0];
+            mask.yaw = actor.angle[1];
+            mask.roll = actor.angle[2];
+            mask.process_free_init();
+            mask.process_init(Step::Free);
+        }
+        mask.adjust_hookshot(entity, actor.pos, booted, &mut hooks);
+        mask.exe_event(entity, &lists, &mut active);
+        mask.manage_item_timer(actor, &mut commands);
+        mask.manage_enemy_timer(actor, &mut commands);
+        let mut doomed = false;
+        match mask.state {
             Step::Free => {
-                if struck.is_some() && booted {
-                    mask.drop_in(actor.pos, struck, &mut stories);
-                }
+                mask.process_free_main(
+                    entity,
+                    actor.pos,
+                    player.as_ref(),
+                    booted,
+                    &mut hooks,
+                    &mut stories,
+                );
             }
             Step::WaitFalldown => {
-                if mask.swing < SWING_FRAMES {
-                    let land = mask.land;
-                    walk::add_calc(&mut actor.pos.x, land.x, SWING_SCALE, SWING_STEP, 0.0);
-                    walk::add_calc(&mut actor.pos.y, land.y, SWING_SCALE, SWING_STEP, 0.0);
-                    walk::add_calc(&mut actor.pos.z, land.z, SWING_SCALE, SWING_STEP, 0.0);
-                    mask.swing += 1;
-                } else {
-                    mask.step = Step::Falldown;
-                    mask.begin_fall(actor.pos, solid);
-                }
+                mask.process_wait_falldown_main(
+                    entity,
+                    actor,
+                    solid,
+                    player.as_ref(),
+                    booted,
+                    &mut hooks,
+                    &mut stories,
+                );
             }
             Step::Falldown => {
-                let base = mask.placed(Vec3::ZERO, actor.pos);
-                let centre = mask.placed(mask.norse(0), actor.pos);
-                if mask.tumbled(centre, base) {
-                    mask.step = Step::Wait;
-                    mask.settle = SETTLE_FRAMES;
-                    if mask.switch_no != NO_SWITCH {
-                        switches.set(mask.switch_no);
-                    }
-                    events.list.push(SimEvent::Se(mask.break_sound()));
-                }
+                mask.process_falldown_main(actor.pos, &mut switches, &mut events);
             }
             Step::Wait => {
-                if mask.settle > 0 {
-                    mask.settle -= 1;
-                    if mask.settle == 0 {
-                        mask.step = Step::Done;
-                        if mask.kind == TYPE_SLAB {
-                            events.list.push(SimEvent::Se(SE_RIDDLE));
-                        }
-                    }
-                }
+                mask.process_wait_main(&mut events);
             }
             Step::Done => {
-                if mask.foe.is_some_and(|foe| !foes.contains(foe)) {
-                    let _ = commands.entity(entity).despawn();
-                    continue;
-                }
+                doomed = mask.process_none_main(&foes);
             }
         }
         mask.lean();
         actor.pos += mask.fall();
-        actor.angle = mask.angle();
+        actor.angle = [mask.pitch, mask.yaw, mask.roll];
+        if doomed {
+            let _ = commands.entity(entity).despawn();
+        }
     }
 }

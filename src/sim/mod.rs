@@ -261,15 +261,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             Some(wall) => world.spawn((actor, wall)).id(),
             None => world.spawn(actor).id(),
         }
-    } else if homen::is_domen(&source.name) {
-        match homen::Domen::spawn(
-            source.parameters,
-            world.resource::<flags::Switches>(),
-            source.angle,
-        ) {
-            Some(mask) => world.spawn((actor, mask)).id(),
-            None => world.spawn(actor).id(),
-        }
+    } else if homen::is_homen(&source.name) {
+        let face = homen::Homen::spawn(source.parameters);
+        world.spawn((actor, face)).id()
     } else if leaves::is_leaves(&source.name) {
         let pile = leaves::Leaves::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, pile)).id()
