@@ -402,6 +402,9 @@ pub fn control(
                 return;
             };
             for (entity, talk, actor) in &talks {
+                if talk.base == 0 {
+                    continue;
+                }
                 if !talk.gone && talk.order == 0 && talking(player, actor) {
                     dialogue.open = true;
                     dialogue.speaker = Some(entity);

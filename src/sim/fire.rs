@@ -49,6 +49,7 @@ pub fn control(
     forced: Query<&FireLit>,
     bombs: Query<&Bomb>,
     foes: Query<(), With<Enemy>>,
+    mut commands: Commands,
 ) {
     let Some(player) = players.iter().next().copied() else {
         return;
@@ -57,6 +58,7 @@ pub fn control(
     for (entity, actor, mut fire) in &mut fires {
         if let Ok(lit) = forced.get(entity) {
             fire.lit = lit.0;
+            commands.entity(entity).remove::<FireLit>();
         } else if fire.switch != 0xFF && switches.test(fire.switch) {
             fire.lit = false;
             continue;

@@ -252,14 +252,15 @@ pub fn control(
     mut switches: ResMut<Switches>,
     forced: Query<&super::fire::FireLit>,
     mut torches: Query<(Entity, &Actor, &mut Torch)>,
+    mut commands: Commands,
 ) {
     let solid = collision.as_deref();
     for (entity, actor, mut torch) in &mut torches {
-        if let Ok(lit) = forced.get(entity)
-            && lit.0
-            && !torch.state.lit()
-        {
-            torch.state = State::Wake;
+        if let Ok(lit) = forced.get(entity) {
+            if lit.0 && !torch.state.lit() {
+                torch.state = State::Wake;
+            }
+            commands.entity(entity).remove::<super::fire::FireLit>();
         }
         torch.tick_burn();
         torch.tick_clip();

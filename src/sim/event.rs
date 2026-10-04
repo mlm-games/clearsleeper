@@ -795,7 +795,7 @@ fn staff_cut(
     } else if staff.name == "Fire" || staff.name == "Zenfire" {
         fire_cut(run, list, flags, owner, actors, commands);
     } else if staff.name == "TAGHINT" {
-        hint_cut(run, list, flags, owner, actors, talks, msg, table);
+        hint_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "SWITCH" {
         switch_cut(run, list, flags, owner, actors, commands);
     } else if staff.name == "Warpt" {
@@ -807,7 +807,7 @@ fn staff_cut(
     } else if staff.name == "Bm1" {
         bm1_cut(run, list, flags, owner, actors);
     } else if staff.name == "MknjD" {
-        statue_cut(run, list, flags, owner, talks, msg, table);
+        statue_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "SHOKUDAI" {
         torch_cut(run, list, flags, owner, actors, commands);
     } else if staff.name == "Fmaster"
@@ -829,11 +829,14 @@ fn staff_cut(
             list,
             flags,
             owner,
+            actors,
             talks,
             msg,
             table,
+            commands,
             ("msg_init", "message"),
             "msg_number",
+            mailbox_msg(owner, actors),
         );
     } else if staff.name == "Os" || staff.name == "Os1" || staff.name == "Os2" {
         os_cut(run, list, flags, owner, talks, msg, table);
@@ -842,49 +845,49 @@ fn staff_cut(
     } else if staff.name == "Ghrwp" {
         hold_cut(run, list, flags, &["WARP_ARRIVE_END"]);
     } else if staff.name == "Gdemo20" {
-        hold_cut(run, list, flags, &["WAIT_DEAD", "DEAD"]);
+        cut_end(run, list, flags);
     } else if staff.name == "Warpgn" {
         hold_cut(run, list, flags, &["WARP_ARRIVE_END", "APPEAR"]);
     } else if staff.name == "Hsh" {
         hsh_cut(run, list, flags);
     } else if staff.name == "Bs1" {
-        bs1_cut(run, list, flags, owner, talks, msg, table);
+        bs1_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Doguu" {
-        hold_cut(run, list, flags, &["MESSAGE_KOKOE", "MESSAGE_OITA", "QUAKE", "SETLIGHT"]);
+        cut_end(run, list, flags);
     } else if staff.name == "Warpfo" {
         warpout_cut(run, list, flags);
     } else if staff.name == "Warpf" {
         warp_cut(run, list, flags);
     } else if people_staff(&staff.name) {
-        people_cut(run, list, flags, owner, talks, msg, table);
+        people_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Ls1" {
-        hold_cut(run, list, flags, &["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"]);
+        hold_cut(run, list, flags, &["WAI"]);
     } else if staff.name == "Ba1" {
         hold_cut(run, list, flags, &["ACTION", "START_TALE1"]);
     } else if staff.name == "Hdai1" || staff.name == "Hdai2" || staff.name == "Hdai3" {
         hold_cut(run, list, flags, &["MOVE"]);
     } else if staff.name == "Apzl" {
-        hold_cut(run, list, flags, &["TALK", "GETITEM", "STOP", "PUSH_A"]);
+        hold_cut(run, list, flags, &["STOP", "PUSH_A"]);
     } else if staff.name == "Ji1" {
         ji1_cut(run, list, flags);
     } else if staff.name == "Tpost" {
-        tpost_cut(run, list, flags, owner, talks, msg, table, commands);
+        tpost_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Auction" {
-        auction_cut(run, list, flags, owner, talks, msg, table);
+        auction_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Zl1" {
         zl1_cut(run, list, flags);
     } else if staff.name == "Tc" {
         tc_cut(run, list, flags);
     } else if staff.name == "Mk" {
-        mk_cut(run, list, flags, owner, talks, msg, table);
+        mk_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Roten" {
-        roten_cut(run, list, flags, owner, talks, msg, table);
+        roten_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.kind == STAFF_CAMERA {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
         match staff.name.as_str() {
             "NpcSo" => soldier_cut(
-                run, list, flags, owner, actors, players, sea, talks, msg, table,
+                run, list, flags, owner, actors, players, sea, talks, msg, table, commands,
             ),
             "Link" => link_cut(
                 run, list, flags, actors, ships, msg, table, partner, anms, players, commands,
@@ -917,16 +920,23 @@ fn warp_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     }
 }
 
+fn mailbox_msg(owner: Entity, actors: &Query<(Entity, &mut Actor)>) -> u32 {
+    actors.get(owner).map_or(0, |(_, actor)| actor.parameters & 0xFFFF)
+}
+
 fn open_msg_cut(
     run: &mut StaffRun,
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
     names: (&str, &str),
     key: &str,
+    fallback: u32,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
@@ -934,11 +944,12 @@ fn open_msg_cut(
     match cut.name.as_str() {
         name if name == names.0 => {
             let Ok(mut talk) = talks.get_mut(owner) else {
-                cut_end(run, list, flags);
+                host_message(owner, actors, commands);
                 return;
             };
             if run.advance > 0 {
-                talk.msg_curr = list.cut_number(run.cut as usize, key).unwrap_or(0) as u32;
+                talk.msg_curr =
+                    list.cut_number(run.cut as usize, key).unwrap_or(fallback as i32) as u32;
                 talk.msg_end = -1;
                 run.talk_open = true;
             }
@@ -947,10 +958,13 @@ fn open_msg_cut(
                 return;
             }
             npc_talk(&mut talk, msg, table);
+            if talk.msg_live {
+                cut_end(run, list, flags);
+            }
         }
         name if name == names.1 => {
             let Ok(mut talk) = talks.get_mut(owner) else {
-                cut_end(run, list, flags);
+                host_message(owner, actors, commands);
                 return;
             };
             if npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED {
@@ -988,11 +1002,14 @@ fn os_cut(
             list,
             flags,
             owner,
+            actors,
             talks,
             msg,
             table,
+            commands,
             ("MSGSET", "MSGEND"),
             "MsgNo",
+            0,
         ),
     }
 }
@@ -1027,13 +1044,15 @@ fn people_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     match list.cuts.get(run.cut as usize).map(|cut| cut.name.as_str()) {
         Some("MES_SET" | "MES_SET_TP" | "MES_SET_PO") => {
-            talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo");
+            talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo");
         }
         Some(
             "MES_SET2" | "UB1_TALK" | "UB1_TALK_XY" | "UB2_TALK" | "UB_SET_ANM" | "TURN_TO_PLAYER",
@@ -1047,26 +1066,17 @@ fn auction_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "MES_SET" => {
-            if let Ok(mut talk) = talks.get_mut(owner) {
-                if run.advance > 0 {
-                    talk.msg_curr =
-                        list.cut_number(run.cut as usize, "MsgNo").unwrap_or(0) as u32;
-                    talk.msg_end = -1;
-                    run.talk_open = true;
-                }
-                npc_talk(&mut talk, msg, table);
-            }
-            cut_end(run, list, flags);
-        }
+        "MES_SET" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
         "MES_END" => {
             let Ok(mut talk) = talks.get_mut(owner) else {
                 cut_end(run, list, flags);
@@ -1096,6 +1106,7 @@ fn tpost_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
@@ -1111,7 +1122,8 @@ fn tpost_cut(
         return;
     }
     let Ok(mut talk) = talks.get_mut(owner) else {
-        cut_end(run, list, flags);
+        let room = actors.get(owner).map_or(-1, |(_, actor)| actor.room);
+        commands.entity(owner).insert(super::talk::Talk::new(0, room));
         return;
     };
     if run.advance > 0 {
@@ -1131,16 +1143,18 @@ fn bs1_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "TALKMSG" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
-        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true, "MsgNo"),
+        "TALKMSG" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, true, "MsgNo"),
         "WAIT" => {
             if run.advance > 0 {
                 wait_start(run, list);
@@ -1228,15 +1242,17 @@ fn mk_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "SPEAK" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
+        "SPEAK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
         "RUN" | "RUN3" | "JUMP" | "JUMP2" | "JITABATA" | "TURN" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1247,15 +1263,17 @@ fn roten_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "MES_SET" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
+        "MES_SET" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
         "SET_ITEM" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1266,9 +1284,10 @@ fn mbdoor_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
         return;
     };
     match cut.name.as_str() {
+        "END" => return,
         "OPEN" => {
             run.timer = run.timer.saturating_add(50);
-            if run.timer >= 7217 {
+            if run.timer >= 7281 {
                 run.timer = 0;
                 cut_end(run, list, flags);
             }
@@ -1300,15 +1319,17 @@ fn statue_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "INPUT" | "LESSON" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
+        "INPUT" | "LESSON" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
         "BREAK" | "TACT" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1380,6 +1401,10 @@ fn switch_cut(
     commands: &mut Commands,
 ) {
     if run.advance > 0
+        && list
+            .cuts
+            .get(run.cut as usize)
+            .is_some_and(|cut| cut.name == "CHANGE")
         && let Ok((_, actor)) = actors.get(owner)
     {
         let bit = (actor.parameters & 0xFF) as u8;
@@ -1395,16 +1420,18 @@ fn hint_cut(
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
-    actors: &mut Query<(Entity, &mut Actor)>,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     if cut.name == "MESSAGE3" {
         let Ok(mut talk) = talks.get_mut(owner) else {
+            host_message(owner, actors, commands);
             return;
         };
         if run.advance > 0
@@ -1424,7 +1451,7 @@ fn hint_cut(
         return;
     }
     let Ok(mut talk) = talks.get_mut(owner) else {
-        cut_end(run, list, flags);
+        host_message(owner, actors, commands);
         return;
     };
     if run.advance > 0
@@ -1499,7 +1526,12 @@ fn staff_targets(
         })
         .collect();
     found.sort_by(|left, right| left.0.total_cmp(&right.0));
-    found.into_iter().skip(rank).map(|(_, entity)| entity).collect()
+    found
+        .into_iter()
+        .skip(rank)
+        .map(|(_, entity)| entity)
+        .take(1)
+        .collect()
 }
 
 fn door_cut(
@@ -1516,7 +1548,10 @@ fn door_cut(
     let opening = match cut.name.as_str() {
         "OPEN" | "STOP_OPEN" => true,
         "CLOSE" | "STOP_CLOSE" => false,
-        "UNLOCK" => return,
+        "UNLOCK" => {
+            cut_end(run, list, flags);
+            return;
+        }
         _ => {
             cut_end(run, list, flags);
             return;
@@ -1575,6 +1610,7 @@ fn soldier_cut(
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
@@ -1615,8 +1651,8 @@ fn soldier_cut(
         "APPEAR" | "DIVE" | "DISAPPEAR" => offset_cut(run, list, flags, &cut.name),
         "JUMP_MAPOPEN" => mapopen_cut(run, list, flags, owner, actors),
         "TURN" => soldier_turn(run, list, flags, owner, actors),
-        "TALK_MSG" => talk_cut(run, list, flags, owner, talks, msg, table, false, "msg_num"),
-        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true, "msg_num"),
+        "TALK_MSG" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "msg_num"),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, true, "msg_num"),
         name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
         name if SOLDIER_PENDING.contains(&name) => {}
         _ => cut_end(run, list, flags),
@@ -1953,19 +1989,32 @@ fn link_cut(
     cut_end(run, list, flags);
 }
 
+fn host_message(
+    owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
+    commands: &mut Commands,
+) {
+    let room = actors.get(owner).map_or(-1, |(_, actor)| actor.room);
+    commands
+        .entity(owner)
+        .insert(super::talk::Talk::new(0, room));
+}
+
 fn talk_cut(
     run: &mut StaffRun,
     list: &EventList,
     flags: &mut EventFlags,
     owner: Entity,
+    actors: &Query<(Entity, &mut Actor)>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
+    commands: &mut Commands,
     cont: bool,
     msg_key: &str,
 ) {
     let Ok(mut talk) = talks.get_mut(owner) else {
-        cut_end(run, list, flags);
+        host_message(owner, actors, commands);
         return;
     };
     if run.advance > 0 {

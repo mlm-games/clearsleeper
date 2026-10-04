@@ -147,7 +147,7 @@ pub fn control(
         zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(entity).despawn();
     }
-    for (_, actor, mut chest, marker) in &mut chests {
+    for (entity, actor, mut chest, marker) in &mut chests {
         let tapped = do_intent.0 && !chest.pressed;
         chest.pressed = do_intent.0;
         if chest.opened || !super::chest::present(chest, &switches) {
@@ -164,6 +164,9 @@ pub fn control(
             if dx * dx + dz * dz > reach * reach {
                 continue;
             }
+        }
+        if marker.is_some() {
+            commands.entity(entity).remove::<super::chest::ChestOpen>();
         }
         chest.opened = true;
         chest_flags.open(super::chest::stage_of(chest), chest.index);
