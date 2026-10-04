@@ -41,6 +41,7 @@ pub mod health;
 pub mod homen;
 pub mod hookshot;
 pub mod hop;
+pub mod iball;
 pub mod ice;
 pub mod intent;
 pub mod inventory;
@@ -57,6 +58,7 @@ pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
 pub mod msg;
+pub mod nh;
 pub mod pickup;
 pub mod pirateship;
 pub mod player;
@@ -161,6 +163,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, state, hit_points, enemy::Hurt::default()))
             .id()
+    } else if nh::is_nh(&source.name) {
+        let firefly = nh::Nh::spawn(source.parameters, actor.pos);
+        world.spawn((actor, firefly)).id()
     } else if pickup::is_pickup(&source.name) {
         world
             .spawn((actor, pickup::Pickup::spawn(source.parameters)))
@@ -272,6 +277,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if buoybarrel::is_buoy_barrel(&source.name) {
         let float = buoybarrel::BuoyBarrel::spawn(source.parameters, actor.pos);
         world.spawn((actor, float)).id()
+    } else if iball::is_iball(&source.name) {
+        world.spawn((actor, iball::Iball::spawn())).id()
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
@@ -595,6 +602,7 @@ pub fn build(
                     jump::control.in_set(WwSimSet::Execute),
                     roll::control.in_set(WwSimSet::Execute),
                     hop::control.in_set(WwSimSet::Execute),
+                    schedule::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -614,7 +622,6 @@ pub fn build(
                     swhammer::control.in_set(WwSimSet::Execute),
                     shmrgrd::control.in_set(WwSimSet::Execute),
                     statue::control.in_set(WwSimSet::Execute),
-                    schedule::control.in_set(WwSimSet::Execute),
                     taglight::control.in_set(WwSimSet::Execute),
                     rockfall::control.in_set(WwSimSet::Execute),
                     wind::control.in_set(WwSimSet::Execute),
@@ -628,6 +635,8 @@ pub fn build(
                     armos::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),
                     redead::control.in_set(WwSimSet::Execute),
+                    iball::control.in_set(WwSimSet::Execute),
+                    nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
