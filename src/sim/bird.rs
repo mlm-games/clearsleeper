@@ -10,10 +10,7 @@ use super::player::Player;
 pub const BIRD_ACTOR: &str = "Bm1";
 pub const MAX_ALTITUDE: f32 = 600.0;
 pub const HOVER_STEP: f32 = 0.25;
-pub const CHASE_STEP: f32 = 0.125;
-pub const DIVE_ACCEL: f32 = 4.0;
 pub const CLIMB_ACCEL: f32 = 3.0;
-pub const DIVE_SPEED: f32 = 40.0;
 pub const CRUISE_SPEED: f32 = 18.0;
 pub const PLUNGE_RANGE: f32 = 90.0;
 pub const PLUNGE_SPEED: f32 = 55.0;
@@ -131,5 +128,4 @@ pub fn control(
         bird.altitude = bird.altitude.clamp(0.0, MAX_ALTITUDE);
     }
 }
-
 
