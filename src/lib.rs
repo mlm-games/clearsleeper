@@ -403,6 +403,11 @@ impl App {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::tingle::Tingle>() {
                 (view::ActorKind::Talker, 0, 24.0, 10.0)
+            } else if entity.contains::<sim::chest::Chest>() {
+                if entity.get::<sim::chest::Chest>().is_some_and(|c| c.opened) {
+                    continue;
+                }
+                (view::ActorKind::Scenery, 0, 24.0, 12.0)
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)

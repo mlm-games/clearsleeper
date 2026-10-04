@@ -2,6 +2,7 @@ pub mod actor;
 pub mod area;
 pub mod balloon;
 pub mod bird;
+pub mod chest;
 pub mod carry;
 pub mod cleared;
 pub mod collision;
@@ -140,6 +141,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, princess)).id()
     } else if source.name == tingle::TINGLE_ACTOR {
         world.spawn((actor, tingle::Tingle::spawn())).id()
+    } else if chest::is_chest(&source.name) {
+        let box_ = chest::Chest::spawn(source.parameters, source.angle[2], source.room);
+        world.spawn((actor, box_)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -195,6 +199,7 @@ pub fn build(
     sim.world.insert_resource(inventory::Equipped::default());
     sim.world.insert_resource(select::Select::default());
     sim.world.insert_resource(carry::Carry::default());
+    sim.world.insert_resource(chest::Chests::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Arrivals::default());
