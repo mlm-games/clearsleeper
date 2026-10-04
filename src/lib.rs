@@ -823,53 +823,54 @@ impl App {
     }
 
     fn install_tag_events(world: &mut World, sources: &[dzs::StageActor]) {
-    let Ok(list) = world.get_resource::<sim::event::EventList>() else {
-        return;
-    };
-    let Ok(names) = world.get_resource::<sim::event::StageEvents>() else {
-        return;
-    };
-    let mut query =
-        world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::flags::TagEvent>>();
-    let pending: Vec<(Entity, sim::flags::TagEvent)> = query
-        .iter(world)
-        .filter(|(_, actor)| sim::flags::is_tag_event(&actor.name))
-        .filter_map(|(entity, actor)| {
-            let event = (actor.parameters >> 24) as u8;
-            let index = names
-                .name(event)
-                .and_then(|name| list.event_index(name))?;
-            let source = sources
-                .iter()
-                .find(|source| source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits());
-            let scale = source.map_or([1.0, 1.0, 1.0], |source| source.scale);
-            Some((
-                entity,
-                sim::flags::tag_event(
-                    actor.parameters,
-                    actor.angle[2] as u16,
-                    scale,
-                    actor.name == sim::flags::TAG_ISLAND_ACTOR,
-                    index,
-                ),
-            ))
-        })
-        .collect();
-    for (entity, tag) in pending {
-        world.entity_mut(entity).insert(tag);
+        let indices: Vec<Option<usize>> = match (
+            world.get_resource::<sim::event::StageEvents>(),
+            world.get_resource::<sim::event::EventList>(),
+        ) {
+            (Some(names), Some(list)) => (0..=0xFE)
+                .map(|id| names.name(id as u8).and_then(|name| list.event_index(name)))
+                .collect(),
+            _ => return,
+        };
+        let mut query =
+            world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::flags::TagEvent>>();
+        let pending: Vec<(Entity, sim::flags::TagEvent)> = query
+            .iter(world)
+            .filter(|(_, actor)| sim::flags::is_tag_event(&actor.name))
+            .filter_map(|(entity, actor)| {
+                let index = indices.get((actor.parameters >> 24) as usize).copied().flatten()?;
+                let source = sources.iter().find(|source| {
+                    source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits()
+                });
+                let scale = source.map_or([1.0, 1.0, 1.0], |source| source.scale);
+                Some((
+                    entity,
+                    sim::flags::tag_event(
+                        actor.parameters,
+                        actor.angle[2] as u16,
+                        scale,
+                        actor.name == sim::flags::TAG_ISLAND_ACTOR,
+                        index,
+                    ),
+                ))
+            })
+            .collect();
+        for (entity, tag) in pending {
+            world.entity_mut(entity).insert(tag);
+        }
+        let mut hints =
+            world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::talk::Talk>>();
+        let pending: Vec<(Entity, u16, i8)> = hints
+            .iter(world)
+            .filter(|(_, actor)| actor.name == "TagHt" || actor.name == "TagHt2")
+            .map(|(entity, actor)| (entity, actor.angle[0] as u16, actor.room))
+            .collect();
+        for (entity, msg, room) in pending {
+            world
+                .entity_mut(entity)
+                .insert(sim::talk::Talk::new(msg, room));
+        }
     }
-    let mut hints = world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::talk::Talk>>();
-    let pending: Vec<(Entity, u16, i8)> = hints
-        .iter(world)
-        .filter(|(_, actor)| actor.name == "TagHt" || actor.name == "TagHt2")
-        .map(|(entity, actor)| (entity, actor.angle[0] as u16, actor.room))
-        .collect();
-    for (entity, msg, room) in pending {
-        world
-            .entity_mut(entity)
-            .insert(sim::talk::Talk::new(msg, room));
-    }
-}
 
 fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
         match set.collision {

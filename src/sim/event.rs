@@ -378,14 +378,6 @@ impl ActiveEvent {
         let running = self.running.iter().find(|running| running.index == index)?;
         running.staffs.get(staff).map(|run| run.cut)
     }
-pub fn staff_cut_flag(&self, list: &EventList, staff: usize) -> Option<i32> {
-        self.running
-            .iter()
-            .flat_map(|running| running.staffs.iter())
-            .find(|run| run.staff == staff)
-            .and_then(|run| list.cuts.get(run.cut as usize))
-            .map(|cut| cut.flag_id)
-    }
 }
 
 struct Reader<'a> {
@@ -1439,13 +1431,14 @@ fn door_cut(
         });
         if targets.is_empty() {
             cut_end(run, list, flags);
-        }
-        for target in targets {
-            commands.entity(target).insert(DoorCut {
-                flag: cut.flag_id as u32,
-                opening,
-                armed: true,
-            });
+        } else {
+            for target in targets {
+                commands.entity(target).insert(DoorCut {
+                    flag: cut.flag_id as u32,
+                    opening,
+                    armed: true,
+                });
+            }
         }
     }
 }

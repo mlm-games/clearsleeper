@@ -456,13 +456,6 @@ impl StageTables {
         &self.actors
     }
 
-    pub fn event_name(&self, id: u8) -> Option<&str> {
-        if id == 0xFF {
-            return None;
-        }
-        self.events.get(usize::from(id)).map(String::as_str)
-    }
-
     pub fn event_names(&self) -> &[String] {
         &self.events
     }
