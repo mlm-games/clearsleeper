@@ -97,6 +97,7 @@ pub mod warship;
 pub mod water;
 pub mod ylzou;
 pub mod zelda;
+pub mod zunari;
 
 use bevy_ecs::prelude::*;
 use glam::Vec3;
@@ -180,6 +181,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         } else {
             world.spawn(actor).id()
         }
+    } else if zunari::is_zunari(&source.name) {
+        let stall = zunari::Zunari::spawn(source.parameters);
+        world.spawn((actor, stall)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -583,6 +587,7 @@ pub fn build(
                     servant::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
+                    zunari::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (

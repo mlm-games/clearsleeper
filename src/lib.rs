@@ -415,6 +415,7 @@ impl App {
             } else if entity.contains::<sim::marlon::Marlon>()
                 || entity.contains::<sim::shop::Shop>()
                 || entity.contains::<sim::lenzo::Lenzo>()
+                || entity.contains::<sim::zunari::Zunari>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
