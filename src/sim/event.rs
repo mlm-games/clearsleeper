@@ -813,8 +813,14 @@ fn staff_cut(
         && matches!(cut.name.as_str(), "Dummy" | "WAIT")
     {
         cut_end(run, list, flags);
-    } else if staff.name == "SHUTTER_DOOR" {
+    } else if staff.name == "SHUTTER_DOOR"
+        || super::door::Door::is_shutter(&staff.name)
+        || super::door::Door::is_sliding(&staff.name)
+        || super::door::Door::is_key_door(&staff.name)
+    {
         door_cut(run, list, flags, owner, commands);
+    } else if staff.name == "MBDOOR" {
+        mbdoor_cut(run, list, flags);
     } else if staff.kind == STAFF_CAMERA {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
@@ -829,6 +835,40 @@ fn staff_cut(
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
+    }
+}
+
+fn mbdoor_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "OPEN" => {
+            run.timer = run.timer.saturating_add(50);
+            if run.timer >= 7217 {
+                run.timer = 0;
+                cut_end(run, list, flags);
+            }
+        }
+        "STOP_OPEN" => {
+            run.timer = run.timer.saturating_add(40);
+            if run.timer >= 16229 {
+                run.timer = 0;
+                cut_end(run, list, flags);
+            }
+        }
+        "ADJUSTMENT" => {
+            if run.advance > 0 {
+                run.timer = list.cut_number(run.cut as usize, "Timer").unwrap_or(0) as i16;
+            }
+            if run.timer > 0 {
+                run.timer -= 1;
+            } else {
+                cut_end(run, list, flags);
+            }
+        }
+        "WAIT" => cut_end(run, list, flags),
+        _ => {}
     }
 }
 
