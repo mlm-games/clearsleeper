@@ -397,7 +397,8 @@ pub fn control(
     collision: Option<Res<Collision>>,
     mut health: ResMut<Health>,
     players: Query<&Player>,
-    mut hurts: Query<&mut Hurt>,
+    mut hurts: Query<&mut Hurt, With<Enemy>>,
+    mut idle: Query<&mut Hurt, (Without<Enemy>, Without<super::redead::ReDead>)>,
     mut enemies: Query<(Entity, &mut Enemy, &mut Actor)>,
     mut spears: Query<(Entity, &mut Spear)>,
     mut commands: Commands,
@@ -407,6 +408,9 @@ pub fn control(
     };
     let floored = collision.is_some();
     let solid = collision.as_deref();
+    for mut hurt in &mut idle {
+        hurt.0 = hurt.0.saturating_sub(1);
+    }
     for (entity, mut enemy, mut actor) in &mut enemies {
         let mut stunned = false;
         let mut recovering = false;
