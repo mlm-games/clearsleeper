@@ -174,7 +174,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let shopkeeper = lenzo::Lenzo::spawn(source.parameters);
         world.spawn((actor, shopkeeper)).id()
     } else if armos::is_armos(&source.name) {
-        world.spawn((actor, armos::Armos::spawn(source.parameters))).id()
+        let statue = armos::Armos::spawn(source.parameters);
+        if statue.present(world.resource::<flags::Switches>()) {
+            world.spawn((actor, statue)).id()
+        } else {
+            world.spawn(actor).id()
+        }
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {

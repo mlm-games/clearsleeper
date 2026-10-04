@@ -107,7 +107,7 @@ pub fn control(
     mut zones: ResMut<super::flags::ZoneActors>,
     mut equipped: ResMut<super::inventory::Equipped>,
     mut got: ResMut<super::inventory::Got>,
-    mut mut chest_flags: ResMut<super::chest::Chests>,
+    mut chest_flags: ResMut<super::chest::Chests>,
     mut switches: ResMut<super::flags::Switches>,
     events: ResMut<SimEvents>,
     players: Query<&Player>,
