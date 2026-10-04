@@ -317,14 +317,16 @@ impl App {
                 });
                 continue;
             }
-            if let Some(arrow) = entity.get::<sim::item::Arrow>() {
-                out.push(view::ActorView {
-                    pos: arrow.pos,
-                    kind: view::ActorKind::Arrow,
-                    item: 0,
-                    height: 3.0,
-                    half: 3.0,
-                });
+            if let Some(arrow) = entity.get::<sim::arrow::Arrow>() {
+                if arrow.visible {
+                    out.push(view::ActorView {
+                        pos: arrow.pos,
+                        kind: view::ActorKind::Arrow,
+                        item: 0,
+                        height: 3.0,
+                        half: 3.0,
+                    });
+                }
                 continue;
             }
             if let Some(boom) = entity.get::<sim::item::Boomerang>() {
@@ -423,6 +425,13 @@ impl App {
                 (view::ActorKind::Scenery, 0, 40.0, 20.0)
             } else if entity.contains::<sim::bomb::Bomb>() {
                 (view::ActorKind::Scenery, 0, 16.0, 8.0)
+            } else if let Some(ladder) = entity.get::<sim::ladder::Ladder>() {
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    ladder.height() + sim::ladder::CULL_HEIGHT,
+                    sim::ladder::CULL_WIDTH,
+                )
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)

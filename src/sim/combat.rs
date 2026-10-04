@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::collision::Collision;
+use super::damage;
 use super::enemy;
 use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
@@ -26,8 +27,8 @@ const DECEL_SCALE: f32 = 0.7;
 const DECEL_MIN: f32 = 0.5;
 const SWORD_OFFSET: f32 = 20.0;
 const SWORD_RADIUS: f32 = 20.0;
-const NORMAL_POWER: i32 = 1;
-const FINISH_POWER: i32 = 2;
+const NORMAL_POWER: i32 = damage::SWORD;
+const FINISH_POWER: i32 = damage::SWORD;
 const FLINCH_TICKS: u32 = 10;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

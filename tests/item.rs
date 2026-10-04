@@ -4,7 +4,8 @@ use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::combat::HitPoints;
 use clearsleeper::sim::enemy::{self, Hurt};
-use clearsleeper::sim::item::{self, Arrow, Bomb, Boomerang, Held, Kind};
+use clearsleeper::sim::arrow::{self, Arrow};
+use clearsleeper::sim::item::{self, Bomb, Boomerang, Held, Kind};
 use clearsleeper::sim::player::Player;
 use glam::Vec3;
 use repose_core::input::PhysicalKey;
@@ -93,7 +94,15 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
 }
 
 fn foe_hp(app: &App, entity: bevy_ecs::entity::Entity) -> i32 {
-    app.sim.world.entity(entity).get::<HitPoints>().unwrap().0
+    app.sim
+        .world
+        .entity(entity)
+        .get::<HitPoints>()
+        .map_or(0, |hp| hp.0)
+}
+
+fn alive(app: &App, entity: bevy_ecs::entity::Entity) -> bool {
+    app.sim.world.entity(entity).contains::<HitPoints>()
 }
 
 fn resting_bomb(app: &mut App, pos: Vec3, fuse: u32) {
@@ -162,11 +171,7 @@ fn golden_bomb_blast_only_hurts_what_it_is_next_to() {
     for _ in 0..100 {
         tick(&mut app);
     }
-    assert_eq!(
-        foe_hp(&app, victim),
-        1,
-        "four quarters come off the near foe"
-    );
+    assert!(!alive(&app, victim), "two hundred power takes the near foe");
     assert_eq!(foe_hp(&app, bystander), 5, "and the far one is untouched");
     assert_eq!(
         app.health().units,
@@ -188,7 +193,7 @@ fn golden_one_bomb_sets_off_the_next() {
 }
 
 #[test]
-fn golden_arrow_bites_two_quarters_and_then_sticks() {
+fn golden_arrow_bites_and_then_sticks_for_three_hundred_frames() {
     let mut app = App::new();
     place_player(&mut app, Vec3::ZERO);
     let victim = foe(&mut app, Vec3::new(0.0, 0.0, 400.0));
@@ -196,11 +201,16 @@ fn golden_arrow_bites_two_quarters_and_then_sticks() {
     use_item(&mut app);
     tick(&mut app);
     tick(&mut app);
-    assert_eq!(foe_hp(&app, victim), 3, "the shaft takes two quarters");
-    for _ in 0..6 {
+    assert!(!alive(&app, victim), "ten power takes the foe it passes");
+    assert_eq!(
+        arrows(&app)[0].phase,
+        arrow::Phase::StuckActor,
+        "and the shaft stays in it"
+    );
+    for _ in 0..arrow::STUCK_FRAMES {
         tick(&mut app);
     }
-    assert!(arrows(&app).is_empty(), "and it is spent in the ground");
+    assert!(arrows(&app).is_empty(), "then it lets go");
 }
 
 #[test]

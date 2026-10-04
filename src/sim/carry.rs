@@ -28,7 +28,7 @@ pub enum Carryable {
 }
 
 pub fn is_carryable(name: &str) -> bool {
-    super::tsubo::is_tsubo(name) || name == PIG_ACTOR
+    super::tsubo::is_tsubo(name) || super::koisi::is_koisi(name) || name == PIG_ACTOR
 }
 
 fn chain_from(carryables: &Query<(Entity, &Actor, &Carryable)>, base: Entity) -> Vec<Entity> {
@@ -66,6 +66,7 @@ pub fn control(
     carryables: Query<(Entity, &Actor, &Carryable)>,
     mut moves: Query<&mut Actor>,
     mut pots: Query<&mut super::tsubo::Tsubo>,
+    mut rocks: Query<&mut super::koisi::Koisi>,
     players: Query<&Player>,
 ) {
     let pressed = do_intent.0 && !carry.held_press;
@@ -97,6 +98,9 @@ pub fn control(
                         actor.pos += forward * RELEASE_SPEED;
                         if let Ok(mut pot) = pots.get_mut(entity) {
                             pot.toss(forward, player.speed);
+                        }
+                        if let Ok(mut rock) = rocks.get_mut(entity) {
+                            rock.toss(forward, player.speed);
                         }
                     }
                 }

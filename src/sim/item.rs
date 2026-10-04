@@ -3,8 +3,10 @@ use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::arrow;
 use super::collision::Collision;
 use super::combat::{Combat, HitPoints};
+use super::damage;
 use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
 use super::ground::{self, grounded};
@@ -32,26 +34,19 @@ const ARROW_CAP: u8 = 30;
 
 const BOMB_FUSE: u32 = 100;
 const BOMB_RADIUS: f32 = 200.0;
-const BOMB_POWER: u8 = 4;
+const BOMB_POWER: i32 = damage::BOMB;
 const BOMB_THROW: f32 = 50.0;
 const BOMB_LIFT: f32 = 40.0;
 const BOMB_GRAVITY: f32 = -2.5;
-const ARROW_SPEED: f32 = 200.0;
-const ARROW_GRAVITY: f32 = -2.0;
-const ARROW_FALL: f32 = -100.0;
-const ARROW_POWER: i32 = 2;
-const ARROW_REACH: f32 = 30.0;
-const ARROW_LIFE: u32 = 120;
 const BOOM_SPEED: f32 = 60.0;
 const BOOM_LIFETIME: u32 = 300;
 const BOOM_LOCKS: usize = 2;
 const BOOM_CATCH: f32 = 120.0;
 const BOOM_RETURN_TICKS: u32 = 60;
 const BOOM_REACH: f32 = 30.0;
-const BOOM_POWER: i32 = 1;
+const BOOM_POWER: i32 = damage::BOMERANG;
 const THROW_OFFSET: f32 = 20.0;
 const BOMB_FLINCH: u32 = 10;
-const ARROW_FLINCH: u32 = 10;
 const BOOM_FLINCH: u32 = 6;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -77,13 +72,6 @@ pub struct Bomb {
     pub fuse: u32,
     pub vel: Vec3,
     pub rest: bool,
-}
-
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
-pub struct Arrow {
-    pub pos: Vec3,
-    pub vel: Vec3,
-    pub life: u32,
 }
 
 #[derive(Component, Debug, Clone, PartialEq)]
@@ -152,8 +140,8 @@ impl Gates<'_, '_> {
 
 #[derive(SystemParam)]
 pub struct Shots<'w, 's> {
-    bombs: Query<'w, 's, (Entity, &'static mut Bomb), Without<Arrow>>,
-    arrows: Query<'w, 's, (Entity, &'static mut Arrow), Without<Bomb>>,
+    bombs: Query<'w, 's, (Entity, &'static mut Bomb), Without<arrow::Arrow>>,
+    nocked: Query<'w, 's, &'static arrow::Arrow>,
     spin: Query<'w, 's, (Entity, &'static mut Boomerang), Without<Bomb>>,
 }
 
@@ -169,7 +157,7 @@ impl Shots<'_, '_> {
     }
 }
 
-fn launch(player: &Player, held: &mut Held, commands: &mut Commands) {
+fn launch(player: &Player, held: &mut Held, rounds: u8, commands: &mut Commands) {
     let Some(kind) = held.kind() else {
         return;
     };
@@ -191,14 +179,11 @@ fn launch(player: &Player, held: &mut Held, commands: &mut Commands) {
             ));
         }
         Kind::Arrow => {
-            commands.spawn((
-                Arrow {
-                    pos,
-                    vel: Vec3::new(ARROW_SPEED * sin, 0.0, ARROW_SPEED * cos),
-                    life: ARROW_LIFE,
-                },
-                InFlight,
-            ));
+            let mut shaft = arrow::Arrow::nocked(arrow::TYPE_NORMAL, rounds);
+            shaft.pos = pos;
+            shaft.yaw = player.yaw;
+            shaft.shoot(0.0, player.yaw);
+            commands.spawn((shaft, InFlight));
         }
         Kind::Boomerang => {
             commands.spawn((
@@ -244,8 +229,13 @@ pub fn control(
         if shots.spinning() {
             shots.recall();
         } else if ready {
+            let rounds = shots
+                .nocked
+                .iter()
+                .next()
+                .map_or(0, |arrow| (arrow.round + 1) % arrow::ROUNDS);
             for player in &players {
-                launch(player, &mut held, &mut commands);
+                launch(player, &mut held, rounds, &mut commands);
             }
         }
     }
@@ -287,7 +277,7 @@ pub fn control(
         }
         for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
             if within(blast, foe.pos, BOMB_RADIUS) {
-                hp.0 -= BOMB_POWER as i32;
+                hp.0 -= BOMB_POWER;
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = BOMB_FLINCH;
                 }
@@ -297,7 +287,7 @@ pub fn control(
             }
         }
         if owner.is_some_and(|pos| within(blast, pos, BOMB_RADIUS)) {
-            health.damage(BOMB_POWER);
+            health.damage(BOMB_POWER as u8);
         }
         events.list.push(SimEvent::Explode);
         let _ = commands.entity(entity).despawn();
@@ -313,28 +303,6 @@ pub fn control(
     }
 
     let mut spent: Vec<Entity> = Vec::new();
-    for (entity, mut arrow) in &mut shots.arrows {
-        let from = arrow.pos;
-        arrow.vel.y = (arrow.vel.y + ARROW_GRAVITY).max(ARROW_FALL);
-        let step = arrow.vel;
-        arrow.pos += step;
-        let mut hit = false;
-        for (_, foe, mut hp, mut hurt) in &mut foes {
-            if swept(from, foe.pos, ARROW_REACH) {
-                hp.0 -= ARROW_POWER;
-                if let Some(hurt) = hurt.as_deref_mut() {
-                    hurt.0 = ARROW_FLINCH;
-                }
-                hit = true;
-                break;
-            }
-        }
-        arrow.life = arrow.life.saturating_sub(1);
-        if hit || arrow.life == 0 || grounded(solid, arrow.pos) {
-            spent.push(entity);
-        }
-    }
-
     let home = players.iter().next().map(|player| player.pos);
     for (entity, mut boom) in &mut shots.spin {
         let from = boom.pos;

@@ -1,5 +1,6 @@
 pub mod actor;
 pub mod area;
+pub mod arrow;
 pub mod balloon;
 pub mod bird;
 pub mod bomb;
@@ -8,6 +9,7 @@ pub mod carry;
 pub mod cleared;
 pub mod collision;
 pub mod combat;
+pub mod damage;
 pub mod death;
 pub mod ending;
 pub mod enemy;
@@ -24,6 +26,8 @@ pub mod intent;
 pub mod inventory;
 pub mod item;
 pub mod jump;
+pub mod ladder;
+pub mod koisi;
 pub mod layer;
 pub mod lock;
 pub mod marlon;
@@ -157,6 +161,17 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if bomb::is_bomb(&source.name) {
         let shell = bomb::Bomb::spawn(source.parameters);
         world.spawn((actor, shell)).id()
+    } else if ladder::is_ladder(&source.name) {
+        let climb = ladder::Ladder::spawn(source.parameters);
+        world.spawn((actor, climb)).id()
+    } else if arrow::is_arrow(&source.name) {
+        let mut shaft = arrow::Arrow::nocked(arrow::TYPE_NORMAL, 0);
+        shaft.pos = actor.pos;
+        shaft.parameter = source.parameters;
+        world.spawn((actor, shaft)).id()
+    } else if koisi::is_koisi(&source.name) {
+        let boulder = koisi::Koisi::spawn(source.parameters);
+        world.spawn((actor, boulder, carry::Carryable::Stone)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -266,18 +281,22 @@ pub fn build(
                     death::freeze.in_set(WwSimSet::Execute),
                     carry::control.in_set(WwSimSet::Execute),
                     tsubo::control.in_set(WwSimSet::Execute),
+                    koisi::control.in_set(WwSimSet::Execute),
                     bomb::control.in_set(WwSimSet::Execute),
+                    ladder::control.in_set(WwSimSet::Execute),
+                    arrow::control.in_set(WwSimSet::Execute),
+                    bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),
                     talk::control.in_set(WwSimSet::Execute),
                     flags::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
-                    ending::control.in_set(WwSimSet::Execute),
-                    ground::ground_check.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
+                    ending::control.in_set(WwSimSet::Execute),
+                    ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
                     swim::control.in_set(WwSimSet::Execute),
                     lock::control.in_set(WwSimSet::Execute),
@@ -288,11 +307,13 @@ pub fn build(
                     item::control.in_set(WwSimSet::Execute),
                     enemy::control.in_set(WwSimSet::Execute),
                     balloon::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     fire::control.in_set(WwSimSet::Execute),
                     gull::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                bird::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (
