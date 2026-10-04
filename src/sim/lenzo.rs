@@ -1843,7 +1843,7 @@ fn bump_order_reg(ctx: &mut Ctx<'_>) {
     ctx.stories.set_reg(SAVE_ORDER_PROGRESS, reg);
 }
 
-struct Text<'a> {
+pub struct Text<'a> {
     procs: &'a mut MsgProcs,
     info: &'a mut MsgGameInfo,
     one: &'a mut Msg1Box,

@@ -767,7 +767,7 @@ impl Sage {
     }
 }
 
-struct Text<'a> {
+pub struct Text<'a> {
     procs: &'a mut MsgProcs,
     info: &'a mut MsgGameInfo,
     archive: &'a dyn MsgArchive,
