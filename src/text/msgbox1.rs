@@ -1904,7 +1904,7 @@ impl Msg1Box {
                 let b = self.text_bounds(0);
                 self.m10ec = b[0] as i32 + self.icon_pos_x(i);
                 self.m10f0 =
-                    b[1] as i32 + (self.m1104 * ((3 - self.m1108) + (self.icon_pos_y(i) * 2)));
+                    b[1] as i32 + (self.m1104 * (3i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
             }
         }
         let columns = if self.msg_no == MSG1_MSG_NO_NUMBER_3 {
@@ -2494,7 +2494,7 @@ impl Msg1Box {
                 if icon_num == ICON_SELECT_YOKO_LEFT {
                     var_r5 = bounds[0] as i32 + self.icon_pos_x(i);
                     var_r6 =
-                        bounds[1] as i32 + (self.m1104 * ((2 - self.m1108) + (self.icon_pos_y(i) * 2)));
+                        bounds[1] as i32 + (self.m1104 * (2i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
                 } else if icon_num == ICON_SELECT_YOKO_RIGHT {
                     var_r11 = bounds[0] as i32 + self.icon_pos_x(i);
                 }
@@ -3360,7 +3360,7 @@ impl Msg1Box {
                 (self.m1104 as f32 + bounds[1] + local_28) as i32
             } else if scale > self.m110c {
                 if self.m1108 > 1 {
-                    let temp1 = (self.m1104 * ((3 - pos_y) - (self.m1108 + -2))) as f32;
+                    let temp1 = (self.m1104 * (3i32.saturating_sub(pos_y) - (self.m1108 + -2))) as f32;
                     ((scale - self.m110c) / 2) + ((temp1 + bounds[1]) - ((scale / 2) as f32)) as i32
                 } else {
                     (((self.m1104 << 2) as f32 + bounds[1]) - ((scale / 2) as f32)) as i32
