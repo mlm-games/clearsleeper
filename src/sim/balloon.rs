@@ -6,7 +6,7 @@ use super::enemy::{self, Hurt};
 
 pub const BALLOON_ACTOR: &str = "Bb";
 
-const HITS: i32 = 2;
+const HITS: i32 = super::damage::KILL_POWER;
 const EMPTY_KIND: u32 = 3;
 const LANCE_KIND: u32 = 5;
 const PAYLOAD_PARAM: u32 = 0xFFFF05;

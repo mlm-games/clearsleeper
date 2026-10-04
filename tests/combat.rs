@@ -179,12 +179,12 @@ fn golden_swing_breaks_targets() {
         .id();
     app.stage_item(true);
     tick(&mut app);
-    assert_eq!(hp(&app, front), Some(1), "the wind-up tick lands no hit");
+    assert_eq!(hp(&app, front), Some(2), "the wind-up tick lands no hit");
     app.stage_item(false);
     tick(&mut app);
     assert_eq!(hp(&app, front), None, "the cut breaks what stands ahead");
-    assert_eq!(hp(&app, behind), Some(1), "the back stays whole");
-    assert_eq!(hp(&app, side), Some(1), "the flank stays whole");
+    assert_eq!(hp(&app, behind), Some(2), "the back stays whole");
+    assert_eq!(hp(&app, side), Some(2), "the flank stays whole");
     assert!(
         app.sim.world.get::<Ship>(boat).is_some(),
         "the boat is no target"
@@ -281,5 +281,5 @@ fn golden_locked_swing_squares_up() {
         tick(&mut app);
     }
     assert!(!combat(&app).active, "the cut ends");
-    assert_eq!(hp(&app, target), Some(1), "the target sits out of reach");
+    assert_eq!(hp(&app, target), Some(2), "the target sits out of reach");
 }

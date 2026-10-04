@@ -173,7 +173,7 @@ fn golden_bomb_blast_only_hurts_what_it_is_next_to() {
         tick(&mut app);
     }
     assert!(!alive(&app, victim), "two hundred power takes the near foe");
-    assert_eq!(foe_hp(&app, bystander), 5, "and the far one is untouched");
+    assert_eq!(foe_hp(&app, bystander), 2, "and the far one is untouched");
     assert_eq!(
         app.health().units,
         12,

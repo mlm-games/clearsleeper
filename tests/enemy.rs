@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy_ecs::prelude::Entity;
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::combat::{Combat, HitPoints};
+use clearsleeper::sim::combat::HitPoints;
 use clearsleeper::sim::enemy::{self, Enemy, EnemyState, Hurt, Spear};
 use clearsleeper::sim::health::Health;
 use clearsleeper::sim::player::Player;
@@ -279,8 +279,8 @@ fn golden_sword_breaks_the_foe() {
     teleport(&mut app, Vec3::new(0.0, 0.0, 0.0));
     assert_eq!(
         hp(&app, foe),
-        Some(7),
-        "the strong cut carries seven points"
+        Some(2),
+        "two power is one point past the kill threshold"
     );
     app.stage_item(true);
     tick(&mut app);
@@ -288,30 +288,7 @@ fn golden_sword_breaks_the_foe() {
     for _ in 0..6 {
         tick(&mut app);
     }
-    assert_eq!(
-        hp(&app, foe),
-        Some(2),
-        "one slash leaves two points standing"
-    );
-    assert_eq!(
-        state(&app, foe),
-        EnemyState::Alert,
-        "the foe is still surprised"
-    );
-    for _ in 0..7 {
-        tick(&mut app);
-    }
-    assert!(
-        !app.sim.world.resource::<Combat>().active,
-        "the cut runs its full length"
-    );
-    app.stage_item(true);
-    tick(&mut app);
-    app.stage_item(false);
-    for _ in 0..2 {
-        tick(&mut app);
-    }
-    assert_eq!(hp(&app, foe), None, "the second slash breaks the foe");
+    assert_eq!(hp(&app, foe), None, "one slash breaks the foe");
     assert_eq!(
         hearts(&app),
         12,

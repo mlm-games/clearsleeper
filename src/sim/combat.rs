@@ -27,8 +27,6 @@ const DECEL_SCALE: f32 = 0.7;
 const DECEL_MIN: f32 = 0.5;
 const SWORD_OFFSET: f32 = 20.0;
 const SWORD_RADIUS: f32 = 20.0;
-const NORMAL_POWER: i32 = damage::SWORD;
-const FINISH_POWER: i32 = damage::SWORD;
 const FLINCH_TICKS: u32 = 10;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -60,6 +58,7 @@ fn is_finisher(kind: CutKind) -> bool {
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct Combat {
     pub active: bool,
+    pub soup: bool,
     pub frame: u32,
     pub combo: u32,
     pub kind: CutKind,
@@ -128,6 +127,7 @@ pub fn control(
     hop: Res<Hop>,
     jump: Res<Jump>,
     lock: Res<Lock>,
+    held: Res<super::item::Held>,
     ships: Query<&Ship>,
     mut actors: Query<
         (
@@ -149,6 +149,8 @@ pub fn control(
     let pressed = item.0 && !combat.held;
     combat.held = item.0;
     let riding = ships.iter().any(|ship| ship.riding);
+    let blade = held.item;
+    let soup = combat.soup;
     for mut player in &mut players {
         let player = &mut *player;
         if swim.active || health.units == 0 {
@@ -200,11 +202,7 @@ pub fn control(
         if combat.frame >= DAMAGE_START && combat.frame < DAMAGE_END {
             let center_x = player.pos.x + SWORD_OFFSET * player.yaw.sin();
             let center_z = player.pos.z + SWORD_OFFSET * player.yaw.cos();
-            let power = if is_finisher(combat.kind) {
-                FINISH_POWER
-            } else {
-                NORMAL_POWER
-            };
+            let power = damage::sword_power(blade, soup);
             let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for (entity, actor, hp, mut hurt) in actors.iter_mut() {
                 let Some(mut hp) = hp else {

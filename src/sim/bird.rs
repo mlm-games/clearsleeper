@@ -50,7 +50,7 @@ impl Bird {
 }
 
 pub fn spawn() -> (Bird, HitPoints) {
-    (Bird::spawn(), HitPoints(1))
+    (Bird::spawn(), HitPoints(super::damage::KILL_POWER))
 }
 
 fn chase(current: f32, target: f32, step: f32) -> f32 {
