@@ -831,6 +831,14 @@ impl App {
     for (entity, tag) in pending {
         world.entity_mut(entity).insert(tag);
     }
+    let mut hints = world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::talk::Talk>>();
+    for (entity, actor) in hints.iter(world) {
+        if actor.name == "TagHt" || actor.name == "TagHt2" {
+            world
+                .entity_mut(entity)
+                .insert(sim::talk::Talk::new(actor.angle[0] as u16, actor.room));
+        }
+    }
 }
 
 fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {

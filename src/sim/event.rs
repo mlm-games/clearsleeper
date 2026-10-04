@@ -790,6 +790,10 @@ fn staff_cut(
         treasure_cut(run, list, flags, owner, commands);
     } else if staff.name == "Fire" || staff.name == "Zenfire" {
         fire_cut(run, list, flags, owner, commands);
+    } else if staff.name == "TAGHINT" {
+        hint_cut(run, list, flags, owner, actors, talks, msg, table);
+    } else if staff.name == "SWITCH" {
+        switch_cut(run, list, flags);
     } else if staff.name == "SHUTTER_DOOR" {
         door_cut(run, list, flags, owner, commands);
     } else if staff.kind == STAFF_CAMERA {
@@ -806,6 +810,47 @@ fn staff_cut(
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
+    }
+}
+
+fn switch_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    cut_end(run, list, flags);
+}
+
+fn hint_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if !matches!(cut.name.as_str(), "MESSAGE" | "MESSAGE2" | "MESSAGE3") {
+        return;
+    }
+    let Ok(mut talk) = talks.get_mut(owner) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    if run.advance > 0
+        && let Ok((_, actor)) = actors.get(owner)
+    {
+        talk.msg_curr = actor.angle[0] as u16 as u32;
+        talk.msg_end = -1;
+        run.talk_open = true;
+    }
+    if !run.talk_open {
+        cut_end(run, list, flags);
+        return;
+    }
+    if npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED {
+        run.talk_open = false;
+        cut_end(run, list, flags);
     }
 }
 
