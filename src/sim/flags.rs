@@ -62,10 +62,8 @@ impl StoryBits {
         self.bytes[cell] &= !mask;
         self.bytes[cell] |= value;
     }
-
 }
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Collect {
     bytes: [u8; COLLECT_SLOTS],

@@ -41,6 +41,7 @@ pub mod gull;
 pub mod hammer;
 pub mod hammerhit;
 pub mod health;
+pub mod hmlif;
 pub mod homen;
 pub mod hookshot;
 pub mod hop;
@@ -411,6 +412,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if swlight::is_swlight(&source.name) {
         let moon = swlight::Swlight::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, moon)).id()
+    } else if hmlif::is_hmlif(&source.name) {
+        let platform = hmlif::Hmlif::spawn(source.parameters, source.angle[2]);
+        world.spawn((actor, platform)).id()
     } else if canon::is_canon(&source.name) {
         match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
             Some(gun) => world.spawn((actor, gun)).id(),
@@ -689,6 +693,7 @@ pub fn build(
                     leaves::control.in_set(WwSimSet::Execute),
                     swpush::control.in_set(WwSimSet::Execute),
                     mflft::control.in_set(WwSimSet::Execute),
+                    hmlif::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
                     chuchu::control.in_set(WwSimSet::Execute),
