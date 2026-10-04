@@ -501,7 +501,7 @@ impl App {
                 let (height, radius) = sim::barrel::hull();
                 (view::ActorKind::Scenery, 0, height, radius)
             } else if let Some(block) = entity.get::<sim::ice::Ice>() {
-                if block.gone {
+                if block.state == sim::ice::State::Gone {
                     continue;
                 }
                 (
@@ -511,13 +511,13 @@ impl App {
                     block.hull(),
                 )
             } else if let Some(brand) = entity.get::<sim::torch::Torch>() {
-                if brand.gone {
+                if brand.state == sim::torch::State::Gone {
                     continue;
                 }
                 (
                     view::ActorKind::Fire,
                     0,
-                    sim::torch::POST_TOP,
+                    sim::torch::CULL_TOP,
                     sim::torch::POST_RADIUS,
                 )
             } else if let Some(hatch) = entity.get::<sim::trapdoor::Trapdoor>() {

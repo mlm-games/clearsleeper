@@ -263,11 +263,3 @@ pub fn control(mut rafts: Query<&mut Raft>) {
         }
     }
 }
-
-pub fn hull(actor: &Actor, scale: f32) -> (f32, f32, f32) {
-    (
-        -scale * HULL_RADIUS,
-        -scale * HULL_DROP,
-        -scale * HULL_RADIUS,
-    )
-}

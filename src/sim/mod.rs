@@ -23,6 +23,7 @@ pub mod ending;
 pub mod enemy;
 pub mod event;
 pub mod events;
+pub mod fallrock;
 pub mod fire;
 pub mod flags;
 pub mod frame;
@@ -209,6 +210,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if fallrock::is_fallrock(&source.name) {
+        let stone = fallrock::FallRock::spawn(1.0);
+        world.spawn((actor, stone)).id()
     } else if windmill::is_windmill(&source.name) {
         let tower = windmill::Windmill::spawn(source.parameters);
         world.spawn((actor, tower)).id()
@@ -222,7 +226,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
     } else if torch::is_torch(&source.name) {
-        let brand = torch::Torch::spawn(source.parameters);
+        let brand = torch::Torch::spawn(source.parameters, 1.0);
         world.spawn((actor, brand)).id()
     } else if trapdoor::is_trapdoor(&source.name) {
         let hatch = trapdoor::Trapdoor::spawn();
@@ -315,7 +319,7 @@ pub fn build(
     sim.world.insert_resource(event::ItemPartner::default());
     sim.world.insert_resource(crate::assets::load_link_anms().unwrap_or_default());
     sim.world.insert_resource(msg::MsgBox::default());
-    sim.world.insert_resource(msg::MsgTable::default());
+    sim.world.insert_resource(crate::assets::load_msg_table().unwrap_or_default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
     let mut area = area::Area::default();
@@ -370,6 +374,7 @@ pub fn build(
                     trapdoor::control.in_set(WwSimSet::Execute),
                     torch::control.in_set(WwSimSet::Execute),
                     barrel::control.in_set(WwSimSet::Execute),
+                    fallrock::control.in_set(WwSimSet::Execute),
                     windmill::control.in_set(WwSimSet::Execute),
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),

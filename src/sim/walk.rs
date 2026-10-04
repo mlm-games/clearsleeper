@@ -126,7 +126,7 @@ pub(super) fn chase_angle_s(value: &mut i16, target: i16, step: i16) -> bool {
     }
     let step = if value.wrapping_sub(target) > 0 { -step } else { step };
     *value = value.wrapping_add(step);
-    if step.wrapping_mul(value.wrapping_sub(target)) >= 0 {
+    if i32::from(step) * i32::from(value.wrapping_sub(target)) >= 0 {
         *value = target;
         true
     } else {

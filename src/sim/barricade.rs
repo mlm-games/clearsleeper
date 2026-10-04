@@ -201,12 +201,3 @@ pub fn strike(
     barricade.shatter(half, switches);
     true
 }
-
-pub fn offset(actor: &Actor, half: usize) -> Vec3 {
-    let _ = actor;
-    if half == 1 {
-        Vec3::new(0.0, TOP_LIFT, 0.0)
-    } else {
-        Vec3::ZERO
-    }
-}

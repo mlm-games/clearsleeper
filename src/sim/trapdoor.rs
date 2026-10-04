@@ -99,8 +99,14 @@ impl Trapdoor {
             return true;
         }
         let target = SWING[self.step];
-        let step = chase(&mut self.swing, target, TURN_SCALE, TURN_MAX_STEP, TURN_MIN_STEP);
-        if step.abs() <= TURN_TOLERANCE {
+        self.swing = super::walk::add_calc_angle_s(
+            self.swing,
+            target,
+            TURN_SCALE,
+            TURN_MAX_STEP,
+            TURN_MIN_STEP,
+        );
+        if target.wrapping_sub(self.swing).unsigned_abs() <= TURN_TOLERANCE as u16 {
             self.step += 1;
         }
         false
@@ -112,23 +118,6 @@ impl Trapdoor {
         }
         Some((SEA_STAGE.to_owned(), SEA_START, WINDFALL_ROOM))
     }
-}
-
-pub fn chase(value: &mut i16, target: i16, scale: i16, max_step: i16, min_step: i16) -> i16 {
-    let diff = target.wrapping_sub(*value);
-    if *value == target {
-        return 0;
-    }
-    let mut step = f32::from(diff) / f32::from(scale);
-    if step > f32::from(min_step) || step < f32::from(-min_step) {
-        step = step.clamp(f32::from(-max_step), f32::from(max_step));
-        *value = value.wrapping_add(step as i16);
-    } else if step > 0.0 {
-        *value = value.wrapping_add(min_step);
-    } else {
-        *value = value.wrapping_sub(min_step);
-    }
-    value.wrapping_sub(target)
 }
 
 pub fn is_trapdoor(name: &str) -> bool {
@@ -153,7 +142,9 @@ pub fn control(
                 }
             }
             Mode::Event => {
-                door.open();
+                if door.hinge == Hinge::Shut {
+                    door.open();
+                }
                 if door.swing_to() {
                     door.order();
                 }
