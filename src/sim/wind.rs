@@ -124,8 +124,8 @@ impl WindTag {
     }
 
     pub fn blowing(&mut self) {
-        self.strength = walk::add_calc(
-            self.strength,
+        walk::add_calc(
+            &mut self.strength,
             STRENGTH_TOP,
             STRENGTH_SCALE,
             STRENGTH_MAX_STEP,
@@ -136,8 +136,8 @@ impl WindTag {
     }
 
     pub fn calming(&mut self) {
-        self.strength = walk::add_calc(
-            self.strength,
+        walk::add_calc(
+            &mut self.strength,
             0.0,
             STRENGTH_SCALE,
             STRENGTH_MAX_STEP,
@@ -180,15 +180,15 @@ fn gust(tag: &WindTag, base: Vec3, player: &mut Player) {
     if speed > GUST_SPEED {
         target *= GUST_SPEED / speed;
     }
-    player.drift.x = walk::add_calc(
-        player.drift.x,
+    walk::add_calc(
+        &mut player.drift.x,
         target.x,
         DRAG_SCALE,
         DRAG_STEP_WIND,
         DRAG_MIN_STEP,
     );
-    player.drift.z = walk::add_calc(
-        player.drift.z,
+    walk::add_calc(
+        &mut player.drift.z,
         target.z,
         DRAG_SCALE,
         DRAG_STEP_WIND,
@@ -199,15 +199,15 @@ fn gust(tag: &WindTag, base: Vec3, player: &mut Player) {
 }
 
 fn settle(player: &mut Player) {
-    player.drift.x = walk::add_calc(
-        player.drift.x,
+    walk::add_calc(
+        &mut player.drift.x,
         0.0,
         DRAG_SCALE,
         DRAG_STEP_CLEAR,
         DRAG_MIN_STEP,
     );
-    player.drift.z = walk::add_calc(
-        player.drift.z,
+    walk::add_calc(
+        &mut player.drift.z,
         0.0,
         DRAG_SCALE,
         DRAG_STEP_CLEAR,
