@@ -100,6 +100,7 @@ fn heart_floor(max: u8) -> u8 {
 
 pub fn control(
     mut health: ResMut<Health>,
+    mut partner: ResMut<super::event::ItemPartner>,
     mut rupees: ResMut<Rupees>,
     mut held: ResMut<Held>,
     mut zones: ResMut<super::flags::ZoneActors>,
@@ -110,6 +111,7 @@ pub fn control(
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
     mut commands: Commands,
 ) {
+    partner.max_life = health.max;
     let Some(player) = players.iter().next() else {
         return;
     };

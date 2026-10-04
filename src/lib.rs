@@ -24,6 +24,7 @@ pub mod input;
 pub mod menus;
 pub mod save;
 pub mod sim;
+pub mod text;
 pub mod view;
 
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
@@ -714,9 +715,9 @@ impl App {
         self.sim
             .world
             .insert_resource(sim::event::ActiveEvent::default());
-        self.sim
-            .world
-            .insert_resource(sim::event::ItemPartner::default());
+        let mut partner = sim::event::ItemPartner::default();
+        partner.max_life = self.sim.world.resource::<sim::health::Health>().max;
+        self.sim.world.insert_resource(partner);
         sim::clear_actors(&mut self.sim.world);
         self.sim.world.insert_resource(sim::door::StayRoom(
             rooms.first().map_or(-1, |room| *room as i8),

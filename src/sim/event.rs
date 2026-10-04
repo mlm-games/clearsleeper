@@ -127,6 +127,8 @@ const LINK_INSTANT: &[i32] = &[
 ];
 const GET_ITEM_MODE: i32 = 11;
 const FAIRY_BOTTLE_ITEM: i32 = 0x57;
+const HEART_PIECE_ITEM: u8 = 0x07;
+const HEART_PIECE_ALT: u8 = 0x17;
 pub const LINK_ANIM_STEMS: &[&str] = &[
     "binopena",
     "binopenb",
@@ -277,6 +279,8 @@ struct StaffRun {
 pub struct ItemPartner {
     pub entity: Option<Entity>,
     pub item: u8,
+    pub max_life: u8,
+    pub move_angle: i16,
 }
 
 const PRESENT_ACTOR: &str = "PresentItem";
@@ -856,10 +860,17 @@ fn anim_ticks(stem: &str, rate: f32, start: f32, end: f32, anms: &LinkAnms) -> O
 fn link_anim_ticks(
     mode: i32,
     prm0: i32,
+    turn: Option<i32>,
+    yaw: i16,
     partner: &ItemPartner,
     anms: &LinkAnms,
 ) -> Option<i32> {
     match mode {
+        5 => {
+            let target = turn.map_or(partner.move_angle, |angle| angle as i16);
+            let delta = target.wrapping_sub(yaw);
+            Some(((i32::from(delta.unsigned_abs()) + 7999) / 8000).max(1))
+        }
         7 => anim_ticks("damf", 0.6, 0.0, 9.0, anms),
         9 | 27 => anim_ticks("damffup", 0.5, 0.0, -1.0, anms),
         10 => anim_ticks(
@@ -873,6 +884,7 @@ fn link_anim_ticks(
             -1.0,
             anms,
         ),
+        12 => Some(1),
         13 => anim_ticks("holdup", 1.1, 0.0, 11.0, anms),
         15 => anim_ticks("comeout", 1.0, 0.0, 72.0, anms),
         19 => anim_ticks("saltation", 1.0, 0.0, -1.0, anms),
@@ -880,6 +892,12 @@ fn link_anim_ticks(
         24 => anim_ticks("surprised", 1.0, 0.0, -1.0, anms),
         25 => anim_ticks("turnback", 1.0, 0.0, 44.0, anms),
         26 => anim_ticks("lookup", 1.0, 0.0, -1.0, anms),
+        34 => match prm0 {
+            -4 => Some(1),
+            6 | 7 => Some(600),
+            1 | 5 => Some(900),
+            _ => None,
+        },
         35 => anim_ticks(
             if prm0 & 1 != 0 {
                 "dooropenblink"
@@ -894,6 +912,7 @@ fn link_anim_ticks(
         36 => anim_ticks("seyyes", 1.0, 0.0, 28.0, anms),
         37 => anim_ticks("presentationa", 1.1, 0.0, 62.0, anms),
         38 => anim_ticks("windl", 1.0, 0.0, -1.0, anms),
+        40 => Some(anim_ticks("grabup", 1.1, 0.0, 7.0, anms)? + 1),
         46 => anim_ticks("powup", 1.0, 0.0, -1.0, anms),
         48 => {
             if prm0 == 0 {
@@ -906,8 +925,10 @@ fn link_anim_ticks(
             }
         }
         49 => anim_ticks("surprisedb", 1.0, 0.0, -1.0, anms),
+        50 => Some(6),
         53 => Some(anim_ticks("windl", 1.0, 0.0, -1.0, anms)? + 5),
         54 => anim_ticks("getletter", 1.0, 0.0, -1.0, anms),
+        56 => anim_ticks("grabup", 1.1, 0.0, 7.0, anms),
         59 => anim_ticks("taktdge", 1.0, 0.0, -1.0, anms),
         60 => Some(
             anim_ticks("binopenpre", 1.0, 0.0, 45.0, anms)?
@@ -928,6 +949,15 @@ fn link_anim_ticks(
         74 => anim_ticks("slipice", 1.0, 0.0, -1.0, anms),
         _ => None,
     }
+}
+
+fn item_message(item: u8, max_life: u8) -> u32 {
+    let value = if item == HEART_PIECE_ITEM && max_life % 4 != 0 {
+        HEART_PIECE_ALT + (max_life % 4) - 1
+    } else {
+        item
+    };
+    u32::from(value) + 101
 }
 
 fn link_anim_msg(mode: i32, prm0: i32, partner: &ItemPartner) -> Option<u32> {
@@ -968,6 +998,29 @@ fn link_cut(
     if run.advance > 0 {
         run.get_stage = 0;
     }
+    let turn = list.cut_number(run.cut as usize, "angle");
+    let yaw = players
+        .iter()
+        .next()
+        .map_or(0, |(_, player)| to_s16(player.yaw));
+    if let Some(mode) = mode {
+        match mode {
+            4 | 44 => partner.move_angle = turn.map_or(yaw, |angle| angle as i16),
+            2 | 3 => {
+                if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
+                    && let Some((_, player)) = players.iter().next()
+                {
+                    partner.move_angle = target_angle_y(player.pos, pos);
+                }
+            }
+            5 => {
+                if let Some(angle) = turn {
+                    partner.move_angle = angle as i16;
+                }
+            }
+            _ => {}
+        }
+    }
     if mode.is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
         cut_end(run, list, flags);
         return;
@@ -976,7 +1029,7 @@ fn link_cut(
         return;
     };
     let prm0 = list.cut_number(run.cut as usize, "prm0").unwrap_or(0);
-    let Some(total) = link_anim_ticks(mode, prm0, partner, anms) else {
+    let Some(total) = link_anim_ticks(mode, prm0, turn, yaw, partner, anms) else {
         return;
     };
     if run.advance > 0 {
@@ -1131,6 +1184,7 @@ fn get_item_cut(
             partner.entity = Some(entity);
             partner.item = item;
         }
+        run.msg_no = item_message(partner.item, partner.max_life) as i32;
     }
     if run.timer > 0 {
         run.timer -= 1;
@@ -1144,7 +1198,7 @@ fn get_item_cut(
     if partner.entity.is_none() {
         return;
     }
-    let msg_no = u32::from(partner.item) + 101;
+    let msg_no = run.msg_no as u32;
     if !run.get_msg_live {
         if msg.active() && msg.message_no() != msg_no {
             return;
@@ -1759,6 +1813,7 @@ fn advance_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) -> 
 
 fn advance_to(run: &mut StaffRun, cut: i32) {
     run.cut = cut;
+    run.get_stage = 0;
     run.timer = 0;
     run.frames = 0;
     run.wipe = 0;
