@@ -136,6 +136,14 @@ pub fn flower_control(
     mut switches: ResMut<Switches>,
     mut flowers: Query<(&Actor, &mut Bombflower)>,
     players: Query<&Player>,
+    mut foes: Query<
+        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (Without<Bombflower>, Without<Crawler>),
+    >,
+    mut zones: ResMut<ZoneActors>,
+    mut events: ResMut<super::events::SimEvents>,
+    mut fences: Query<&mut super::barricade::Barricade>,
+    mut blocks: Query<&mut super::ice::Ice>,
     mut commands: Commands,
 ) {
     let soaked = wet.as_deref().is_some_and(|water| water.in_area);
@@ -196,6 +204,9 @@ pub fn crawler_control(
         (Without<Bombflower>, Without<Crawler>),
     >,
     mut events: ResMut<super::events::SimEvents>,
+    mut fences: Query<&mut super::barricade::Barricade>,
+    mut blocks: Query<&mut super::ice::Ice>,
+    mut switches: ResMut<super::flags::Switches>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
@@ -247,6 +258,9 @@ pub fn crawler_control(
             owner,
             &mut zones,
             &mut events,
+            &mut fences,
+            &mut blocks,
+            &mut switches,
             &mut commands,
         );
         let _ = commands.entity(entity).despawn();
@@ -262,8 +276,18 @@ pub fn blast(
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
     events: &mut super::events::SimEvents,
+    mut fences: Query<&mut super::barricade::Barricade>,
+    mut blocks: Query<&mut super::ice::Ice>,
+    mut switches: ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {
+    let heat = super::barricade::AT_BOMB;
+    for mut fence in &mut fences {
+        super::barricade::strike(&mut fence, heat, 0, &mut switches);
+    }
+    for mut block in &mut blocks {
+        block.strike(heat);
+    }
     let mut slain: Vec<(Entity, i8, u16)> = Vec::new();
     for (entity, actor, mut hp, mut hurt) in foes.iter_mut() {
         if !within(origin, actor.pos, BLAST_RADIUS) {

@@ -210,6 +210,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if barrel::is_barrel(&source.name) {
+        let cask = barrel::Barrel::spawn(source.parameters);
+        world.spawn((actor, cask, carry::Carryable::Barrel)).id()
     } else if fallrock::is_fallrock(&source.name) {
         let stone = fallrock::FallRock::spawn(1.0);
         world.spawn((actor, stone)).id()
@@ -219,9 +222,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if buoybarrel::is_buoy_barrel(&source.name) {
         let float = buoybarrel::BuoyBarrel::spawn(source.parameters);
         world.spawn((actor, float)).id()
-    } else if barrel::is_barrel(&source.name) {
-        let cask = barrel::Barrel::spawn(source.parameters);
-        world.spawn((actor, cask)).id()
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
@@ -235,7 +235,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let fence = barricade::Barricade::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, fence)).id()
     } else if raft::is_raft(&source.name) {
-        let vessel = raft::Raft::spawn(source.parameters, source.angle, true);
+        let vessel = raft::Raft::spawn(source.parameters, source.angle, 0);
         world.spawn((actor, vessel)).id()
     } else if barrier::is_barrier(&source.name) {
         let field = barrier::Barrier::spawn(Vec3::ONE);

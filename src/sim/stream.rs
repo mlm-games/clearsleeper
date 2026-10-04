@@ -136,6 +136,17 @@ pub fn move_stream(
     )
 }
 
+pub fn add_calc_angle_s2(value: &mut i16, target: i16, scale: i16, max_step: i16) {
+    let step = target.wrapping_sub(*value) / scale;
+    if step > max_step {
+        *value = value.wrapping_add(max_step);
+    } else if step < -max_step {
+        *value = value.wrapping_sub(max_step);
+    } else {
+        *value = value.wrapping_add(step);
+    }
+}
+
 pub fn calc_speed(
     speed_f: f32,
     heading: i16,

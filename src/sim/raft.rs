@@ -1,5 +1,7 @@
 use bevy_ecs::prelude::*;
 
+use super::stream;
+
 pub const RAFT_ACTORS: [&str; 5] = ["Ikada", "ikada_h", "ikadaS", "ikada_u", "Svsp"];
 
 pub const TYPE_PLAIN: u8 = 0;
@@ -12,7 +14,6 @@ pub const NO_PATH: u8 = 0xFF;
 
 pub const ROPE_MIN: i32 = 15;
 pub const ROPE_MAX: i32 = 100;
-pub const ROPE_CAP: i32 = 200;
 pub const JOINT_LEN: f32 = 10.0;
 pub const ARM_FRAME: f32 = 1.5;
 pub const PENDULUM: i16 = 150;
@@ -28,15 +29,21 @@ pub const HOLD: u16 = 600;
 pub const HEAP: [u32; 5] = [0x1D00, 0x2F60, 0x2E20, 0x32E0, 0x6D60];
 pub const HULL_RADIUS: f32 = 1000.0;
 pub const HULL_DROP: f32 = 50.0;
-pub const CULL_FAR: f32 = 10.0;
-pub const CONTACT_RADIUS: f32 = 75.0;
-pub const STOP_TIMER_MAX: f32 = 120.0;
-pub const STOP_TIMER_BASE: f32 = 240.0;
 
-pub const FLAG_PARAM: [u32; 5] = [4, 4, 4, 4, 0x0200_0000];
-pub const FLAG_SCALE: [f32; 5] = [0.2, 0.0, 0.0, 0.0, 0.12];
-pub const FLAG_LIFT: [f32; 5] = [700.0, 0.0, 0.0, 0.0, 530.0];
-pub const FLAG_SIDE: [f32; 5] = [0.0, 0.0, 0.0, 0.0, 100.0];
+pub const ROLL_SPLIT: f32 = 0.5;
+pub const SV_OFFSET_X: [f32; 4] = [265.0, -18.0, -97.0, -175.0];
+pub const SV_WAVE_OFFSET_X: f32 = -320.0;
+pub const SV_TRACK_OFFSET_X: f32 = 240.0;
+pub const TERRY_WAVE_Z: f32 = 660.0;
+pub const TERRY_WAVE_Y: f32 = 20.0;
+pub const TERRY_TRACK_Z: f32 = -180.0;
+pub const SHIP_ATTENTION_LIFT: f32 = 900.0;
+pub const SHIP_EYE_LIFT: f32 = 300.0;
+pub const FLAG_SCALE: f32 = 0.0;
+pub const FLAG_OFFSET: [f32; 3] = [0.0, 0.0, 0.0];
+pub const CONTACT_RADIUS: f32 = 300.0;
+pub const STOP_TIMER_JITTER: f32 = 120.0;
+pub const STOP_TIMER_BASE: f32 = 240.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -65,12 +72,12 @@ pub struct Raft {
     pub swing: i16,
     pub swivel: i16,
     pub swivel_target: i16,
-    pub counterweight: bool,
+    pub roll_dir: u8,
     pub timer: u16,
 }
 
 impl Raft {
-    pub fn spawn(parameters: u32, angle: [i16; 3], counterweight: bool) -> Self {
+    pub fn spawn(parameters: u32, angle: [i16; 3], roll_dir: u8) -> Self {
         let kind = (parameters & 0xF) as u8;
         let packed = u32::from(angle[0] as u16);
         let path_no = if kind == TYPE_CRANE {
@@ -87,7 +94,7 @@ impl Raft {
             swing: PENDULUM,
             swivel: 0,
             swivel_target: 0,
-            counterweight,
+            roll_dir,
             timer: 0,
         };
         if kind == TYPE_CRANE && path_no != NO_PATH {
@@ -99,16 +106,8 @@ impl Raft {
         raft
     }
 
-    pub fn heap(&self) -> u32 {
-        HEAP[usize::from(self.kind) % HEAP.len()]
-    }
-
-    pub fn flag_scale(&self) -> f32 {
-        FLAG_SCALE[usize::from(self.kind) % FLAG_SCALE.len()]
-    }
-
-    pub fn flag_lift(&self) -> f32 {
-        FLAG_LIFT[usize::from(self.kind) % FLAG_LIFT.len()]
+    pub fn heap(&self) -> Option<u32> {
+        HEAP.get(usize::from(self.kind)).copied()
     }
 
     pub fn rises(&self) -> bool {
@@ -124,16 +123,20 @@ impl Raft {
     }
 
     pub fn settle(&mut self, target: i16, scale: i16, max_step: i16) {
-        chase(&mut self.swivel, target, scale, max_step);
+        stream::add_calc_angle_s2(&mut self.swivel, target, scale, max_step);
     }
 
     pub fn aligned(&self) -> bool {
-        distance(self.swivel, self.swivel_target) <= TURN_TOLERANCE
+        distance(self.swivel, self.swivel_target) <= TURN_TOLERANCE as u16
     }
 
     pub fn lowered(&mut self) -> bool {
-        chase(&mut self.swing, 0, ARM_SCALE, ARM_MAX_STEP);
+        stream::add_calc_angle_s2(&mut self.swing, 0, ARM_SCALE, ARM_MAX_STEP);
         self.swing < LOWERED
+    }
+
+    pub fn flip(&mut self) {
+        self.roll_dir ^= 1;
     }
 
     pub fn enter(&mut self, mode: Mode) {
@@ -142,8 +145,9 @@ impl Raft {
             Mode::CraneUpWait | Mode::CraneDownWait => self.timer = HOIST_WAIT,
             Mode::CraneWait => self.timer = HOLD,
             Mode::CraneDown | Mode::CraneTurn | Mode::CraneReset => self.swing = PENDULUM,
-            Mode::Wait | Mode::CraneUp | Mode::PathMove | Mode::Stop | Mode::PathMoveTerry
-            | Mode::StopTerry | Mode::StopBombTerry => {}
+            Mode::PathMove => self.flip(),
+            Mode::Wait | Mode::CraneUp | Mode::Stop | Mode::PathMoveTerry | Mode::StopTerry
+            | Mode::StopBombTerry => {}
         }
     }
 
@@ -188,7 +192,7 @@ impl Raft {
                     return Mode::CraneTurn;
                 }
                 self.arm_right();
-                self.swivel_target = if self.counterweight {
+                self.swivel_target = if self.roll_dir == 0 {
                     TURN_HALF
                 } else {
                     -TURN_HALF
@@ -208,8 +212,11 @@ impl Raft {
                 }
             }
             Mode::CraneDown => {
+                if !self.lowered() {
+                    return Mode::CraneDown;
+                }
+                self.arm_left();
                 if self.rope < ROPE_MAX {
-                    self.arm_left();
                     self.rope += 1;
                     Mode::CraneDown
                 } else {
@@ -233,19 +240,8 @@ impl Raft {
     }
 }
 
-fn chase(value: &mut i16, target: i16, scale: i16, max_step: i16) {
-    let step = target.wrapping_sub(*value) / scale;
-    *value = if step > max_step {
-        value.wrapping_add(max_step)
-    } else if step < -max_step {
-        value.wrapping_sub(max_step)
-    } else {
-        value.wrapping_add(step)
-    };
-}
-
-fn distance(from: i16, to: i16) -> i16 {
-    from.wrapping_sub(to).abs()
+fn distance(from: i16, to: i16) -> u16 {
+    from.wrapping_sub(to).unsigned_abs()
 }
 
 pub fn is_raft(name: &str) -> bool {

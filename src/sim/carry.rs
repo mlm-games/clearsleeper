@@ -25,10 +25,14 @@ pub enum Carryable {
     Tsubo,
     Stone,
     Pig,
+    Barrel,
 }
 
 pub fn is_carryable(name: &str) -> bool {
-    super::tsubo::is_tsubo(name) || super::koisi::is_koisi(name) || name == PIG_ACTOR
+    super::tsubo::is_tsubo(name)
+        || super::koisi::is_koisi(name)
+        || super::barrel::is_barrel(name)
+        || name == PIG_ACTOR
 }
 
 fn chain_from(carryables: &Query<(Entity, &Actor, &Carryable)>, base: Entity) -> Vec<Entity> {
@@ -67,6 +71,7 @@ pub fn control(
     mut moves: Query<&mut Actor>,
     mut pots: Query<&mut super::tsubo::Tsubo>,
     mut rocks: Query<&mut super::koisi::Koisi>,
+    mut casks: Query<&mut super::barrel::Barrel>,
     players: Query<&Player>,
 ) {
     let pressed = do_intent.0 && !carry.held_press;
@@ -77,6 +82,13 @@ pub fn control(
     };
     let yaw = player.yaw + axis_yaw(intent.axis);
     let forward = Vec3::new(yaw.sin(), 0.0, yaw.cos());
+    if let Some(held) = carry.held {
+        let Some(mut cask) = casks.get_mut(held) else {
+            carry.held = None;
+            return;
+        };
+        cask.carry_step(true);
+    }
     match carry.held {
         Some(held) => {
             let chain = chain_from(&carryables, held);
@@ -93,6 +105,9 @@ pub fn control(
             }
             if pressed {
                 carry.held = None;
+                if let Some(mut cask) = casks.get_mut(held) {
+                    cask.carry_step(false);
+                }
                 for entity in chain {
                     if let Ok(mut actor) = moves.get_mut(entity) {
                         actor.pos += forward * RELEASE_SPEED;
@@ -101,6 +116,9 @@ pub fn control(
                         }
                         if let Ok(mut rock) = rocks.get_mut(entity) {
                             rock.toss(forward, player.speed);
+                        }
+                        if let Ok(mut cask) = casks.get_mut(entity) {
+                            cask.dropped();
                         }
                     }
                 }
@@ -117,9 +135,15 @@ pub fn control(
                 })
                 .map(|(entity, actor, _)| (entity, actor.pos));
             if let Some((entity, pos)) = nearest {
-                if reach(pos, player.pos) <= GRAB_RANGE * GRAB_RANGE {
-                    carry.held = Some(entity);
+                if reach(pos, player.pos) > GRAB_RANGE * GRAB_RANGE {
+                    return;
                 }
+                if let Ok(mut cask) = casks.get_mut(entity)
+                    && cask.liftable(true)
+                {
+                    cask.pick_up(angle_of(yaw));
+                }
+                carry.held = Some(entity);
             }
         }
     }

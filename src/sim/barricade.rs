@@ -1,5 +1,4 @@
 use bevy_ecs::prelude::*;
-
 use glam::Vec3;
 
 use super::flags::Switches;
@@ -12,15 +11,22 @@ pub const POSTS: usize = 3;
 pub const TYPE_STRAW: u8 = 0;
 pub const TYPE_WOOD: u8 = 1;
 
+pub const ABSENT: u8 = 0;
 pub const WHOLE: u8 = 1;
 pub const BURNING: u8 = 2;
 pub const BROKEN: u8 = 3;
 
-pub const BURN_FRAMES: u8 = 0x5A;
+pub const BURN_FRAMES: i16 = 0x5A;
+pub const RELEASE_FRAMES: i16 = 50;
+pub const IDLE_FRAMES: i16 = -1;
+pub const ALPHA_OUT: i16 = 2;
 pub const TOP_LIFT: f32 = 200.0;
 pub const POST_Y: f32 = 20.0;
 pub const TOP_POST_Y: f32 = 220.0;
 pub const POST_SIDE: f32 = 100.0;
+pub const STTS_WEIGHT: u8 = 0xFF;
+pub const STTS_POWER: u8 = 0xFF;
+pub const HEAP: u32 = 0x2280;
 
 pub const STRAW_BREAKERS: u32 = AT_SWORD
     | AT_UNK8
@@ -47,6 +53,8 @@ pub const AT_FIRE_ARROW: u32 = 1 << 18;
 pub const AT_DARKNUT_SWORD: u32 = 1 << 26;
 pub const AT_MOBLIN_SPEAR: u32 = 1 << 28;
 
+pub const NO_SWITCH: u8 = 0xFF;
+
 const TYPE_SHIFT: u32 = 4;
 const TYPE_MASK: u32 = 0xF;
 const SWITCH_SHIFT: u32 = 8;
@@ -54,36 +62,46 @@ const TOP_SWITCH_SHIFT: u32 = 16;
 const FIELD_MASK: u32 = 0xFF;
 const SUB_MASK: u32 = 0xF;
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Barricade {
     pub kind: u8,
-    pub sub: u8,
-    pub bottom_switch: u8,
-    pub top_switch: u8,
     pub halves: [u8; HALVES],
-    pub counters: [u8; HALVES],
-    pub burned: u8,
+    pub counters: [i16; HALVES],
+    pub alpha_out: i16,
+    pub hold: i16,
+    pub switches: [u8; HALVES],
 }
 
 impl Barricade {
     pub fn spawn(parameters: u32, switches: &Switches) -> Self {
         let bottom = ((parameters >> SWITCH_SHIFT) & FIELD_MASK) as u8;
         let top = ((parameters >> TOP_SWITCH_SHIFT) & FIELD_MASK) as u8;
-        let bottom_gone = bottom != NO_SWITCH && switches.test(bottom);
-        let top_gone = top != NO_SWITCH && switches.test(top);
+        let paired = parameters & SUB_MASK != 0;
         Self {
             kind: ((parameters >> TYPE_SHIFT) & TYPE_MASK) as u8,
-            sub: (parameters & SUB_MASK) as u8,
-            bottom_switch: bottom,
-            top_switch: top,
-            halves: [if bottom_gone { BROKEN } else { WHOLE }, if top_gone { BROKEN } else { WHOLE }],
-            counters: [0; HALVES],
-            burned: 0,
+            halves: [
+                if bottom == NO_SWITCH || !switches.test(bottom) {
+                    WHOLE
+                } else {
+                    BROKEN
+                },
+                if !paired {
+                    ABSENT
+                } else if top == NO_SWITCH || !switches.test(top) {
+                    WHOLE
+                } else {
+                    BROKEN
+                },
+            ],
+            counters: [IDLE_FRAMES; HALVES],
+            alpha_out: ALPHA_OUT,
+            hold: 0,
+            switches: [bottom, top],
         }
     }
 
-    pub fn intact(&self, half: usize) -> bool {
-        self.halves[half] == WHOLE
+    pub fn paired(&self) -> bool {
+        self.halves[1] != ABSENT
     }
 
     pub fn blocking(&self, half: usize) -> bool {
@@ -106,36 +124,46 @@ impl Barricade {
         if self.halves[half] != WHOLE {
             return;
         }
-        if half == 1 && self.kind == TYPE_WOOD && self.halves[0] == WHOLE {
+        if half == 1 && self.halves[0] == WHOLE {
             self.halves[0] = BROKEN;
             self.counters[0] = 0;
-            latch(switches, self.bottom_switch);
+            self.latch(switches, 0);
         }
         self.halves[half] = BROKEN;
         self.counters[half] = 0;
-        latch(switches, half_slot(self, half));
+        self.latch(switches, half);
     }
 
     pub fn scorch(&mut self, switches: &mut Switches) {
-        if self.burned != 0 {
+        if self.hold != 0 {
             return;
         }
-        self.burned = BURN_FRAMES;
         for half in 0..HALVES {
             if self.halves[half] == WHOLE {
                 self.halves[half] = BURNING;
-                self.counters[half] = BURN_FRAMES;
+                self.counters[half] = RELEASE_FRAMES;
             }
-            latch(switches, half_slot(self, half));
+        }
+        self.hold = BURN_FRAMES;
+        self.latch(switches, 0);
+        if self.paired() {
+            self.latch(switches, 1);
+        }
+    }
+
+    fn latch(&self, switches: &mut Switches, half: usize) {
+        let no = self.switches[half];
+        if no != NO_SWITCH {
+            switches.set(no);
         }
     }
 
     pub fn tick(&mut self) {
-        if self.burned > 0 {
-            self.burned -= 1;
+        if self.hold > 0 {
+            self.hold -= 1;
         }
         for half in 0..HALVES {
-            if self.counters[half] > 0 {
+            if self.counters[half] >= 0 {
                 self.counters[half] -= 1;
             }
         }
@@ -156,22 +184,6 @@ impl Barricade {
             (WHOLE, _) => TOP_POST_Y,
             _ => 0.0,
         }
-    }
-}
-
-pub const NO_SWITCH: u8 = 0xFF;
-
-fn half_slot(barricade: &Barricade, half: usize) -> u8 {
-    if half == 0 {
-        barricade.bottom_switch
-    } else {
-        barricade.top_switch
-    }
-}
-
-fn latch(switches: &mut Switches, no: u8) {
-    if no != NO_SWITCH {
-        switches.set(no);
     }
 }
 

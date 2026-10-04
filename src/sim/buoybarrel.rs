@@ -2,6 +2,8 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::player::Player;
+use super::ship::Ship;
 use super::stream;
 
 pub const BARREL2_ACTOR: &str = "Ktarur";
@@ -19,11 +21,8 @@ pub const MODE_DEMO_EXPLODE1: u8 = 8;
 pub const TYPES: usize = 4;
 pub const KIND_MINE: usize = 2;
 
-pub const HEAP: [u32; TYPES] = [0x520, 0x520, 0x880, 0x520];
 pub const COLLIDE_R: [f32; TYPES] = [200.0, 200.0, 288.0, 288.0];
 pub const COLLIDE_H: [f32; TYPES] = [300.0, 400.0, 432.0, 576.0];
-pub const CULL_DRAW: [f32; TYPES] = [75.0, 75.0, 375.0, 75.0];
-pub const CULL_MOVE: [f32; TYPES] = [800.0, 300.0, 4500.0, 800.0];
 pub const BUOY_R: [f32; TYPES] = [50.0; TYPES];
 pub const DRIFT: [f32; TYPES] = [100.0; TYPES];
 pub const DEPTH: [f32; TYPES] = [0.55, 0.75, 0.3, 0.55];
@@ -34,8 +33,10 @@ pub const TRIP: [f32; TYPES] = [500.0, 450.0, 500.0, 500.0];
 pub const REACH: [f32; TYPES] = [300.0; TYPES];
 pub const SHIP_SPEED: [f32; TYPES] = [25.0; TYPES];
 pub const CRASH_DEPTH: [f32; TYPES] = [0.0, 0.0, 400.0, 0.0];
-pub const FLASH_REACH: [f32; TYPES] = [0.0, 0.0, 700.0, 0.0];
+pub const FLASH_REACH: [f32; TYPES] = [0.0, 0.0, 7500.0, 0.0];
 pub const BLOW_REACH: [f32; TYPES] = [0.0, 0.0, 900.0, 0.0];
+pub const STRIKE_LIFT: [f32; TYPES] = [0.0, 0.0, 250.0, 0.0];
+pub const STRIKE_DAMAGE: [f32; TYPES] = [0.0, 0.0, 700.0, 0.0];
 pub const PHASE_STEP: [f32; TYPES] = [1000.0; TYPES];
 pub const LEAN_SLOPE: [f32; TYPES] = [0.35; TYPES];
 pub const LEAN_LIMIT: [f32; TYPES] = [0.3; TYPES];
@@ -93,20 +94,6 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub fn code(self) -> u8 {
-        match self {
-            Self::Afloat => MODE_AFL,
-            Self::ExitV => MODE_EXIT_V,
-            Self::ExitH => MODE_EXIT_H,
-            Self::ExitMine => MODE_EXIT_MINE,
-            Self::Explode => MODE_EXPLODE,
-            Self::DemoBreak0 => MODE_DEMO_BREAK0,
-            Self::DemoBreak1 => MODE_DEMO_BREAK1,
-            Self::DemoExplode0 => MODE_DEMO_EXPLODE0,
-            Self::DemoExplode1 => MODE_DEMO_EXPLODE1,
-        }
-    }
-
     pub fn demo(self) -> bool {
         matches!(
             self,
@@ -184,17 +171,17 @@ impl BuoyBarrel {
         (COLLIDE_H[self.kind], COLLIDE_R[self.kind])
     }
 
-    pub fn draw_cull(&self) -> f32 {
-        SCALE[self.kind] * CULL_DRAW[self.kind]
+
+    pub fn strike_lift(&self) -> f32 {
+        STRIKE_LIFT[self.kind]
     }
 
-    pub fn move_cull(&self) -> f32 {
-        CULL_MOVE[self.kind]
+    pub fn damage_reach(&self) -> f32 {
+        STRIKE_DAMAGE[self.kind]
     }
 
-    pub fn cap(&self) -> f32 {
-        DRIFT[self.kind] * if self.coming { COMING_CAP } else { SETTLED_CAP }
-    }
+
+
 
     pub fn spring(&mut self, decay: f32, damp: f32, cap: f32) {
         self.heave_vel += self.heave * -decay;
@@ -207,13 +194,16 @@ impl BuoyBarrel {
     }
 
     pub fn bob(&mut self) {
-        self.phase += (self.rand() * PHASE_STEP[self.kind] * 2.0) as i32;
+        self.phase += (self.rand() + 1.0) as i32 * PHASE_STEP[self.kind] as i32;
     }
 
-    pub fn float_step(&mut self) {
+    pub fn tick_cooldown(&mut self) {
         if self.cooldown > 0 {
             self.cooldown -= 1;
         }
+    }
+
+    pub fn float_step(&mut self, anchor: Vec3, pos: Vec3) {
         let (decay, damp) = if self.coming {
             if self.heave > 0.0 {
                 (COMING_DECAY_HIGH, COMING_DAMP)
@@ -225,8 +215,8 @@ impl BuoyBarrel {
         };
         self.spring(decay, damp, if self.coming { COMING_CAP } else { SETTLED_CAP });
         self.bob();
-        self.drift_x = (self.drift_x + DRIFT_PUSH) * DRIFT_DECAY;
-        self.drift_z = (self.drift_z + DRIFT_PUSH) * DRIFT_DECAY;
+        self.drift_x = (self.drift_x + (pos.x - anchor.x) * DRIFT_PUSH) * DRIFT_DECAY;
+        self.drift_z = (self.drift_z + (pos.z - anchor.z) * DRIFT_PUSH) * DRIFT_DECAY;
         self.lean_step();
     }
 
@@ -252,22 +242,23 @@ impl BuoyBarrel {
         self.heave += self.heave_vel;
     }
 
-    pub fn sink_depth(&self) -> f32 {
-        -(BUOY_R[self.kind] * HEIGHT[self.kind] * SCALE[self.kind])
-    }
 
     pub fn sunk(&self, depth: f32) -> bool {
         self.heave <= self.sink_depth() - depth
+    }
+
+    pub fn clip_barge(&mut self) {
+        if self.cooldown == 0 {
+            self.heave_vel = CLIP_SEED;
+            self.cooldown = CLIP_COOLDOWN;
+        }
     }
 
     pub fn clip_step(&mut self) {
         if self.heave_vel > 0.0 {
             self.heave_vel = 0.0;
         }
-        self.heave_vel -= CLIP_STEP;
-        if self.heave_vel < CLIP_FLOOR {
-            self.heave_vel = CLIP_FLOOR;
-        }
+        self.heave_vel = (self.heave_vel - CLIP_STEP).max(CLIP_FLOOR);
     }
 
     pub fn explode_step(&mut self) {
@@ -298,9 +289,6 @@ impl BuoyBarrel {
         }
     }
 
-    pub fn bomb(&mut self) {
-        self.trigger = TRIGGER_BOMB;
-    }
 
     pub fn crashed(&mut self) {
         self.trigger = TRIGGER_CRASH;
@@ -310,20 +298,14 @@ impl BuoyBarrel {
         self.trigger = TRIGGER_TOUCH;
     }
 
-    pub fn fast_enough(&self, ship_speed: f32) -> bool {
-        ship_speed > SHIP_SPEED[self.kind]
+    pub fn ship_speed(&self) -> f32 {
+        SHIP_SPEED[self.kind]
     }
 
     pub fn head_on(&self, gap: Vec3, heading: Vec3) -> bool {
         (gap.x * heading.x + gap.z * heading.z) < CRASH_DEPTH[self.kind] * CRASH_DEPTH[self.kind]
     }
 
-    pub fn clip(&mut self) {
-        if self.cooldown == 0 {
-            self.heave_vel = CLIP_SEED;
-            self.cooldown = CLIP_COOLDOWN;
-        }
-    }
 
     pub fn within(&self, range: f32, gap: Vec3) -> bool {
         gap.x * gap.x + gap.z * gap.z < range * range
@@ -361,14 +343,53 @@ pub fn is_buoy_barrel(name: &str) -> bool {
     name == BARREL2_ACTOR
 }
 
-pub fn control(mut barrels: Query<(&mut Actor, &mut BuoyBarrel)>) {
+pub fn control(
+    mut switches: ResMut<super::flags::Switches>,
+    mut barrels: Query<(&mut Actor, &mut BuoyBarrel)>,
+    ships: Query<(&Actor, &Ship)>,
+    players: Query<&Player>,
+) {
+    let ship = ships.iter().next();
+    let player = players.iter().next();
     for (mut actor, mut barrel) in &mut barrels {
         if barrel.mode.demo() || barrel.given {
             continue;
         }
+        dispatch(&actor, &mut barrel, ship);
+        barrel.tick_cooldown();
+        if let Some(player) = player
+            && barrel.pickup_range() > 0.0
+            && barrel.within(barrel.pickup_range(), player.pos - actor.pos)
+        {
+            barrel.take();
+            if barrel.item_save != NO_ITEM_SAVE {
+                switches.set(barrel.item_save);
+            }
+        }
+        if barrel.exit_request && barrel.mode == Mode::Afloat {
+            match barrel.kind {
+                0 => barrel.enter(Mode::ExitV),
+                1 => barrel.enter(Mode::ExitH),
+                KIND_MINE if !barrel.flashing => barrel.enter(Mode::ExitMine),
+                _ => {}
+            }
+            barrel.exit_request = false;
+        }
+        match barrel.trigger {
+            TRIGGER_BOMB => {
+                barrel.trigger = TRIGGER_NONE;
+                barrel.given = true;
+                continue;
+            }
+            TRIGGER_CRASH if !barrel.mode.demo() => barrel.enter(Mode::DemoBreak0),
+            TRIGGER_TOUCH => barrel.clip_step(),
+            _ => {}
+        }
+        barrel.trigger = TRIGGER_NONE;
+        let anchor = actor.pos;
         match barrel.mode {
             Mode::Afloat => {
-                barrel.float_step();
+                barrel.float_step(anchor, actor.pos);
                 actor.pos.x += barrel.drift_x;
                 actor.pos.z += barrel.drift_z;
             }
@@ -395,4 +416,47 @@ pub fn control(mut barrels: Query<(&mut Actor, &mut BuoyBarrel)>) {
         }
         actor.pos.y = barrel.height();
     }
+}
+
+fn dispatch(actor: &Actor, barrel: &mut BuoyBarrel, ship: Option<(&Actor, &Ship)>) {
+    let Some((hull, ship)) = ship else {
+        return;
+    };
+    let gap = hull.pos - actor.pos;
+    if barrel.kind == KIND_MINE
+        && barrel.mode != Mode::Explode
+        && !barrel.mode.demo()
+        && barrel.within(barrel.blow_range(), gap)
+    {
+        barrel.enter(Mode::Explode);
+        return;
+    }
+    if barrel.within(barrel.flash_range(), gap) {
+        barrel.flashing = true;
+    }
+    if barrel.flashing
+        && barrel.within(barrel.damage_reach(), gap)
+        && ship.riding
+        && hull.pos.y < actor.pos.y + barrel.strike_lift()
+        && barrel.head_on(gap, ship_heading(gap, ship.speed))
+    {
+        barrel.enter(Mode::DemoExplode0);
+        return;
+    }
+    if barrel.kind == 0 {
+        if ship.speed > barrel.ship_speed() && barrel.head_on(gap, ship_heading(gap, ship.speed)) {
+            barrel.crashed();
+        } else if barrel.cooldown == 0 {
+            barrel.clip_barge();
+        }
+    } else {
+        barrel.touched();
+    }
+}
+
+fn ship_heading(gap: Vec3, speed: f32) -> Vec3 {
+    if gap.x == 0.0 && gap.z == 0.0 {
+        return Vec3::Z * speed;
+    }
+    gap.normalize() * speed
 }

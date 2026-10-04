@@ -24,7 +24,6 @@ pub const CARRY_STEP: i16 = 0x1000;
 pub const YAW_STEP: i16 = 0x600;
 pub const CARRY_SETTLE: u8 = 15;
 
-pub const ATTENTION_LIFT: f32 = 50.0;
 pub const RADIUS: f32 = 50.0;
 pub const BODY_HEIGHT: f32 = 100.0;
 pub const SHORT_RADIUS: f32 = 45.0;
@@ -67,9 +66,6 @@ pub const MOVE_DECAY: f32 = 0.95;
 pub const MOVE_EPSILON: f32 = 0.1;
 
 pub const FALL_DAMAGE: f32 = 200.0;
-pub const CULL_LIFT: f32 = 50.0;
-pub const CULL_DRAW: f32 = 75.0;
-pub const CULL_MOVE: f32 = 300.0;
 pub const CULL_SHIFT: u32 = 0x1C;
 pub const CULL_MASK: u32 = 0x03;
 
@@ -114,6 +110,7 @@ pub struct Barrel {
     pub drive: Vec3,
     pub timer: u8,
     pub weight: u8,
+    pub last_ground: f32,
     pub broken: bool,
 }
 
@@ -134,6 +131,7 @@ impl Barrel {
             drive: Vec3::ZERO,
             timer: 0,
             weight: WEIGHT,
+            last_ground: 0.0,
             broken: false,
         }
     }
@@ -141,10 +139,11 @@ impl Barrel {
     pub fn enter(&mut self, mode: Mode) {
         self.mode = mode;
         match mode {
-            Mode::Wait | Mode::Walk => {
+            Mode::Wait => {
                 self.gravity = GRAVITY;
                 self.weight = WEIGHT;
             }
+            Mode::Walk => self.gravity = GRAVITY,
             Mode::Carry => self.timer = CARRY_SETTLE,
             Mode::Vib0 => {
                 self.gravity = VIB0_GRAVITY;
@@ -176,13 +175,7 @@ impl Barrel {
         }
     }
 
-    pub fn lying(&self) -> bool {
-        self.tilt == LYING
-    }
 
-    pub fn solid(&self) -> bool {
-        !self.broken
-    }
 
     pub fn liftable(&self, grounded: bool) -> bool {
         !self.broken && grounded
@@ -197,10 +190,6 @@ impl Barrel {
         self.enter(Mode::Jump);
     }
 
-    pub fn smashed(&mut self) {
-        self.broken = true;
-        self.enter(Mode::Wait);
-    }
 
     pub fn carry_step(&mut self, still_carried: bool) -> Option<Mode> {
         self.timer = self.timer.saturating_sub(1);
@@ -217,23 +206,19 @@ impl Barrel {
     pub fn rest_step(&mut self, grounded: bool, sloped: bool) -> Option<Mode> {
         let target = if self.tilt > TILT_THRESHOLD { LYING } else { 0 };
         walk::chase_angle_s(&mut self.tilt, target, TILT_STEP);
-        if grounded {
-            if self.tilt == LYING && sloped {
-                return Some(Mode::Walk);
-            }
-            self.weight = if self.tilt == LYING {
-                ROLLING_WEIGHT
-            } else {
-                WEIGHT
-            };
+        if !grounded {
+            return None;
         }
-        None
+        let rolling = self.tilt == LYING;
+        let next = if rolling && sloped { Some(Mode::Walk) } else { None };
+        self.weight = if rolling { ROLLING_WEIGHT } else { WEIGHT };
+        next
     }
 
-    pub fn integrate(&mut self) {
+    pub fn integrate(&mut self, heading: i16) {
         let (speed, speed_f) = stream::calc_speed(
             self.speed_f,
-            self.yaw,
+            heading,
             self.speed.y,
             self.gravity,
             MAX_FALL,
@@ -242,7 +227,7 @@ impl Barrel {
         self.speed_f = speed_f;
     }
 
-    pub fn drag_step(&mut self, slope: Option<Vec3>) {
+    pub fn drag_step(&mut self, heading: i16, slope: Option<Vec3>) {
         let surface = match slope {
             Some(slope) => Grade::sloped(slope, GROUND_FRICTION, stream::cos_s(GROUND_ANGLE)),
             None => Grade::level(),
@@ -250,7 +235,7 @@ impl Barrel {
         let (speed, speed_f, _) = stream::grade(
             self.speed,
             self.drive,
-            0,
+            heading,
             self.speed_f,
             self.gravity,
             MAX_FALL,
@@ -282,7 +267,7 @@ impl Barrel {
             _ => {
                 self.tilt = 0;
                 self.roll = 0;
-                self.drift = 0;
+                self.spin = 0;
                 Some(Mode::Wait)
             }
         }
@@ -303,7 +288,7 @@ impl Barrel {
     }
 
     pub fn face_step(&mut self, step: Vec3) -> i16 {
-        let travel = step.length();
+        let travel = step.x.hypot(step.z);
         let facing = if step.x == 0.0 && step.z == 0.0 {
             None
         } else {
@@ -326,7 +311,7 @@ impl Barrel {
         }
         let circumference =
             (stream::cos_s(self.tilt) * ROLL_RADIUS_GAIN + SHORT_RADIUS) * ROLL_TURN;
-        let arc = stream::units_s(travel / circumference * 65536.0);
+        let arc = stream::units_s(travel / circumference * 65535.0);
         let spin = stream::units_s(f32::from(arc) * ROLL_SPIN);
         if facing.is_some_and(|facing| facing < 0) {
             self.spin = self.spin.wrapping_add(spin);
@@ -339,6 +324,24 @@ impl Barrel {
         facing.unwrap_or(self.yaw)
     }
 
+    pub fn smashed(&mut self) {
+        self.broken = true;
+        self.enter(Mode::Wait);
+    }
+
+    pub fn smash_check(&mut self, grounded: bool, landed: bool, pos: f32) -> bool {
+        if matches!(self.mode, Mode::Wait | Mode::Jump | Mode::Walk) {
+            if landed && self.last_ground - pos > FALL_DAMAGE {
+                self.smashed();
+                return true;
+            }
+            if grounded {
+                self.last_ground = pos;
+            }
+        }
+        false
+    }
+
     pub fn decay_drive(&mut self) {
         self.drive *= MOVE_DECAY;
         if self.drive.length_squared() < MOVE_EPSILON {
@@ -346,9 +349,6 @@ impl Barrel {
         }
     }
 
-    pub fn hazard(&self) -> bool {
-        self.speed.y.abs() >= FALL_DAMAGE
-    }
 }
 
 pub fn is_barrel(name: &str) -> bool {
@@ -365,28 +365,29 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
         let grounded = ground::grounded(solid, actor.pos);
         let slope = ground::slope_normal(solid, actor.pos);
         let sloped = slope.x.abs() >= SLOPE_EPSILON && slope.z.abs() >= SLOPE_EPSILON;
+        let heading = actor.angle[1];
         let next = match barrel.mode {
             Mode::Carry => continue,
             Mode::Vib0 | Mode::Vib1 => {
-                barrel.integrate();
+                barrel.integrate(heading);
                 barrel.wobble(grounded);
                 barrel.wobble_tick()
             }
             Mode::Vib2 => {
                 barrel.rock_step();
-                barrel.integrate();
+                barrel.integrate(heading);
                 barrel.wobble(grounded);
                 barrel.wobble_tick()
             }
             Mode::Wait => {
-                barrel.integrate();
+                barrel.integrate(heading);
                 barrel.rest_step(grounded, sloped)
             }
             Mode::Jump => {
                 if grounded {
                     Some(Mode::Walk)
                 } else {
-                    barrel.drag_step(None);
+                    barrel.drag_step(heading, None);
                     let tilt = LYING;
                     walk::chase_angle_s(&mut barrel.tilt, tilt, TILT_STEP);
                     None
@@ -394,10 +395,10 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
             }
             Mode::Walk => {
                 if grounded {
-                    barrel.drag_step(Some(slope));
+                    barrel.drag_step(heading, Some(slope));
                     barrel.roll_step(sloped)
                 } else {
-                    barrel.drag_step(None);
+                    barrel.drag_step(heading, None);
                     let tilt = LYING;
                     walk::chase_angle_s(&mut barrel.tilt, tilt, TILT_STEP);
                     None
@@ -405,10 +406,15 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
             }
         };
         actor.pos += barrel.speed;
+        if barrel.smash_check(grounded, grounded, actor.pos.y) {
+            continue;
+        }
         if let Some(next) = next {
             barrel.enter(next);
         }
-        actor.angle[1] = barrel.face_step(actor.pos - before);
+        if matches!(barrel.mode, Mode::Wait | Mode::Jump | Mode::Walk) {
+            actor.angle[1] = barrel.face_step(actor.pos - before);
+        }
         barrel.decay_drive();
     }
 }
@@ -417,14 +423,3 @@ pub fn hull() -> (f32, f32) {
     (BODY_HEIGHT, RADIUS)
 }
 
-pub fn attention_height() -> f32 {
-    ATTENTION_LIFT
-}
-
-pub fn draw_cull() -> (f32, f32) {
-    (CULL_LIFT, CULL_DRAW)
-}
-
-pub fn move_cull() -> (f32, f32) {
-    (CULL_LIFT, CULL_MOVE)
-}
