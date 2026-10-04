@@ -60,6 +60,7 @@ pub mod player;
 pub mod raft;
 pub mod rockfall;
 pub mod roll;
+pub mod sage;
 pub mod scenery;
 pub mod schedule;
 pub mod select;
@@ -370,6 +371,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
+    } else if sage::is_sage(&source.name) {
+        world.spawn((actor, sage::Sage::spawn(source.parameters))).id()
     } else {
         world.spawn(actor).id()
     }
@@ -551,6 +554,7 @@ pub fn build(
                     volcano::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
+                    sage::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),

@@ -658,6 +658,12 @@ impl App {
                 let (half, top) = crab.cull();
                 lift = crab.bury;
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(sage) = entity.get::<sim::sage::Sage>() {
+                if !sage.drawn() {
+                    continue;
+                }
+                let (half, top) = sage.cull();
+                (view::ActorKind::Talker, 0, top, half)
             } else if let Some(gun) = entity.get::<sim::canon::Canon>() {
                 if !gun.drawn() {
                     continue;
