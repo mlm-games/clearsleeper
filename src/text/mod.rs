@@ -9,6 +9,7 @@ use glam::Vec3;
 pub mod font;
 pub mod fontdata;
 pub mod msgbox;
+pub mod msgbox1;
 pub mod msgdata;
 pub mod msgget;
 pub mod msglayout;

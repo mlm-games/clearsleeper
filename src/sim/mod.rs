@@ -402,6 +402,7 @@ pub fn build(
     sim.world.insert_resource(crate::text::msgproc::MsgGameInfo::default());
     sim.world.insert_resource(crate::text::msgproc::MsgProcs::default());
     sim.world.insert_resource(crate::text::msgbox::Msg2Box::default());
+    sim.world.insert_resource(crate::text::msgbox1::Msg1Box::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::OrderFlags::default());

@@ -538,6 +538,37 @@ fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
     None
 }
 
+pub struct MsgArchives {
+    pub normal: Option<Archive>,
+    pub hyrule: Option<Archive>,
+}
+
+impl MsgArchives {
+    pub fn load(root: &AssetRoot) -> Self {
+        Self {
+            normal: root.read_archive(MSG_ARCHIVE).ok(),
+            hyrule: root.read_archive(MSG_ARCHIVE_HYRULE).ok(),
+        }
+    }
+
+    pub fn available(&self) -> bool {
+        self.normal.is_some()
+    }
+}
+
+impl crate::text::msgget::MsgArchive for MsgArchives {
+    fn resource(&self, name: &str) -> Option<&[u8]> {
+        self.normal
+            .as_ref()
+            .and_then(|archive| archive.read(name).ok())
+            .or_else(|| {
+                self.hyrule
+                    .as_ref()
+                    .and_then(|archive| archive.read(name).ok())
+            })
+    }
+}
+
 const MSG_ARCHIVE: &str = "files/res/Msg/bmgres.arc";
 const MSG_ARCHIVE_HYRULE: &str = "files/res/Msg/bmgresh.arc";
 const MSG_LINE_MAX: u16 = 4;
