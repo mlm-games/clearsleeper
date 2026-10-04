@@ -6,6 +6,7 @@ pub mod barrier;
 pub mod barrel;
 pub mod barricade;
 pub mod bird;
+pub mod buoybarrel;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
@@ -207,6 +208,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if buoybarrel::is_buoy_barrel(&source.name) {
+        let float = buoybarrel::BuoyBarrel::spawn(source.parameters);
+        world.spawn((actor, float)).id()
     } else if barrel::is_barrel(&source.name) {
         let cask = barrel::Barrel::spawn(source.parameters);
         world.spawn((actor, cask)).id()
@@ -361,6 +365,7 @@ pub fn build(
                     trapdoor::control.in_set(WwSimSet::Execute),
                     torch::control.in_set(WwSimSet::Execute),
                     barrel::control.in_set(WwSimSet::Execute),
+                    buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),

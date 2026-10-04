@@ -485,6 +485,12 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(float) = entity.get::<sim::buoybarrel::BuoyBarrel>() {
+                if float.gone {
+                    continue;
+                }
+                let (height, radius) = float.hull();
+                (view::ActorKind::Scenery, 0, height, radius)
             } else if let Some(cask) = entity.get::<sim::barrel::Barrel>() {
                 if cask.broken {
                     continue;
