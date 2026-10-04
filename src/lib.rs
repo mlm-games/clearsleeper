@@ -251,7 +251,8 @@ impl App {
                 | sim::events::SimEvent::Restart
                 | sim::events::SimEvent::Credits
                 | sim::events::SimEvent::CreditsDone
-                | sim::events::SimEvent::Se(_) => None,
+                | sim::events::SimEvent::Se(_)
+                | sim::events::SimEvent::Bgm(_) => None,
             };
             if let Some(cue) = cue {
                 self.audio.play(cue);
@@ -525,6 +526,12 @@ impl App {
                     block.hull_height(),
                     block.hull(),
                 )
+            } else if let Some(idol) = entity.get::<sim::statue::Statue>() {
+                if idol.alpha == sim::statue::TRANSPARENT {
+                    continue;
+                }
+                let (half, top) = idol.cull();
+                (view::ActorKind::Scenery, 0, top, half)
             } else if let Some(plunger) = entity.get::<sim::swhammer::Swhammer>() {
                 let (radius, top) = plunger.cull();
                 lift = plunger.top;

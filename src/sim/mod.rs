@@ -56,6 +56,7 @@ pub mod shop;
 pub mod sea;
 pub mod ship;
 pub mod shmrgrd;
+pub mod statue;
 pub mod stone;
 pub mod stream;
 pub mod swim;
@@ -241,6 +242,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             .test(((source.parameters >> 8) & 0xFF) as u8);
         let guard = shmrgrd::Shmrgrd::spawn(source.parameters, set);
         world.spawn((actor, guard)).id()
+    } else if statue::is_statue(&source.name) {
+        let idol = statue::Statue::spawn(source.parameters);
+        world.spawn((actor, idol)).id()
     } else if torch::is_torch(&source.name) {
         let brand = torch::Torch::spawn(source.parameters, 1.0);
         world.spawn((actor, brand)).id()
@@ -440,6 +444,7 @@ pub fn build(
                 (
                     swhammer::control.in_set(WwSimSet::Execute),
                     shmrgrd::control.in_set(WwSimSet::Execute),
+                    statue::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
