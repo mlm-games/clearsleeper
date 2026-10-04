@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
+use bevy_ecs::prelude::{QueryFilter, Without, World};
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;
@@ -777,6 +778,7 @@ impl App {
         self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::spawn_actors(&mut self.sim.world, &tables);
+        install_tag_events(&mut self.sim.world, &tables);
         if !rooms.is_empty() {
             if let Some(set) = load_rooms(&tables, &rooms, stories) {
                 self.install_room_set(set, frame);
@@ -798,7 +800,40 @@ impl App {
         self.rooms = rooms;
     }
 
-    fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
+    fn install_tag_events(world: &mut World, tables: &dzs::StageTables) {
+    let Ok(list) = world.get_resource::<sim::event::EventList>() else {
+        return;
+    };
+    let mut query =
+        world.query_filtered::<(Entity, &sim::actor::Actor), Without<sim::flags::TagEvent>>();
+    let pending: Vec<(Entity, sim::flags::TagEvent)> = query
+        .iter(world)
+        .filter(|(_, actor)| sim::flags::is_tag_event(&actor.name))
+        .filter_map(|(entity, actor)| {
+            let event = (actor.parameters >> 24) as u8;
+            let index = tables.event_name(event).and_then(|name| list.event_index(name))?;
+            let source = tables.actors().iter().find(|source| {
+                source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits()
+            });
+            let scale = source.map_or([1.0, 1.0, 1.0], |source| source.scale);
+            Some((
+                entity,
+                sim::flags::tag_event(
+                    actor.parameters,
+                    actor.angle[2] as u16,
+                    scale,
+                    actor.name == sim::flags::TAG_ISLAND_ACTOR,
+                    index,
+                ),
+            ))
+        })
+        .collect();
+    for (entity, tag) in pending {
+        world.entity_mut(entity).insert(tag);
+    }
+}
+
+fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
         match set.collision {
             Some(collision) => {
                 let (bounds_min, bounds_max) = collision.bounds();

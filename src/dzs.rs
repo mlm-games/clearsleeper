@@ -14,6 +14,9 @@ const COLO_LEN: usize = 0x0C;
 const PALE_LEN: usize = 0x2C;
 const VIRT_LEN: usize = 0x24;
 const ACTOR_LEN: usize = 0x20;
+const SCALED_ACTOR_LEN: usize = 0x24;
+const EVENT_LEN: usize = 0x18;
+const EVENT_NAME_LEN: usize = 15;
 const ACTOR_NAME_LEN: usize = 8;
 const SEA_ACTOR: &str = "sea";
 pub const DEFAULT_WAVE_MAX: u8 = 10;
@@ -74,6 +77,7 @@ pub struct StageActor {
     pub angle: [i16; 3],
     pub set_id: u16,
     pub room: i8,
+    pub scale: [f32; 3],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +108,7 @@ pub struct StageTables {
     skies: Vec<[u8; 3]>,
     actors: Vec<StageActor>,
     exits: Vec<StageExit>,
+    events: Vec<String>,
     name: String,
     has_sea: bool,
 }
@@ -145,18 +150,38 @@ fn layer_chunk(layer: u8) -> Option<[u8; 4]> {
     Some([b'A', b'C', b'T', digit])
 }
 
+fn scene_chunk(layer: u8) -> Option<u8> {
+    match layer {
+        0..=9 => Some(b'0' + layer),
+        10 => Some(b'a'),
+        11 => Some(b'b'),
+        _ => None,
+    }
+}
+
 pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, DzsError> {
     let nodes = chunk_nodes(data)?;
     let mut actors = Vec::new();
     for tag in [b"ACTR", b"TGOB"] {
         if let Some((count, offset)) = chunk_locate(&nodes, tag) {
-            actors.extend(parse_actors(data, count, offset, room)?);
+            actors.extend(parse_actors(data, count, offset, room, false)?);
         }
     }
     if let Some(tag) = layer_chunk(layer) {
         if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
-            actors.extend(parse_actors(data, count, offset, room)?);
+            actors.extend(parse_actors(data, count, offset, room, false)?);
         }
+    }
+    for tag in [Some([b'S', b'C', b'O', b'B']), scene_chunk(layer).map(|digit| [b'S', b'C', b'O', digit])]
+        .into_iter()
+        .flatten()
+    {
+        if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
+            actors.extend(parse_actors(data, count, offset, room, true)?);
+        }
+    }
+    if let Some((count, offset)) = chunk_locate(&nodes, b"TGDR") {
+        actors.extend(parse_actors(data, count, offset, room, true)?);
     }
     Ok(actors)
 }
@@ -208,6 +233,10 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_exits(data, count, offset)?,
         None => Vec::new(),
     };
+    let events = match locate(b"EVNT") {
+        Some((count, offset)) => parse_events(data, count, offset)?,
+        None => Vec::new(),
+    };
     let has_sea = actors.iter().any(|actor| actor.name == SEA_ACTOR);
     Ok(StageTables {
         placements,
@@ -219,9 +248,31 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         skies,
         actors,
         exits,
+        events,
         name: String::new(),
         has_sea,
     })
+}
+
+fn parse_events(data: &[u8], count: u32, offset: u32) -> Result<Vec<String>, DzsError> {
+    let end = table_end(offset as usize, count as usize, EVENT_LEN)?;
+    if end > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    let mut events = Vec::with_capacity(count as usize);
+    for index in 0..count as usize {
+        let at = offset as usize + index * EVENT_LEN + 1;
+        if at + EVENT_NAME_LEN > data.len() {
+            return Err(DzsError::BadTable);
+        }
+        let raw: [u8; EVENT_NAME_LEN] = read_array(data, at)?;
+        let stop = raw
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(EVENT_NAME_LEN);
+        events.push(String::from_utf8_lossy(&raw[..stop]).into_owned());
+    }
+    Ok(events)
 }
 
 fn parse_placements(data: &[u8], count: u32, offset: u32) -> Result<Vec<Placement>, DzsError> {
@@ -346,14 +397,16 @@ fn parse_actors(
     count: u32,
     offset: u32,
     room: i8,
+    scaled: bool,
 ) -> Result<Vec<StageActor>, DzsError> {
-    let end = table_end(offset as usize, count as usize, ACTOR_LEN)?;
+    let stride = if scaled { SCALED_ACTOR_LEN } else { ACTOR_LEN };
+    let end = table_end(offset as usize, count as usize, stride)?;
     if end > data.len() {
         return Err(DzsError::BadTable);
     }
     let mut actors = Vec::with_capacity(count as usize);
     for index in 0..count as usize {
-        let at = offset as usize + index * ACTOR_LEN;
+        let at = offset as usize + index * stride;
         let name: [u8; ACTOR_NAME_LEN] = read_array(data, at)?;
         let stop = name
             .iter()
@@ -374,6 +427,15 @@ fn parse_actors(
             ],
             set_id: read_u16(data, at + 0x1E)?,
             room,
+            scale: if scaled {
+                [
+                    f32::from(data[at + 0x20]) * 0.01,
+                    f32::from(data[at + 0x21]) * 0.01,
+                    f32::from(data[at + 0x22]) * 0.01,
+                ]
+            } else {
+                [1.0, 1.0, 1.0]
+            },
         });
     }
     Ok(actors)
@@ -382,6 +444,10 @@ fn parse_actors(
 impl StageTables {
     pub fn actors(&self) -> &[StageActor] {
         &self.actors
+    }
+
+    pub fn event_name(&self, id: u8) -> Option<&str> {
+        self.events.get(usize::from(id)).map(String::as_str)
     }
 
     pub fn exit(&self, id: u8) -> Option<&StageExit> {

@@ -1,6 +1,12 @@
 use bevy_ecs::prelude::*;
 
+use super::actor::Actor;
+use super::event::{ActiveEvents, EventList};
+use super::player::Player;
+
 pub const EVENT_SWITCH_ACTOR: &str = "Evsw";
+pub const TAG_EVENT_ACTOR: &str = "TagEv";
+pub const TAG_ISLAND_ACTOR: &str = "TagIsl";
 
 const SWITCH_SHIFT: u32 = 0;
 const EVENT_SHIFT: u32 = 8;
@@ -407,12 +413,130 @@ pub fn control(
     stories: Res<StoryBits>,
     mut switches: ResMut<Switches>,
     actors: Query<&EventSwitch>,
+    mut active: ResMut<ActiveEvents>,
+    list: Res<EventList>,
+    players: Query<&Player>,
+    tags: Query<(Entity, &Actor, &mut TagEvent)>,
 ) {
     for switch in &actors {
         if stories.test(switch.event) {
             switches.set(switch.switch_no);
         } else if !switch.hold {
             switches.clear(switch.switch_no);
+        }
+    }
+    if let Some(player) = players.iter().next() {
+        tag_triggers(
+            &mut active,
+            &list,
+            &stories,
+            &mut switches,
+            player,
+            &mut tags,
+        );
+    }
+}
+
+const NO_SWITCH: u8 = 0xFF;
+const NO_EVENT_FLAG: u16 = 0xFFFF;
+const RADIUS_SCALE: f32 = 100.0;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TagState {
+    Hunt,
+    Event,
+    Wait,
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct TagEvent {
+    pub index: usize,
+    pub swbit: u8,
+    pub swbit2: u8,
+    pub kind: u8,
+    pub event_flag: u16,
+    pub radius: f32,
+    pub height: f32,
+    pub state: TagState,
+}
+
+pub fn is_tag_event(name: &str) -> bool {
+    name == TAG_EVENT_ACTOR || name == TAG_ISLAND_ACTOR
+}
+
+pub fn tag_event(
+    parameters: u32,
+    event_flag: u16,
+    scale: [f32; 3],
+    island: bool,
+    index: usize,
+) -> TagEvent {
+    let swbit2 = if island {
+        NO_SWITCH
+    } else {
+        ((parameters >> 16) & 0xFF) as u8
+    };
+    TagEvent {
+        index,
+        swbit: ((parameters >> 8) & 0xFF) as u8,
+        swbit2,
+        kind: (parameters & 0xFF) as u8,
+        event_flag,
+        radius: scale[0] * RADIUS_SCALE,
+        height: scale[1] * RADIUS_SCALE,
+        state: TagState::Hunt,
+    }
+}
+
+fn tag_triggers(
+    active: &mut ActiveEvents,
+    list: &EventList,
+    stories: &StoryBits,
+    switches: &mut Switches,
+    player: &Player,
+    tags: &mut Query<(Entity, &Actor, &mut TagEvent)>,
+) {
+    for (entity, actor, mut tag) in tags.iter_mut() {
+        if tag.state == TagState::Event {
+            if active.end_check(tag.index) {
+                tag.state = TagState::Wait;
+            }
+            continue;
+        }
+        if tag.state == TagState::Wait {
+            if tag.swbit == NO_SWITCH || switches.test(tag.swbit) {
+                continue;
+            }
+            tag.state = TagState::Hunt;
+        }
+        let terms = if tag.kind == 0x0C {
+            tag.swbit2 == NO_SWITCH || !switches.test(tag.swbit2)
+        } else {
+            (tag.swbit2 == NO_SWITCH || switches.test(tag.swbit2))
+                && (tag.event_flag == NO_EVENT_FLAG
+                    || tag.event_flag == 0
+                    || stories.test(tag.event_flag))
+        };
+        if !terms {
+            continue;
+        }
+        if tag.swbit != NO_SWITCH && switches.test(tag.swbit) {
+            tag.state = TagState::Wait;
+            continue;
+        }
+        if tag.state == TagState::Hunt {
+            let dx = player.pos.x - actor.pos.x;
+            let dz = player.pos.z - actor.pos.z;
+            let dy = (player.pos.y - actor.pos.y).abs();
+            if dx * dx + dz * dz >= tag.radius * tag.radius || dy > tag.height {
+                continue;
+            }
+        }
+        if active.order(list, tag.index, entity) {
+            if tag.swbit != NO_SWITCH {
+                switches.set(tag.swbit);
+            }
+            tag.state = TagState::Event;
         }
     }
 }

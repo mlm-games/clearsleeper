@@ -53,6 +53,7 @@ fn golden_stage_actor_table_parses_records() {
             angle: [0, 0, 0],
             set_id: 0xFFFF,
             room: dzs::NO_ROOM,
+            scale: [1.0, 1.0, 1.0],
         }
     );
     assert_eq!(
@@ -64,6 +65,7 @@ fn golden_stage_actor_table_parses_records() {
             angle: [0, -3094, 0],
             set_id: 0xFFFF,
             room: dzs::NO_ROOM,
+            scale: [1.0, 1.0, 1.0],
         }
     );
     assert!(
