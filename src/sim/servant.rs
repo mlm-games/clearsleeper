@@ -256,6 +256,8 @@ pub struct Ctx<'a> {
     pub procs: &'a mut MsgProcs,
     pub info: &'a mut MsgGameInfo,
     pub msg: &'a mut Msg1Box,
+    pub stick: f32,
+    pub stick_angle: i16,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
