@@ -37,6 +37,7 @@ pub mod frame;
 pub mod floormaster;
 pub mod ghostship;
 pub mod ground;
+pub mod gryw;
 pub mod gull;
 pub mod hammer;
 pub mod hammerhit;
@@ -51,6 +52,7 @@ pub mod intent;
 pub mod inventory;
 pub mod item;
 pub mod jump;
+pub mod kita;
 pub mod kn;
 pub mod ladder;
 pub mod koisi;
@@ -412,9 +414,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if swlight::is_swlight(&source.name) {
         let moon = swlight::Swlight::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, moon)).id()
+    } else if gryw::is_gryw(&source.name) {
+        let pool = gryw::Gryw::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, pool)).id()
     } else if hmlif::is_hmlif(&source.name) {
         let platform = hmlif::Hmlif::spawn(source.parameters, source.angle[2]);
         world.spawn((actor, platform)).id()
+    } else if kita::is_kita(&source.name) {
+        let flower = kita::Kita::spawn(source.parameters, actor.pos, actor.angle);
+        world.spawn((actor, flower)).id()
     } else if canon::is_canon(&source.name) {
         match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
             Some(gun) => world.spawn((actor, gun)).id(),
@@ -694,6 +702,8 @@ pub fn build(
                     swpush::control.in_set(WwSimSet::Execute),
                     mflft::control.in_set(WwSimSet::Execute),
                     hmlif::control.in_set(WwSimSet::Execute),
+                    kita::control.in_set(WwSimSet::Execute),
+                    gryw::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
                     chuchu::control.in_set(WwSimSet::Execute),

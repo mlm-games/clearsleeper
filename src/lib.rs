@@ -718,6 +718,15 @@ impl App {
                 )
             } else if entity.contains::<sim::redead::ReDead>() {
                 (view::ActorKind::Enemy, 0, 260.0, 100.0)
+            } else if let Some(flower) = entity.get::<sim::kita::Kita>() {
+                let (min, max) = flower.cull();
+                lift = min.y;
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max.y - min.y,
+                    (max.x - min.x) * 0.5,
+                )
             } else if let Some(platform) = entity.get::<sim::hmlif::Hmlif>() {
                 let (min, max) = platform.cull();
                 lift = min.y;
