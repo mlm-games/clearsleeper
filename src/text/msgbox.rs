@@ -5,7 +5,7 @@ use super::msgdata::MsgLenState;
 use super::msglayout::MsgLayoutState;
 use super::msgget::{MsgArchive, MsgGet};
 use super::msgproc::{
-    MsgGameInfo, MsgHio, MsgIconPic, fop_msgm_out_font_draw, fop_msgm_out_font_set,
+    MsgGameInfo, MeterMsgHio, MsgIconPic, fop_msgm_out_font_draw, fop_msgm_out_font_set,
     fop_msgm_value_increase,
 };
 use super::{
@@ -1352,27 +1352,7 @@ impl Msg2Env {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Msg2Hio {
-    pub field_0x5: u32,
-    pub field_0x9: u32,
-    pub field_0xd: u32,
-    pub field_0x11: u32,
-    pub field_0x15: u32,
-    pub field_0x19: u32,
-    pub field_0x1d: u32,
-    pub field_0x21: u32,
-    pub field_0x25: u32,
-    pub field_0x29: u8,
-    pub field_0x38: i16,
-    pub field_0x3b: u8,
-    pub field_0x3c: i16,
-    pub field_0x4b: u8,
-    pub field_0x58: i16,
-    pub field_0x5b: u8,
-    pub field_0x5e: u8,
-    pub field_0x70: i16,
-}
+pub use super::msghio::MeterMsgHio as Msg2Hio;
 
 impl Msg2Hio {
     pub fn aim_brightness(&self, env: &Msg2Env) -> u8 {
@@ -2803,7 +2783,7 @@ impl Msg2Box {
         );
     }
 
-    pub fn out_font_draw(&mut self, out_hio: &MsgHio) {
+    pub fn out_font_draw(&mut self, out_hio: &MeterMsgHio) {
         let var_f31 = self
             .board_pane
             .first()
@@ -2868,7 +2848,7 @@ impl Msg2Box {
         }
     }
 
-    pub fn draw_list(&mut self, out_hio: &MsgHio, fonts: &mut FontBank) -> Msg2DrawOutput {
+    pub fn draw_list(&mut self, out_hio: &MeterMsgHio, fonts: &mut FontBank) -> Msg2DrawOutput {
         self.out_font_draw(out_hio);
 
         let mut out = Msg2DrawOutput {

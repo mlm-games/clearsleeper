@@ -1050,7 +1050,7 @@ pub fn fop_msgm_select_message_get<F: FontSlot>(
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MsgHio {
+pub struct MeterMsgHio {
     pub field_0x6a: i16,
     pub field_0x87: u8,
     pub field_0x88: u8,
@@ -1265,7 +1265,7 @@ struct AnimePhases {
     temp5: i16,
 }
 
-fn anime_phases(hio: &MsgHio, param_4: i16) -> AnimePhases {
+fn anime_phases(hio: &MeterMsgHio, param_4: i16) -> AnimePhases {
     let temp = ((hio.field_0x88 as i32)
         + hio.field_0x87 as i32
         + hio.field_0x89 as i32
@@ -1283,7 +1283,7 @@ fn anime_phases(hio: &MsgHio, param_4: i16) -> AnimePhases {
     }
 }
 
-fn anime_piece_blend(hio: &MsgHio, param_3: i16, param_4: i16) -> Option<[f32; 4]> {
+fn anime_piece_blend(hio: &MeterMsgHio, param_3: i16, param_4: i16) -> Option<[f32; 4]> {
     let p = anime_phases(hio, param_4);
     if param_3 < p.temp2 {
         Some(BLEND_FULL)
@@ -1303,7 +1303,7 @@ fn anime_piece_blend(hio: &MsgHio, param_3: i16, param_4: i16) -> Option<[f32; 4
 }
 
 pub fn fop_msgm_out_font_stick_anime_piece(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     i_sdw_pic: &mut MsgIconPic,
     param_3: i16,
@@ -1316,7 +1316,7 @@ pub fn fop_msgm_out_font_stick_anime_piece(
 }
 
 pub fn fop_msgm_out_font_stick_anime_piece_offsets(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     param_2: i16,
     param_3: i16,
@@ -1340,7 +1340,7 @@ fn swap_i32(a: &mut i32, b: &mut i32) {
 }
 
 pub fn fop_msgm_out_font_stick_anime(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     i_sdw_pic: &mut MsgIconPic,
     param_3: &mut i32,
@@ -1376,7 +1376,7 @@ pub fn fop_msgm_out_font_stick_anime(
 }
 
 pub fn fop_msgm_out_font_stick_anime_offsets(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     param_2: &mut i32,
     param_3: &mut i32,
@@ -1414,7 +1414,7 @@ pub fn fop_msgm_out_font_stick_anime_offsets(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_stick_anime_dir(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     i_sdw_pic: &mut MsgIconPic,
     param_3: &mut i32,
@@ -1450,7 +1450,7 @@ pub fn fop_msgm_out_font_stick_anime_dir(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_stick_anime_dir_offsets(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     param_2: &mut i32,
     param_3: &mut i32,
@@ -1490,7 +1490,7 @@ pub fn fop_msgm_out_font_stick_anime_dir_offsets(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_stick_anime2(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     i_sdw_pic: &mut MsgIconPic,
     param_3: &mut i32,
@@ -1538,7 +1538,7 @@ pub fn fop_msgm_out_font_stick_anime2(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_stick_anime2_offsets(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     param_2: &mut i32,
     param_3: &mut i32,
@@ -1633,7 +1633,7 @@ pub fn fop_msgm_out_font_arrow_offsets(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_draw(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     i_sdw_pic: &mut MsgIconPic,
     mut param_3: i32,
@@ -1756,7 +1756,7 @@ pub fn fop_msgm_out_font_draw(
 
 #[allow(clippy::too_many_arguments)]
 pub fn fop_msgm_out_font_draw2(
-    hio: &MsgHio,
+    hio: &MeterMsgHio,
     i_icon_pic: &mut MsgIconPic,
     param_2: &mut MsgIconPic,
     param_3: i32,

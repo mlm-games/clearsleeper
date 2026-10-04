@@ -9,7 +9,7 @@ use super::msgdata::{MsgLenState, MsgStickFlags};
 use super::msglayout::{MsgLayoutState, fop_msgm_get_color_table};
 use super::msgget::{MsgArchive, MsgGet, hyrule_language_check};
 use super::msgproc::{
-    MsgGameInfo, MsgHio, MsgIconPic, MyPicture, fop_msgm_out_font_draw, fop_msgm_out_font_set,
+    MsgGameInfo, MeterMsgHio, MsgIconPic, MyPicture, fop_msgm_out_font_draw, fop_msgm_out_font_set,
     fop_msgm_value_increase,
 };
 use super::{
@@ -413,7 +413,7 @@ pub struct Msg1Ctx<'a, F: MsgArchive + ?Sized> {
     pub screen: &'a Msg1Screen,
     pub len: &'a MsgLenState<'a>,
     pub layout: &'a MsgLayoutState<'a>,
-    pub out_hio: &'a MsgHio,
+    pub out_hio: &'a MeterMsgHio,
     pub stick: Msg1Stick,
 }
 
@@ -3362,7 +3362,7 @@ impl Msg1Box {
         }
     }
 
-    pub fn out_font_draw(&mut self, hio: &Msg1Hio, out_hio: &MsgHio) {
+    pub fn out_font_draw(&mut self, hio: &Msg1Hio, out_hio: &MeterMsgHio) {
         let line_space = hio.field_0x5e as i32;
         let bounds = self.text_bounds(0);
         let pane_alpha = self.m0544[0].state.now_alpha;
@@ -3410,7 +3410,7 @@ impl Msg1Box {
         }
     }
 
-    pub fn draw_msg(&mut self, hio: &Msg1Hio, out_hio: &MsgHio) {
+    pub fn draw_msg(&mut self, hio: &Msg1Hio, out_hio: &MeterMsgHio) {
         self.out_font_draw(hio, out_hio);
         if self.status == STATUS_SELECT_YOKO {
             self.arrow_rot

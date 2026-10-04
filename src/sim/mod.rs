@@ -398,6 +398,7 @@ pub fn build(
     sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(bombflower::Blasts::default());
     sim.world.insert_resource(crate::text::font::FontBank::default());
+    sim.world.insert_resource(crate::text::msghio::MsgHio::default());
     sim.world.insert_resource(crate::text::msgproc::MsgFlags::default());
     sim.world.insert_resource(crate::text::msgproc::MsgGameInfo::default());
     sim.world.insert_resource(crate::text::msgproc::MsgProcs::default());

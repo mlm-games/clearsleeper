@@ -12,6 +12,7 @@ pub mod msgbox;
 pub mod msgbox1;
 pub mod msgdata;
 pub mod msgget;
+pub mod msghio;
 pub mod msglayout;
 pub mod msgproc;
 pub mod msgtags;
