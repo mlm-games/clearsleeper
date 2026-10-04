@@ -52,6 +52,7 @@ pub mod ship;
 pub mod stone;
 pub mod swim;
 pub mod tag;
+pub mod trapdoor;
 pub mod talk;
 pub mod tingle;
 pub mod transition;
@@ -202,6 +203,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if trapdoor::is_trapdoor(&source.name) {
+        let hatch = trapdoor::Trapdoor::spawn();
+        world.spawn((actor, hatch)).id()
     } else if barricade::is_barricade(&source.name) {
         let fence = barricade::Barricade::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, fence)).id()
@@ -341,6 +345,7 @@ pub fn build(
                     barrier::control.in_set(WwSimSet::Execute),
                     raft::control.in_set(WwSimSet::Execute),
                     barricade::control.in_set(WwSimSet::Execute),
+                    trapdoor::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),

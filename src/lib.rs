@@ -485,6 +485,16 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(hatch) = entity.get::<sim::trapdoor::Trapdoor>() {
+                if hatch.hinge == sim::trapdoor::Hinge::Swinging {
+                    continue;
+                }
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    sim::trapdoor::TRIGGER_HEIGHT,
+                    sim::trapdoor::TRIGGER_RADIUS * 0.5,
+                )
             } else if let Some(fence) = entity.get::<sim::barricade::Barricade>() {
                 if !fence.blocking(0) {
                     continue;
