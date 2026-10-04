@@ -376,6 +376,11 @@ pub fn build(
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
+    sim.world.insert_resource(crate::text::font::FontBank::default());
+    sim.world.insert_resource(crate::text::msgproc::MsgFlags::default());
+    sim.world.insert_resource(crate::text::msgproc::MsgGameInfo::default());
+    sim.world.insert_resource(crate::text::msgproc::MsgProcs::default());
+    sim.world.insert_resource(crate::text::msgbox::Msg2Box::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::OrderFlags::default());
