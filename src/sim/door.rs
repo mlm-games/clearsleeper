@@ -25,7 +25,7 @@ pub const SLIDING_ACTORS: [&str; 8] = [
     "ZenS12",
 ];
 
-pub const NO_ROOM: u8 = 0x3F;
+pub const JAIL_ACTOR: &str = "ATdoor";
 pub const NO_SWITCH: u8 = 0xFF;
 pub const BOSS_SWITCH_FLOOR: u8 = 0x80;
 
@@ -385,4 +385,71 @@ fn chase(current: &mut f32, target: f32, step: f32) -> bool {
 
 pub fn solid(door: &Door) -> bool {
     door.bars_y < BAR_HEIGHT
+}
+
+pub const JAIL_OPEN: i16 = 0x4000;
+pub const JAIL_STEP: i16 = 0x400;
+pub const JAIL_HEIGHT: f32 = 150.0;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Jail {
+    Wait,
+    CloseWait,
+    Close,
+    OpenWait,
+    Open,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JailDoor {
+    pub switch_no: u8,
+    pub action: Jail,
+    pub swing: i16,
+}
+
+impl JailDoor {
+    pub fn spawn(parameters: u32) -> Self {
+        Self {
+            switch_no: (parameters & SWITCH_MASK) as u8,
+            action: Jail::Wait,
+            swing: 0,
+        }
+    }
+
+    pub fn locked(&self) -> bool {
+        self.switch_no == NO_SWITCH
+    }
+
+    pub fn open(&self) -> bool {
+        self.swing >= JAIL_OPEN
+    }
+}
+
+pub fn jail_control(switches: Res<Switches>, mut doors: Query<&mut JailDoor>) {
+    for mut door in &mut doors {
+        let latched = switches.test(door.switch_no);
+        door.action = match door.action {
+            Jail::Wait => Jail::Wait,
+            Jail::CloseWait if latched => Jail::Open,
+            Jail::CloseWait => Jail::CloseWait,
+            Jail::OpenWait if !latched => Jail::Close,
+            Jail::OpenWait => Jail::OpenWait,
+            Jail::Close => {
+                door.swing = (door.swing - JAIL_STEP).max(0);
+                if door.swing == 0 {
+                    Jail::CloseWait
+                } else {
+                    Jail::Close
+                }
+            }
+            Jail::Open => {
+                door.swing = (door.swing + JAIL_STEP).min(JAIL_OPEN);
+                if door.swing >= JAIL_OPEN {
+                    Jail::OpenWait
+                } else {
+                    Jail::Open
+                }
+            }
+        };
+    }
 }

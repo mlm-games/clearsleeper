@@ -7,6 +7,7 @@ pub mod bomb;
 pub mod chest;
 pub mod carry;
 pub mod cleared;
+pub mod clock;
 pub mod collision;
 pub mod combat;
 pub mod damage;
@@ -179,6 +180,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if door::Door::is_sliding(&source.name) {
         let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Slide);
         world.spawn((actor, gate)).id()
+    } else if source.name == door::JAIL_ACTOR {
+        let cell = door::JailDoor::spawn(source.parameters);
+        world.spawn((actor, cell)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -232,6 +236,8 @@ pub fn build(
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
+    sim.world.insert_resource(inventory::Got::default());
+    sim.world.insert_resource(clock::Clock::default());
     sim.world.insert_resource(select::Select::default());
     sim.world.insert_resource(carry::Carry::default());
     sim.world.insert_resource(chest::Chests::default());
@@ -293,16 +299,18 @@ pub fn build(
                     ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
+                    door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),
-                    talk::control.in_set(WwSimSet::Execute),
-                    flags::control.in_set(WwSimSet::Execute),
-                    event::control.in_set(WwSimSet::Execute),
-                    msg::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
+                    talk::control.in_set(WwSimSet::Execute),
+                    flags::control.in_set(WwSimSet::Execute),
+                    clock::control.in_set(WwSimSet::Execute),
+                    event::control.in_set(WwSimSet::Execute),
+                    msg::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
@@ -311,13 +319,13 @@ pub fn build(
                     jump::control.in_set(WwSimSet::Execute),
                     roll::control.in_set(WwSimSet::Execute),
                     hop::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     combat::control.in_set(WwSimSet::Execute),
                     item::control.in_set(WwSimSet::Execute),
                     enemy::control.in_set(WwSimSet::Execute),
                     balloon::control.in_set(WwSimSet::Execute),
-                )
-                    .chain(),
-                (
                     fire::control.in_set(WwSimSet::Execute),
                     gull::control.in_set(WwSimSet::Execute),
                 )

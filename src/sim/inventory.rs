@@ -3,9 +3,11 @@ use bevy_ecs::prelude::*;
 pub const SLOT_COUNT: usize = 21;
 pub const BOW_SLOT: usize = 12;
 pub const BOMB_SLOT: usize = 13;
+pub const WAKER_SLOT: usize = 2;
 pub const NO_ITEM: u8 = 0xFF;
 
 pub const ITEM_BOW: u8 = 0x27;
+pub const ITEM_WIND_WAKER: u8 = 0x22;
 pub const FIRST_BOMB: u8 = 0x0B;
 
 const SLOT_ITEMS: [(u8, usize); 15] = [
@@ -75,5 +77,48 @@ impl Equipped {
         if let Some(slot) = slot_of(item) {
             self.grant(slot, item);
         }
+    }
+}
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Got {
+    flags: [u8; SLOT_COUNT],
+}
+
+impl Default for Got {
+    fn default() -> Self {
+        Self {
+            flags: [0; SLOT_COUNT],
+        }
+    }
+}
+
+impl Got {
+    pub fn has(&self, field: usize, bit: u8) -> bool {
+        bit < 8 && self.flags.get(field).is_some_and(|flags| flags & (1 << bit) != 0)
+    }
+
+    pub fn gain(&mut self, field: usize, bit: u8) {
+        if bit < 8
+            && let Some(flags) = self.flags.get_mut(field)
+        {
+            *flags |= 1 << bit;
+        }
+    }
+
+    pub fn clear(&mut self, field: usize, bit: u8) {
+        if bit < 8
+            && let Some(flags) = self.flags.get_mut(field)
+        {
+            *flags &= !(1 << bit);
+        }
+    }
+
+    pub fn words(&self) -> [u8; SLOT_COUNT] {
+        self.flags
+    }
+
+    pub fn from_words(flags: [u8; SLOT_COUNT]) -> Self {
+        Self { flags }
     }
 }

@@ -448,6 +448,16 @@ impl App {
             } else if let Some(door) = entity.get::<sim::door::Door>() {
                 let height = door.key_height() + sim::door::BAR_HEIGHT - door.bars_y;
                 (view::ActorKind::Scenery, 0, height, 40.0)
+            } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
+                if cell.open() {
+                    continue;
+                }
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    sim::door::JAIL_HEIGHT,
+                    40.0,
+                )
             } else {
                 continue;
             };

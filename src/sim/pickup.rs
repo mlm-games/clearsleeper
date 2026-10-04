@@ -104,6 +104,7 @@ pub fn control(
     mut held: ResMut<Held>,
     mut zones: ResMut<super::flags::ZoneActors>,
     mut equipped: ResMut<super::inventory::Equipped>,
+    mut got: ResMut<super::inventory::Got>,
     mut events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
@@ -127,6 +128,9 @@ pub fn control(
             continue;
         }
         apply(pickup.item, &mut health, &mut rupees, &mut held);
+        if let Some(slot) = super::inventory::slot_of(pickup.item) {
+            got.gain(slot, 0);
+        }
         equipped.collect(pickup.item);
         events.list.push(SimEvent::Collect);
         zones.mark_done(actor.room, actor.set_id);
