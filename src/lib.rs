@@ -453,6 +453,23 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(flower) = entity.get::<sim::bombflower::Bombflower>() {
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    sim::bombflower::FLOWER_TOP,
+                    flower.radius(),
+                )
+            } else if let Some(crawler) = entity.get::<sim::bombflower::Crawler>() {
+                if crawler.spent {
+                    continue;
+                }
+                (
+                    view::ActorKind::Bomb,
+                    0,
+                    sim::bombflower::CRAWLER_TOP,
+                    sim::bombflower::CRAWLER_HALF,
+                )
             } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
                 if cell.open() {
                     continue;

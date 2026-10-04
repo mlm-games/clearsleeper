@@ -28,16 +28,12 @@ pub const SLIDING_ACTORS: [&str; 8] = [
 pub const KEY_DOOR_ACTORS: [&str; 5] = ["doorKD", "ZenshKD", "K_ZshKD", "doorSH", "doorSZ"];
 
 pub const ROCK_BARS: usize = 3;
-pub const ROCK_CALC: usize = 3;
-pub const ROCK_SEED: f32 = 5.0;
 pub const ROCK_RISE_STEP: f32 = 0.25;
 pub const ROCK_RISE_MIN: f32 = 0.3;
 pub const ROCK_DUST_STEP: f32 = 0.5;
 pub const ROCK_DUST_MIN: f32 = 0.3;
 pub const ROCK_FALL_STEP: f32 = 0.3;
 pub const ROCK_FALL_MIN: f32 = 0.3;
-pub const ROCK_PEAK: f32 = 0.9;
-pub const ROCK_FLOOR: f32 = 0.1;
 
 pub const JAIL_ACTOR: &str = "ATdoor";
 pub const NO_SWITCH: u8 = 0xFF;
@@ -70,6 +66,9 @@ pub const KEY_DOOR_CLEAR_TYPES: [u8; 2] = [0, 1];
 pub const SHUTTER_KEY_TYPES: [u8; 2] = [4, 5];
 pub const GENOCIDE_TYPES: [u8; 2] = [2, 4];
 pub const FEELER_TYPES: [u8; 2] = [3, 4];
+pub const LATCH_FRONT: u8 = 2;
+pub const LATCH_BACK: u8 = 5;
+pub const GENOCIDE_FRONT: u8 = 1;
 
 const ROOM_MASK: u32 = 0x3F;
 const ROOM_SHIFT: u32 = 6;
@@ -115,12 +114,9 @@ pub struct Door {
     pub bars: i32,
     pub bars_y: f32,
     pub bars_speed: f32,
-    pub front_bar: i32,
-    pub back_bar: i32,
+    pub barrier: i32,
     pub slide: f32,
     pub slide_speed: f32,
-    pub open_flag: bool,
-    pub close_flag: bool,
     pub delay: u8,
     pub rock_delay: [u8; ROCK_BARS],
     pub rock: [f32; ROCK_BARS],
@@ -138,7 +134,7 @@ impl Door {
             event_no: ((parameters >> EVENT_SHIFT) & SWITCH_MASK) as u8,
             front_room: (packed & ROOM_MASK) as u8,
             back_room: ((packed >> ROOM_SHIFT) & ROOM_MASK) as u8,
-            ship_id: (angle[2] as u8) & 0x3F,
+            ship_id: (angle[2] as u8 & ROOM_MASK as u8),
             arg1: (angle[2] >> 8) as u8,
             back_switch: ((parameters >> BACK_SWITCH_SHIFT) & SWITCH_MASK) as u8,
             front_check: 2,
@@ -146,12 +142,9 @@ impl Door {
             bars: BAR_CLOSED,
             bars_y: 0.0,
             bars_speed: 0.0,
-            front_bar: BAR_CLOSED,
-            back_bar: BAR_CLOSED,
+            barrier: BAR_CLOSED,
             slide: 0.0,
             slide_speed: 0.0,
-            open_flag: false,
-            close_flag: false,
             delay: DELAY_FRAMES,
             rock_delay: [0; ROCK_BARS],
             rock: [1.0; ROCK_BARS],
@@ -281,11 +274,26 @@ impl Door {
         i32::from(!switches.test(self.back_switch))
     }
 
+    pub fn barrier_value(&self, loaded: bool, switches: &Switches) -> i32 {
+        let front = self.stop_front(loaded, switches);
+        let back = self.stop_back(loaded, switches);
+        match self.front_check {
+            0 => front,
+            1 => back,
+            _ => BAR_CLOSED,
+        }
+    }
+
+    pub fn blocking(&self) -> bool {
+        self.barrier != BAR_CLOSED
+    }
+
     pub fn latching(&self) -> bool {
         if self.kind == Kind::Key {
             return self.genocide();
         }
-        self.front_check == 0 && self.kind_bits == 2 || self.front_check == 1 && self.kind_bits == 5
+        LATCH_FRONT == self.kind_bits && self.front_check == 0
+            || LATCH_BACK == self.kind_bits && self.front_check == 1
     }
 
     pub fn genocide(&self) -> bool {
@@ -293,7 +301,7 @@ impl Door {
             return false;
         }
         if self.front_check == 0 {
-            self.kind_bits == 1
+            self.kind_bits == GENOCIDE_FRONT
         } else {
             GENOCIDE_TYPES.contains(&self.kind_bits)
         }
@@ -310,7 +318,7 @@ impl Door {
         if self.kind_bits == self.bare_type() {
             return false;
         }
-        if self.front_check == 0 && self.kind_bits == 2 {
+        if self.front_check == 0 && self.kind_bits == LATCH_FRONT {
             return false;
         }
         let bit = self.bit();
@@ -344,38 +352,26 @@ pub fn control(
     for mut door in &mut doors {
         door.set_key(&switches);
         door.front_check = door.facing(room);
+        door.barrier = door.barrier_value(room >= 0, &switches);
         if !door.makes_stop() {
+            advance(&mut door);
             continue;
         }
-        let loaded = room >= 0;
-        let (front, back) = (
-            door.stop_front(loaded, &switches),
-            door.stop_back(loaded, &switches),
-        );
-        if door.front_check == 0 {
-            door.front_bar = front;
-            door.back_bar = back;
-        } else {
-            door.front_bar = back;
-            door.back_bar = front;
-        }
-        if door.bars != BAR_OPENED {
-            if door.should_close(&switches) {
-                door.bars = BAR_CLOSED;
-                door.close_flag = true;
-                door.action = Action::StopClose;
-                door.delay = door.reopen_delay();
-                continue;
-            }
+        if door.bars == BAR_CLOSED && door.should_close(&switches) {
+            door.bars = BAR_CLOSED;
+            door.delay = door.reopen_delay();
+            advance(&mut door);
+            continue;
         }
         let clear = door.latching()
             && room >= 0
-            && !actors.iter().any(|(actor, hp)| {
-                hp.is_some() && actor.room == room
-            });
+            && !actors
+                .iter()
+                .any(|(actor, hp)| hp.is_some() && actor.room == room);
         if clear {
             if door.delay > 0 {
                 door.delay -= 1;
+                advance(&mut door);
                 continue;
             }
             if door.bit() != NO_SWITCH {
@@ -383,12 +379,7 @@ pub fn control(
             }
         }
         if door.should_open(&switches) || clear {
-            if door.bars == BAR_CLOSED {
-                door.bars = BAR_OPENED;
-                door.bars_y = 0.0;
-                door.bars_speed = 0.0;
-                door.open_flag = true;
-            }
+            door.bars = BAR_OPENED;
         }
         advance(&mut door);
     }
@@ -499,16 +490,18 @@ pub struct JailDoor {
 }
 
 impl JailDoor {
-    pub fn spawn(parameters: u32) -> Self {
+    pub fn spawn(parameters: u32, latched: bool) -> Self {
+        let locked = (parameters & SWITCH_MASK) as u8 == NO_SWITCH;
+        let (action, swing) = match (locked, latched) {
+            (true, _) => (Jail::Wait, 0),
+            (false, true) => (Jail::OpenWait, JAIL_OPEN),
+            (false, false) => (Jail::CloseWait, 0),
+        };
         Self {
             switch_no: (parameters & SWITCH_MASK) as u8,
-            action: Jail::Wait,
-            swing: 0,
+            action,
+            swing,
         }
-    }
-
-    pub fn locked(&self) -> bool {
-        self.switch_no == NO_SWITCH
     }
 
     pub fn open(&self) -> bool {
@@ -518,6 +511,9 @@ impl JailDoor {
 
 pub fn jail_control(switches: Res<Switches>, mut doors: Query<&mut JailDoor>) {
     for mut door in &mut doors {
+        if matches!(door.action, Jail::Wait) {
+            continue;
+        }
         let latched = switches.test(door.switch_no);
         door.action = match door.action {
             Jail::Wait => Jail::Wait,

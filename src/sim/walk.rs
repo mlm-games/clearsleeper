@@ -55,15 +55,14 @@ pub(crate) fn within(from: Vec3, to: Vec3, radius: f32) -> bool {
     (to - from).length_squared() <= radius * radius
 }
 
-pub(crate) fn swept(from: Vec3, to: Vec3, radius: f32) -> bool {
+pub(crate) fn swept(from: Vec3, to: Vec3, target: Vec3, radius: f32) -> bool {
     let travel = to - from;
-    let length = travel.length();
-    if length < 1e-4 {
-        return within(from, to, radius);
+    let length_squared = travel.length_squared();
+    if length_squared < 1e-8 {
+        return within(from, target, radius);
     }
-    let dir = travel / length;
-    let along = ((from - to).dot(dir)).clamp(0.0, length);
-    within(from + dir * along, to, radius)
+    let along = ((target - from).dot(travel) / length_squared).clamp(0.0, 1.0);
+    within(from + travel * along, target, radius)
 }
 
 pub(super) fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f32) {

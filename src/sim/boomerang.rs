@@ -7,7 +7,7 @@ use super::damage;
 use super::enemy::Hurt;
 use super::player::Player;
 use super::ship::Ship;
-use super::walk::within;
+use super::walk::{self, within};
 
 pub const BOOMERANG_ACTOR: &str = "Boo";
 
@@ -22,14 +22,14 @@ pub const RETURN_REACH: f32 = SPEED * 2.0;
 pub const HIT_REACH: f32 = SPEED;
 pub const CAPSULE_RADIUS: f32 = 30.0;
 pub const SPIN: i16 = 0x1F00;
-pub const SPIN_ANGLE: i16 = 0x2000;
 pub const NOMINAL_TURN: f32 = 0.75;
 pub const TURN_BASE: f32 = 20.0;
 pub const TURN_SOFT: f32 = 18.0;
 pub const TURN_KICK: f32 = 40.0;
 pub const TURN_BIAS: f32 = 1024.0;
-pub const TURN_SCALE: f32 = 256.0;
-pub const TURN_CAP: f32 = 16384.0;
+pub const TURN_UNITS: f32 = 256.0;
+pub const TURN_SCALE: f32 = TURN_UNITS;
+pub const TURN_CAP: f32 = 0.25 * core::f32::consts::TAU;
 pub const NOMINAL_RANGE: f32 = 0.1;
 pub const FLINCH: u32 = 6;
 
@@ -46,7 +46,6 @@ pub struct Boomerang {
     pub returning: bool,
     pub free: bool,
     pub struck: Vec<Entity>,
-    pub model_spin: i16,
     pub model_yaw: i16,
 }
 
@@ -64,7 +63,6 @@ impl Boomerang {
             returning: false,
             free: false,
             struck: Vec::new(),
-            model_spin: SPIN_ANGLE,
             model_yaw: 0,
         }
     }
@@ -76,7 +74,6 @@ impl Boomerang {
         self.struck.clear();
         self.returning = false;
         self.lock = 0;
-        self.model_spin = SPIN_ANGLE;
         self.model_yaw = 0;
         self.aim_at(heading, pitch, locks);
     }
@@ -85,7 +82,7 @@ impl Boomerang {
         if riding { FLY_MAX_RIDING } else { FLY_MAX }
     }
 
-    pub fn aim(&mut self) {
+    fn aim(&mut self) {
         let delta = self.target - self.pos;
         let flat = delta.x.hypot(delta.z);
         self.pitch = -(delta.y).atan2(flat);
@@ -116,13 +113,12 @@ impl Boomerang {
 
     pub fn returning(&mut self) {
         self.returning = true;
-        self.free = false;
         self.locks = 0;
         self.lock = 0;
     }
 
-    fn steer(&mut self, bearing: f32) -> f32 {
-        let mut turn = shortest(bearing, self.heading);
+    fn steer(&mut self, bearing: f32) {
+        let mut turn = shortest(self.heading, bearing);
         if self.free || self.locks == 0 {
             let distance = self.distance();
             let mut arc = TURN_BASE - distance * 2.0 / self.speed;
@@ -131,12 +127,12 @@ impl Boomerang {
             } else if arc > TURN_SOFT {
                 arc = TURN_BASE + TURN_KICK * (arc - TURN_SOFT);
             }
-            turn = turn.clamp(-(arc * TURN_SCALE + TURN_BIAS), arc * TURN_SCALE + TURN_BIAS);
+            let limit = walk::from_s16((arc * TURN_SCALE + TURN_BIAS) as i16);
+            turn = turn.clamp(-limit, limit);
         } else {
             turn = turn.clamp(-TURN_CAP, TURN_CAP);
         }
         self.heading += turn;
-        turn
     }
 
     pub fn distance(&self) -> f32 {
@@ -148,14 +144,12 @@ impl Boomerang {
         let distance = delta.length();
         if distance > NOMINAL_RANGE {
             let bearing = delta.x.atan2(delta.z);
-            self.target = player.pos;
             self.aim_at(bearing, self.pitch, self.locks);
-            self.free = false;
         }
         distance
     }
 
-    pub fn step(&mut self) -> Vec3 {
+    pub fn step(&mut self) {
         self.model_yaw = self.model_yaw.wrapping_sub(SPIN);
         let delta = self.target - self.pos;
         let distance = delta.length();
@@ -171,7 +165,6 @@ impl Boomerang {
             self.speed * self.pitch.cos() * self.heading.cos(),
         );
         self.pos += step;
-        step
     }
 
     pub fn catches(&self, home: Vec3) -> bool {
@@ -201,7 +194,7 @@ pub fn control(
         if boom.parameter == MODE_WAIT {
             continue;
         }
-        if on_ship {
+        if on_ship && !boom.returning {
             boom.extend(true);
         }
         boom.step();
@@ -223,6 +216,7 @@ pub fn control(
                 boom.lock += 1;
                 if boom.lock >= LOCK_MAX {
                     boom.returning();
+                    break;
                 }
             }
         }

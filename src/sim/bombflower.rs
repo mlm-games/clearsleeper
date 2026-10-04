@@ -15,23 +15,16 @@ use super::walk::within;
 pub const FLOWER_ACTORS: [&str; 2] = ["BFlower", "VbakH"];
 pub const BOMB_ACTOR: &str = "Bomb2";
 
-pub const LIVE: u8 = 0;
-pub const DEAD: u8 = 1;
 
-pub const KIND_SHIFT: u32 = 4;
-pub const KIND_MASK: u32 = 0xF;
 pub const SWITCH_SHIFT: u32 = 8;
 pub const SWITCH_MASK: u32 = 0xFF;
 
 pub const FLOWER_RADIUS: f32 = 30.0;
 pub const SPENT_RADIUS: f32 = 15.0;
-pub const WATER_RADIUS: f32 = 50.0;
-pub const WATER_HEIGHT: f32 = 10.0;
-pub const FLOWER_REACH: f32 = 50.0;
-pub const FLOWER_NUDGE: f32 = 2.0;
 pub const FLOWER_HEIGHT: f32 = 10.0;
-pub const DROP_REACH: f32 = 200.0;
-pub const DROP_RADIUS: f32 = 70.0;
+pub const FLOWER_TOP: f32 = 100.0;
+pub const CRAWLER_TOP: f32 = 66.0;
+pub const CRAWLER_HALF: f32 = 36.0;
 pub const REVIVE_FRAMES: u8 = 0x46;
 pub const IDLE_MAX: u32 = 150;
 pub const IDLE_BASE: u32 = 60;
@@ -40,28 +33,19 @@ pub const IDLE_SHORT_BASE: u32 = 100;
 
 pub const START_INSTANT: u8 = 0;
 pub const START_FUSED: u8 = 1;
-pub const START_CARRIED: u8 = 2;
 pub const START_MASK: u32 = 0x3;
 pub const STICK_SHIFT: u32 = 8;
 
 pub const FUSE: i16 = 0x96;
 pub const FUSE_CAP: i16 = 0x1E;
-pub const FUSE_FRAME: i16 = 0x87;
 pub const GRAVITY: f32 = -2.9;
 pub const MAX_FALL: f32 = -100.0;
-pub const STREAM_DAMP: f32 = 0.002;
-pub const STREAM_DRAG: f32 = 0.0005;
 pub const BOUNCE_DAMP: f32 = -0.6;
 pub const ROLL_DAMP: f32 = 0.8;
 pub const LAND_DAMP: f32 = 0.9;
 pub const SETTLE_SPEED: f32 = 19.5;
 pub const HOP_SPEED: f32 = 13.0;
-pub const WATER_SPEED: f32 = 20.0;
-pub const WALL_SPEED: f32 = 25.0;
 pub const BLAST_RADIUS: f32 = 200.0;
-pub const BLAST_MASS: u8 = 3;
-pub const BOMB_CULL_XZ: f32 = 36.0;
-pub const BOMB_CULL_Y: f32 = 66.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flower {
@@ -71,31 +55,21 @@ pub enum Flower {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Bombflower {
-    pub kind: u8,
     pub switch_no: u8,
     pub state: Flower,
+    pub armed: bool,
     pub idle: u32,
     pub revive: u8,
-    pub previous_reach: f32,
-    pub carrying: bool,
 }
 
 impl Bombflower {
-    pub fn spawn(parameters: u32) -> Self {
+    pub fn spawn(parameters: u32, spent: bool) -> Self {
         Self {
-            kind: ((parameters >> KIND_SHIFT) & KIND_MASK) as u8,
             switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
-            state: Flower::Live,
+            state: if spent { Flower::Spent } else { Flower::Live },
+            armed: spent,
             idle: IDLE_BASE,
             revive: 0,
-            previous_reach: f32::INFINITY,
-            carrying: false,
-        }
-    }
-
-    pub fn arm(&mut self, switches: &Switches) {
-        if switches.test(self.switch_no) {
-            self.state = Flower::Live;
         }
     }
 
@@ -106,12 +80,9 @@ impl Bombflower {
         }
     }
 
-    pub fn centre(&self) -> Vec3 {
-        Vec3::new(0.0, FLOWER_HEIGHT * 3.0, 0.0)
-    }
-
     pub fn revived(&mut self) {
         self.state = Flower::Live;
+        self.armed = true;
         self.revive = REVIVE_FRAMES;
     }
 }
@@ -126,7 +97,6 @@ pub struct Crawler {
     pub heading: Vec3,
     pub settled: bool,
     pub spent: bool,
-    pub exploded: bool,
 }
 
 impl Crawler {
@@ -141,7 +111,6 @@ impl Crawler {
             heading: Vec3::ZERO,
             settled: false,
             spent: false,
-            exploded: false,
         }
     }
 
@@ -149,20 +118,11 @@ impl Crawler {
         u32::from(start) | (u32::from(stick) << STICK_SHIFT)
     }
 
-    pub fn carryable(&self) -> bool {
-        self.parameter == 0
-    }
-
-    pub fn lit(&self) -> bool {
-        self.fuse == 0
-    }
-
     pub fn rush(&mut self) {
         self.fuse = self.fuse.min(FUSE_CAP);
     }
 
     pub fn detonate(&mut self) {
-        self.exploded = true;
         self.spent = true;
     }
 }
@@ -174,14 +134,20 @@ pub fn is_flower(name: &str) -> bool {
 pub fn flower_control(
     wet: Option<Res<super::water::Water>>,
     mut switches: ResMut<Switches>,
-    mut flowers: Query<(Entity, &Actor, &mut Bombflower)>,
+    mut flowers: Query<(&Actor, &mut Bombflower)>,
     players: Query<&Player>,
     mut commands: Commands,
 ) {
     let soaked = wet.as_deref().is_some_and(|water| water.in_area);
     let home = players.iter().next().map(|player| player.pos);
-    for (entity, actor, mut flower) in &mut flowers {
-        flower.arm(&switches);
+    for (actor, mut flower) in &mut flowers {
+        if !flower.armed {
+            flower.state = match switches.test(flower.switch_no) {
+                true => Flower::Live,
+                false => Flower::Spent,
+            };
+            flower.armed = true;
+        }
         if flower.idle > 0 {
             flower.idle -= 1;
         } else {
@@ -190,7 +156,7 @@ pub fn flower_control(
         match flower.state {
             Flower::Spent => {
                 flower.revive = flower.revive.saturating_sub(1);
-                if soaked {
+                if soaked && flower.revive == 0 {
                     flower.revived();
                     switches.set(flower.switch_no);
                 }
@@ -200,7 +166,7 @@ pub fn flower_control(
                     within(player + Vec3::new(0.0, FLOWER_HEIGHT, 0.0), actor.pos, FLOWER_RADIUS)
                 });
                 if touched {
-                    let prm = Crawler::make(START_FUSED, !flower.carrying);
+                    let prm = Crawler::make(START_FUSED, false);
                     commands.spawn((
                         Actor {
                             name: BOMB_ACTOR.to_owned(),
@@ -214,7 +180,6 @@ pub fn flower_control(
                     ));
                     flower.state = Flower::Spent;
                     flower.idle = IDLE_SHORT_BASE + IDLE_SHORT;
-                    let _ = entity;
                 }
             }
         }
@@ -224,10 +189,12 @@ pub fn flower_control(
 pub fn crawler_control(
     collision: Option<Res<Collision>>,
     mut zones: ResMut<ZoneActors>,
-    mut health: ResMut<super::health::Health>,
     mut crawlers: Query<(Entity, &mut Actor, &mut Crawler)>,
     players: Query<&Player>,
-    mut foes: Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>)>,
+    mut foes: Query<
+        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (Without<Bombflower>, Without<Crawler>),
+    >,
     mut events: ResMut<super::events::SimEvents>,
     mut commands: Commands,
 ) {
@@ -279,7 +246,7 @@ pub fn crawler_control(
             &mut foes,
             owner,
             &mut zones,
-            &mut health,
+            &mut events,
             &mut commands,
         );
         let _ = commands.entity(entity).despawn();
@@ -288,10 +255,13 @@ pub fn crawler_control(
 
 pub fn blast(
     origin: Vec3,
-    foes: &mut Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>)>,
+    foes: &mut Query<
+        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (Without<Bombflower>, Without<Crawler>),
+    >,
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
-    health: &mut super::health::Health,
+    events: &mut super::events::SimEvents,
     commands: &mut Commands,
 ) {
     let mut slain: Vec<(Entity, i8, u16)> = Vec::new();
@@ -308,7 +278,7 @@ pub fn blast(
         }
     }
     if owner.is_some_and(|pos| within(origin, pos, BLAST_RADIUS)) {
-        health.damage(damage::BOMB as u8);
+        events.list.push(super::events::SimEvent::Hurt);
     }
     for (entity, room, set_id) in slain {
         zones.mark_done(room, set_id);

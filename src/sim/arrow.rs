@@ -8,7 +8,7 @@ use super::damage;
 use super::enemy::Hurt;
 use super::ground;
 use super::ship::Ship;
-use super::walk::{swept, within};
+use super::walk::swept;
 
 pub const ARROW_ACTOR: &str = "Arrow";
 
@@ -24,8 +24,7 @@ pub const TYPE_LIGHT: u8 = 3;
 pub const MUZZLE_SPEED: f32 = 200.0;
 pub const CAPSULE_RADIUS: f32 = 5.0;
 pub const CAPSULE_STRETCH: f32 = 1.25;
-pub const STIFFNESS: u8 = 10;
-pub const MASS: u8 = 1;
+pub const BODY_HALF: f32 = 30.0;
 pub const POWER: i32 = damage::ARROW;
 pub const FLINCH: u32 = 10;
 pub const STUCK_FRAMES: i32 = 300;
@@ -89,26 +88,6 @@ impl Arrow {
         );
     }
 
-    pub fn cycle(kind: u8, magic: u8, arrows: bool) -> u8 {
-        if !arrows {
-            return TYPE_NORMAL;
-        }
-        match kind {
-            TYPE_NORMAL if magic >= 1 => TYPE_FIRE,
-            TYPE_FIRE => TYPE_ICE,
-            TYPE_ICE if magic >= 2 => TYPE_LIGHT,
-            _ => TYPE_NORMAL,
-        }
-    }
-
-    pub fn cost(kind: u8) -> i16 {
-        MAGIC_COST[usize::from(kind)]
-    }
-
-    pub fn charge(kind: u8) -> i16 {
-        -MAGIC_COST[usize::from(kind)]
-    }
-
     pub fn water_frames(&self) -> i32 {
         match self.kind {
             TYPE_FIRE => FIRE_WATER_FRAMES,
@@ -117,12 +96,11 @@ impl Arrow {
         }
     }
 
-    pub fn drown(&mut self) -> bool {
+    pub fn drown(&mut self) {
         self.parameter = PARAM_WATER;
         self.phase = Phase::Drowning;
         self.frames = self.water_frames();
         self.visible = self.frames > 0;
-        self.frames > 0
     }
 
     pub fn stick(&mut self, phase: Phase) {
@@ -136,9 +114,6 @@ impl Arrow {
         self.visible
     }
 
-    pub fn tip(&self) -> Vec3 {
-        self.pos + self.speed * CAPSULE_STRETCH
-    }
 }
 
 pub fn is_arrow(name: &str) -> bool {
@@ -167,7 +142,7 @@ pub fn control(
                 let tip = arrow.pos + step * CAPSULE_STRETCH;
                 let mut struck = false;
                 for (foe, mut hp, mut hurt) in &mut foes {
-                    if !swept(from, tip, CAPSULE_RADIUS) || !within(tip, foe.pos, CAPSULE_RADIUS) {
+                    if !swept(from, tip, foe.pos, CAPSULE_RADIUS + BODY_HALF) {
                         continue;
                     }
                     hp.0 -= POWER;

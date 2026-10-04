@@ -46,11 +46,6 @@ impl Clock {
         self.time / HOUR_UNITS
     }
 
-    pub fn minute(&self) -> f32 {
-        let fraction = (self.time * 1_000_000.0) as i64 % 15_000_000;
-        fraction as f32 / 1_000_000.0 / HOUR_UNITS * 60.0
-    }
-
     pub fn day(&self) -> Day {
         let hour = self.hour();
         if (DAY_HOUR..DUSK_HOUR).contains(&hour) {
@@ -58,10 +53,6 @@ impl Clock {
         } else {
             Day::Night
         }
-    }
-
-    pub fn night(&self) -> bool {
-        self.day() == Day::Night
     }
 
     pub fn weekday(&self) -> u32 {
@@ -113,12 +104,6 @@ impl Clock {
         }
     }
 
-    pub fn set_time(&mut self, time: f32) {
-        if time < self.time {
-            self.date += 1;
-        }
-        self.time = time;
-    }
 }
 
 pub fn control(got: Res<Got>, mut clock: ResMut<Clock>) {

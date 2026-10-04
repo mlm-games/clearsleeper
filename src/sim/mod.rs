@@ -187,16 +187,19 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Key);
         world.spawn((actor, gate)).id()
     } else if source.name == ghostship::GHOSTSHIP_ACTOR {
-        let wreck = ghostship::Ghostship::spawn(source.parameters, actor.angle[1] as f32);
+        let wreck = ghostship::Ghostship::spawn(source.parameters);
         world.spawn((actor, wreck)).id()
     } else if bombflower::is_flower(&source.name) {
-        let bloom = bombflower::Bombflower::spawn(source.parameters);
+        let bloom = bombflower::Bombflower::spawn(
+            source.parameters,
+            world.resource::<flags::Switches>().test(((source.parameters >> 8) & 0xFF) as u8),
+        );
         world.spawn((actor, bloom)).id()
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
     } else if source.name == door::JAIL_ACTOR {
-        let cell = door::JailDoor::spawn(source.parameters);
+        let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
     } else {
         world.spawn(actor).id()
@@ -268,6 +271,7 @@ pub fn build(
     sim.world.insert_resource(event_list);
     sim.world.insert_resource(event::ActiveEvent::default());
     sim.world.insert_resource(event::ItemPartner::default());
+    sim.world.insert_resource(crate::assets::load_link_anms().unwrap_or_default());
     sim.world.insert_resource(msg::MsgBox::default());
     sim.world.insert_resource(msg::MsgTable::default());
     sim.world.insert_resource(death::GameOver::default());

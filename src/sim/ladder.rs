@@ -6,6 +6,7 @@ use super::actor::Actor;
 use super::collision::Collision;
 use super::flags::Switches;
 use super::ground::surface;
+use super::walk::from_s16;
 
 pub const LADDER_ACTORS: [&str; 2] = ["Mhsg15", "Mhsg4H"];
 
@@ -16,24 +17,21 @@ pub const VIB_RATE_X: i16 = 20000;
 pub const VIB_RATE_Y: i16 = 0x3CC3;
 pub const VIB_AMPLITUDE_X: f32 = 2.0;
 pub const VIB_AMPLITUDE_Y: f32 = 1.0;
-pub const VIB_DAMP: f32 = 0.995;
+pub const VIB_DAMP: f32 = 0.005;
+pub const VIB_DRAG: f32 = 0.0005;
 pub const DROP_GRAVITY: f32 = -5.0;
 pub const BOUNCES: i16 = 3;
 pub const RESTITUTION: f32 = -0.5;
 pub const OFFSET_SCALE: f32 = 0.5;
 pub const CULL_WIDTH: f32 = 55.0;
 pub const CULL_HEIGHT: f32 = 41.0;
-pub const CULL_DEPTH: f32 = 10.0;
 
 pub const TYPE_HEIGHTS: [f32; 5] = [600.0, 900.0, 1200.0, 1500.0, 450.0];
 
-pub const TYPE_MHSG6: u8 = 0;
-pub const TYPE_MHSG9: u8 = 1;
-pub const TYPE_MHSG12: u8 = 2;
 pub const TYPE_MHSG15: u8 = 3;
 pub const TYPE_MHSG4H: u8 = 4;
 
-const TYPE_MASK: u32 = 0x03;
+const TYPE_MASK: u32 = 0x07;
 const SWITCH_SHIFT: u32 = 8;
 const EVENT_SHIFT: u32 = 16;
 const FIELD_MASK: u32 = 0xFF;
@@ -81,6 +79,10 @@ impl Ladder {
         TYPE_HEIGHTS[usize::from(self.kind) % TYPE_HEIGHTS.len()]
     }
 
+    pub fn resting(&self) -> bool {
+        self.mode == Mode::Fell
+    }
+
     pub fn released(&self, switches: &Switches) -> bool {
         self.switch_no == NO_SWITCH || switches.test(self.switch_no)
     }
@@ -117,8 +119,8 @@ pub fn control(
 fn shake(ladder: &mut Ladder) {
     ladder.phase_x = ladder.phase_x.wrapping_add(VIB_RATE_X);
     ladder.phase_y = ladder.phase_y.wrapping_add(VIB_RATE_Y);
-    ladder.offset.x = cosine(VIB_RATE_X, ladder.phase_x) * VIB_AMPLITUDE_X;
-    ladder.offset.y = cosine(VIB_RATE_Y, ladder.phase_y) * VIB_AMPLITUDE_Y;
+    ladder.offset.x = (from_s16(ladder.phase_x)).cos() * VIB_AMPLITUDE_X;
+    ladder.offset.y = (from_s16(ladder.phase_y)).cos() * VIB_AMPLITUDE_Y;
     ladder.frames -= 1;
     if ladder.frames <= 0 {
         ladder.mode = Mode::Drop;
@@ -128,16 +130,15 @@ fn shake(ladder: &mut Ladder) {
 }
 
 fn drop(actor: &mut Actor, ladder: &mut Ladder, solid: Option<&Collision>) {
-    ladder.fall += DROP_GRAVITY;
+    ladder.fall = stream(ladder.fall, DROP_GRAVITY, VIB_DAMP, VIB_DRAG);
     actor.pos.y += ladder.fall;
-    ladder.fall *= VIB_DAMP;
     let Some(floor) = surface(solid, actor.pos) else {
         return;
     };
     if actor.pos.y >= floor {
         return;
     }
-    if ladder.bounces < 0 {
+    if ladder.bounces == 0 {
         actor.pos.y = floor;
         ladder.mode = Mode::Fell;
         ladder.offset = Vec3::ZERO;
@@ -149,11 +150,7 @@ fn drop(actor: &mut Actor, ladder: &mut Ladder, solid: Option<&Collision>) {
     ladder.fall *= RESTITUTION;
 }
 
-fn cosine(rate: i16, phase: i16) -> f32 {
-    let degrees = f32::from(rate) * f32::from(phase);
-    let mut wrapped = degrees % 360.0;
-    if wrapped < 0.0 {
-        wrapped += 360.0;
-    }
-    wrapped.to_radians().cos()
+pub fn stream(speed: f32, gravity: f32, damp: f32, drag: f32) -> f32 {
+    let resist = -(speed * damp + speed.abs() * speed * drag);
+    speed + gravity + resist
 }
