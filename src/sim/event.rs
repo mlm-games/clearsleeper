@@ -849,6 +849,8 @@ fn staff_cut(
         warp_cut(run, list, flags);
     } else if people_staff(&staff.name) {
         people_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Tpost" {
+        tpost_cut(run, list, flags, owner, talks, msg, table, commands);
     } else if staff.name == "Auction" {
         auction_cut(run, list, flags, owner, talks, msg, table);
     } else if staff.name == "Zl1" {
@@ -1067,6 +1069,41 @@ fn auction_cut(
         }
         "START" | "MAIN" | "GET_ITEM" | "GET_ITEM_NPC" | "GET_ITEM_MES" => {}
         _ => cut_end(run, list, flags),
+    }
+}
+
+fn tpost_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    commands: &mut Commands,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if cut.name != "DISP_LETTER" {
+        if cut.name != "SET_ANM" {
+            cut_end(run, list, flags);
+        }
+        return;
+    }
+    let Ok(mut talk) = talks.get_mut(owner) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    if run.advance > 0 {
+        commands.entity(owner).insert(super::flags::LetterMsg);
+        run.talk_open = true;
+    }
+    if run.talk_open
+        && npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED
+    {
+        run.talk_open = false;
+        cut_end(run, list, flags);
     }
 }
 

@@ -412,6 +412,34 @@ pub fn is_event_switch(name: &str) -> bool {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SwitchOn(pub u8);
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LetterMsg;
+
+const LETTER_STOCK: u8 = 2;
+const TPOST_LETTERS: [(u32, u16); 13] = [
+    (0x1AAF, 0xAC03),
+    (0x0CF9, 0xB503),
+    (0x0CFA, 0x7D03),
+    (0x0CFC, 0x7B03),
+    (0x0805, 0x9D03),
+    (0x0CFD, 0x7A03),
+    (0x0DB6, 0xB203),
+    (0x1148, 0x8B03),
+    (0x1AAF, 0xAC03),
+    (0x0F76, 0xB003),
+    (0x19A6, 0xAE03),
+    (0x0CFB, 0x7C03),
+    (0x0F77, 0xAF03),
+];
+
+fn letter_msg(regs: &EventReg) -> u32 {
+    TPOST_LETTERS
+        .iter()
+        .skip(1)
+        .find(|(_, reg)| regs.get(*reg) == LETTER_STOCK)
+        .map_or(0, |(msg, _)| *msg)
+}
+
 pub fn control(
     stories: Res<StoryBits>,
     mut switches: ResMut<Switches>,
@@ -421,11 +449,18 @@ pub fn control(
     players: Query<&Player>,
     tags: Query<(Entity, &Actor, &mut TagEvent)>,
     forced: Query<(Entity, &SwitchOn)>,
+    regs: Res<EventReg>,
+    mut posts: Query<(Entity, &LetterMsg, &mut super::talk::Talk)>,
     mut commands: Commands,
 ) {
     for (entity, on) in &forced {
         switches.set(on.0);
         commands.entity(entity).remove::<SwitchOn>();
+    }
+    for (entity, _, mut talk) in &mut posts {
+        talk.msg_curr = letter_msg(&regs);
+        talk.msg_end = -1;
+        commands.entity(entity).remove::<LetterMsg>();
     }
     for switch in &actors {
         if stories.test(switch.event) {
