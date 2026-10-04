@@ -4,10 +4,12 @@ pub const SLOT_COUNT: usize = 21;
 pub const BOW_SLOT: usize = 12;
 pub const BOMB_SLOT: usize = 13;
 pub const WAKER_SLOT: usize = 2;
+pub const HAMMER_SLOT: usize = 20;
 pub const NO_ITEM: u8 = 0xFF;
 
 pub const ITEM_BOW: u8 = 0x27;
 pub const ITEM_WIND_WAKER: u8 = 0x22;
+pub const ITEM_SKULL_HAMMER: u8 = 0x33;
 pub const FIRST_BOMB: u8 = 0x0B;
 
 const SLOT_ITEMS: [(u8, usize); 15] = [

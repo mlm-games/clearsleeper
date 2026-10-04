@@ -19,6 +19,7 @@ pub enum SimEvent {
     Restart,
     Credits,
     CreditsDone,
+    Se(u32),
 }
 
 /// Walk distance accumulated toward the next footstep.

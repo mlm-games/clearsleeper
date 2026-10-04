@@ -30,6 +30,8 @@ pub mod frame;
 pub mod ghostship;
 pub mod ground;
 pub mod gull;
+pub mod hammer;
+pub mod hammerhit;
 pub mod health;
 pub mod hookshot;
 pub mod hop;
@@ -53,9 +55,11 @@ pub mod select;
 pub mod shop;
 pub mod sea;
 pub mod ship;
+pub mod shmrgrd;
 pub mod stone;
 pub mod stream;
 pub mod swim;
+pub mod swhammer;
 pub mod tag;
 pub mod trapdoor;
 pub mod talk;
@@ -225,6 +229,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
+    } else if swhammer::is_swhammer(&source.name) {
+        let set = world
+            .resource::<flags::Switches>()
+            .test(((source.parameters >> 8) & 0xFF) as u8);
+        let plunger = swhammer::Swhammer::spawn(source.parameters, set);
+        world.spawn((actor, plunger)).id()
+    } else if shmrgrd::is_guard(&source.name) {
+        let set = world
+            .resource::<flags::Switches>()
+            .test(((source.parameters >> 8) & 0xFF) as u8);
+        let guard = shmrgrd::Shmrgrd::spawn(source.parameters, set);
+        world.spawn((actor, guard)).id()
     } else if torch::is_torch(&source.name) {
         let brand = torch::Torch::spawn(source.parameters, 1.0);
         world.spawn((actor, brand)).id()
@@ -293,6 +309,7 @@ pub fn build(
     sim.world.insert_resource(lock::Lock::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
+    sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(talk::Dialogue::default());
@@ -347,13 +364,16 @@ pub fn build(
             .unwrap_or_default(),
     ));
     sim.world.insert_resource(collision::MoveFrom(spawn));
-    sim.world.spawn((player::Player {
-        pos: spawn,
-        yaw,
-        face: yaw,
-        speed: 0.0,
-        speed_y: 0.0,
-    },));
+    sim.world.spawn((
+        player::Player {
+            pos: spawn,
+            yaw,
+            face: yaw,
+            speed: 0.0,
+            speed_y: 0.0,
+        },
+        hammer::Hammer::idle(),
+    ));
     sim.add_chained_systems(
         (
             (
@@ -378,6 +398,9 @@ pub fn build(
                     windmill::control.in_set(WwSimSet::Execute),
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
@@ -410,6 +433,13 @@ pub fn build(
                     balloon::control.in_set(WwSimSet::Execute),
                     fire::control.in_set(WwSimSet::Execute),
                     gull::control.in_set(WwSimSet::Execute),
+                    hammer::control.in_set(WwSimSet::Execute),
+                    hammerhit::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
+                    swhammer::control.in_set(WwSimSet::Execute),
+                    shmrgrd::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )

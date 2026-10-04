@@ -8,6 +8,8 @@ pub const HIT_CUE: &str = "hit";
 pub const BOOM_CUE: &str = "boom";
 pub const PICKUP_CUE: &str = "pickup";
 pub const HURT_CUE: &str = "hurt";
+pub const HAMMER_CUE: &str = "hammer";
+pub const HAMMER_SWING_CUE: &str = "hammer-swing";
 
 const FOOTSTEP_HZ: f32 = 140.0;
 const FOOTSTEP_SECS: f32 = 0.09;
@@ -21,6 +23,10 @@ const PICKUP_HZ: f32 = 1180.0;
 const PICKUP_SECS: f32 = 0.12;
 const HURT_HZ: f32 = 220.0;
 const HURT_SECS: f32 = 0.16;
+const HAMMER_HZ: f32 = 96.0;
+const HAMMER_SECS: f32 = 0.42;
+const HAMMER_SWING_HZ: f32 = 300.0;
+const HAMMER_SWING_SECS: f32 = 0.2;
 const FALLBACK_RATE: u32 = 44100;
 
 pub fn footstep_cue() -> CueDef {
@@ -43,7 +49,7 @@ fn cue(gain: f32, cooldown_ms: u64, wobble: f32) -> CueDef {
     }
 }
 
-pub fn boot_cues() -> [(CueDef, f32, f32); 6] {
+pub fn boot_cues() -> [(CueDef, f32, f32); 8] {
     [
         (footstep_cue(), FOOTSTEP_HZ, FOOTSTEP_SECS),
         (cue(0.42, 40, 0.22), SLASH_HZ, SLASH_SECS),
@@ -51,6 +57,8 @@ pub fn boot_cues() -> [(CueDef, f32, f32); 6] {
         (cue(0.85, 80, 0.12), BOOM_HZ, BOOM_SECS),
         (cue(0.5, 40, 0.05), PICKUP_HZ, PICKUP_SECS),
         (cue(0.66, 60, 0.14), HURT_HZ, HURT_SECS),
+        (cue(0.9, 90, 0.1), HAMMER_HZ, HAMMER_SECS),
+        (cue(0.6, 50, 0.2), HAMMER_SWING_HZ, HAMMER_SWING_SECS),
     ]
 }
 
@@ -78,6 +86,8 @@ pub fn load_cues(audio: &mut Audio) -> anyhow::Result<()> {
         BOOM_CUE,
         PICKUP_CUE,
         HURT_CUE,
+        HAMMER_CUE,
+        HAMMER_SWING_CUE,
     ];
     for (index, (def, hz, secs)) in boot_cues().into_iter().enumerate() {
         let wave = synth_sine_wav(hz, secs, rate);

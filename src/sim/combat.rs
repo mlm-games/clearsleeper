@@ -128,6 +128,7 @@ pub fn control(
     jump: Res<Jump>,
     lock: Res<Lock>,
     held: Res<super::item::Held>,
+    equipped: Res<super::inventory::Equipped>,
     ships: Query<&Ship>,
     mut actors: Query<
         (
@@ -150,6 +151,8 @@ pub fn control(
     combat.held = item.0;
     let riding = ships.iter().any(|ship| ship.riding);
     let blade = held.item;
+    let bare_hands =
+        equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
     let soup = combat.soup;
     for mut player in &mut players {
         let player = &mut *player;
@@ -161,6 +164,7 @@ pub fn control(
         }
         if !combat.active {
             if !pressed
+                || bare_hands
                 || riding
                 || roll.active
                 || hop.active

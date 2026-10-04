@@ -244,10 +244,14 @@ impl App {
                 sim::events::SimEvent::Explode => Some(audio::BOOM_CUE),
                 sim::events::SimEvent::Collect => Some(audio::PICKUP_CUE),
                 sim::events::SimEvent::Hurt => Some(audio::HURT_CUE),
+                sim::events::SimEvent::Se(sim::hammer::SE_SWING) => Some(audio::HAMMER_SWING_CUE),
+                sim::events::SimEvent::Se(sim::hammer::SE_ON) => Some(audio::HAMMER_CUE),
+                sim::events::SimEvent::Se(sim::hammer::SE_OFF) => Some(audio::HAMMER_CUE),
                 sim::events::SimEvent::GameOver
                 | sim::events::SimEvent::Restart
                 | sim::events::SimEvent::Credits
-                | sim::events::SimEvent::CreditsDone => None,
+                | sim::events::SimEvent::CreditsDone
+                | sim::events::SimEvent::Se(_) => None,
             };
             if let Some(cue) = cue {
                 self.audio.play(cue);
@@ -378,6 +382,7 @@ impl App {
             let Some(actor) = entity.get::<sim::actor::Actor>() else {
                 continue;
             };
+            let mut lift = 0.0;
             let (kind, item, height, half) = if entity.contains::<sim::ship::Ship>() {
                 (view::ActorKind::Ship, 0, 26.0, 44.0)
             } else if let Some(pickup) = entity.get::<sim::pickup::Pickup>() {
@@ -520,6 +525,14 @@ impl App {
                     block.hull_height(),
                     block.hull(),
                 )
+            } else if let Some(plunger) = entity.get::<sim::swhammer::Swhammer>() {
+                let (radius, top) = plunger.cull();
+                lift = plunger.top;
+                (view::ActorKind::Scenery, 0, top, radius)
+            } else if let Some(guard) = entity.get::<sim::shmrgrd::Shmrgrd>() {
+                let (_, max) = guard.cull();
+                lift = guard.top;
+                (view::ActorKind::Scenery, 0, max[1], max[0])
             } else if let Some(brand) = entity.get::<sim::torch::Torch>() {
                 if brand.state == sim::torch::State::Gone {
                     continue;
@@ -581,7 +594,7 @@ impl App {
                 continue;
             };
             out.push(view::ActorView {
-                pos: actor.pos,
+                pos: actor.pos + Vec3::new(0.0, lift, 0.0),
                 kind,
                 item,
                 height,
