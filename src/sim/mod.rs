@@ -5,6 +5,7 @@ pub mod arrow;
 pub mod balloon;
 pub mod barrier;
 pub mod barrel;
+pub mod bemos;
 pub mod barricade;
 pub mod bird;
 pub mod buoybarrel;
@@ -303,6 +304,16 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             world.get_resource::<collision::Collision>(),
         );
         world.spawn((actor, hoist)).id()
+    } else if bemos::is_bemos(&source.name) {
+        let (eye, hit_points) = bemos::Bemos::spawn(
+            actor.pos,
+            source.parameters,
+            source.angle,
+            world.resource::<flags::Switches>(),
+        );
+        world
+            .spawn((actor, eye, hit_points, enemy::Hurt::default()))
+            .id()
     } else if ylzou::is_ylzou(&source.name) {
         world.spawn((actor, ylzou::Ylzou::spawn(source.parameters))).id()
     } else if taglight::is_tag_light(&source.name) {
@@ -513,6 +524,7 @@ pub fn build(
                     gull::control.in_set(WwSimSet::Execute),
                     hammer::control.in_set(WwSimSet::Execute),
                     hammerhit::control.in_set(WwSimSet::Execute),
+                    bemos::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
