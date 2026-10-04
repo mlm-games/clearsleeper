@@ -3379,9 +3379,7 @@ pub fn is_makar(name: &str) -> bool {
 }
 
 fn radians_to_s16(radians: f32) -> i16 {
-    (radians * stream::UNITS_PER_RAD)
-        .round()
-        .rem_euclid(65536.0) as i32 as i16
+    super::walk::to_s16(radians)
 }
 
 #[derive(SystemParam)]

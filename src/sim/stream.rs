@@ -1,10 +1,6 @@
-use std::f32::consts::TAU;
-
 use glam::Vec3;
 
 use super::walk;
-
-pub const UNITS_PER_RAD: f32 = 65536.0 / TAU;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Grade {
@@ -35,11 +31,11 @@ impl Grade {
 }
 
 pub fn angle_s(radians: f32) -> i16 {
-    (radians * UNITS_PER_RAD) as i32 as i16
+    walk::to_s16(radians)
 }
 
 pub fn units_s(units: f32) -> i16 {
-    angle_s(units * walk::RAD_PER_UNIT)
+    walk::to_s16(units * walk::RAD_PER_UNIT)
 }
 
 pub fn cos_s(units: i16) -> f32 {
