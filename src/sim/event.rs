@@ -837,6 +837,14 @@ fn staff_cut(
         );
     } else if staff.name == "Os" || staff.name == "Os1" || staff.name == "Os2" {
         os_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Mori1" {
+        hold_cut(run, list, flags, &["CLOSE", "STOP_OPEN"]);
+    } else if staff.name == "Ghrwp" {
+        hold_cut(run, list, flags, &["WARP_ARRIVE_END"]);
+    } else if staff.name == "Gdemo20" {
+        hold_cut(run, list, flags, &["WAIT_DEAD", "DEAD"]);
+    } else if staff.name == "Warpgn" {
+        hold_cut(run, list, flags, &["WARP_ARRIVE_END", "APPEAR"]);
     } else if staff.name == "Hsh" {
         hsh_cut(run, list, flags);
     } else if staff.name == "Bs1" {
