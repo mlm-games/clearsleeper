@@ -15,7 +15,6 @@ pub const BOMB_ACTORS: [&str; 2] = ["Bomb", "Bomb2"];
 
 pub const START_INSTANT: u8 = 0;
 pub const START_INTERVAL: u8 = 1;
-pub const START_CARRY: u8 = 2;
 
 pub const MODE_WAIT: u8 = 0;
 pub const MODE_CARRY: u8 = 1;
@@ -25,21 +24,12 @@ pub const MODE_SINK: u8 = 3;
 pub const FUSE_FRAMES: i16 = 0x96;
 pub const FUSE_CAP: i16 = 0x1E;
 pub const EXPLODE_FRAMES: i16 = 4;
-pub const SINK_FRAMES: i16 = 4;
-pub const SINK_DAMP: f32 = 0.8;
-pub const SINK_SPEED: f32 = 20.0;
-pub const SINK_PICKUP: f32 = 30.0;
 pub const GRAVITY: f32 = -2.9;
 pub const MAX_FALL: f32 = -100.0;
 pub const STTS_WEIGHT: u16 = 200;
 pub const STTS_POWER: u8 = 0xFF;
-pub const CULL_XZ: f32 = 36.0;
-pub const CULL_TOP: f32 = 66.0;
-pub const CULL_FAR: f32 = 10.0;
 
 pub const NO_GRAVITY: u32 = 1 << 16;
-pub const VERSION: u32 = 1 << 31;
-pub const MARK: u32 = 0x8000_0000;
 pub const CARRYABLE: u32 = 1 << 8;
 
 const START_MASK: u32 = 0x3;
@@ -119,13 +109,6 @@ pub fn is_bomb(name: &str) -> bool {
     BOMB_ACTORS.contains(&name)
 }
 
-pub fn make_parameters(start: u8, no_gravity: bool, version: bool) -> u32 {
-    MARK
-        | (u32::from(version) << 31)
-        | (u32::from(no_gravity) << 16)
-        | u32::from(start & 0x3)
-}
-
 pub fn control(
     collision: Option<Res<Collision>>,
     water: Option<Res<Water>>,
@@ -141,6 +124,7 @@ pub fn control(
     players: Query<&Player>,
     mut zones: ResMut<ZoneActors>,
     mut events: ResMut<SimEvents>,
+    mut published: ResMut<super::bombflower::Blasts>,
     mut fences: Query<(&Actor, &mut super::barricade::Barricade)>,
     mut floats: Query<
         (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
@@ -155,6 +139,9 @@ pub fn control(
     let mut burst: Vec<Vec3> = Vec::new();
     for (entity, mut actor, mut bomb) in &mut bombs {
         if bomb.life == Life::Carry {
+            if bomb.carried && grounded(solid, actor.pos) {
+                bomb.release();
+            }
             continue;
         }
         if !bomb.no_gravity && (!wet || !grounded(solid, actor.pos)) {
@@ -173,6 +160,7 @@ pub fn control(
         events.list.push(SimEvent::Explode);
         super::bombflower::blast(
             origin,
+            &mut published,
             &mut foes,
             owner,
             &mut zones,

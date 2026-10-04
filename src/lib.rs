@@ -638,6 +638,13 @@ impl App {
             } else if let Some(hoist) = entity.get::<sim::mflft::Mflft>() {
                 let (half, top) = hoist.cull();
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(gun) = entity.get::<sim::canon::Canon>() {
+                if !gun.drawn() {
+                    continue;
+                }
+                let (base, height, half) = gun.hull();
+                lift = base;
+                (view::ActorKind::Scenery, 0, height, half)
             } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
                 if cell.open() {
                     continue;

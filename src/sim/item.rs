@@ -220,6 +220,7 @@ pub fn control(
     mut shots: Shots,
     mut foes: Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), Without<Ship>>,
     mut events: ResMut<SimEvents>,
+    mut blasts: ResMut<super::bombflower::Blasts>,
     mut commands: Commands,
 ) {
     let pressed = intent.0 && !held.pressed;
@@ -270,6 +271,7 @@ pub fn control(
         }
     }
     let owner = players.iter().next().map(|player| player.pos);
+    blasts.list.clear();
     for &entity in &burst {
         let Ok((_, bomb)) = shots.bombs.get(entity) else {
             continue;
@@ -294,6 +296,7 @@ pub fn control(
                 }
             }
         }
+        blasts.list.push(blast);
         if owner.is_some_and(|pos| within(blast, pos, BOMB_RADIUS)) {
             health.damage(BOMB_POWER as u8);
         }
@@ -310,10 +313,4 @@ pub fn control(
         let _ = commands.entity(entity).despawn();
     }
 
-    for (entity, _) in &shots.spin {
-        let _ = commands.entity(entity).despawn();
-        if held.item == BOOMERANG {
-            held.count = 1;
-        }
-    }
 }

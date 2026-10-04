@@ -9,8 +9,6 @@ use super::player::Player;
 use super::ship::Ship;
 use super::walk::{self, within};
 
-pub const BOOMERANG_ACTOR: &str = "Boo";
-
 pub const MODE_WAIT: u8 = 0;
 pub const MODE_THROW: u8 = 1;
 
@@ -181,6 +179,7 @@ pub fn control(
     mut booms: Query<(Entity, &mut Boomerang)>,
     players: Query<&Player>,
     riding: Query<&Ship>,
+    held: Option<ResMut<super::item::Held>>,
     mut foes: Query<(Entity, &super::actor::Actor, &mut HitPoints, Option<&mut Hurt>)>,
     mut commands: Commands,
 ) {
@@ -188,6 +187,7 @@ pub fn control(
         return;
     };
     let on_ship = riding.iter().any(|ship| ship.riding);
+    let mut caught = false;
     let mut spent: Vec<Entity> = Vec::new();
     let mut slain: Vec<Entity> = Vec::new();
     for (entity, mut boom) in &mut booms {
@@ -221,6 +221,7 @@ pub fn control(
             }
         }
         if boom.catches(player.pos) {
+            caught = true;
             spent.push(entity);
         }
     }
@@ -230,6 +231,12 @@ pub fn control(
         };
         zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(foe).despawn();
+    }
+    if caught
+        && let Some(mut held) = held
+        && held.item == BOOMERANG
+    {
+        held.count = 1;
     }
     for entity in spent {
         let _ = commands.entity(entity).despawn();

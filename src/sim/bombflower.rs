@@ -197,6 +197,7 @@ pub fn crawler_control(
         (Without<Bombflower>, Without<Crawler>),
     >,
     mut events: ResMut<super::events::SimEvents>,
+    mut published: ResMut<Blasts>,
     mut fences: Query<
         (&Actor, &mut super::barricade::Barricade),
         (Without<Crawler>, Without<Bomb>),
@@ -253,6 +254,7 @@ pub fn crawler_control(
         events.list.push(super::events::SimEvent::Explode);
         blast(
             origin,
+            published,
             &mut foes,
             owner,
             &mut zones,
@@ -266,8 +268,24 @@ pub fn crawler_control(
     }
 }
 
+#[derive(Resource, Debug, Clone, Default)]
+pub struct Blasts {
+    pub list: Vec<Vec3>,
+}
+
+impl Blasts {
+    pub fn push(&mut self, origin: Vec3) {
+        self.list.push(origin);
+    }
+
+    pub fn at(&self, origin: Vec3) -> bool {
+        self.list.iter().any(|hit| *hit == origin)
+    }
+}
+
 pub fn blast(
     origin: Vec3,
+    published: &mut Blasts,
     foes: &mut Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
         (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),

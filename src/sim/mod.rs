@@ -9,6 +9,7 @@ pub mod bemos;
 pub mod barricade;
 pub mod bird;
 pub mod buoybarrel;
+pub mod canon;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
@@ -314,6 +315,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, eye, hit_points, enemy::Hurt::default()))
             .id()
+    } else if canon::is_canon(&source.name) {
+        match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
+            Some(gun) => world.spawn((actor, gun)).id(),
+            None => world.spawn(actor).id(),
+        }
     } else if ylzou::is_ylzou(&source.name) {
         world.spawn((actor, ylzou::Ylzou::spawn(source.parameters))).id()
     } else if taglight::is_tag_light(&source.name) {
@@ -390,6 +396,7 @@ pub fn build(
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
+    sim.world.insert_resource(bombflower::Blasts::default());
     sim.world.insert_resource(crate::text::font::FontBank::default());
     sim.world.insert_resource(crate::text::msgproc::MsgFlags::default());
     sim.world.insert_resource(crate::text::msgproc::MsgGameInfo::default());
@@ -494,6 +501,7 @@ pub fn build(
                     bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),
+                    canon::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (

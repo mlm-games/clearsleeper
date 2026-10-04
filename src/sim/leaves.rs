@@ -7,7 +7,6 @@ use super::barricade::{AT_BOMB, AT_FIRE_ARROW, AT_SKULL_HAMMER};
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 use super::hammer::{self, Cut, Hammer};
-use super::item::Bomb;
 use super::pickup::{ITEM_ACTORS, Pickup};
 use super::player::Player;
 use super::walk;
@@ -195,7 +194,7 @@ pub fn control(
     hammers: Query<&Hammer>,
     cut: Res<Cut>,
     arrows: Query<&Arrow>,
-    blasts: Query<&Bomb>,
+    blasts: Res<super::bombflower::Blasts>,
     mut piles: Query<(Entity, &Actor, &mut Leaves)>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
@@ -222,12 +221,11 @@ pub fn control(
                 }
             }
             if sound.is_none() {
-                for blast in &blasts {
-                    if blast.fuse != 0 {
-                        continue;
+                for origin in &blasts.list {
+                    sound = pile.struck(AT_BOMB, *origin, actor.pos);
+                    if sound.is_some() {
+                        break;
                     }
-                    sound = pile.struck(AT_BOMB, blast.pos, actor.pos);
-                    break;
                 }
             }
             if sound.is_none() && striking && let Some(head) = head {
