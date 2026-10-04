@@ -73,6 +73,7 @@ pub mod sage;
 pub mod scenery;
 pub mod schedule;
 pub mod select;
+pub mod medli;
 pub mod merchant;
 pub mod shop;
 pub mod sea;
@@ -200,6 +201,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if merchant::is_merchant(&source.name) {
         let trader = merchant::Merchant::spawn(source.parameters);
         world.spawn((actor, trader)).id()
+    } else if medli::is_medli(&source.name) {
+        let sage2 = medli::Medli::spawn(source.parameters);
+        world.spawn((actor, sage2)).id()
     } else if aryll::is_aryll(&source.name) {
         let seer = aryll::Aryll::spawn(source.parameters);
         world.spawn((actor, seer)).id()
@@ -610,6 +614,7 @@ pub fn build(
                     servant::control.in_set(WwSimSet::Execute),
                     merchant::control.in_set(WwSimSet::Execute),
                     aryll::control.in_set(WwSimSet::Execute),
+                    medli::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
