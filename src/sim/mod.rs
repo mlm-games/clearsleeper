@@ -40,6 +40,7 @@ pub mod tsubo;
 pub mod transition;
 pub mod walk;
 pub mod warship;
+pub mod zelda;
 pub mod water;
 
 use bevy_ecs::prelude::*;
@@ -133,6 +134,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == shop::SHOP_ACTOR {
         let store = shop::Shop::spawn(source.parameters);
         world.spawn((actor, store)).id()
+    } else if source.name == zelda::ZELDA_ACTOR {
+        let princess = zelda::Zelda::spawn(source.parameters);
+        world.spawn((actor, princess)).id()
     } else {
         world.spawn(actor).id()
     }

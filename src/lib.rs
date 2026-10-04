@@ -396,6 +396,11 @@ impl App {
                 || entity.contains::<sim::shop::Shop>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
+            } else if entity.contains::<sim::zelda::Zelda>() {
+                if entity.get::<sim::zelda::Zelda>().is_some_and(|z| !z.drawn) {
+                    continue;
+                }
+                (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::warship::Warship>() {
                 let (height, half) = sim::warship::BODY;
                 (view::ActorKind::Warship, 0, height, half)
