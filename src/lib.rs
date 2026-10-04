@@ -383,6 +383,16 @@ impl App {
             } else if let Some(pickup) = entity.get::<sim::pickup::Pickup>() {
                 let size = pickup.size();
                 (view::ActorKind::Pickup, pickup.item, size, size)
+            } else if let Some(present) = entity.get::<sim::event::PresentItem>() {
+                if present.hidden {
+                    continue;
+                }
+                let size = sim::pickup::Pickup {
+                    item: present.item,
+                    timer: 0,
+                }
+                .size();
+                (view::ActorKind::Pickup, present.item, size, size)
             } else if let Some(enemy) = entity.get::<sim::enemy::Enemy>() {
                 (
                     view::ActorKind::Enemy,
@@ -445,6 +455,13 @@ impl App {
                 || entity.contains::<sim::carry::Carryable>()
             {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
+            } else if entity.contains::<sim::raft::Raft>() {
+                (
+                    view::ActorKind::Ship,
+                    0,
+                    sim::raft::HULL_RADIUS * 0.5,
+                    sim::raft::HULL_RADIUS * 0.5,
+                )
             } else if let Some(field) = entity.get::<sim::barrier::Barrier>() {
                 if field.phase == sim::barrier::Phase::Cut {
                     continue;

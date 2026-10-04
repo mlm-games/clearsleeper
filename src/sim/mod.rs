@@ -41,6 +41,7 @@ pub mod marlon;
 pub mod msg;
 pub mod pickup;
 pub mod player;
+pub mod raft;
 pub mod roll;
 pub mod scenery;
 pub mod select;
@@ -200,6 +201,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if raft::is_raft(&source.name) {
+        let vessel = raft::Raft::spawn(source.parameters, source.angle, true);
+        world.spawn((actor, vessel)).id()
     } else if barrier::is_barrier(&source.name) {
         let field = barrier::Barrier::spawn(Vec3::ONE);
         world.spawn((actor, field)).id()
@@ -331,6 +335,7 @@ pub fn build(
                     arrow::control.in_set(WwSimSet::Execute),
                     hookshot::control.in_set(WwSimSet::Execute),
                     barrier::control.in_set(WwSimSet::Execute),
+                    raft::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
