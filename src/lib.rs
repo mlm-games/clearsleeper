@@ -669,6 +669,9 @@ impl App {
         self.sim
             .world
             .insert_resource(sim::event::ActiveEvent::default());
+        self.sim
+            .world
+            .insert_resource(sim::event::ItemPartner::default());
         sim::clear_actors(&mut self.sim.world);
         self.sim.world.insert_resource(sim::door::StayRoom(
             rooms.first().map_or(-1, |room| *room as i8),

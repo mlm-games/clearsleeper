@@ -279,6 +279,14 @@ pub struct ItemPartner {
     pub item: u8,
 }
 
+const PRESENT_ACTOR: &str = "PresentItem";
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PresentItem {
+    pub item: u8,
+    pub hidden: bool,
+}
+
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct LinkAnms {
     ends: HashMap<String, (u8, u16)>,
@@ -659,13 +667,15 @@ pub fn control(
     mut next: ResMut<NextStage>,
     mut msg: ResMut<MsgBox>,
     table: Res<MsgTable>,
-    partner: Res<ItemPartner>,
+    mut partner: ResMut<ItemPartner>,
     anms: Res<LinkAnms>,
     sea: Option<Res<Sea>>,
     mut actors: Query<(Entity, &mut Actor)>,
     players: Query<(Entity, &Player)>,
     mut ships: Query<&mut Ship>,
     mut talks: Query<&mut Talk>,
+    mut presents: Query<&mut PresentItem>,
+    mut commands: Commands,
 ) {
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
@@ -722,8 +732,10 @@ pub fn control(
                 &mut talks,
                 &mut msg,
                 &table,
-                &partner,
+                &mut partner,
                 &anms,
+                &mut presents,
+                &mut commands,
             );
         }
     }
@@ -741,8 +753,10 @@ fn staff_cut(
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
     table: &MsgTable,
-    partner: &ItemPartner,
+    partner: &mut ItemPartner,
     anms: &LinkAnms,
+    presents: &mut Query<&mut PresentItem>,
+    commands: &mut Commands,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -754,7 +768,9 @@ fn staff_cut(
             "NpcSo" => soldier_cut(
                 run, list, flags, owner, actors, players, sea, talks, msg, table,
             ),
-            "Link" => link_cut(run, list, flags, msg, table, partner, anms),
+            "Link" => link_cut(
+                run, list, flags, msg, table, partner, anms, players, commands, presents,
+            ),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
@@ -935,16 +951,22 @@ fn link_cut(
     flags: &mut EventFlags,
     msg: &mut MsgBox,
     table: &MsgTable,
-    partner: &ItemPartner,
+    partner: &mut ItemPartner,
     anms: &LinkAnms,
+    players: &Query<(Entity, &Player)>,
+    commands: &mut Commands,
+    presents: &mut Query<&mut PresentItem>,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     let mode = leading_digits(&cut.name, 3);
     if mode == Some(GET_ITEM_MODE) {
-        get_item_cut(run, list, flags, msg, table, partner, anms);
+        get_item_cut(run, list, flags, msg, table, partner, anms, players, commands, presents);
         return;
+    }
+    if run.advance > 0 {
+        run.get_stage = 0;
     }
     if mode.is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
         cut_end(run, list, flags);
@@ -1062,8 +1084,11 @@ fn get_item_cut(
     flags: &mut EventFlags,
     msg: &mut MsgBox,
     table: &MsgTable,
-    partner: &ItemPartner,
+    partner: &mut ItemPartner,
     anms: &LinkAnms,
+    players: &Query<(Entity, &Player)>,
+    commands: &mut Commands,
+    presents: &mut Query<&mut PresentItem>,
 ) {
     if run.get_stage & GET_DONE != 0 {
         cut_end(run, list, flags);
@@ -1073,10 +1098,48 @@ fn get_item_cut(
         run.get_stage |= GET_ENTERED;
         run.get_msg_live = false;
         run.timer = anim_ticks("itemget", 1.0, 0.0, -1.0, anms).unwrap_or(0) as i16;
+        let prm0 = list.cut_number(run.cut as usize, "prm0").unwrap_or(0);
+        let item = match prm0 {
+            0 => None,
+            0x100 => Some(partner.item),
+            value => Some(value as u8),
+        };
+        if let Some(item) = item {
+            if let Some(old) = partner.entity.take() {
+                let _ = commands.entity(old).despawn();
+            }
+            let pos = players
+                .iter()
+                .next()
+                .map_or(Vec3::ZERO, |(_, player)| player.pos);
+            let entity = commands
+                .spawn((
+                    Actor {
+                        name: PRESENT_ACTOR.to_owned(),
+                        parameters: 0,
+                        pos,
+                        angle: [0; 3],
+                        set_id: u16::MAX,
+                        room: -1,
+                    },
+                    PresentItem {
+                        item,
+                        hidden: true,
+                    },
+                ))
+                .id();
+            partner.entity = Some(entity);
+            partner.item = item;
+        }
     }
     if run.timer > 0 {
         run.timer -= 1;
         return;
+    }
+    if let Some(entity) = partner.entity
+        && let Ok(mut present) = presents.get_mut(entity)
+    {
+        present.hidden = false;
     }
     if partner.entity.is_none() {
         return;
@@ -1099,6 +1162,9 @@ fn get_item_cut(
             msg.set_status(MSG_DESTROYED);
             run.get_msg_live = false;
             run.get_stage |= GET_DONE;
+            if let Some(entity) = partner.entity.take() {
+                let _ = commands.entity(entity).despawn();
+            }
             cut_end(run, list, flags);
         }
         _ => {}

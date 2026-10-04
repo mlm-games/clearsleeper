@@ -5,7 +5,7 @@ use bevy_ecs::system::RunSystemOnce;
 use clearsleeper::assets;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::event::{
-    ActiveEvent, EVENT_LIST_ENTRY, EventList, ItemPartner, LinkAnms, Stage, Value,
+    ActiveEvent, EVENT_LIST_ENTRY, EventList, ItemPartner, LinkAnms, PresentItem, Stage, Value,
 };
 use clearsleeper::sim::flags::{EventFlags, StoryBits};
 use clearsleeper::sim::intent::DoIntent;
@@ -1070,6 +1070,150 @@ fn golden_talk_msg_drives_one_message_through_open_type_and_close() {
         done += 1;
         assert!(done < 20, "the event closes");
     }
+}
+
+#[test]
+fn golden_get_item_cut_presents_its_partner_from_the_cut_parameter() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Rupe", &[0], [2, -1, -1])],
+        vec![staff("Link", 0, 0)],
+        vec![named_cut("011get_item", [-1, -1, -1], 2, 0, -1)],
+        vec![record("prm0", 3, 0, -1)],
+        Vec::new(),
+        vec![15_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<MsgTable>().insert(
+        116,
+        MsgEntry {
+            text: b"Green rupee\x00".to_vec(),
+            draw_type: 0,
+            textbox_type: 0,
+            lines: 4,
+        },
+    );
+    assert!(app
+        .sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, Entity::PLACEHOLDER));
+    tick(&mut app);
+    let partner = *app.sim.world.resource::<ItemPartner>();
+    let entity = partner
+        .entity
+        .expect("the cut spawns its present partner");
+    assert_eq!(partner.item, 15, "the cut parameter names the item");
+    let present = app
+        .sim
+        .world
+        .get::<PresentItem>(entity)
+        .expect("the partner is a present item");
+    assert_eq!(present.item, 15, "the partner carries the item");
+    assert!(present.hidden, "the partner stays hidden through the animation");
+    let mut opened = 0;
+    while !app.sim.world.resource::<MsgBox>().active() {
+        tick(&mut app);
+        opened += 1;
+        assert!(opened < 60, "the cut opens the message after the animation");
+    }
+    let mut typed = 0;
+    while box_status(&app) != MSG_TYPING {
+        tick(&mut app);
+        typed += 1;
+        assert!(typed < 40, "the box starts typing");
+    }
+    assert!(
+        !app.sim
+            .world
+            .get::<PresentItem>(entity)
+            .expect("the partner lives with its message")
+            .hidden,
+        "the partner shows itself with the message"
+    );
+    assert_eq!(
+        app.sim.world.resource::<MsgBox>().message_no(),
+        116,
+        "the message comes from the item number"
+    );
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DISPLAYED,
+        "one press finishes the message"
+    );
+    press(&mut app, false);
+    tick(&mut app);
+    assert_eq!(box_status(&app), MSG_ENDS, "the driver marks it for closing");
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_BOX_CLOSING,
+        "the second press closes it"
+    );
+    press(&mut app, false);
+    let mut closed = 0;
+    while box_status(&app) != MSG_BOX_CLOSED {
+        tick(&mut app);
+        closed += 1;
+        assert!(closed < 20, "the box closes");
+    }
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DESTROYED,
+        "the driver destroys the box"
+    );
+    assert!(flags(&app).test(2), "the get item cut ended with the box");
+    assert!(
+        app.sim.world.resource::<ItemPartner>().entity.is_none(),
+        "the partner dies with the box"
+    );
+    assert!(
+        app.sim.world.get::<PresentItem>(entity).is_none(),
+        "the partner entity is gone"
+    );
+    let mut done = 0;
+    while !active(&app).end_check(0) {
+        tick(&mut app);
+        done += 1;
+        assert!(done < 20, "the event closes");
+    }
+}
+
+#[test]
+fn golden_get_item_cut_waits_for_an_outside_partner() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Chest", &[0], [2, -1, -1])],
+        vec![staff("Link", 0, 0)],
+        vec![named_cut("011get_item", [-1, -1, -1], 2, 0, -1)],
+        vec![record("prm0", 3, 0, -1)],
+        Vec::new(),
+        vec![0_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(app
+        .sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, Entity::PLACEHOLDER));
+    for _ in 0..40 {
+        tick(&mut app);
+    }
+    assert!(
+        app.sim.world.resource::<ItemPartner>().entity.is_none(),
+        "a zero parameter spawns nothing of its own"
+    );
+    assert!(
+        !app.sim.world.resource::<MsgBox>().active(),
+        "the cut holds its message for the outside partner"
+    );
+    assert!(!flags(&app).test(2), "the cut stays inside");
 }
 
 #[test]
