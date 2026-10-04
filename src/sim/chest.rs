@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::flags::Switches;
-use super::inventory::Equipped;
+use super::inventory::{Equipped, Got};
 use super::pickup::Rupees;
 
 pub const CHEST_ACTORS: [&str; 6] = ["takara", "takara2", "takara3", "takara4", "takara5", "takara6"];
@@ -66,8 +66,20 @@ pub struct Chest {
     pub func: u8,
     pub shape: u8,
     pub switch_no: u8,
+    pub open_switch: u8,
     pub room: i8,
     pub opened: bool,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChestOpen;
+
+pub fn stage_of(chest: &Chest) -> u8 {
+    if matches!(chest.func, FUNC_EXTRA_SAVE_INFO | FUNC_EXTRA_SAVE_INFO_SPAWN) {
+        SEA2_STAGE
+    } else {
+        0
+    }
 }
 
 impl Chest {
@@ -79,6 +91,7 @@ impl Chest {
             func: (parameters & 0x7F) as u8,
             shape: if shape >= SHAPE_MAX { 0 } else { shape },
             switch_no: ((parameters >> 12) & 0xFF) as u8,
+            open_switch: angle_z as u8,
             room,
             opened: false,
         }
@@ -104,11 +117,14 @@ pub fn present(chest: &Chest, switches: &Switches) -> bool {
     true
 }
 
-pub fn loot(chest: &Chest, rupees: &mut Rupees, equipped: &mut Equipped) {
+pub fn loot(chest: &Chest, rupees: &mut Rupees, equipped: &mut Equipped, got: &mut Got) {
     if chest.item == 0 {
         rupees.count = rupees.count.saturating_add(50);
     } else {
         equipped.collect(chest.item);
+        if let Some(slot) = super::inventory::slot_of(chest.item) {
+            got.gain(slot, 0);
+        }
     }
 }
 

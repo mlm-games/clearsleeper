@@ -3,6 +3,7 @@ use glam::Vec3;
 use std::collections::HashMap;
 
 use super::actor::Actor;
+use super::chest::ChestOpen;
 use super::flags::{EventFlags, StoryBits};
 use super::msg::{
     MsgBox, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING, MSG_CONTINUES,
@@ -775,7 +776,9 @@ fn staff_cut(
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
     };
-    if staff.kind == STAFF_CAMERA {
+    if staff.name == "TREASURE" {
+        treasure_cut(run, list, flags, owner, commands);
+    } else if staff.kind == STAFF_CAMERA {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
         match staff.name.as_str() {
@@ -790,6 +793,22 @@ fn staff_cut(
             _ => {}
         }
     }
+}
+
+fn treasure_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    commands: &mut Commands,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if matches!(cut.name.as_str(), "OPEN" | "OPEN_SHORT") {
+        commands.entity(owner).insert(ChestOpen);
+    }
+    cut_end(run, list, flags);
 }
 
 fn soldier_cut(

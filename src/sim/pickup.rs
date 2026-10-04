@@ -106,9 +106,17 @@ pub fn control(
     mut zones: ResMut<super::flags::ZoneActors>,
     mut equipped: ResMut<super::inventory::Equipped>,
     mut got: ResMut<super::inventory::Got>,
-    mut events: ResMut<SimEvents>,
+    mut mut chest_flags: ResMut<super::chest::Chests>,
+    mut switches: ResMut<super::flags::Switches>,
+    events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
+    mut chests: Query<(
+        Entity,
+        &Actor,
+        &mut super::chest::Chest,
+        Option<&super::chest::ChestOpen>,
+    )>,
     mut commands: Commands,
 ) {
     partner.max_life = health.max;
@@ -137,5 +145,26 @@ pub fn control(
         events.list.push(SimEvent::Collect);
         zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(entity).despawn();
+    }
+    for (_, actor, mut chest, marker) in &mut chests {
+        if chest.opened || !super::chest::present(chest, &switches) {
+            continue;
+        }
+        let forced = marker.is_some();
+        if !forced {
+            let dx = player.pos.x - actor.pos.x;
+            let dz = player.pos.z - actor.pos.z;
+            let reach = super::chest::GRAB_RANGE;
+            if dx * dx + dz * dz > reach * reach {
+                continue;
+            }
+        }
+        chest.opened = true;
+        chest_flags.open(super::chest::stage_of(chest), chest.index);
+        if forced && chest.open_switch != super::chest::NO_SWITCH {
+            switches.set(chest.open_switch);
+        }
+        super::chest::loot(chest, &mut rupees, &mut equipped, &mut got);
+        events.list.push(SimEvent::Collect);
     }
 }
