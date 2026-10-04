@@ -81,6 +81,7 @@ pub mod wind;
 pub mod windmill;
 pub mod warship;
 pub mod water;
+pub mod ylzou;
 pub mod zelda;
 
 use bevy_ecs::prelude::*;
@@ -302,6 +303,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             world.get_resource::<collision::Collision>(),
         );
         world.spawn((actor, hoist)).id()
+    } else if ylzou::is_ylzou(&source.name) {
+        world.spawn((actor, ylzou::Ylzou::spawn(source.parameters))).id()
     } else if taglight::is_tag_light(&source.name) {
         let spot = taglight::TagLight::spawn(source.parameters);
         world.spawn((actor, spot)).id()
@@ -524,6 +527,7 @@ pub fn build(
                     leaves::control.in_set(WwSimSet::Execute),
                     swpush::control.in_set(WwSimSet::Execute),
                     mflft::control.in_set(WwSimSet::Execute),
+                    ylzou::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
