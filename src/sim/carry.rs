@@ -64,6 +64,7 @@ pub fn control(
     mut carry: ResMut<Carry>,
     carryables: Query<(Entity, &Actor, &Carryable)>,
     mut moves: Query<&mut Actor>,
+    mut pots: Query<&mut super::tsubo::Tsubo>,
     players: Query<&Player>,
 ) {
     let pressed = do_intent.0 && !carry.held_press;
@@ -93,6 +94,9 @@ pub fn control(
                 for entity in chain {
                     if let Ok(mut actor) = moves.get_mut(entity) {
                         actor.pos += forward * RELEASE_SPEED;
+                        if let Ok(mut pot) = pots.get_mut(entity) {
+                            pot.toss(forward, player.speed);
+                        }
                     }
                 }
             }

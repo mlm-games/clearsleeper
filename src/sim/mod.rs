@@ -236,6 +236,7 @@ pub fn build(
             (
                 death::freeze.in_set(WwSimSet::Execute),
                 carry::control.in_set(WwSimSet::Execute),
+                tsubo::control.in_set(WwSimSet::Execute),
                 select::control.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
