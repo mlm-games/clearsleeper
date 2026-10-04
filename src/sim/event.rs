@@ -1081,6 +1081,14 @@ fn link_cut(
                     cut_end(run, list, flags);
                 }
             }
+            67 => {
+                partner.demo_stick = Some(0.0);
+                if run.advance > 0 {
+                    if let Some((_, mut player)) = players.iter_mut().next() {
+                        player.speed = 0.0;
+                    }
+                }
+            }
             _ => {}
         }
     }
