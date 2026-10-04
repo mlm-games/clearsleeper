@@ -436,6 +436,7 @@ pub struct MsgProc {
 #[derive(Resource, Debug, Clone)]
 pub struct MsgProcs {
     pub i_msg_id: u32,
+    next_pid: u32,
     procs: Vec<MsgProc>,
 }
 
@@ -443,6 +444,7 @@ impl Default for MsgProcs {
     fn default() -> Self {
         Self {
             i_msg_id: FPC_M_ERROR_PROCESS_ID,
+            next_pid: 0,
             procs: Vec::new(),
         }
     }
@@ -458,7 +460,8 @@ impl MsgProcs {
     }
 
     pub fn spawn(&mut self, name: u16, append: MsgAppend) -> u32 {
-        let pid = self.procs.len() as u32;
+        let pid = self.next_pid;
+        self.next_pid = self.next_pid.wrapping_add(1);
         self.procs.push(MsgProc {
             pid,
             name,

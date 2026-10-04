@@ -166,6 +166,7 @@ pub struct TextDriver {
     pub screen: TextScreen,
     pub phase1: u8,
     pub phase2: u8,
+    pub live_pid: u32,
     pub live: bool,
     pub msg_no: u32,
 }
@@ -185,6 +186,7 @@ impl Default for TextDriver {
             screen: TextScreen::default(),
             phase1: 0,
             phase2: 0,
+            live_pid: 0,
             live: false,
             msg_no: 0,
         }
@@ -298,10 +300,22 @@ pub fn control(
         driver.live = false;
         driver.phase1 = 0;
         driver.phase2 = 0;
+        driver.live_pid = 0;
         return;
     };
     driver.live = true;
     driver.msg_no = msg_no;
+    // a different process became the newest one: the live box belongs to the old pid,
+    // so create the new one and remember which pid it is, or the old box finishing
+    // would delete the wrong process
+    if driver.live_pid != pid {
+        if driver.live_pid != super::msgproc::FPC_M_ERROR_PROCESS_ID {
+            procs.delete(driver.live_pid);
+        }
+        driver.live_pid = pid;
+        driver.phase1 = 0;
+        driver.phase2 = 0;
+    }
     let Some(archive) = archive else {
         return;
     };
