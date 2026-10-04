@@ -90,10 +90,11 @@ impl Hookshot {
         self.carry_offset = offset;
     }
 
-    pub fn anchored(&mut self, pos: Vec3) {
+    pub fn anchored(&mut self, target: Entity, pos: Vec3) {
         self.phase = Phase::Pull;
         self.pos = pos;
-        self.carry = None;
+        self.carry = Some(target);
+        self.carry_offset = Vec3::ZERO;
         self.heading = Vec3::ZERO;
     }
 

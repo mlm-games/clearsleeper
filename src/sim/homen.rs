@@ -510,8 +510,9 @@ impl Homen {
         let Ok((_, mut hook)) = hooks.get_mut(shot) else {
             return;
         };
-        hook.anchored(pos + turned_y(self.norse_offset(1), self.yaw));
-        hook.carry = Some(entity);
+        let offset = turned_y(self.norse_offset(1), self.yaw);
+        hook.anchored(entity, pos + offset);
+        hook.carry_offset = offset;
         self.hookshot = None;
     }
 
