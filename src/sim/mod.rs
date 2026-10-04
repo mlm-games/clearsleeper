@@ -50,6 +50,7 @@ pub mod layer;
 pub mod leaves;
 pub mod lock;
 pub mod marlon;
+pub mod mbdoor;
 pub mod mflft;
 pub mod msg;
 pub mod pickup;
@@ -70,7 +71,9 @@ pub mod stone;
 pub mod stream;
 pub mod swim;
 pub mod swhammer;
+pub mod swpush;
 pub mod tag;
+pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
 pub mod tingle;
@@ -319,6 +322,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if pirateship::is_pirateship(&source.name) {
         let vessel = pirateship::Pirate::spawn(source.parameters);
         world.spawn((actor, vessel)).id()
+    } else if mbdoor::is_mbdoor(&source.name) {
+        let gate = mbdoor::Mbdoor::spawn(
+            source.parameters,
+            source.angle,
+            world.resource::<flags::Switches>(),
+        );
+        world.spawn((actor, gate)).id()
     } else if canon::is_canon(&source.name) {
         match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
             Some(gun) => world.spawn((actor, gun)).id(),
@@ -520,6 +530,7 @@ pub fn build(
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),
                     canon::control.in_set(WwSimSet::Execute),
+                    mbdoor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (

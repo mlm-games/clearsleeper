@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
-use super::event::{ActiveEvents, EventList};
+use super::event::{ActiveEvent, EventList};
 use super::player::Player;
 
 pub const EVENT_SWITCH_ACTOR: &str = "Evsw";
@@ -409,15 +409,24 @@ pub fn is_event_switch(name: &str) -> bool {
     name == EVENT_SWITCH_ACTOR
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SwitchOn(pub u8);
+
 pub fn control(
     stories: Res<StoryBits>,
     mut switches: ResMut<Switches>,
     actors: Query<&EventSwitch>,
-    mut active: ResMut<ActiveEvents>,
+    mut active: ResMut<ActiveEvent>,
     list: Res<EventList>,
     players: Query<&Player>,
     tags: Query<(Entity, &Actor, &mut TagEvent)>,
+    forced: Query<(Entity, &SwitchOn)>,
+    mut commands: Commands,
 ) {
+    for (entity, on) in &forced {
+        switches.set(on.0);
+        commands.entity(entity).remove::<SwitchOn>();
+    }
     for switch in &actors {
         if stories.test(switch.event) {
             switches.set(switch.switch_no);
@@ -440,6 +449,7 @@ pub fn control(
 const NO_SWITCH: u8 = 0xFF;
 const NO_EVENT_FLAG: u16 = 0xFFFF;
 const RADIUS_SCALE: f32 = 100.0;
+const ISLAND_SCALE: f32 = 10000.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TagState {
@@ -455,6 +465,7 @@ pub struct TagEvent {
     pub swbit2: u8,
     pub kind: u8,
     pub event_flag: u16,
+    pub arrival: u16,
     pub radius: f32,
     pub height: f32,
     pub state: TagState,
@@ -471,25 +482,41 @@ pub fn tag_event(
     island: bool,
     index: usize,
 ) -> TagEvent {
+    let kind = (parameters & 0xFF) as u8;
     let swbit2 = if island {
         NO_SWITCH
     } else {
         ((parameters >> 16) & 0xFF) as u8
     };
+    let reach = if island { ISLAND_SCALE } else { RADIUS_SCALE };
     TagEvent {
         index,
         swbit: ((parameters >> 8) & 0xFF) as u8,
         swbit2,
-        kind: (parameters & 0xFF) as u8,
+        kind,
         event_flag,
-        radius: scale[0] * RADIUS_SCALE,
-        height: scale[1] * RADIUS_SCALE,
+        arrival: if island { arrival_flag(kind) } else { 0 },
+        radius: scale[0] * reach,
+        height: scale[1] * reach,
         state: TagState::Hunt,
     }
 }
 
+fn arrival_flag(kind: u8) -> u16 {
+    match kind {
+        1 => 0x0902,
+        2 => 0x0A20,
+        3 => 0x0A02,
+        4 => 0x1F04,
+        5 => 0x2E04,
+        6 => 0x2E02,
+        7 => 0x3E10,
+        _ => 0,
+    }
+}
+
 fn tag_triggers(
-    active: &mut ActiveEvents,
+    active: &mut ActiveEvent,
     list: &EventList,
     stories: &StoryBits,
     switches: &mut Switches,
@@ -504,12 +531,15 @@ fn tag_triggers(
             continue;
         }
         if tag.state == TagState::Wait {
-            if tag.swbit == NO_SWITCH || switches.test(tag.swbit) {
-                continue;
-            }
-            tag.state = TagState::Hunt;
+            continue;
         }
-        let terms = if tag.kind == 0x0C {
+        if tag.arrival != 0 && stories.test(tag.arrival) {
+            tag.state = TagState::Wait;
+            continue;
+        }
+        let terms = if tag.arrival != 0 {
+            tag.swbit == NO_SWITCH || !switches.test(tag.swbit)
+        } else if tag.kind == 0x0C {
             tag.swbit2 == NO_SWITCH || !switches.test(tag.swbit2)
         } else {
             (tag.swbit2 == NO_SWITCH || switches.test(tag.swbit2))
