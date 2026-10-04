@@ -10,7 +10,8 @@ use super::events::{SimEvent, SimEvents};
 use super::flags::StoryBits;
 use super::ground;
 use super::intent::{CameraYaw, DoIntent, MoveIntent, TargetIntent};
-use super::inventory::{Got, ITEM_WIND_WAKER};
+use super::flags::Collect;
+use super::inventory::{check_get_item as item_obtained, Equipped, ITEM_WIND_WAKER};
 use super::lock::Lock;
 use super::player::Player;
 use super::stream;
@@ -247,7 +248,6 @@ pub const BIT_2E02: u16 = 0x2E02;
 pub const ITEM_MASTER_SWORD_2: u8 = 0x3A;
 pub const ITEM_MASTER_SWORD_3: u8 = 0x3E;
 pub const ITEM_PEARL_FARORE: u8 = 0x6B;
-pub const PEARL_FARORE_SYMBOL: u8 = 2;
 
 pub const MSG_BOSS_DIE: u32 = 0x1456;
 pub const MSG_FOREST_FIRST: u32 = 0x14C2;
@@ -313,7 +313,7 @@ pub const ORDER_OFF: i16 = -1;
 pub const ORDER_DRAW: i16 = 0;
 pub const ORDER_TO_LINK: i16 = 1;
 pub const ORDER_TACT_PRM: i16 = 3;
-pub const ORDER_OTHER: i16 = 4;
+pub const ORDER_OTHER: i32 = 4;
 pub const ORDER_SPEAK: i16 = 5;
 pub const ORDER_TALK: i16 = 6;
 pub const ORDER_TALK_ITEM: i16 = 7;
@@ -1950,7 +1950,7 @@ impl Makar {
             } else {
                 accel = HIO_DECEL;
             }
-            if gap > ROUTE_TURN_WALL {
+            if i32::from(gap) > ROUTE_TURN_WALL {
                 target = 0.0;
                 if self.speed_f != 0.0 {
                     aim_angle = self.yaw;
@@ -3241,9 +3241,15 @@ impl Text<'_> {
 }
 
 impl Makar {
-    pub fn stage_ok(prm: u32, got: &Got, stories: &StoryBits, start_stage: &str) -> bool {
+    pub fn stage_ok(
+        prm: u32,
+        equipped: &Equipped,
+        collect: &Collect,
+        stories: &StoryBits,
+        start_stage: &str,
+    ) -> bool {
         if prm & PRM_TYPE_MASK != PRM_TYPE_BOSS_DIE {
-            if check_get_item(got, ITEM_MASTER_SWORD_3) {
+            if item_obtained(equipped, collect, ITEM_MASTER_SWORD_3) {
                 if prm & PRM_TYPE_MASK != PRM_TYPE_KAZE_BOSS {
                     return false;
                 }
@@ -3259,13 +3265,13 @@ impl Makar {
                 if start_stage != STAGE_SEA || !stories.test(BIT_1604) {
                     return false;
                 }
-            } else if check_get_item(got, ITEM_MASTER_SWORD_2) {
+            } else if item_obtained(equipped, collect, ITEM_MASTER_SWORD_2) {
                 if prm & PRM_TYPE_MASK != PRM_TYPE_WATERFALL {
                     return false;
                 }
             } else if stories.test(BIT_1820) {
                 return false;
-            } else if check_get_item(got, ITEM_PEARL_FARORE) {
+            } else if item_obtained(equipped, collect, ITEM_PEARL_FARORE) {
                 if prm & PRM_TYPE_MASK != PRM_TYPE_FOREST {
                     return false;
                 }
@@ -3275,13 +3281,6 @@ impl Makar {
         }
         true
     }
-}
-
-fn check_get_item(got: &Got, item: u8) -> bool {
-    if item == ITEM_PEARL_FARORE {
-        return got.has(usize::from(item), PEARL_FARORE_SYMBOL);
-    }
-    got.has(usize::from(item), 0)
 }
 
 pub struct Ctx<'a> {

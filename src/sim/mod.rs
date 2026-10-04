@@ -135,6 +135,17 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         {
             continue;
         }
+        if makar::is_makar(&source.name)
+            && !makar::Makar::stage_ok(
+                source.parameters,
+                world.resource::<inventory::Equipped>(),
+                world.resource::<flags::Collect>(),
+                world.resource::<flags::StoryBits>(),
+                &stage,
+            )
+        {
+            continue;
+        }
         spawn_actor(world, source);
     }
 }

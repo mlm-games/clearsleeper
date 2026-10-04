@@ -5,7 +5,7 @@ use glam::{Quat, Vec3};
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
-use super::flags::StoryBits;
+use super::flags::{Collect, StoryBits};
 use super::frame::CurrentFrame;
 use super::inventory::Equipped;
 use super::player::Player;
@@ -2388,6 +2388,7 @@ pub struct World<'w> {
     pub active: ResMut<'w, ActiveEvent>,
     pub events: ResMut<'w, SimEvents>,
     pub equipped: Res<'w, Equipped>,
+    pub collect: Res<'w, Collect>,
     pub frame: Res<'w, CurrentFrame>,
 }
 
@@ -2432,7 +2433,7 @@ pub fn control(
             pos: actor.pos,
             player,
             clear_count,
-            collect0: None,
+            collect0: Some(world.collect.check(0)),
             select_item: [ITEM_NONE; ITEM_BUTTON_COUNT],
             frame,
             attention: false,

@@ -86,6 +86,16 @@ impl Default for Collect {
 }
 
 impl Collect {
+    pub fn check(&self, idx: u8) -> u8 {
+        self.bytes.get(usize::from(idx)).copied().unwrap_or(0)
+    }
+
+    pub fn set_byte(&mut self, idx: u8, byte: u8) {
+        if let Some(slot) = self.bytes.get_mut(usize::from(idx)) {
+            *slot = byte;
+        }
+    }
+
     pub fn test(&self, idx: u8, item: u8) -> bool {
         if item >= COLLECT_ITEMS {
             return false;
