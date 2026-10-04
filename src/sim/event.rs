@@ -794,6 +794,12 @@ fn staff_cut(
         hint_cut(run, list, flags, owner, actors, talks, msg, table);
     } else if staff.name == "SWITCH" {
         switch_cut(run, list, flags);
+    } else if staff.name == "Warpt" {
+        named_cut(run, list, flags, "WARP");
+    } else if staff.name == "WINDMAN" {
+        named_cut(run, list, flags, "WINDOW");
+    } else if staff.name == "TALKMAN" {
+        talkman_cut(run, list, flags, owner, talks, msg, table);
     } else if staff.name == "SHUTTER_DOOR" {
         door_cut(run, list, flags, owner, commands);
     } else if staff.kind == STAFF_CAMERA {
@@ -811,6 +817,32 @@ fn staff_cut(
             _ => {}
         }
     }
+}
+
+fn named_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, name: &str) {
+    if let Some(cut) = list.cuts.get(run.cut as usize)
+        && cut.name == name
+    {
+        cut_end(run, list, flags);
+    }
+}
+
+fn talkman_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if !matches!(cut.name.as_str(), "TALK0" | "TALK1") {
+        return;
+    }
+    talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo");
 }
 
 fn switch_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
@@ -967,8 +999,8 @@ fn soldier_cut(
         "APPEAR" | "DIVE" | "DISAPPEAR" => offset_cut(run, list, flags, &cut.name),
         "JUMP_MAPOPEN" => mapopen_cut(run, list, flags, owner, actors),
         "TURN" => soldier_turn(run, list, flags, owner, actors),
-        "TALK_MSG" => talk_cut(run, list, flags, owner, talks, msg, table, false),
-        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true),
+        "TALK_MSG" => talk_cut(run, list, flags, owner, talks, msg, table, false, "msg_num"),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true, "msg_num"),
         name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
         name if SOLDIER_PENDING.contains(&name) => {}
         _ => cut_end(run, list, flags),
@@ -1314,6 +1346,7 @@ fn talk_cut(
     msg: &mut MsgBox,
     table: &MsgTable,
     cont: bool,
+    msg_key: &str,
 ) {
     let Ok(mut talk) = talks.get_mut(owner) else {
         cut_end(run, list, flags);
@@ -1323,7 +1356,7 @@ fn talk_cut(
         if cont {
             talk.msg_end = list.cut_number(run.cut as usize, "end_num").unwrap_or(-1);
         } else {
-            talk.msg_curr = list.cut_number(run.cut as usize, "msg_num").unwrap_or(0) as u32;
+            talk.msg_curr = list.cut_number(run.cut as usize, msg_key).unwrap_or(0) as u32;
             talk.msg_end = list.cut_number(run.cut as usize, "end_msg").unwrap_or(-1);
             run.talk_open = true;
         }
