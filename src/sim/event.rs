@@ -642,6 +642,14 @@ impl EventList {
             .and_then(|(_, value)| int_of(value))
     }
 
+    pub fn cut_name(&self, cut: usize) -> Option<&str> {
+        Some(self.cuts.get(cut)?.name.as_str())
+    }
+
+    pub fn cut_count(&self) -> usize {
+        self.cuts.len()
+    }
+
     pub fn cut_number(&self, cut: usize, key: &str) -> Option<i32> {
         let cut = self.cuts.get(cut)?;
         let record = self.record_of(cut.first_data, key)?;
