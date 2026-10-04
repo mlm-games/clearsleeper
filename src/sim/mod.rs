@@ -477,7 +477,6 @@ pub fn build(
     sim.world.insert_resource(chest::Chests::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
-    sim.world.insert_resource(flags::EventReg::default());
     sim.world.insert_resource(flags::Charts::default());
     sim.world.insert_resource(flags::Arrivals::default());
     sim.world.insert_resource(ending::Ending::default());

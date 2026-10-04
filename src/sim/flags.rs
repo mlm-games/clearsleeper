@@ -60,6 +60,14 @@ impl StoryBits {
         self.bytes[cell] &= !mask;
         self.bytes[cell] |= value;
     }
+
+    pub fn get(&self, reg: u16) -> u8 {
+        self.reg(reg)
+    }
+
+    pub fn set(&mut self, reg: u16, value: u8) {
+        self.set_reg(reg, value)
+    }
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,35 +222,7 @@ pub const REG_GHOST_SHIP_ROOM: u16 = 0xC3FF;
 pub const REG_GHOST_SHIP_START: u16 = 0x85FF;
 pub const GHOST_SHIP_DONE: u8 = 3;
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EventReg {
-    bytes: [u8; REG_PAGES],
-}
-
-impl Default for EventReg {
-    fn default() -> Self {
-        Self {
-            bytes: [0; REG_PAGES],
-        }
-    }
-}
-
-impl EventReg {
-    pub fn get(&self, reg: u16) -> u8 {
-        let mask = (reg & 0xFF) as u8;
-        self.bytes
-            .get(usize::from(reg >> 8))
-            .map_or(0, |page| page & mask)
-    }
-
-    pub fn set(&mut self, reg: u16, value: u8) {
-        let mask = (reg & 0xFF) as u8;
-        if let Some(page) = self.bytes.get_mut(usize::from(reg >> 8)) {
-            *page &= !mask;
-            *page |= value & mask;
-        }
-    }
-}
+pub type EventReg = StoryBits;
 
 pub const CHART_SLOTS: usize = 128;
 pub const CHART_WORDS: usize = CHART_SLOTS / 32;
@@ -449,7 +429,6 @@ pub fn control(
     players: Query<&Player>,
     tags: Query<(Entity, &Actor, &mut TagEvent)>,
     forced: Query<(Entity, &SwitchOn)>,
-    regs: Res<EventReg>,
     mut posts: Query<(Entity, &LetterMsg, &mut super::talk::Talk)>,
     mut commands: Commands,
 ) {
@@ -458,7 +437,7 @@ pub fn control(
         commands.entity(entity).remove::<SwitchOn>();
     }
     for (entity, _, mut talk) in &mut posts {
-        talk.msg_curr = letter_msg(&regs);
+        talk.msg_curr = letter_msg(&stories);
         talk.msg_end = -1;
         commands.entity(entity).remove::<LetterMsg>();
     }
