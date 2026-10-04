@@ -102,6 +102,7 @@ pub mod torch;
 pub mod transition;
 pub mod tsubo;
 pub mod volcano;
+pub mod vgnfd;
 pub mod walk;
 pub mod wall;
 pub mod wind;
@@ -472,6 +473,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if servant::is_servant(&source.name) {
         let statue = servant::Servant::spawn(source.parameters);
         world.spawn((actor, statue)).id()
+    } else if vgnfd::is_vgnfd(&source.name) {
+        match vgnfd::Vgnfd::spawn(world.resource::<flags::StoryBits>()) {
+            Some(door) => world.spawn((actor, door)).id(),
+            None => world.spawn(actor).id(),
+        }
     } else {
         world.spawn(actor).id()
     }
@@ -704,6 +710,7 @@ pub fn build(
                     hmlif::control.in_set(WwSimSet::Execute),
                     kita::control.in_set(WwSimSet::Execute),
                     gryw::control.in_set(WwSimSet::Execute),
+                    vgnfd::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
                     chuchu::control.in_set(WwSimSet::Execute),

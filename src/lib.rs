@@ -727,6 +727,18 @@ impl App {
                     max.y - min.y,
                     (max.x - min.x) * 0.5,
                 )
+            } else if let Some(door) = entity.get::<sim::vgnfd::Vgnfd>() {
+                if !door.drawn() {
+                    continue;
+                }
+                let (min, max) = door.cull();
+                lift = min.y;
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max.y - min.y,
+                    (max.x - min.x) * 0.5,
+                )
             } else if let Some(platform) = entity.get::<sim::hmlif::Hmlif>() {
                 let (min, max) = platform.cull();
                 lift = min.y;
