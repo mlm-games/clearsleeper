@@ -3,9 +3,14 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::flags::{EventFlags, StoryBits};
+use super::msg::{
+    MsgBox, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING, MSG_CONTINUES,
+    MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS, MSG_TYPING,
+};
 use super::player::Player;
 use super::sea::Sea;
 use super::ship::{Ship, SHIP_ACTOR};
+use super::talk::Talk;
 use super::transition::{NextStage, Target};
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 use super::water;
@@ -106,8 +111,6 @@ const SOLDIER_INSTANT: &[&str] = &[
     "PARTNER_SHIP",
 ];
 const SOLDIER_PENDING: &[&str] = &[
-    "TALK_MSG",
-    "CONTINUE_TALK",
     "MINIGAME",
     "MINIGAME_WARP",
     "MINIGAME_RETURN",
@@ -118,6 +121,9 @@ const SOLDIER_PENDING: &[&str] = &[
     "EATESA1ST",
 ];
 const LINK_INSTANT: &[i32] = &[1, 4, 6, 14, 17, 18, 20, 23, 39, 42, 43, 44, 51, 55];
+const GET_ITEM_MODE: i32 = 11;
+const GET_ENTERED: u8 = 0x01;
+const GET_DONE: u8 = 0x04;
 
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct EventList {
@@ -221,6 +227,17 @@ struct StaffRun {
     offset_scale: f32,
     attn: Vec3,
     target: Option<Entity>,
+    talk_open: bool,
+    msg_bound: bool,
+    msg_no: i32,
+    get_stage: u8,
+    get_msg_live: bool,
+}
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ItemPartner {
+    pub entity: Option<Entity>,
+    pub item: u8,
 }
 
 impl ActiveEvent {
@@ -581,10 +598,14 @@ pub fn control(
     mut flags: ResMut<EventFlags>,
     mut story: ResMut<StoryBits>,
     mut next: ResMut<NextStage>,
+    mut msg: ResMut<MsgBox>,
+    table: Res<MsgTable>,
+    partner: Res<ItemPartner>,
     sea: Option<Res<Sea>>,
     mut actors: Query<(Entity, &mut Actor)>,
     players: Query<(Entity, &Player)>,
     mut ships: Query<&mut Ship>,
+    mut talks: Query<&mut Talk>,
 ) {
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
@@ -620,7 +641,7 @@ pub fn control(
             continue;
         }
         for run in running.staffs.iter_mut() {
-            special_proc(run, &list, &mut flags, &mut story, &mut next);
+            special_proc(run, &list, &mut flags, &mut story, &mut next, &mut msg, &table);
         }
     }
     for running in active.running.iter_mut() {
@@ -638,6 +659,10 @@ pub fn control(
                 &players,
                 &mut ships,
                 sea.as_deref(),
+                &mut talks,
+                &mut msg,
+                &table,
+                &partner,
             );
         }
     }
@@ -652,6 +677,10 @@ fn staff_cut(
     players: &Query<(Entity, &Player)>,
     ships: &mut Query<&mut Ship>,
     sea: Option<&Sea>,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    partner: &ItemPartner,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -660,8 +689,10 @@ fn staff_cut(
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
         match staff.name.as_str() {
-            "NpcSo" => soldier_cut(run, list, flags, owner, actors, players, sea),
-            "Link" => link_cut(run, list, flags),
+            "NpcSo" => soldier_cut(
+                run, list, flags, owner, actors, players, sea, talks, msg, table,
+            ),
+            "Link" => link_cut(run, list, flags, msg, table, partner),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
@@ -676,6 +707,9 @@ fn soldier_cut(
     actors: &mut Query<(Entity, &mut Actor)>,
     players: &Query<(Entity, &Player)>,
     sea: Option<&Sea>,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
@@ -716,18 +750,127 @@ fn soldier_cut(
         "APPEAR" | "DIVE" | "DISAPPEAR" => offset_cut(run, list, flags, &cut.name),
         "JUMP_MAPOPEN" => mapopen_cut(run, list, flags, owner, actors),
         "TURN" => soldier_turn(run, list, flags, owner, actors),
+        "TALK_MSG" => talk_cut(run, list, flags, owner, talks, msg, table, false),
+        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, talks, msg, table, true),
         name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
         name if SOLDIER_PENDING.contains(&name) => {}
         _ => cut_end(run, list, flags),
     }
 }
 
-fn link_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn link_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    partner: &ItemPartner,
+) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
+    if leading_digits(&cut.name, 3) == Some(GET_ITEM_MODE) {
+        get_item_cut(run, list, flags, msg, table, partner);
+        return;
+    }
     if leading_digits(&cut.name, 3).is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
         cut_end(run, list, flags);
+    }
+}
+
+fn talk_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    cont: bool,
+) {
+    let Ok(mut talk) = talks.get_mut(owner) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    if run.advance > 0 {
+        if cont {
+            talk.msg_end = list.cut_number(run.cut as usize, "end_num").unwrap_or(-1);
+        } else {
+            talk.msg_curr = list.cut_number(run.cut as usize, "msg_num").unwrap_or(0) as u32;
+            talk.msg_end = list.cut_number(run.cut as usize, "end_msg").unwrap_or(-1);
+            run.talk_open = true;
+        }
+    }
+    if !run.talk_open {
+        cut_end(run, list, flags);
+        return;
+    }
+    let status = npc_talk(&mut talk, msg, table);
+    if status == MSG_BOX_CLOSED {
+        run.talk_open = false;
+        cut_end(run, list, flags);
+    } else if (status == MSG_BOX_OPENING || status == MSG_TYPING)
+        && talk.msg_end as u32 == talk.msg_curr
+    {
+        talk.msg_end = -1;
+        cut_end(run, list, flags);
+    }
+}
+
+fn npc_talk(talk: &mut Talk, msg: &mut MsgBox, table: &MsgTable) -> u8 {
+    let mut status = 0xFF;
+    if !talk.msg_live {
+        talk.msg_live = true;
+        talk.msg_bound = false;
+        msg.message_set(talk.msg_curr, table);
+    } else if talk.msg_bound {
+        status = msg.status();
+        if status == MSG_DISPLAYED {
+            msg.set_status(MSG_ENDS);
+        } else if status == MSG_BOX_CLOSED {
+            msg.set_status(MSG_DESTROYED);
+            talk.msg_live = false;
+        }
+    } else {
+        talk.msg_bound = true;
+    }
+    status
+}
+
+fn get_item_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    partner: &ItemPartner,
+) {
+    if run.get_stage & GET_DONE != 0 {
+        cut_end(run, list, flags);
+        return;
+    }
+    if run.get_stage & GET_ENTERED == 0 {
+        run.get_stage |= GET_ENTERED;
+        run.get_msg_live = false;
+    }
+    if partner.entity.is_none() {
+        return;
+    }
+    let msg_no = u32::from(partner.item) + 101;
+    if !run.get_msg_live {
+        run.get_msg_live = true;
+        msg.message_set(msg_no, table);
+        return;
+    }
+    match msg.status() {
+        MSG_DISPLAYED => msg.set_status(MSG_ENDS),
+        MSG_BOX_CLOSED => {
+            msg.set_status(MSG_DESTROYED);
+            run.get_msg_live = false;
+            run.get_stage |= GET_DONE;
+            cut_end(run, list, flags);
+        }
+        _ => {}
     }
 }
 
@@ -1256,6 +1399,11 @@ fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
                 offset_scale: 0.0,
                 attn: Vec3::ZERO,
                 target: None,
+                talk_open: false,
+                msg_bound: false,
+                msg_no: 0,
+                get_stage: 0,
+                get_msg_live: false,
             })
         })
         .collect();
@@ -1362,6 +1510,8 @@ fn special_proc(
     flags: &mut EventFlags,
     story: &mut StoryBits,
     next: &mut NextStage,
+    msg: &mut MsgBox,
+    table: &MsgTable,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -1370,7 +1520,7 @@ fn special_proc(
         STAFF_ALL | STAFF_CREATE | STAFF_LIGHT => cut_end(run, list, flags),
         STAFF_TIMEKEEPER => timekeeper(run, list, flags),
         STAFF_DIRECTOR => director(run, list, flags, next),
-        STAFF_MESSAGE => message(run, list, flags),
+        STAFF_MESSAGE => message(run, list, flags, msg, table),
         STAFF_SOUND => sound(run, list, flags),
         STAFF_PACKAGE => package(run, list, flags, story),
         _ => {}
@@ -1441,15 +1591,75 @@ fn director(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, next: 
     }
 }
 
-fn message(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+fn message(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
     let action = act_index(run, list, MESSAGE_ACTIONS);
-    if run.advance > 0 && (action == 0 || action == 7) {
-        wait_start(run, list);
+    if run.advance > 0 {
+        match action {
+            0 | 7 => wait_start(run, list),
+            1 => {
+                run.msg_bound = false;
+                run.msg_no = list.cut_number(run.cut as usize, "msgNo").unwrap_or(0);
+                run.phase = 0;
+            }
+            3 | 5 => {
+                if run.msg_bound {
+                    msg.set_status(MSG_ENDS);
+                }
+            }
+            4 => {
+                if run.msg_bound {
+                    run.msg_no = list.cut_number(run.cut as usize, "msgNo").unwrap_or(0);
+                    msg.set_status(MSG_CONTINUES);
+                    msg.message_set(run.msg_no as u32, table);
+                }
+            }
+            _ => {}
+        }
     }
     match action {
         0 | 7 => wait_proc(run, list, flags),
-        3 | 4 | 6 | 8 => cut_end(run, list, flags),
-        1 | 2 | 5 => {}
+        1 => match run.phase {
+            0 => {
+                msg.message_set(run.msg_no as u32, table);
+                run.phase = 1;
+            }
+            1 => {
+                if msg.active() {
+                    run.msg_bound = true;
+                    run.phase = 2;
+                }
+            }
+            _ => cut_end(run, list, flags),
+        },
+        2 => {
+            if run.msg_bound && msg.status() == MSG_DISPLAYED {
+                cut_end(run, list, flags);
+            }
+        }
+        3 | 6 => {
+            if !run.msg_bound {
+                cut_end(run, list, flags);
+            } else if msg.status() == MSG_BOX_CLOSED {
+                msg.set_status(MSG_DESTROYED);
+                run.msg_bound = false;
+                cut_end(run, list, flags);
+            }
+        }
+        4 => cut_end(run, list, flags),
+        5 => {
+            if run.msg_bound
+                && matches!(msg.status(), MSG_BOX_CLOSING | MSG_BOX_CLOSED)
+            {
+                cut_end(run, list, flags);
+            }
+        }
+        8 => cut_end(run, list, flags),
         _ => cut_end(run, list, flags),
     }
 }

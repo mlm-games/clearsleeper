@@ -4,8 +4,16 @@ use bevy_ecs::prelude::{Entity, World};
 use bevy_ecs::system::RunSystemOnce;
 use clearsleeper::assets;
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::event::{ActiveEvent, EVENT_LIST_ENTRY, EventList, Stage, Value};
+use clearsleeper::sim::event::{
+    ActiveEvent, EVENT_LIST_ENTRY, EventList, ItemPartner, Stage, Value,
+};
 use clearsleeper::sim::flags::{EventFlags, StoryBits};
+use clearsleeper::sim::intent::DoIntent;
+use clearsleeper::sim::msg::{
+    MsgBox, MsgEntry, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING,
+    MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS, MSG_TYPING,
+};
+use clearsleeper::sim::talk::Talk;
 use clearsleeper::sim::transition::{NextStage, Target};
 use clearsleeper::{App, SIM_HZ};
 use glam::Vec3;
@@ -162,6 +170,31 @@ fn flags(app: &App) -> EventFlags {
     *app.sim.world.resource::<EventFlags>()
 }
 
+fn press(app: &mut App, held: bool) {
+    app.sim.world.resource_mut::<DoIntent>().0 = held;
+}
+
+fn box_status(app: &App) -> u8 {
+    app.sim.world.resource::<MsgBox>().status()
+}
+
+fn talker(app: &mut App) -> Entity {
+    app.sim
+        .world
+        .spawn((
+            Actor {
+                name: "So".to_owned(),
+                parameters: 0,
+                pos: Vec3::new(1000.0, 0.0, 0.0),
+                angle: [0; 3],
+                set_id: 0,
+                room: 0,
+            },
+            Talk::new(0, 0),
+        ))
+        .id()
+}
+
 fn run_control(list: &EventList) -> World {
     let mut world = World::new();
     world.insert_resource(list.clone());
@@ -169,6 +202,9 @@ fn run_control(list: &EventList) -> World {
     world.insert_resource(EventFlags::default());
     world.insert_resource(StoryBits::default());
     world.insert_resource(NextStage::default());
+    world.insert_resource(ItemPartner::default());
+    world.insert_resource(MsgBox::default());
+    world.insert_resource(MsgTable::default());
     assert!(
         world.resource_mut::<ActiveEvent>().order(list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
@@ -824,4 +860,235 @@ fn golden_soldier_offset_and_mapopen_cuts_resolve_through_the_ship() {
     );
     tick(&mut app);
     assert!(active(&app).end_check(0), "the event closes");
+}
+
+#[test]
+fn golden_talk_msg_drives_one_message_through_open_type_and_close() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Talk", &[0], [8, -1, -1])],
+        vec![staff("NpcSo", 0, 0)],
+        vec![
+            named_cut("TALK_MSG", [-1, -1, -1], 7, 0, 1),
+            named_cut("STOP", [-1, -1, -1], 8, u32::MAX, -1),
+        ],
+        vec![record("msg_num", 3, 0, -1)],
+        Vec::new(),
+        vec![4242_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<MsgTable>().insert(
+        4242,
+        MsgEntry {
+            text: b"Hi\x00".to_vec(),
+            draw_type: 0,
+            textbox_type: 0,
+            lines: 4,
+        },
+    );
+    let soldier = talker(&mut app);
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, soldier);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_BOX_OPENING,
+        "the create frame opens the box"
+    );
+    let mut opened = 0;
+    while box_status(&app) != MSG_TYPING {
+        tick(&mut app);
+        opened += 1;
+        assert!(opened < 40, "the box starts typing");
+    }
+    assert_eq!(opened, 14, "thirteen open frames then typing");
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DISPLAYED,
+        "one press finishes the message"
+    );
+    press(&mut app, false);
+    tick(&mut app);
+    assert_eq!(box_status(&app), MSG_ENDS, "the driver marks it for closing");
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_BOX_CLOSING,
+        "the second press closes it"
+    );
+    press(&mut app, false);
+    let mut closed = 0;
+    while box_status(&app) != MSG_BOX_CLOSED {
+        tick(&mut app);
+        closed += 1;
+        assert!(closed < 20, "the box closes");
+    }
+    assert_eq!(closed, 10, "closing takes ten frames");
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DESTROYED,
+        "the driver destroys the box"
+    );
+    assert!(flags(&app).test(7), "the talk cut ended with the box");
+    let mut done = 0;
+    while !active(&app).end_check(0) {
+        tick(&mut app);
+        done += 1;
+        assert!(done < 20, "the event closes");
+    }
+}
+
+#[test]
+fn golden_talk_msg_ends_the_cut_when_current_message_is_the_end() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Talk", &[0], [8, -1, -1])],
+        vec![staff("NpcSo", 0, 0)],
+        vec![
+            named_cut("TALK_MSG", [-1, -1, -1], 7, 0, 1),
+            named_cut("STOP", [-1, -1, -1], 8, u32::MAX, -1),
+        ],
+        vec![
+            record("msg_num", 3, 0, 1),
+            record("end_msg", 3, 1, -1),
+        ],
+        Vec::new(),
+        vec![
+            4242_i32.to_be_bytes().to_vec(),
+            4242_i32.to_be_bytes().to_vec(),
+        ],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<MsgTable>().insert(
+        4242,
+        MsgEntry {
+            text: b"Hi\x00".to_vec(),
+            draw_type: 0,
+            textbox_type: 0,
+            lines: 4,
+        },
+    );
+    let soldier = talker(&mut app);
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, soldier);
+    for _ in 0..20 {
+        if flags(&app).test(7) {
+            break;
+        }
+        tick(&mut app);
+    }
+    assert!(
+        flags(&app).test(7),
+        "the talk cut ends when current is the end message"
+    );
+    assert!(
+        app.sim.world.resource::<MsgBox>().active(),
+        "the box outlives the cut"
+    );
+    let mut done = 0;
+    while !active(&app).end_check(0) {
+        tick(&mut app);
+        done += 1;
+        assert!(done < 20, "the event closes");
+    }
+}
+
+#[test]
+fn golden_message_staff_creates_pushes_and_finishes_the_box() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Box", &[0], [9, -1, -1])],
+        vec![staff("Msg", 7, 0)],
+        vec![
+            named_cut("CREATE_MSG", [-1, -1, -1], 7, 0, 1),
+            named_cut("PUSHBUTTON", [-1, -1, -1], 8, u32::MAX, 2),
+            named_cut("FINISH", [-1, -1, -1], 9, u32::MAX, -1),
+        ],
+        vec![record("msgNo", 3, 0, -1)],
+        Vec::new(),
+        vec![500_i32.to_be_bytes().to_vec()],
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    app.sim.world.resource_mut::<MsgTable>().insert(
+        500,
+        MsgEntry {
+            text: b"OK\x00".to_vec(),
+            draw_type: 0,
+            textbox_type: 0,
+            lines: 4,
+        },
+    );
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, Entity::PLACEHOLDER);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_BOX_OPENING,
+        "CREATE_MSG opens the box"
+    );
+    tick(&mut app);
+    tick(&mut app);
+    assert!(flags(&app).test(7), "CREATE_MSG ends after the resolve frames");
+    let mut typed = 0;
+    while box_status(&app) != MSG_TYPING {
+        tick(&mut app);
+        typed += 1;
+        assert!(typed < 40, "the box starts typing");
+    }
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DISPLAYED,
+        "the press finishes the message"
+    );
+    press(&mut app, false);
+    tick(&mut app);
+    assert!(
+        flags(&app).test(8),
+        "PUSHBUTTON waits for the message then advances"
+    );
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_ENDS,
+        "FINISH marks the box for closing"
+    );
+    press(&mut app, true);
+    tick(&mut app);
+    assert_eq!(box_status(&app), MSG_BOX_CLOSING, "the press closes it");
+    press(&mut app, false);
+    let mut closed = 0;
+    while box_status(&app) != MSG_BOX_CLOSED {
+        tick(&mut app);
+        closed += 1;
+        assert!(closed < 20, "the box closes");
+    }
+    assert_eq!(closed, 10, "closing takes ten frames");
+    tick(&mut app);
+    assert_eq!(
+        box_status(&app),
+        MSG_DESTROYED,
+        "FINISH destroys the box"
+    );
+    assert!(flags(&app).test(9), "the chain finishes");
+    let mut done = 0;
+    while !active(&app).end_check(0) {
+        tick(&mut app);
+        done += 1;
+        assert!(done < 20, "the event closes");
+    }
 }

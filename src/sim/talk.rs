@@ -73,6 +73,10 @@ pub struct Talk {
     pub rupee_count: u8,
     pub gone: bool,
     pub order: u8,
+    pub msg_curr: u32,
+    pub msg_end: i32,
+    pub msg_live: bool,
+    pub msg_bound: bool,
 }
 
 impl Talk {
@@ -86,6 +90,10 @@ impl Talk {
             rupee_count: 0,
             gone: false,
             order: 0,
+            msg_curr: 0,
+            msg_end: -1,
+            msg_live: false,
+            msg_bound: false,
         }
     }
 }
