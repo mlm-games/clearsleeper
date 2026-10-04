@@ -635,6 +635,9 @@ impl App {
                     sim::bombflower::CRAWLER_TOP,
                     sim::bombflower::CRAWLER_HALF,
                 )
+            } else if let Some(hoist) = entity.get::<sim::mflft::Mflft>() {
+                let (half, top) = hoist.cull();
+                (view::ActorKind::Scenery, 0, top, half)
             } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
                 if cell.open() {
                     continue;

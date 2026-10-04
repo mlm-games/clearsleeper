@@ -48,6 +48,7 @@ pub mod layer;
 pub mod leaves;
 pub mod lock;
 pub mod marlon;
+pub mod mflft;
 pub mod msg;
 pub mod pickup;
 pub mod player;
@@ -293,6 +294,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             world.resource::<flags::Switches>(),
         );
         world.spawn((actor, button)).id()
+    } else if mflft::is_mflft(&source.name) {
+        let hoist = mflft::Mflft::spawn(
+            source.parameters,
+            actor.pos,
+            world.resource::<flags::Switches>(),
+            world.get_resource::<collision::Collision>(),
+        );
+        world.spawn((actor, hoist)).id()
     } else if taglight::is_tag_light(&source.name) {
         let spot = taglight::TagLight::spawn(source.parameters);
         world.spawn((actor, spot)).id()
@@ -509,6 +518,7 @@ pub fn build(
                     homen::control.in_set(WwSimSet::Execute),
                     leaves::control.in_set(WwSimSet::Execute),
                     swpush::control.in_set(WwSimSet::Execute),
+                    mflft::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
