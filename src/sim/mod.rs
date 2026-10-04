@@ -67,6 +67,7 @@ pub mod shop;
 pub mod sea;
 pub mod ship;
 pub mod shmrgrd;
+pub mod stalfos;
 pub mod statue;
 pub mod stone;
 pub mod stream;
@@ -355,6 +356,17 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if hookshot::is_hookshot(&source.name) {
         let chain = hookshot::Hookshot::nocked(actor.pos);
         world.spawn((actor, chain)).id()
+    } else if stalfos::is_stalfos(&source.name) {
+        match stalfos::Stalfos::spawn(
+            source.parameters,
+            source.angle[2],
+            world.resource::<flags::Switches>(),
+        ) {
+            Some((st, hit_points)) => world
+                .spawn((actor, st, hit_points, enemy::Hurt::default()))
+                .id(),
+            None => world.spawn(actor).id(),
+        }
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
@@ -577,6 +589,7 @@ pub fn build(
                     mflft::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
+                    stalfos::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
