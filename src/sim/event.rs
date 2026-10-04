@@ -835,12 +835,22 @@ fn staff_cut(
             ("msg_init", "message"),
             "msg_number",
         );
-    } else if staff.name == "Os" {
+    } else if staff.name == "Os" || staff.name == "Os1" || staff.name == "Os2" {
         os_cut(run, list, flags, owner, talks, msg, table);
     } else if staff.name == "Warpf" {
         warp_cut(run, list, flags);
     } else if people_staff(&staff.name) {
         people_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Ls1" {
+        hold_cut(run, list, flags, &["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"]);
+    } else if staff.name == "Ba1" {
+        hold_cut(run, list, flags, &["ACTION", "START_TALE1"]);
+    } else if staff.name == "Hdai1" || staff.name == "Hdai2" || staff.name == "Hdai3" {
+        hold_cut(run, list, flags, &["MOVE"]);
+    } else if staff.name == "Apzl" {
+        hold_cut(run, list, flags, &["TALK", "GETITEM", "STOP", "PUSH_A"]);
+    } else if staff.name == "Ji1" {
+        ji1_cut(run, list, flags);
     } else if staff.name == "Tpost" {
         tpost_cut(run, list, flags, owner, talks, msg, table, commands);
     } else if staff.name == "Auction" {
@@ -992,6 +1002,7 @@ fn people_staff(name: &str) -> bool {
             | "Sa5"
             | "Ug1"
             | "Ug2"
+            | "Figure"
     )
 }
 
@@ -1097,6 +1108,26 @@ fn tpost_cut(
         run.talk_open = false;
         cut_end(run, list, flags);
     }
+}
+
+fn hold_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, hold: &[&str]) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if hold.contains(&cut.name.as_str()) {
+        return;
+    }
+    cut_end(run, list, flags);
+}
+
+fn ji1_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if cut.name == "02_dummy" {
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn zl1_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
