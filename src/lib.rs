@@ -414,6 +414,7 @@ impl App {
                 (view::ActorKind::Gull, 0, 12.0, 8.0)
             } else if entity.contains::<sim::marlon::Marlon>()
                 || entity.contains::<sim::shop::Shop>()
+                || entity.contains::<sim::lenzo::Lenzo>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {

@@ -51,6 +51,7 @@ pub mod ladder;
 pub mod koisi;
 pub mod layer;
 pub mod leaves;
+pub mod lenzo;
 pub mod lock;
 pub mod marlon;
 pub mod mbdoor;
@@ -169,6 +170,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if flags::is_event_switch(&source.name) {
         let switch = flags::EventSwitch::spawn(source.parameters);
         world.spawn((actor, switch)).id()
+    } else if lenzo::is_lenzo(&source.name) {
+        let shopkeeper = lenzo::Lenzo::spawn(source.parameters);
+        world.spawn((actor, shopkeeper)).id()
     } else if armos::is_armos(&source.name) {
         world.spawn((actor, armos::Armos::spawn(source.parameters))).id()
     } else if figure::is_figure(&source.name) {
@@ -574,7 +578,11 @@ pub fn build(
                     msg::control.in_set(WwSimSet::Execute),
                     sage::control.in_set(WwSimSet::Execute),
                     servant::control.in_set(WwSimSet::Execute),
+                    lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     ending::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
