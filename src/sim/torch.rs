@@ -250,10 +250,17 @@ pub fn is_torch(name: &str) -> bool {
 pub fn control(
     collision: Option<Res<Collision>>,
     mut switches: ResMut<Switches>,
-    mut torches: Query<(&Actor, &mut Torch)>,
+    forced: Query<&super::fire::FireLit>,
+    mut torches: Query<(Entity, &Actor, &mut Torch)>,
 ) {
     let solid = collision.as_deref();
-    for (actor, mut torch) in &mut torches {
+    for (entity, actor, mut torch) in &mut torches {
+        if let Ok(lit) = forced.get(entity)
+            && lit.0
+            && !torch.state.lit()
+        {
+            torch.state = State::Wake;
+        }
         torch.tick_burn();
         torch.tick_clip();
         match torch.state {

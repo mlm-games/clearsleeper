@@ -57,25 +57,25 @@ pub fn control(
     for (entity, actor, mut fire) in &mut fires {
         if let Ok(lit) = forced.get(entity) {
             fire.lit = lit.0;
-            continue;
-        }
-        if fire.switch != 0xFF && switches.test(fire.switch) {
-            fire.lit = false;
-            continue;
-        }
-        if fire.room && !fighting {
-            fire.lit = false;
-            continue;
-        }
-        if !fire.lit {
-            let pos = actor.pos;
-            if !bombs
-                .iter()
-                .any(|bomb| (bomb.pos - pos).length() <= LIGHT_RADIUS)
-            {
+        } else {
+            if fire.switch != 0xFF && switches.test(fire.switch) {
+                fire.lit = false;
                 continue;
             }
-            fire.lit = true;
+            if fire.room && !fighting {
+                fire.lit = false;
+                continue;
+            }
+            if !fire.lit {
+                let pos = actor.pos;
+                if !bombs
+                    .iter()
+                    .any(|bomb| (bomb.pos - pos).length() <= LIGHT_RADIUS)
+                {
+                    continue;
+                }
+                fire.lit = true;
+            }
         }
         let delta = player.pos - actor.pos;
         if delta.length() <= REACH {
