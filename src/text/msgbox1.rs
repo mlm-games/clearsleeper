@@ -3282,7 +3282,7 @@ impl Msg1Box {
         }
         env.mesg_status = self.status;
         info.mesg_status = self.status;
-        true
+        self.alive
     }
 
     pub fn draw(&mut self, env: &Msg1Env) {

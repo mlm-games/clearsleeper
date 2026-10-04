@@ -2733,7 +2733,7 @@ impl Msg2Box {
         }
 
         info.mesg_status = self.status;
-        true
+        self.alive
     }
 
     pub fn draw(&mut self, hio: &Msg2Hio) {
