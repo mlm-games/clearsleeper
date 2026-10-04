@@ -116,6 +116,24 @@ pub(super) fn add_calc_angle_s(
     value
 }
 
+pub(super) fn chase_f(value: &mut f32, target: f32, step: f32) -> bool {
+    if step == 0.0 {
+        let done = *value == target;
+        if done {
+            *value = target;
+        }
+        return done;
+    }
+    let step = if *value > target { -step } else { step };
+    *value += step;
+    if step * (*value - target) >= 0.0 {
+        *value = target;
+        true
+    } else {
+        false
+    }
+}
+
 pub(super) fn chase_angle_s(value: &mut i16, target: i16, step: i16) -> bool {
     if step == 0 {
         let done = *value == target;

@@ -8,4 +8,5 @@ pub struct Player {
     pub face: f32,
     pub speed: f32,
     pub speed_y: f32,
+    pub drift: Vec3,
 }

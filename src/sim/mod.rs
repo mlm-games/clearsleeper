@@ -72,6 +72,7 @@ pub mod transition;
 pub mod tsubo;
 pub mod walk;
 pub mod wall;
+pub mod wind;
 pub mod windmill;
 pub mod warship;
 pub mod water;
@@ -226,6 +227,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if fallrock::is_fallrock(&source.name) {
         let stone = fallrock::FallRock::spawn(1.0);
         world.spawn((actor, stone)).id()
+    } else if wind::is_wind_tag(&source.name) {
+        let gale = wind::WindTag::spawn(source.parameters, source.angle[2]);
+        world.spawn((actor, gale)).id()
     } else if windmill::is_windmill(&source.name) {
         let tower = windmill::Windmill::spawn(source.parameters);
         world.spawn((actor, tower)).id()
@@ -383,6 +387,7 @@ pub fn build(
             face: yaw,
             speed: 0.0,
             speed_y: 0.0,
+            drift: Vec3::ZERO,
         },
         hammer::Hammer::idle(),
     ));
@@ -455,6 +460,7 @@ pub fn build(
                     statue::control.in_set(WwSimSet::Execute),
                     schedule::control.in_set(WwSimSet::Execute),
                     rockfall::control.in_set(WwSimSet::Execute),
+                    wind::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )

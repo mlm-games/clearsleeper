@@ -502,8 +502,14 @@ impl App {
                     rock.hit_radius(),
                 )
             } else if let Some(mill) = entity.get::<sim::windmill::Windmill>() {
-                let (_, max) = mill.extent();
-                (view::ActorKind::Scenery, 0, max[1], max[0])
+                let (_, max) = mill.cull();
+                (view::ActorKind::Scenery, 0, max.y, max.x)
+            } else if let Some(gale) = entity.get::<sim::wind::WindTag>() {
+                if !gale.visible() {
+                    continue;
+                }
+                lift = gale.cur;
+                (view::ActorKind::Fire, 0, gale.span, gale.radius())
             } else if let Some(float) = entity.get::<sim::buoybarrel::BuoyBarrel>() {
                 if float.gone {
                     continue;
