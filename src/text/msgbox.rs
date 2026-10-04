@@ -1352,7 +1352,7 @@ impl Msg2Env {
     }
 }
 
-pub use super::msghio::MeterMsgHio as Msg2Hio;
+pub use super::msghio::MsgHio as Msg2Hio;
 
 impl Msg2Hio {
     pub fn aim_brightness(&self, env: &Msg2Env) -> u8 {

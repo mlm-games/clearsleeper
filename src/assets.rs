@@ -1,3 +1,4 @@
+use bevy_ecs::prelude::Resource;
 use std::path::{Path, PathBuf};
 
 pub const ASSETS_ENV: &str = "CS_ASSETS";
@@ -538,6 +539,7 @@ fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
     None
 }
 
+#[derive(Resource, Debug)]
 pub struct MsgArchives {
     pub normal: Option<Archive>,
     pub hyrule: Option<Archive>,
@@ -606,6 +608,16 @@ fn msg_table_from_assets() -> Result<crate::sim::msg::MsgTable, AssetError> {
         Err(error) => log::warn!("clearsleeper: hyrule message archive unavailable ({error})"),
     }
     Ok(table)
+}
+
+pub fn load_msg_archives() -> MsgArchives {
+    match AssetRoot::from_env() {
+        Ok(root) => MsgArchives::load(&root),
+        Err(_) => MsgArchives {
+            normal: None,
+            hyrule: None,
+        },
+    }
 }
 
 pub fn msg_table_from_bmg(data: &[u8], table: &mut crate::sim::msg::MsgTable) -> Option<()> {

@@ -231,7 +231,7 @@ fn item_icon_size(msg_no: u32) -> Option<[f32; 2]> {
     })
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Msg1Hio {
     pub field_0x5: u32,
     pub field_0x9: u32,

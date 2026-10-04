@@ -6,6 +6,7 @@ use glam::Vec3;
 //! constant values and cross-module signatures are fixed here; implementations
 //! live in the per-module files and must not redeclare anything from here.
 
+pub mod driver;
 pub mod font;
 pub mod fontdata;
 pub mod msgbox;

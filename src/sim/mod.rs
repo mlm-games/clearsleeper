@@ -399,6 +399,15 @@ pub fn build(
     sim.world.insert_resource(bombflower::Blasts::default());
     sim.world.insert_resource(crate::text::font::FontBank::default());
     sim.world.insert_resource(crate::text::msghio::MsgHio::default());
+    sim.world.insert_resource(crate::assets::load_msg_archives());
+    sim.world.insert_resource(crate::text::driver::TextEnv::default());
+    sim.world.insert_resource(crate::text::driver::Stick::default());
+    sim.world.insert_resource(crate::text::driver::Names::default());
+    sim.world.insert_resource(crate::text::driver::TextFlags::default());
+    sim.world.insert_resource(crate::text::driver::Counters::default());
+    sim.world.insert_resource(crate::text::driver::Layout::default());
+    sim.world.insert_resource(crate::text::driver::TextScreen::default());
+    sim.world.insert_resource(crate::text::driver::TextDriver::default());
     sim.world.insert_resource(crate::text::msgproc::MsgFlags::default());
     sim.world.insert_resource(crate::text::msgproc::MsgGameInfo::default());
     sim.world.insert_resource(crate::text::msgproc::MsgProcs::default());
@@ -489,6 +498,9 @@ pub fn build(
                     raft::control.in_set(WwSimSet::Execute),
                     barricade::control.in_set(WwSimSet::Execute),
                     trapdoor::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     torch::control.in_set(WwSimSet::Execute),
                     barrel::control.in_set(WwSimSet::Execute),
                     fallrock::control.in_set(WwSimSet::Execute),
@@ -514,6 +526,7 @@ pub fn build(
                     volcano::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
+                    crate::text::driver::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
