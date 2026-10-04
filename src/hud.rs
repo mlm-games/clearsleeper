@@ -154,6 +154,7 @@ fn held_view(held: Held) -> View {
         Some(Kind::Bomb) => "bomb",
         Some(Kind::Arrow) => "arrow",
         Some(Kind::Boomerang) => "boomerang",
+        Some(Kind::Hookshot) => "hookshot",
         None => "none",
     };
     Row(Modifier::new()

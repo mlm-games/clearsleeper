@@ -149,6 +149,7 @@ pub fn item_hex(kind: crate::sim::item::Kind) -> &'static str {
         crate::sim::item::Kind::Bomb => "#2E3138",
         crate::sim::item::Kind::Arrow => "#C9C4B4",
         crate::sim::item::Kind::Boomerang => "#B84C85",
+        crate::sim::item::Kind::Hookshot => "#7C8C9C",
     }
 }
 const HEART: Rgb = [0.86, 0.20, 0.22];

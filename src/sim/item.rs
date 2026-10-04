@@ -13,6 +13,7 @@ use super::events::{SimEvent, SimEvents};
 use super::ground::{self, grounded};
 use super::health::Health;
 use super::hop::Hop;
+use super::hookshot;
 use super::intent::UseIntent;
 use super::jump::Jump;
 use super::player::Player;
@@ -27,6 +28,7 @@ pub const LAST_BOMB: u8 = 0x0E;
 pub const FIRST_ARROW: u8 = 0x10;
 pub const LAST_ARROW: u8 = 0x12;
 pub const BOOMERANG: u8 = 0x2D;
+pub const HOOKSHOT: u8 = 0x2F;
 
 const BOMB_COUNTS: [u8; 4] = [5, 10, 20, 30];
 const ARROW_COUNTS: [u8; 3] = [10, 20, 30];
@@ -57,6 +59,7 @@ pub enum Kind {
     Bomb,
     Arrow,
     Boomerang,
+    Hookshot,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -73,6 +76,7 @@ impl Held {
             FIRST_BOMB..=LAST_BOMB => (FIRST_BOMB, BOMB_COUNTS[(item - FIRST_BOMB) as usize]),
             FIRST_ARROW..=LAST_ARROW => (FIRST_ARROW, ARROW_COUNTS[(item - FIRST_ARROW) as usize]),
             BOOMERANG => (BOOMERANG, 1),
+            HOOKSHOT => (HOOKSHOT, 1),
             _ => return,
         };
         if self.item == slot {
@@ -93,6 +97,7 @@ impl Held {
             FIRST_BOMB..=LAST_BOMB => Some(Kind::Bomb),
             FIRST_ARROW..=LAST_ARROW => Some(Kind::Arrow),
             BOOMERANG => Some(Kind::Boomerang),
+            HOOKSHOT => Some(Kind::Hookshot),
             _ => None,
         }
     }
@@ -133,6 +138,15 @@ pub struct Shots<'w, 's> {
     bombs: Query<'w, 's, (Entity, &'static mut Bomb), Without<arrow::Arrow>>,
     nocked: Query<'w, 's, &'static arrow::Arrow>,
     spin: Query<'w, 's, (Entity, &'static mut boomerang::Boomerang), Without<Bomb>>,
+    hooked: Query<'w, 's, &'static hookshot::Hookshot>,
+}
+
+impl Shots<'_, '_> {
+    fn stowed(&self) -> bool {
+        self.hooked
+            .iter()
+            .all(|hook| matches!(hook.phase, hookshot::Phase::Wait))
+    }
 }
 
 impl Shots<'_, '_> {
@@ -181,6 +195,11 @@ fn launch(
             shaft.shoot(0.0, player.yaw);
             commands.spawn((shaft, InFlight));
         }
+        Kind::Hookshot => {
+            let mut hook = hookshot::Hookshot::nocked(pos);
+            hook.launch(0.0, player.face);
+            commands.spawn((hook, InFlight));
+        }
         Kind::Boomerang => {
             let mut boom = boomerang::Boomerang::nocked();
             boom.toss(pos, player.face, 0.0, locks);
@@ -216,7 +235,7 @@ pub fn control(
     if pressed {
         if shots.spinning() {
             shots.recall();
-        } else if ready {
+        } else if ready && shots.stowed() {
             let rounds = shots
                 .nocked
                 .iter()

@@ -26,6 +26,7 @@ pub mod ghostship;
 pub mod ground;
 pub mod gull;
 pub mod health;
+pub mod hookshot;
 pub mod hop;
 pub mod intent;
 pub mod inventory;
@@ -198,6 +199,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if hookshot::is_hookshot(&source.name) {
+        let chain = hookshot::Hookshot::nocked(actor.pos);
+        world.spawn((actor, chain)).id()
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
@@ -321,6 +325,7 @@ pub fn build(
                     bombflower::crawler_control.in_set(WwSimSet::Execute),
                     ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
+                    hookshot::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
