@@ -400,7 +400,9 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
-            } else if entity.contains::<sim::scenery::Scenery>() {
+            } else if entity.contains::<sim::scenery::Scenery>()
+                || entity.contains::<sim::tsubo::Tsubo>()
+            {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
             } else {
                 continue;

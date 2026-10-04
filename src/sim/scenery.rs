@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-pub const SCENERY_ACTORS: [&str; 23] = [
+pub const SCENERY_ACTORS: [&str; 21] = [
     "kusax1",
     "kusax7",
     "kusax21",
@@ -14,8 +14,6 @@ pub const SCENERY_ACTORS: [&str; 23] = [
     "pflwrx7",
     "flwr7",
     "flwr17",
-    "kotubo",
-    "ootubo1",
     "koisi1",
     "Oyashi",
     "Pirates",

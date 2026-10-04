@@ -32,6 +32,7 @@ pub mod ship;
 pub mod swim;
 pub mod tag;
 pub mod talk;
+pub mod tsubo;
 pub mod transition;
 pub mod walk;
 pub mod warship;
@@ -111,6 +112,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, switch)).id()
     } else if scenery::is_scenery(&source.name) {
         world.spawn((actor, scenery::Scenery)).id()
+    } else if tsubo::is_tsubo(&source.name) {
+        let pot = tsubo::Tsubo::spawn(source.parameters);
+        world.spawn((actor, pot)).id()
     } else if tag::is_tag(&source.name) {
         let marker = tag::Tag::spawn(source.parameters, actor.pos, source.angle[1]);
         world.spawn((actor, marker)).id()
