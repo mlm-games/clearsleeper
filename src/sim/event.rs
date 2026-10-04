@@ -675,7 +675,7 @@ pub fn control(
     anms: Res<LinkAnms>,
     sea: Option<Res<Sea>>,
     mut actors: Query<(Entity, &mut Actor)>,
-    players: Query<(Entity, &Player)>,
+    mut players: Query<(Entity, &mut Player)>,
     mut ships: Query<&mut Ship>,
     mut talks: Query<&mut Talk>,
     mut presents: Query<&mut PresentItem>,
@@ -730,7 +730,7 @@ pub fn control(
                 &mut flags,
                 owner,
                 &mut actors,
-                &players,
+                &mut players,
                 &mut ships,
                 sea.as_deref(),
                 &mut talks,
@@ -751,7 +751,7 @@ fn staff_cut(
     flags: &mut EventFlags,
     owner: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
     ships: &mut Query<&mut Ship>,
     sea: Option<&Sea>,
     talks: &mut Query<&mut Talk>,
@@ -773,7 +773,8 @@ fn staff_cut(
                 run, list, flags, owner, actors, players, sea, talks, msg, table,
             ),
             "Link" => link_cut(
-                run, list, flags, msg, table, partner, anms, players, commands, presents,
+                run, list, flags, actors, ships, msg, table, partner, anms, players, commands,
+                presents,
             ),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
@@ -787,7 +788,7 @@ fn soldier_cut(
     flags: &mut EventFlags,
     owner: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
     sea: Option<&Sea>,
     talks: &mut Query<&mut Talk>,
     msg: &mut MsgBox,
@@ -979,11 +980,13 @@ fn link_cut(
     run: &mut StaffRun,
     list: &EventList,
     flags: &mut EventFlags,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    ships: &Query<&mut Ship>,
     msg: &mut MsgBox,
     table: &MsgTable,
     partner: &mut ItemPartner,
     anms: &LinkAnms,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
     commands: &mut Commands,
     presents: &mut Query<&mut PresentItem>,
 ) {
@@ -1005,7 +1008,38 @@ fn link_cut(
         .map_or(0, |(_, player)| to_s16(player.yaw));
     if let Some(mode) = mode {
         match mode {
-            4 | 44 => partner.move_angle = turn.map_or(yaw, |angle| angle as i16),
+            4 | 44 => {
+                let angle = turn.map_or(yaw, |angle| angle as i16);
+                partner.move_angle = angle;
+                let mut placed: Option<Vec3> = None;
+                if let Some((_, mut player)) = players.iter_mut().next() {
+                    if let Some(pos) = list.cut_vec(run.cut as usize, "pos") {
+                        player.pos = pos;
+                        placed = Some(pos);
+                    }
+                    let heading = from_s16(angle);
+                    player.yaw = heading;
+                    player.face = heading;
+                    player.speed = 0.0;
+                }
+                if let Some(pos) = placed
+                    && ships.iter().any(|ship| ship.riding)
+                    && let Some((_, mut actor)) =
+                        actors.iter_mut().find(|(_, actor)| actor.name == SHIP_ACTOR)
+                {
+                    actor.pos = pos;
+                    actor.angle[1] = angle;
+                }
+            }
+            43 => {
+                if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
+                    && let Some((_, mut player)) = players.iter_mut().next()
+                {
+                    let heading = target_angle_y(player.pos, pos);
+                    player.yaw = from_s16(heading);
+                    player.face = from_s16(heading);
+                }
+            }
             2 | 3 => {
                 if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
                     && let Some((_, player)) = players.iter().next()
@@ -1139,7 +1173,7 @@ fn get_item_cut(
     table: &MsgTable,
     partner: &mut ItemPartner,
     anms: &LinkAnms,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
     commands: &mut Commands,
     presents: &mut Query<&mut PresentItem>,
 ) {
@@ -1295,7 +1329,7 @@ fn move_cut(
     flags: &mut EventFlags,
     owner: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
 ) {
     let cut = run.cut as usize;
     let is_actor = list
@@ -1359,7 +1393,7 @@ fn turn_cut(
     flags: &mut EventFlags,
     owner: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
     is_actor: bool,
 ) {
     let cut = run.cut as usize;
@@ -1581,7 +1615,7 @@ fn resolve_target(
     cut: usize,
     owner: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
 ) -> Option<Entity> {
     let set_id = list.cut_number(cut, "SetId").unwrap_or(0);
     if set_id != 0 {
@@ -1638,7 +1672,7 @@ fn nearest(
 fn read_pos(
     target: Entity,
     actors: &mut Query<(Entity, &mut Actor)>,
-    players: &Query<(Entity, &Player)>,
+    players: &mut Query<(Entity, &mut Player)>,
 ) -> Option<(Vec3, i16)> {
     if let Ok((_, actor)) = actors.get_mut(target) {
         return Some((actor.pos, actor.angle[1]));
