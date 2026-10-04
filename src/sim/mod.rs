@@ -2,6 +2,7 @@ pub mod actor;
 pub mod area;
 pub mod arrow;
 pub mod balloon;
+pub mod barrier;
 pub mod bird;
 pub mod bomb;
 pub mod bombflower;
@@ -199,6 +200,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if barrier::is_barrier(&source.name) {
+        let field = barrier::Barrier::spawn(Vec3::ONE);
+        world.spawn((actor, field)).id()
     } else if hookshot::is_hookshot(&source.name) {
         let chain = hookshot::Hookshot::nocked(actor.pos);
         world.spawn((actor, chain)).id()
@@ -326,6 +330,7 @@ pub fn build(
                     ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
                     hookshot::control.in_set(WwSimSet::Execute),
+                    barrier::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),

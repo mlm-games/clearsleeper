@@ -445,6 +445,21 @@ impl App {
                 || entity.contains::<sim::carry::Carryable>()
             {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
+            } else if let Some(field) = entity.get::<sim::barrier::Barrier>() {
+                if field.phase == sim::barrier::Phase::Cut {
+                    continue;
+                }
+                (
+                    view::ActorKind::Fire,
+                    0,
+                    field.height(),
+                    field.radius(true),
+                )
+            } else if let Some(hook) = entity.get::<sim::hookshot::Hookshot>() {
+                if hook.phase == sim::hookshot::Phase::Wait {
+                    continue;
+                }
+                (view::ActorKind::Spear, 0, 6.0, 3.0)
             } else if let Some(door) = entity.get::<sim::door::Door>() {
                 let height = door.key_height() + sim::door::BAR_HEIGHT - door.bars_y;
                 (view::ActorKind::Scenery, 0, height, 40.0)
