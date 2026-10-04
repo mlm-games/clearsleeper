@@ -6,8 +6,6 @@ use super::fontdata;
 use super::msgbox::{Msg2Box, Msg2Ctx, Msg2Env, Msg2Hio, Msg2Screen, Msg2Stick};
 use super::msgbox1::{Msg1Box, Msg1Ctx, Msg1Env, Msg1Hio, Msg1Screen, Msg1Stick};
 use super::msgdata::MsgLenState;
-use super::msgget::MsgGet;
-use super::msghio::MsgHio;
 use super::msgproc::{MeterMsgHio, MsgGameInfo, MsgProcs, FPC_NM_MSG2};
 use super::msglayout::MsgLayoutState;
 
@@ -284,7 +282,7 @@ pub fn load_fonts(fonts: &mut FontBank) {
 
 pub fn control(
     archive: Option<Res<crate::assets::MsgArchives>>,
-    procs: Res<MsgProcs>,
+    mut procs: ResMut<MsgProcs>,
     mut info: ResMut<MsgGameInfo>,
     mut driver: ResMut<TextDriver>,
     mut one: ResMut<Msg1Box>,
@@ -292,8 +290,11 @@ pub fn control(
     mut fonts: ResMut<FontBank>,
 ) {
     load_fonts(&mut fonts);
-    let pending = procs.procs().last().map(|proc| (proc.name, proc.msg_no));
-    let Some((name, msg_no)) = pending else {
+    let pending = procs
+        .procs()
+        .last()
+        .map(|proc| (proc.pid, proc.name, proc.msg_no));
+    let Some((pid, name, msg_no)) = pending else {
         driver.live = false;
         driver.phase1 = 0;
         driver.phase2 = 0;
@@ -304,9 +305,6 @@ pub fn control(
     let Some(archive) = archive else {
         return;
     };
-    if !driver.live {
-        return;
-    }
     let is_two = name == FPC_NM_MSG2;
     if is_two {
         if driver.phase2 == 0 {
@@ -371,9 +369,8 @@ pub fn control(
         driver.env.absorb(env);
         if !outcome {
             driver.phase2 = 0;
-            if let Some(last) = procs.procs().last() {
-                let _ = last.msg_no;
-            }
+            driver.live = false;
+            procs.delete(pid);
         }
         return;
     }
@@ -432,7 +429,11 @@ pub fn control(
             trig_a: driver.stick.trig_a,
         },
     };
-    one.execute(&mut ctx, &mut info);
+    if !one.execute(&mut ctx, &mut info) {
+        driver.phase1 = 0;
+        driver.live = false;
+        procs.delete(pid);
+    }
 }
 
 pub fn spawn(
