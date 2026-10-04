@@ -13,7 +13,7 @@ fn msg_cr(value: i32) -> String {
 }
 
 impl MsgData {
-    fn msg_tag_measure<F: FontSlot>(
+    fn msg_tag_measure<F: FontSlot + ?Sized>(
         &self,
         font: &F,
         text: &str,
@@ -70,7 +70,7 @@ impl MsgData {
             .wrapping_add(self.bmg.get(step as usize).copied().unwrap_or(0) as i32);
     }
 
-    fn msg_tag_emit<F: FontSlot>(&mut self, font: &F, text: &str) {
+    fn msg_tag_emit<F: FontSlot + ?Sized>(&mut self, font: &F, text: &str) {
         let scale = self.field_0x148;
         for byte in text.bytes() {
             if self.field_0x150 == 0 {
@@ -86,7 +86,7 @@ impl MsgData {
         self.msg_tag_cursor();
     }
 
-    pub fn tag_len_kaisen_game<F: FontSlot>(
+    pub fn tag_len_kaisen_game<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         event_reg_beff: i32,
@@ -100,7 +100,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_rupee<F: FontSlot>(
+    pub fn tag_len_rupee<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -119,7 +119,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_num_input<F: FontSlot>(
+    pub fn tag_len_num_input<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -132,7 +132,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_sword_game<F: FontSlot>(
+    pub fn tag_len_sword_game<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -151,7 +151,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_letter_game<F: FontSlot>(
+    pub fn tag_len_letter_game<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         mini_game_rupee: i32,
@@ -165,7 +165,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_letter_game_max<F: FontSlot>(
+    pub fn tag_len_letter_game_max<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         event_reg_8aff: i32,
@@ -179,7 +179,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_fish<F: FontSlot>(
+    pub fn tag_len_fish<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -193,7 +193,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_fish_rupee<F: FontSlot>(
+    pub fn tag_len_fish_rupee<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -213,7 +213,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_letter<F: FontSlot>(
+    pub fn tag_len_letter<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -232,7 +232,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_rescue<F: FontSlot>(
+    pub fn tag_len_rescue<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -246,7 +246,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_forest_timer<F: FontSlot>(
+    pub fn tag_len_forest_timer<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         fwater_timer: i32,
@@ -267,7 +267,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_birdman<F: FontSlot>(
+    pub fn tag_len_birdman<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -286,7 +286,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_point<F: FontSlot>(
+    pub fn tag_len_point<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         event_reg_86ff: i32,
@@ -305,7 +305,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_get_pendant<F: FontSlot>(
+    pub fn tag_len_get_pendant<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         beast_joy_pendant: i32,
@@ -319,7 +319,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_rev_pendant<F: FontSlot>(
+    pub fn tag_len_rev_pendant<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         event_reg_c0ff: i32,
@@ -333,7 +333,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_pig_timer<F: FontSlot>(
+    pub fn tag_len_pig_timer<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         item_timer: i32,
@@ -354,7 +354,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_get_bomb<F: FontSlot>(
+    pub fn tag_len_get_bomb<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         bomb_max: i32,
@@ -373,7 +373,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_get_arrow<F: FontSlot>(
+    pub fn tag_len_get_arrow<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         arrow_max: i32,
@@ -392,7 +392,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_bokobaba<F: FontSlot>(
+    pub fn tag_len_stock_bokobaba<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -411,7 +411,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_dokuro<F: FontSlot>(
+    pub fn tag_len_stock_dokuro<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -430,7 +430,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_chuchu<F: FontSlot>(
+    pub fn tag_len_stock_chuchu<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -444,7 +444,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_pendant<F: FontSlot>(
+    pub fn tag_len_stock_pendant<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -463,7 +463,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_hane<F: FontSlot>(
+    pub fn tag_len_stock_hane<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -482,7 +482,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_stock_kenshi<F: FontSlot>(
+    pub fn tag_len_stock_kenshi<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         buy_item: i32,
@@ -501,7 +501,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_terry_rupee<F: FontSlot>(
+    pub fn tag_len_terry_rupee<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         pay_rupee: i32,
@@ -520,7 +520,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_bokobaba<F: FontSlot>(
+    pub fn tag_len_input_bokobaba<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -533,7 +533,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_dokuro<F: FontSlot>(
+    pub fn tag_len_input_dokuro<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -546,7 +546,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_chuchu<F: FontSlot>(
+    pub fn tag_len_input_chuchu<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -559,7 +559,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_pendant<F: FontSlot>(
+    pub fn tag_len_input_pendant<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -572,7 +572,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_hane<F: FontSlot>(
+    pub fn tag_len_input_hane<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -585,7 +585,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_len_input_kenshi<F: FontSlot>(
+    pub fn tag_len_input_kenshi<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         len: i32,
@@ -598,7 +598,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_kaisen_game<F: FontSlot>(
+    pub fn tag_kaisen_game<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         event_reg_beff: i32,
@@ -610,7 +610,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_rupee<F: FontSlot>(&mut self, font: &F, message_count_number: i32) {
+    pub fn tag_rupee<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         if message_count_number != 1 {
@@ -622,7 +622,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_num_input<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_num_input<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 3;
         self.select_auction_on();
@@ -635,7 +635,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_sword_game<F: FontSlot>(
+    pub fn tag_sword_game<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -652,28 +652,28 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_letter_game<F: FontSlot>(&mut self, font: &F, mini_game_rupee: i32) {
+    pub fn tag_letter_game<F: FontSlot + ?Sized>(&mut self, font: &F, mini_game_rupee: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, mini_game_rupee, false);
         self.msg_tag_emit(font, &buf);
         self.msg_tag_advance();
     }
 
-    pub fn tag_letter_game_max<F: FontSlot>(&mut self, font: &F, event_reg_8aff: i32) {
+    pub fn tag_letter_game_max<F: FontSlot + ?Sized>(&mut self, font: &F, event_reg_8aff: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, event_reg_8aff, false);
         self.msg_tag_emit(font, &buf);
         self.msg_tag_advance();
     }
 
-    pub fn tag_fish<F: FontSlot>(&mut self, font: &F, message_count_number: i32) {
+    pub fn tag_fish<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         self.msg_tag_emit(font, &buf);
         self.msg_tag_advance();
     }
 
-    pub fn tag_fish_rupee<F: FontSlot>(
+    pub fn tag_fish_rupee<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         message_count_number: i32,
@@ -690,7 +690,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_letter<F: FontSlot>(&mut self, font: &F, message_count_number: i32) {
+    pub fn tag_letter<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         self.msg_tag_emit(font, &buf);
@@ -703,7 +703,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_rescue<F: FontSlot>(&mut self, font: &F, message_count_number: i32) {
+    pub fn tag_rescue<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         self.msg_tag_emit(font, &buf);
@@ -711,7 +711,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_forest_timer<F: FontSlot>(
+    pub fn tag_forest_timer<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         fwater_timer: i32,
@@ -732,7 +732,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_birdman<F: FontSlot>(&mut self, font: &F, message_count_number: i32) {
+    pub fn tag_birdman<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         if message_count_number != 1 {
@@ -744,7 +744,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_point<F: FontSlot>(&mut self, font: &F, event_reg_86ff: i32) {
+    pub fn tag_point<F: FontSlot + ?Sized>(&mut self, font: &F, event_reg_86ff: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, event_reg_86ff, false);
         if event_reg_86ff != 1 {
@@ -756,7 +756,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_get_pendant<F: FontSlot>(&mut self, font: &F, beast_joy_pendant: i32) {
+    pub fn tag_get_pendant<F: FontSlot + ?Sized>(&mut self, font: &F, beast_joy_pendant: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, beast_joy_pendant, false);
         self.msg_tag_emit(font, &buf);
@@ -764,7 +764,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_rev_pendant<F: FontSlot>(&mut self, font: &F, event_reg_c0ff: i32) {
+    pub fn tag_rev_pendant<F: FontSlot + ?Sized>(&mut self, font: &F, event_reg_c0ff: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, event_reg_c0ff, false);
         self.msg_tag_emit(font, &buf);
@@ -772,7 +772,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_pig_timer<F: FontSlot>(&mut self, font: &F, item_timer: i32) {
+    pub fn tag_pig_timer<F: FontSlot + ?Sized>(&mut self, font: &F, item_timer: i32) {
         let minutes = item_timer / 1800;
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, minutes, false);
@@ -789,7 +789,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_get_bomb<F: FontSlot>(&mut self, font: &F, bomb_max: i32) {
+    pub fn tag_get_bomb<F: FontSlot + ?Sized>(&mut self, font: &F, bomb_max: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, bomb_max, false);
         self.msg_tag_emit(font, &buf);
@@ -798,7 +798,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_get_arrow<F: FontSlot>(&mut self, font: &F, arrow_max: i32) {
+    pub fn tag_get_arrow<F: FontSlot + ?Sized>(&mut self, font: &F, arrow_max: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, arrow_max, false);
         self.msg_tag_emit(font, &buf);
@@ -807,7 +807,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_bokobaba<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_bokobaba<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -816,7 +816,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_dokuro<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_dokuro<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -829,7 +829,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_chuchu<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_chuchu<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -837,7 +837,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_pendant<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_pendant<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -850,7 +850,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_hane<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_hane<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -863,7 +863,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_stock_kenshi<F: FontSlot>(&mut self, font: &F, buy_item: i32) {
+    pub fn tag_stock_kenshi<F: FontSlot + ?Sized>(&mut self, font: &F, buy_item: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, buy_item, false);
         self.msg_tag_emit(font, &buf);
@@ -872,7 +872,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_terry_rupee<F: FontSlot>(&mut self, font: &F, pay_rupee: i32) {
+    pub fn tag_terry_rupee<F: FontSlot + ?Sized>(&mut self, font: &F, pay_rupee: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, pay_rupee, false);
         if pay_rupee != 1 {
@@ -884,7 +884,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_bokobaba<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_bokobaba<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();
@@ -898,7 +898,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_dokuro<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_dokuro<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();
@@ -912,7 +912,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_chuchu<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_chuchu<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();
@@ -926,7 +926,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_pendant<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_pendant<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();
@@ -940,7 +940,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_hane<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_hane<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();
@@ -954,7 +954,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_input_kenshi<F: FontSlot>(&mut self, font: &F) {
+    pub fn tag_input_kenshi<F: FontSlot + ?Sized>(&mut self, font: &F) {
         let scale = self.field_0x148;
         let temp = (scale + self.char_space) * 2;
         self.select_auction_on();

@@ -14,7 +14,7 @@ use super::msglayout::MsgLayoutState;
 pub const FONT_SLOTS: usize = 2;
 pub const MAIN_FONT: usize = 0;
 pub const RUBY_FONT: usize = 1;
-pub const NAME_MAX: usize = 24;
+pub const NAME_MAX: usize = 20;
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TextEnv {
@@ -156,7 +156,6 @@ pub struct TextScreen {
 
 #[derive(Resource)]
 pub struct TextDriver {
-    pub hio: MsgHio,
     pub out_hio: MeterMsgHio,
     pub msg1_hio: Msg1Hio,
     pub msg2_hio: Msg2Hio,
@@ -176,7 +175,6 @@ pub struct TextDriver {
 impl Default for TextDriver {
     fn default() -> Self {
         Self {
-            hio: MsgHio::default(),
             out_hio: MeterMsgHio::default(),
             msg1_hio: Msg1Hio::default(),
             msg2_hio: Msg2Hio::default(),
@@ -274,22 +272,6 @@ impl TextDriver {
         }
     }
 
-    pub fn resolve_names(&mut self, archive: &dyn super::msgget::MsgArchive) {
-        let clear = self.flags.clear_count;
-        let mut get = MsgGet::default();
-        let fetch = |get: &mut MsgGet, no: u32| -> Vec<u8> {
-            let Some(head) = get.get_mesg_header(archive, clear, no) else {
-                return Vec::new();
-            };
-            get.get_message(head).unwrap_or(&[]).to_vec()
-        };
-        let npc = fetch(&mut get, self.layout.npc_name_msg_no);
-        let item = fetch(&mut get, self.layout.item_name_msg_no);
-        let password = fetch(&mut get, self.layout.password_msg_no);
-        self.layout.set(&mut self.layout.npc_name, &npc);
-        self.layout.set(&mut self.layout.item_name, &item);
-        self.layout.set(&mut self.layout.password, &password);
-    }
 }
 
 pub fn load_fonts(fonts: &mut FontBank) {
@@ -339,6 +321,7 @@ pub fn control(
                 );
                 let mut ctx = Msg2Ctx {
                     hio: &driver.msg2_hio,
+                    out_hio: &driver.out_hio,
                     env: &mut env,
                     archive: archive.as_ref(),
                     fonts: &fonts,
@@ -368,6 +351,7 @@ pub fn control(
             );
             let mut ctx = Msg2Ctx {
                 hio: &driver.msg2_hio,
+                out_hio: &driver.out_hio,
                 env: &mut env,
                 archive: archive.as_ref(),
                 fonts: &fonts,

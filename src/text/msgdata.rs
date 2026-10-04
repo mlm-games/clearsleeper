@@ -161,7 +161,7 @@ impl MsgData {
         self.field_0x296 = 0;
     }
 
-    pub fn char_length<F: FontSlot>(&self, font: &F, scale: i32, code: u16, spaced: bool) -> f32 {
+    pub fn char_length<F: FontSlot + ?Sized>(&self, font: &F, scale: i32, code: u16, spaced: bool) -> f32 {
         let char_width = font.char_width(self.font, code) as f32;
         let cell_width = scale as f32 / font.metrics(self.font).cell_width as f32;
         let width = char_width * cell_width;
@@ -172,7 +172,7 @@ impl MsgData {
         }
     }
 
-    pub fn ruby_length<F: FontSlot>(&self, font: &F, code: u16, spaced: bool) -> f32 {
+    pub fn ruby_length<F: FontSlot + ?Sized>(&self, font: &F, code: u16, spaced: bool) -> f32 {
         let width = font.char_width(self.ruby_font, code);
         let cell_width = font.metrics(self.ruby_font).cell_width as f32;
         let scale = self.ruby_font_size as f32 / cell_width;
@@ -183,7 +183,7 @@ impl MsgData {
         }
     }
 
-    pub fn string_length<F: FontSlot>(&mut self, font: &F, state: MsgLenState<'_>) -> u32 {
+    pub fn string_length<F: FontSlot + ?Sized>(&mut self, font: &F, state: MsgLenState<'_>) -> u32 {
         let mut sp18 = [0i32; 4];
         let mut sp14 = 0i32;
         let mut sp10 = 0i32;

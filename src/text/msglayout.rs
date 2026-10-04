@@ -457,7 +457,7 @@ impl MsgData {
                     && src.get(offset.wrapping_add(3)).copied().unwrap_or(0) == 0
                     && src.get(offset.wrapping_add(4)).copied().unwrap_or(0) == CTRL_PLAYER_NAME
                 {
-                    let name = player_name_plural(player_name, msg_no, pal_language, 23);
+                    let name = player_name_plural(player_name, msg_no, pal_language, 19);
                     for byte in name {
                         dest.push(byte as char);
                     }
@@ -470,7 +470,7 @@ impl MsgData {
         }
     }
 
-    pub fn get_string_layout<F: FontSlot>(
+    pub fn get_string_layout<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         src: &[u8],
@@ -588,7 +588,7 @@ impl MsgData {
         }
     }
 
-    pub fn get_ruby_string<F: FontSlot>(&mut self, font: &F, base: &[u8], ruby: &[u8]) {
+    pub fn get_ruby_string<F: FontSlot + ?Sized>(&mut self, font: &F, base: &[u8], ruby: &[u8]) {
         let start = self.now_cursor_pos;
         let scale = self.field_0x148;
         for b in base.iter().copied().take_while(|&b| b != 0) {
@@ -627,7 +627,7 @@ impl MsgData {
         self.layout_out_ruby(&cstr_bytes(ruby));
     }
 
-    pub fn string_set<F: FontSlot>(
+    pub fn string_set<F: FontSlot + ?Sized>(
         &mut self,
         font: &F,
         state: &MsgLayoutState<'_>,

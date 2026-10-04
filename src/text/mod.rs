@@ -23,10 +23,7 @@ pub const WID1: u32 = u32::from_be_bytes(*b"WID1");
 pub const GLY1: u32 = u32::from_be_bytes(*b"GLY1");
 pub const MAP1: u32 = u32::from_be_bytes(*b"MAP1");
 
-pub const FONT_MAGIC: u64 = u64::from_be_bytes(*b"FONTbfn1");
 
-pub const GLYPH_W: i32 = 12;
-pub const GLYPH_H: i32 = 12;
 pub const ZFONT: [[u16; 2]; 97] = [
     [0x8340, 0x84A4], [0x8341, 0x84A5], [0x8342, 0x84A6], [0x8343, 0x84A7], [0x8344, 0x84A8],
     [0x8345, 0x84A9], [0x8346, 0x84AA], [0x8347, 0x84AB], [0x8348, 0x84AC], [0x8349, 0x84AD],
@@ -462,7 +459,6 @@ pub const STATUS_INPUT: u8 = 0x15;
 pub const STATUS_TACT: u8 = 0x16;
 pub const STATUS_DEMO: u8 = 0x17;
 
-pub const WAIT_TIMER_MAX: i32 = 0x7FFF;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Metrics {

@@ -231,35 +231,7 @@ fn item_icon_size(msg_no: u32) -> Option<[f32; 2]> {
     })
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Msg1Hio {
-    pub field_0x5: u32,
-    pub field_0x9: u32,
-    pub field_0x40: f32,
-    pub field_0x44: i16,
-    pub field_0x46: i16,
-    pub field_0x48: i16,
-    pub field_0x58: u8,
-    pub field_0x5a: i16,
-    pub field_0x5c: i16,
-    pub field_0x5e: i16,
-    pub field_0x60: i16,
-    pub field_0x62: i16,
-    pub field_0x66: i16,
-    pub field_0x68: i16,
-    pub field_0x6e: i16,
-    pub field_0x70: i16,
-    pub field_0x74: i16,
-    pub field_0x76: i16,
-    pub field_0x78: i16,
-    pub field_0x7a: i16,
-    pub field_0x7c: i16,
-    pub field_0x7e: u8,
-    pub field_0x80: u8,
-    pub field_0x81: u8,
-    pub field_0x82: i32,
-    pub field_0x83: i32,
-}
+pub use super::msghio::MsgMeterHio as Msg1Hio;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Msg1Tact {
@@ -1069,7 +1041,7 @@ impl Msg1Box {
             self.item_white = white;
         }
         if let Some(size) = item_icon_size(self.msg_no) {
-            let p = self.m0624.get_mut(8).expect("index within 10");
+            let p = &mut self.m0624[8];
             p.state.size = size;
             p.state.pane_trans(0.0f32, 0.0f32);
         }
@@ -1444,9 +1416,9 @@ impl Msg1Box {
 
     pub fn text_position(&mut self) {
         let shift = match self.mesg_entry.textbox_type {
-            5 => (self.m1104 * (2 - self.m1108)) as f32,
+            5 => (self.m1104 * 2i32.saturating_sub(self.m1108)) as f32,
             0xE => 0.0f32,
-            _ => (self.m1104 * (3 - self.m1108)) as f32,
+            _ => (self.m1104 * 3i32.saturating_sub(self.m1108)) as f32,
         };
         for i in 0..4 {
             self.text_shift(i, 0.0f32, shift);
@@ -1761,7 +1733,7 @@ impl Msg1Box {
     }
 
     pub fn ring_move(&mut self) {
-        let p = self.m0624.get_mut(9).expect("index within 10");
+        let p = &mut self.m0624[9];
         p.user_area = p.user_area.wrapping_add(1);
         if p.user_area >= MSG1_RING_PERIOD {
             p.user_area = 0;
@@ -1777,12 +1749,12 @@ impl Msg1Box {
             )
             .unwrap_or_default()
         };
-        let p = self.m0624.get_mut(9).expect("index within 10");
+        let p = &mut self.m0624[9];
         p.set_now_alpha((d_var2 * MSG1_RING_SPAN) + MSG1_RING_MIN);
     }
 
     pub fn light_move(&mut self) {
-        let p = self.m0624.get_mut(0).expect("index within 10");
+        let p = &mut self.m0624[0];
         p.user_area = p.user_area.wrapping_add(1);
         if p.user_area >= MSG1_LIGHT_PERIOD {
             p.user_area = 0;
@@ -3381,7 +3353,7 @@ impl Msg1Box {
             let r5 = pos_x + bounds[0] as i32;
             let r6 = if self.mesg_entry.textbox_type == 5 {
                 let local_30 = (line_space * pos_y) as f32;
-                let local_38 = (self.m1104 as f32) * (2 - self.m1108) as f32;
+                let local_38 = (self.m1104 as f32) * 2i32.saturating_sub(self.m1108) as f32;
                 (local_38 + bounds[1] + local_30) as i32
             } else if self.mesg_entry.textbox_type == 0xE {
                 let local_28 = (line_space * pos_y) as f32;
@@ -3395,7 +3367,7 @@ impl Msg1Box {
                 }
             } else {
                 let local_28 = (line_space * pos_y) as f32;
-                let local_30 = (self.m1104 as f32) * (3 - self.m1108) as f32;
+                let local_30 = (self.m1104 as f32) * 3i32.saturating_sub(self.m1108) as f32;
                 (local_30 + bounds[1] + local_28) as i32
             };
             if let (Some(icon), Some(kage), Some(timer)) = (

@@ -956,7 +956,7 @@ fn select_icon_pos(temp_r3: i16, temp_r3_3: i16, temp_r5: i32, icon_pos_y: i32) 
     temp_r3_3 as i32 + temp_r5 * ((SELECT_CURSOR_TARGET_LINES - temp_r3 as i32) + icon_pos_y * 2)
 }
 
-pub fn fop_msgm_select_message_get<F: FontSlot>(
+pub fn fop_msgm_select_message_get<F: FontSlot + ?Sized>(
     font: &F,
     archive: &dyn MsgArchive,
     len_state: &MsgLenState<'_>,
@@ -1049,13 +1049,7 @@ pub fn fop_msgm_select_message_get<F: FontSlot>(
     })
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MeterMsgHio {
-    pub field_0x6a: i16,
-    pub field_0x87: u8,
-    pub field_0x88: u8,
-    pub field_0x89: u8,
-}
+pub use super::msghio::MsgMeterHio as MeterMsgHio;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MsgIconPic {
