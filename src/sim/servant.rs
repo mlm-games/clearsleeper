@@ -13,11 +13,12 @@ use super::player::Player;
 use super::stream::add_calc_angle_s2;
 use super::walk;
 use crate::assets::MsgArchives;
+use crate::text::msgbox1::Msg1Box;
 use crate::text::msgproc::fop_msgm_message_set;
 use crate::text::msgproc::{MsgGameInfo, MsgProcs, DA_EVT_MODE_NONE, FPC_M_ERROR_PROCESS_ID};
 use crate::text::{
-    STATUS_BOX_CLOSED, STATUS_INPUT, STATUS_MSG_CONTINUES, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_TYPING,
+    STATUS_BOX_CLOSED, STATUS_INPUT, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED,
+    STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_TYPING,
 };
 
 pub const SERVANT_ACTORS: [&str; 3] = ["Os", "Os1", "Os2"];
@@ -254,6 +255,7 @@ pub struct Ctx<'a> {
     pub events: &'a mut SimEvents,
     pub procs: &'a mut MsgProcs,
     pub info: &'a mut MsgGameInfo,
+    pub msg: &'a mut Msg1Box,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -663,18 +665,22 @@ impl Servant {
 
     pub fn talk(
         &mut self,
-        status: u8,
+        msg: &mut Msg1Box,
         stories: &mut StoryBits,
         procs: &mut MsgProcs,
         info: &mut MsgGameInfo,
         archive: Option<&MsgArchives>,
     ) -> bool {
-        if status == STATUS_MSG_DISPLAYED {
-            if self.next_msg_status(stories) == STATUS_MSG_CONTINUES {
+        if msg.status == STATUS_MSG_DISPLAYED {
+            msg.status = self.next_msg_status(stories);
+            if msg.status == STATUS_MSG_CONTINUES {
                 self.message_set(procs, info, archive);
             }
-        } else if status != STATUS_INPUT && status != STATUS_TYPING && status == STATUS_BOX_CLOSED
+        } else if msg.status != STATUS_INPUT
+            && msg.status != STATUS_TYPING
+            && msg.status == STATUS_BOX_CLOSED
         {
+            msg.status = STATUS_MSG_DESTROYED;
             return true;
         }
         false
@@ -1284,8 +1290,7 @@ impl Servant {
                 }
             }
             STEP_TALK_RUN => {
-                let status = ctx.info.mesg_status;
-                let done = self.talk(status, ctx.stories, ctx.procs, ctx.info, archive);
+                let done = self.talk(ctx.msg, ctx.stories, ctx.procs, ctx.info, archive);
                 if done {
                     self.set_npc_action(Step::Wait, Param::Null, ctx.stories);
                     ctx.info.event_mode = DA_EVT_MODE_NONE;
@@ -1781,17 +1786,18 @@ pub fn control(
     pedestals: Query<&Actor, Without<Servant>>,
     carry: Res<Carry>,
     intent: Res<MoveIntent>,
-    camera: Res<CameraYaw>,
     collision: Option<Res<Collision>>,
-    list: Res<EventList>,
+    scene: (Res<CameraYaw>, Res<EventList>),
     mut active: ResMut<ActiveEvent>,
     mut stories: ResMut<StoryBits>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
     mut procs: ResMut<MsgProcs>,
     mut info: ResMut<MsgGameInfo>,
+    mut msg: ResMut<Msg1Box>,
     archive: Option<Res<MsgArchives>>,
 ) {
+    let (camera, list) = (&*scene.0, &*scene.1);
     let player = players.iter().next().copied();
     let stick = intent.axis.length();
     let stick_angle = if intent.axis == Vec2::ZERO {
@@ -1811,10 +1817,10 @@ pub fn control(
             .find(|base| base.name == servant.daiza_name());
         let mut ctx = Ctx {
             player: player.as_ref(),
-            camera: &camera,
+            camera,
             collision: collision.as_deref(),
             pedestal,
-            list: &list,
+            list,
             archive: archive.as_deref(),
             stick,
             stick_angle,
@@ -1824,6 +1830,7 @@ pub fn control(
             events: &mut events,
             procs: &mut procs,
             info: &mut info,
+            msg: &mut msg,
         };
         servant.execute(&mut ctx, entity);
         actor.pos = servant.pos;
