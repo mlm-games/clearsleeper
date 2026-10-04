@@ -802,6 +802,8 @@ fn staff_cut(
         talkman_cut(run, list, flags, owner, talks, msg, table);
     } else if staff.name == "GIVEMAN" {
         cut_end(run, list, flags);
+    } else if staff.name == "Bm1" {
+        bm1_cut(run, list, flags, owner, actors);
     } else if staff.name == "Fmaster"
         && let Some(cut) = list.cuts.get(run.cut as usize)
         && matches!(cut.name.as_str(), "Dummy" | "WAIT")
@@ -824,6 +826,32 @@ fn staff_cut(
             _ => {}
         }
     }
+}
+
+fn bm1_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if cut.name == "ACTION" {
+        let act = list.cut_number(run.cut as usize, "ActNo").unwrap_or(-1);
+        if matches!(act, 0x16 | 0x17 | 0x19 | 0x1B) {
+            return;
+        }
+        cut_end(run, list, flags);
+        return;
+    }
+    if cut.name == "360_TRN" {
+        if let Ok((_, body)) = actors.get_mut(owner) {
+            body.angle[1] = body.angle[1].wrapping_add(0x8000);
+        }
+    }
+    cut_end(run, list, flags);
 }
 
 fn named_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, name: &str) {
