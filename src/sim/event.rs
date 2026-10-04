@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
 use glam::Vec3;
+use std::collections::HashMap;
 
 use super::actor::Actor;
 use super::flags::{EventFlags, StoryBits};
@@ -120,8 +121,46 @@ const SOLDIER_PENDING: &[&str] = &[
     "EATESA",
     "EATESA1ST",
 ];
-const LINK_INSTANT: &[i32] = &[1, 4, 6, 14, 17, 18, 20, 23, 39, 42, 43, 44, 51, 55];
+const LINK_INSTANT: &[i32] = &[
+    1, 4, 6, 8, 14, 17, 18, 20, 22, 23, 28, 29, 30, 31, 32, 33, 39, 42, 43, 44, 47, 51, 52, 55, 57,
+    58, 62, 66, 69, 72,
+];
 const GET_ITEM_MODE: i32 = 11;
+const FAIRY_BOTTLE_ITEM: i32 = 0x57;
+pub const LINK_ANIM_STEMS: &[&str] = &[
+    "binopena",
+    "binopenb",
+    "binopenpre",
+    "boxopenlink",
+    "boxopenshortlink",
+    "boxopenslink",
+    "combo_link",
+    "comeout",
+    "damf",
+    "damffup",
+    "dooropenalink",
+    "dooropenblink",
+    "esamaki",
+    "getletter",
+    "holdup",
+    "itemget",
+    "lookup",
+    "pickup",
+    "presentationa",
+    "powup",
+    "saltation",
+    "seyyes",
+    "sethyoinomi",
+    "slipice",
+    "surprised",
+    "surprisedb",
+    "taktdge",
+    "turnback",
+    "warpin",
+    "warpout",
+    "warpoutfirst",
+    "windl",
+];
 const GET_ENTERED: u8 = 0x01;
 const GET_DONE: u8 = 0x04;
 
@@ -238,6 +277,26 @@ struct StaffRun {
 pub struct ItemPartner {
     pub entity: Option<Entity>,
     pub item: u8,
+}
+
+#[derive(Resource, Debug, Clone, PartialEq, Default)]
+pub struct LinkAnms {
+    ends: HashMap<String, (u8, u16)>,
+}
+
+impl LinkAnms {
+    pub fn insert(&mut self, stem: &str, attribute: u8, frames: u16) {
+        self.ends.insert(stem.to_owned(), (attribute, frames));
+    }
+
+    fn end_frame(&self, stem: &str) -> Option<f32> {
+        let &(attribute, frames) = self.ends.get(stem)?;
+        if attribute <= 1 && frames > 0 {
+            Some(frames as f32)
+        } else {
+            None
+        }
+    }
 }
 
 impl ActiveEvent {
@@ -601,6 +660,7 @@ pub fn control(
     mut msg: ResMut<MsgBox>,
     table: Res<MsgTable>,
     partner: Res<ItemPartner>,
+    anms: Res<LinkAnms>,
     sea: Option<Res<Sea>>,
     mut actors: Query<(Entity, &mut Actor)>,
     players: Query<(Entity, &Player)>,
@@ -663,6 +723,7 @@ pub fn control(
                 &mut msg,
                 &table,
                 &partner,
+                &anms,
             );
         }
     }
@@ -681,6 +742,7 @@ fn staff_cut(
     msg: &mut MsgBox,
     table: &MsgTable,
     partner: &ItemPartner,
+    anms: &LinkAnms,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -692,7 +754,7 @@ fn staff_cut(
             "NpcSo" => soldier_cut(
                 run, list, flags, owner, actors, players, sea, talks, msg, table,
             ),
-            "Link" => link_cut(run, list, flags, msg, table, partner),
+            "Link" => link_cut(run, list, flags, msg, table, partner, anms),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
@@ -758,6 +820,115 @@ fn soldier_cut(
     }
 }
 
+fn anim_ticks(stem: &str, rate: f32, start: f32, end: f32, anms: &LinkAnms) -> Option<i32> {
+    let target = if end < 0.0 { anms.end_frame(stem)? } else { end };
+    if rate <= 0.0 {
+        return None;
+    }
+    let mut frame = start;
+    let mut ticks = 0;
+    while frame < target {
+        frame += rate;
+        ticks += 1;
+        if ticks > 4000 {
+            return None;
+        }
+    }
+    Some(ticks.max(1))
+}
+
+fn link_anim_ticks(
+    mode: i32,
+    prm0: i32,
+    partner: &ItemPartner,
+    anms: &LinkAnms,
+) -> Option<i32> {
+    match mode {
+        7 => anim_ticks("damf", 0.6, 0.0, 9.0, anms),
+        9 | 27 => anim_ticks("damffup", 0.5, 0.0, -1.0, anms),
+        10 => anim_ticks(
+            if prm0 == 1 {
+                "boxopenshortlink"
+            } else {
+                "boxopenlink"
+            },
+            1.0,
+            0.0,
+            -1.0,
+            anms,
+        ),
+        13 => anim_ticks("holdup", 1.1, 0.0, 11.0, anms),
+        15 => anim_ticks("comeout", 1.0, 0.0, 72.0, anms),
+        19 => anim_ticks("saltation", 1.0, 0.0, -1.0, anms),
+        21 => anim_ticks("pickup", 1.5, 2.0, 89.0, anms),
+        24 => anim_ticks("surprised", 1.0, 0.0, -1.0, anms),
+        25 => anim_ticks("turnback", 1.0, 0.0, 44.0, anms),
+        26 => anim_ticks("lookup", 1.0, 0.0, -1.0, anms),
+        35 => anim_ticks(
+            if prm0 & 1 != 0 {
+                "dooropenblink"
+            } else {
+                "dooropenalink"
+            },
+            1.0,
+            if prm0 & 2 != 0 { 35.0 } else { 0.0 },
+            -1.0,
+            anms,
+        ),
+        36 => anim_ticks("seyyes", 1.0, 0.0, 28.0, anms),
+        37 => anim_ticks("presentationa", 1.1, 0.0, 62.0, anms),
+        38 => anim_ticks("windl", 1.0, 0.0, -1.0, anms),
+        46 => anim_ticks("powup", 1.0, 0.0, -1.0, anms),
+        48 => {
+            if prm0 == 0 {
+                Some(
+                    anim_ticks("warpoutfirst", 1.0, 0.0, -1.0, anms)?
+                        + anim_ticks("warpout", 1.0, 0.0, -1.0, anms)?,
+                )
+            } else {
+                anim_ticks("warpin", 1.0, 0.0, -1.0, anms)
+            }
+        }
+        49 => anim_ticks("surprisedb", 1.0, 0.0, -1.0, anms),
+        53 => Some(anim_ticks("windl", 1.0, 0.0, -1.0, anms)? + 5),
+        54 => anim_ticks("getletter", 1.0, 0.0, -1.0, anms),
+        59 => anim_ticks("taktdge", 1.0, 0.0, -1.0, anms),
+        60 => Some(
+            anim_ticks("binopenpre", 1.0, 0.0, 45.0, anms)?
+                + anim_ticks("binopenb", 1.0, 0.0, 124.0, anms)?,
+        ),
+        61 => {
+            let second = if partner.item as i32 == FAIRY_BOTTLE_ITEM {
+                anim_ticks("binopenb", 1.0, 0.0, 124.0, anms)?
+            } else {
+                anim_ticks("binopena", 1.0, 0.0, 69.0, anms)?
+            };
+            Some(anim_ticks("binopenpre", 1.0, 0.0, 45.0, anms)? + second)
+        }
+        63 => anim_ticks("boxopenslink", 1.0, 0.0, -1.0, anms),
+        65 => anim_ticks("sethyoinomi", 1.1, 2.0, 21.0, anms),
+        70 => anim_ticks("combo_link", 1.0, 0.0, -1.0, anms),
+        73 => anim_ticks("esamaki", 0.6, 0.0, 17.0, anms),
+        74 => anim_ticks("slipice", 1.0, 0.0, -1.0, anms),
+        _ => None,
+    }
+}
+
+fn link_anim_msg(mode: i32, prm0: i32, partner: &ItemPartner) -> Option<u32> {
+    match mode {
+        46 => {
+            let item = if prm0 == 0x100 {
+                partner.item as i32
+            } else {
+                prm0
+            };
+            Some((item + 101).max(0) as u32)
+        }
+        59 => Some((prm0 + 0xD2).max(0) as u32),
+        _ => None,
+    }
+}
+
 fn link_cut(
     run: &mut StaffRun,
     list: &EventList,
@@ -765,17 +936,65 @@ fn link_cut(
     msg: &mut MsgBox,
     table: &MsgTable,
     partner: &ItemPartner,
+    anms: &LinkAnms,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
-    if leading_digits(&cut.name, 3) == Some(GET_ITEM_MODE) {
-        get_item_cut(run, list, flags, msg, table, partner);
+    let mode = leading_digits(&cut.name, 3);
+    if mode == Some(GET_ITEM_MODE) {
+        get_item_cut(run, list, flags, msg, table, partner, anms);
         return;
     }
-    if leading_digits(&cut.name, 3).is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
+    if mode.is_some_and(|mode| LINK_INSTANT.contains(&mode)) {
         cut_end(run, list, flags);
+        return;
     }
+    let Some(mode) = mode else {
+        return;
+    };
+    let prm0 = list.cut_number(run.cut as usize, "prm0").unwrap_or(0);
+    let Some(total) = link_anim_ticks(mode, prm0, partner, anms) else {
+        return;
+    };
+    if run.advance > 0 {
+        run.timer = total as i16;
+        run.get_msg_live = false;
+        run.phase = 0;
+    }
+    if run.timer > 0 {
+        run.timer -= 1;
+        return;
+    }
+    let Some(msg_no) = link_anim_msg(mode, prm0, partner) else {
+        cut_end(run, list, flags);
+        return;
+    };
+    if run.phase == 0 {
+        if !run.get_msg_live {
+            if msg.active() && msg.message_no() != msg_no {
+                return;
+            }
+            run.get_msg_live = true;
+            msg.message_set(msg_no, table);
+            return;
+        }
+        if msg.active() && msg.message_no() != msg_no {
+            return;
+        }
+        match msg.status() {
+            MSG_DISPLAYED => msg.set_status(MSG_ENDS),
+            MSG_BOX_CLOSED => {
+                msg.set_status(MSG_DESTROYED);
+                run.get_msg_live = false;
+                run.phase = 1;
+                cut_end(run, list, flags);
+            }
+            _ => {}
+        }
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn talk_cut(
@@ -844,6 +1063,7 @@ fn get_item_cut(
     msg: &mut MsgBox,
     table: &MsgTable,
     partner: &ItemPartner,
+    anms: &LinkAnms,
 ) {
     if run.get_stage & GET_DONE != 0 {
         cut_end(run, list, flags);
@@ -852,14 +1072,25 @@ fn get_item_cut(
     if run.get_stage & GET_ENTERED == 0 {
         run.get_stage |= GET_ENTERED;
         run.get_msg_live = false;
+        run.timer = anim_ticks("itemget", 1.0, 0.0, -1.0, anms).unwrap_or(0) as i16;
+    }
+    if run.timer > 0 {
+        run.timer -= 1;
+        return;
     }
     if partner.entity.is_none() {
         return;
     }
     let msg_no = u32::from(partner.item) + 101;
     if !run.get_msg_live {
+        if msg.active() && msg.message_no() != msg_no {
+            return;
+        }
         run.get_msg_live = true;
         msg.message_set(msg_no, table);
+        return;
+    }
+    if msg.active() && msg.message_no() != msg_no {
         return;
     }
     match msg.status() {

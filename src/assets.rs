@@ -480,6 +480,64 @@ pub fn load_event_list(stage: &str) -> Option<crate::sim::event::EventList> {
     }
 }
 
+const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
+
+pub fn load_link_anms() -> Option<crate::sim::event::LinkAnms> {
+    match link_anms_from_assets() {
+        Ok(anms) => Some(anms),
+        Err(error) => {
+            log::warn!("clearsleeper: link animations unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn link_anms_from_assets() -> Result<crate::sim::event::LinkAnms, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let archive = root.read_archive(LINK_ANM_ARCHIVE)?;
+    let path = root.root().join(LINK_ANM_ARCHIVE);
+    let mut anms = crate::sim::event::LinkAnms::default();
+    for stem in crate::sim::event::LINK_ANIM_STEMS {
+        let Ok(data) = archive.read(&format!("bcks/{stem}.bck")) else {
+            log::warn!("clearsleeper: missing link animation {stem}");
+            continue;
+        };
+        let raw = if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
+            let Ok(raw) = yaz0_decode(data, &path) else {
+                log::warn!("clearsleeper: failed to expand link animation {stem}");
+                continue;
+            };
+            raw
+        } else {
+            data.to_vec()
+        };
+        match bck_anm(&raw) {
+            Some((attribute, frames)) => anms.insert(stem, attribute, frames),
+            None => log::warn!("clearsleeper: unreadable link animation {stem}"),
+        }
+    }
+    Ok(anms)
+}
+
+fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
+    if data.len() < 0x20 || data[..4] != *b"J3D1" || data[4..8] != *b"bck1" {
+        return None;
+    }
+    let blocks = read_u32(data, 0x0C)? as usize;
+    let mut at = 0x20;
+    for _ in 0..blocks {
+        if data.len() < at.saturating_add(0x0C) || read_u32(data, at + 4)? < 8 {
+            return None;
+        }
+        if data[at..at + 4] == *b"ANK1" {
+            let frames = read_i16(data, at + 0x0A)?;
+            return Some((data[at + 8], frames.max(0) as u16));
+        }
+        at = at.saturating_add(read_u32(data, at + 4)? as usize);
+    }
+    None
+}
+
 fn event_list_from_assets(stage: &str) -> Result<crate::sim::event::EventList, AssetError> {
     let root = AssetRoot::from_env()?;
     let map = root.read_archive(&stage_map(stage))?;

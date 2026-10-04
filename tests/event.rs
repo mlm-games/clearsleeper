@@ -5,7 +5,7 @@ use bevy_ecs::system::RunSystemOnce;
 use clearsleeper::assets;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::event::{
-    ActiveEvent, EVENT_LIST_ENTRY, EventList, ItemPartner, Stage, Value,
+    ActiveEvent, EVENT_LIST_ENTRY, EventList, ItemPartner, LinkAnms, Stage, Value,
 };
 use clearsleeper::sim::flags::{EventFlags, StoryBits};
 use clearsleeper::sim::intent::DoIntent;
@@ -203,6 +203,7 @@ fn run_control(list: &EventList) -> World {
     world.insert_resource(StoryBits::default());
     world.insert_resource(NextStage::default());
     world.insert_resource(ItemPartner::default());
+    world.insert_resource(LinkAnms::default());
     world.insert_resource(MsgBox::default());
     world.insert_resource(MsgTable::default());
     assert!(
@@ -717,6 +718,132 @@ fn golden_link_and_ship_cuts_end_or_wait_on_their_locomotion() {
         active(&app).stage_of(0),
         Some(Stage::Play),
         "and the event never closes"
+    );
+}
+
+#[test]
+fn golden_link_anim_cut_waits_out_its_animation() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Nod", &[0], [3, -1, -1])],
+        vec![staff("Link", 0, 0)],
+        vec![
+            named_cut("036nod", [-1, -1, -1], 2, u32::MAX, 1),
+            named_cut("003n_dash", [-1, -1, -1], 3, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        "the event takes the order"
+    );
+    for _ in 0..28 {
+        tick(&mut app);
+    }
+    assert!(!flags(&app).test(2), "the nod waits out its 28 frames");
+    assert_eq!(active(&app).cut_of(0, 0), Some(0), "still on the nod");
+    tick(&mut app);
+    assert!(flags(&app).test(2), "the nod ends after its animation");
+    tick(&mut app);
+    assert_eq!(
+        active(&app).cut_of(0, 0),
+        Some(1),
+        "the cut advances once the animation ran out"
+    );
+}
+
+#[test]
+fn golden_link_anim_cut_reads_frame_counts_from_the_animation_table() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Salute", &[0], [3, -1, -1])],
+        vec![staff("Link", 0, 0)],
+        vec![
+            named_cut("019salutet", [-1, -1, -1], 2, u32::MAX, 1),
+            named_cut("003n_dash", [-1, -1, -1], 3, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut pend = boot(list.clone());
+    pend
+        .sim
+        .world
+        .insert_resource(LinkAnms::default());
+    assert!(
+        pend.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
+        "the event takes the order"
+    );
+    for _ in 0..40 {
+        tick(&mut pend);
+    }
+    assert!(
+        !flags(&pend).test(2),
+        "without the table the salute cannot end"
+    );
+    assert_eq!(active(&pend).cut_of(0, 0), Some(0), "it stays pending");
+    let mut app = boot(list.clone());
+    app.sim
+        .world
+        .resource_mut::<LinkAnms>()
+        .insert("saltation", 0, 150);
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        "the event takes the order"
+    );
+    for _ in 0..150 {
+        tick(&mut app);
+    }
+    assert!(!flags(&app).test(2), "the salute waits out 150 frames");
+    tick(&mut app);
+    assert!(
+        flags(&app).test(2),
+        "the salute ends on the frame count from the table"
+    );
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(1), "and moves on");
+}
+
+#[test]
+fn golden_link_instant_cuts_end_at_once() {
+    let list = EventList::parse(&assemble(
+        vec![event_record("Wait", &[0], [4, -1, -1])],
+        vec![staff("Link", 0, 0)],
+        vec![
+            named_cut("022t_wait", [-1, -1, -1], 2, u32::MAX, 1),
+            named_cut("008e_talk", [-1, -1, -1], 3, u32::MAX, 2),
+            named_cut("003n_dash", [-1, -1, -1], 4, u32::MAX, -1),
+        ],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        &[],
+    ))
+    .expect("fixture parses");
+    let mut app = boot(list.clone());
+    assert!(
+        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        "the event takes the order"
+    );
+    tick(&mut app);
+    assert!(flags(&app).test(2), "the wait cut ends at once");
+    tick(&mut app);
+    assert!(flags(&app).test(3), "the talk cut ends at once too");
+    tick(&mut app);
+    assert_eq!(active(&app).cut_of(0, 0), Some(2), "then the dash");
+    tick(&mut app);
+    assert!(
+        !flags(&app).test(4),
+        "the dash still waits on locomotion"
     );
 }
 
