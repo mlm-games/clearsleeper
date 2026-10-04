@@ -685,13 +685,12 @@ impl EventList {
 }
 
 pub fn control(
-    list: Res<EventList>,
+    data: (Res<EventList>, Res<MsgTable>),
     mut active: ResMut<ActiveEvent>,
     mut flags: ResMut<EventFlags>,
     mut story: ResMut<StoryBits>,
     mut next: ResMut<NextStage>,
     mut msg: ResMut<MsgBox>,
-    table: Res<MsgTable>,
     mut partner: ResMut<ItemPartner>,
     anms: Res<LinkAnms>,
     sea: Option<Res<Sea>>,
@@ -702,6 +701,7 @@ pub fn control(
     mut presents: Query<&mut PresentItem>,
     mut commands: Commands,
 ) {
+    let (list, table) = data;
     partner.demo_stick = None;
     partner.demo_fall = false;
     partner.demo_backjump = false;
