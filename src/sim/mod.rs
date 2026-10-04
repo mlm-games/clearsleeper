@@ -11,6 +11,7 @@ pub mod collision;
 pub mod combat;
 pub mod damage;
 pub mod death;
+pub mod door;
 pub mod ending;
 pub mod enemy;
 pub mod event;
@@ -172,6 +173,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if koisi::is_koisi(&source.name) {
         let boulder = koisi::Koisi::spawn(source.parameters);
         world.spawn((actor, boulder, carry::Carryable::Stone)).id()
+    } else if door::Door::is_shutter(&source.name) {
+        let hatch = door::Door::spawn(source.parameters, source.angle, door::Kind::Shutter);
+        world.spawn((actor, hatch)).id()
+    } else if door::Door::is_sliding(&source.name) {
+        let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Slide);
+        world.spawn((actor, gate)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -285,6 +292,7 @@ pub fn build(
                     bomb::control.in_set(WwSimSet::Execute),
                     ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
+                    door::control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),

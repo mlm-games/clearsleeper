@@ -445,6 +445,9 @@ impl App {
                 || entity.contains::<sim::carry::Carryable>()
             {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
+            } else if let Some(door) = entity.get::<sim::door::Door>() {
+                let height = door.key_height() + sim::door::BAR_HEIGHT - door.bars_y;
+                (view::ActorKind::Scenery, 0, height, 40.0)
             } else {
                 continue;
             };
@@ -557,6 +560,9 @@ impl App {
             .world
             .insert_resource(sim::event::ActiveEvent::default());
         sim::clear_actors(&mut self.sim.world);
+        self.sim.world.insert_resource(sim::door::StayRoom(
+            rooms.first().map_or(-1, |room| *room as i8),
+        ));
         self.room_actors.clear();
         self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
