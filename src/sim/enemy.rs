@@ -23,9 +23,9 @@ const ATTACK_POWER: u8 = 1;
 const STAND_KINDS: [u32; 3] = [4, 0xA, 0xB];
 const PLANTED_KIND: u32 = 0xB;
 const STRONG_BIT: u32 = 0x20;
-const STRONG_HP: i32 = super::damage::KILL_POWER;
-const BASE_HP: i32 = super::damage::KILL_POWER;
-const LANCE_HP: i32 = super::damage::KILL_POWER;
+const STRONG_HP: i32 = 7;
+const BASE_HP: i32 = 5;
+const LANCE_HP: i32 = 10;
 const LANCE_FALLEN: u32 = 0xF;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
