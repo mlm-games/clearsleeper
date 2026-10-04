@@ -539,6 +539,33 @@ impl App {
                 }
                 let (half, top) = idol.cull();
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(wall) = entity.get::<sim::ajav::Ajav>() {
+                if !wall.standing() {
+                    continue;
+                }
+                let (drop, height, radius) = wall.hull();
+                lift = drop;
+                (view::ActorKind::Scenery, 0, height, radius)
+            } else if let Some(mask) = entity.get::<sim::homen::Domen>() {
+                if !mask.drawn() {
+                    continue;
+                }
+                let (min, max) = mask.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(pile) = entity.get::<sim::leaves::Leaves>() {
+                if !pile.drawn() {
+                    continue;
+                }
+                let (half, top) = pile.cull();
+                (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(crater) = entity.get::<sim::volcano::Volcano>() {
+                if !crater.visible() {
+                    continue;
+                }
+                lift = crater.lava.y - actor.pos.y;
+                let (height, half) = crater.hull();
+                (view::ActorKind::Fire, 0, height, half)
             } else if let Some(plunger) = entity.get::<sim::swhammer::Swhammer>() {
                 let (radius, top) = plunger.cull();
                 lift = plunger.top;

@@ -1,4 +1,5 @@
 pub mod actor;
+pub mod ajav;
 pub mod area;
 pub mod arrow;
 pub mod balloon;
@@ -33,6 +34,7 @@ pub mod gull;
 pub mod hammer;
 pub mod hammerhit;
 pub mod health;
+pub mod homen;
 pub mod hookshot;
 pub mod hop;
 pub mod ice;
@@ -43,6 +45,7 @@ pub mod jump;
 pub mod ladder;
 pub mod koisi;
 pub mod layer;
+pub mod leaves;
 pub mod lock;
 pub mod marlon;
 pub mod msg;
@@ -70,6 +73,7 @@ pub mod tingle;
 pub mod torch;
 pub mod transition;
 pub mod tsubo;
+pub mod volcano;
 pub mod walk;
 pub mod wall;
 pub mod wind;
@@ -239,6 +243,34 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
+    } else if ajav::is_ajav(&source.name) {
+        match ajav::Ajav::spawn(
+            source.parameters,
+            world.resource::<flags::StoryBits>(),
+            world.resource::<flags::Switches>(),
+        ) {
+            Some(wall) => world.spawn((actor, wall)).id(),
+            None => world.spawn(actor).id(),
+        }
+    } else if homen::is_domen(&source.name) {
+        match homen::Domen::spawn(
+            source.parameters,
+            world.resource::<flags::Switches>(),
+            source.angle,
+        ) {
+            Some(mask) => world.spawn((actor, mask)).id(),
+            None => world.spawn(actor).id(),
+        }
+    } else if leaves::is_leaves(&source.name) {
+        let pile = leaves::Leaves::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, pile)).id()
+    } else if volcano::is_volcano(&source.name) {
+        let crater = volcano::Volcano::spawn(
+            source.parameters,
+            actor.pos,
+            world.resource::<flags::Switches>(),
+        );
+        world.spawn((actor, crater)).id()
     } else if swhammer::is_swhammer(&source.name) {
         let set = world
             .resource::<flags::Switches>()
@@ -394,6 +426,7 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
+                (ajav::control.in_set(WwSimSet::Execute),).chain(),
                 (
                     death::freeze.in_set(WwSimSet::Execute),
                     carry::control.in_set(WwSimSet::Execute),
@@ -430,6 +463,7 @@ pub fn build(
                     flags::control.in_set(WwSimSet::Execute),
                     clock::control.in_set(WwSimSet::Execute),
                     ghostship::control.in_set(WwSimSet::Execute),
+                    volcano::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),
@@ -461,6 +495,8 @@ pub fn build(
                     schedule::control.in_set(WwSimSet::Execute),
                     rockfall::control.in_set(WwSimSet::Execute),
                     wind::control.in_set(WwSimSet::Execute),
+                    homen::control.in_set(WwSimSet::Execute),
+                    leaves::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )

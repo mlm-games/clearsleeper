@@ -129,7 +129,7 @@ pub fn make_parameters(start: u8, no_gravity: bool, version: bool) -> u32 {
 pub fn control(
     collision: Option<Res<Collision>>,
     water: Option<Res<Water>>,
-    mut bombs: Query<(Entity, &mut Actor, &mut Bomb), Without<Bomb>>,
+    mut bombs: Query<(Entity, &mut Actor, &mut Bomb)>,
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
         (
