@@ -420,7 +420,6 @@ impl App {
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
                 || entity.contains::<sim::medli::Medli>()
-                || entity.contains::<sim::makar::Makar>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
@@ -573,6 +572,13 @@ impl App {
                 let (min, max) = statuette.cull();
                 lift = min[1];
                 (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(sage) = entity.get::<sim::makar::Makar>() {
+                if !sage.drawn() {
+                    continue;
+                }
+                let (min, max) = sage.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
             } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
                 if !robot.drawn() {
                     continue;
