@@ -382,16 +382,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             None => world.spawn(actor).id(),
         }
     } else if stalfos::is_stalfos(&source.name) {
-        match stalfos::Stalfos::spawn(
-            source.parameters,
-            source.angle[2],
-            world.resource::<flags::Switches>(),
-        ) {
-            Some((st, hit_points)) => world
-                .spawn((actor, st, hit_points, enemy::Hurt::default()))
-                .id(),
-            None => world.spawn(actor).id(),
-        }
+        let bones = stalfos::Stalfos::spawn(source.parameters);
+        world
+            .spawn((
+                actor,
+                bones,
+                combat::HitPoints(damage::KILL_POWER),
+                enemy::Hurt::default(),
+            ))
+            .id()
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
