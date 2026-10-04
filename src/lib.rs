@@ -559,6 +559,13 @@ impl App {
                 let (drop, height, radius) = wall.hull();
                 lift = drop;
                 (view::ActorKind::Scenery, 0, height, radius)
+            } else if let Some(statuette) = entity.get::<sim::armos::Armos>() {
+                if !statuette.drawn() {
+                    continue;
+                }
+                let (min, max) = statuette.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(idol) = entity.get::<sim::figure::Figure>() {
                 if !idol.drawn() {
                     continue;
