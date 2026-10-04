@@ -331,6 +331,15 @@ impl BuoyBarrel {
         self.given = true;
     }
 
+    pub fn has_buoy(&self) -> bool {
+        self.has_buoy
+    }
+
+    pub fn pop(&mut self) {
+        self.given = true;
+        self.gone = true;
+    }
+
     pub fn rand(&mut self) -> f32 {
         self.seed ^= self.seed << 13;
         self.seed ^= self.seed >> 17;

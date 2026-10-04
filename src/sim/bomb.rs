@@ -1,7 +1,13 @@
 use bevy_ecs::prelude::*;
 
+use super::actor::Actor;
 use super::collision::Collision;
+use super::combat::HitPoints;
+use super::enemy::Hurt;
+use super::events::{SimEvent, SimEvents};
+use super::flags::{Switches, ZoneActors};
 use super::ground::grounded;
+use super::player::Player;
 use super::water::Water;
 
 pub const BOMB_ACTORS: [&str; 2] = ["Bomb", "Bomb2"];
@@ -93,11 +99,24 @@ pub fn arm(bombs: &mut Query<&mut Bomb>, entity: Entity) {
 pub fn control(
     collision: Option<Res<Collision>>,
     water: Option<Res<Water>>,
-    mut bombs: Query<(Entity, &mut super::actor::Actor, &mut Bomb)>,
+    mut bombs: Query<(Entity, &mut Actor, &mut Bomb)>,
+    mut foes: Query<
+        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (Without<super::bombflower::Bombflower>, Without<super::bombflower::Crawler>),
+    >,
+    players: Query<&Player>,
+    mut zones: ResMut<ZoneActors>,
+    mut events: ResMut<SimEvents>,
+    mut fences: Query<&mut super::barricade::Barricade>,
+    mut blocks: Query<&mut super::ice::Ice>,
+    mut floats: Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel)>,
+    mut switches: ResMut<Switches>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
     let wet = water.as_deref().map(|water| water.in_area).unwrap_or(false);
+    let owner = players.iter().next().map(|player| player.pos);
+    let mut burst: Vec<Vec3> = Vec::new();
     for (entity, mut actor, mut bomb) in &mut bombs {
         if bomb.no_gravity > 0 {
             bomb.no_gravity -= 1;
@@ -105,18 +124,33 @@ pub fn control(
             actor.pos.y += bomb.speed();
         }
         match bomb.life {
-            Life::Spent | Life::Sunk => continue,
-            Life::Rolling => {}
+            Life::Spent | Life::Sunk | Life::Rolling => continue,
             Life::Fused => {
                 if bomb.rest > 0 {
                     bomb.rest -= 1;
                 }
                 if bomb.rest == 0 {
                     bomb.life = Life::Spent;
+                    burst.push(actor.pos);
                     let _ = commands.entity(entity).despawn();
                 }
             }
         }
+    }
+    for origin in burst {
+        events.list.push(SimEvent::Explode);
+        super::bombflower::blast(
+            origin,
+            &mut foes,
+            owner,
+            &mut zones,
+            &mut events,
+            &mut fences,
+            &mut blocks,
+            &mut floats,
+            &mut switches,
+            &mut commands,
+        );
     }
 }
 

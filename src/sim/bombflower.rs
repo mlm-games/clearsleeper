@@ -136,14 +136,6 @@ pub fn flower_control(
     mut switches: ResMut<Switches>,
     mut flowers: Query<(&Actor, &mut Bombflower)>,
     players: Query<&Player>,
-    mut foes: Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
-        (Without<Bombflower>, Without<Crawler>),
-    >,
-    mut zones: ResMut<ZoneActors>,
-    mut events: ResMut<super::events::SimEvents>,
-    mut fences: Query<&mut super::barricade::Barricade>,
-    mut blocks: Query<&mut super::ice::Ice>,
     mut commands: Commands,
 ) {
     let soaked = wet.as_deref().is_some_and(|water| water.in_area);
@@ -206,6 +198,7 @@ pub fn crawler_control(
     mut events: ResMut<super::events::SimEvents>,
     mut fences: Query<&mut super::barricade::Barricade>,
     mut blocks: Query<&mut super::ice::Ice>,
+    mut floats: Query<&mut super::buoybarrel::BuoyBarrel>,
     mut switches: ResMut<super::flags::Switches>,
     mut commands: Commands,
 ) {
@@ -260,6 +253,7 @@ pub fn crawler_control(
             &mut events,
             &mut fences,
             &mut blocks,
+            &mut floats,
             &mut switches,
             &mut commands,
         );
@@ -278,6 +272,7 @@ pub fn blast(
     events: &mut super::events::SimEvents,
     mut fences: Query<&mut super::barricade::Barricade>,
     mut blocks: Query<&mut super::ice::Ice>,
+    mut floats: Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel)>,
     mut switches: ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {
@@ -287,6 +282,12 @@ pub fn blast(
     }
     for mut block in &mut blocks {
         block.strike(heat);
+    }
+    for (entity, actor, mut float) in floats.iter_mut() {
+        if float.has_buoy() && within(origin, actor.pos, BLAST_RADIUS) {
+            float.pop();
+            let _ = commands.entity(entity).despawn();
+        }
     }
     let mut slain: Vec<(Entity, i8, u16)> = Vec::new();
     for (entity, actor, mut hp, mut hurt) in foes.iter_mut() {
