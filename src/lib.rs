@@ -584,6 +584,20 @@ impl App {
                     sim::torch::CULL_TOP,
                     sim::torch::POST_RADIUS,
                 )
+            } else if let Some(spot) = entity.get::<sim::taglight::TagLight>() {
+                if !spot.drawn() {
+                    continue;
+                }
+                let (half, top) = spot.cull();
+                (view::ActorKind::Fire, 0, top, half)
+            } else if let Some(button) = entity.get::<sim::swpush::Swpush>() {
+                lift = button.cull_base + button.top;
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    button.cull_top - lift,
+                    button.half,
+                )
             } else if let Some(hatch) = entity.get::<sim::trapdoor::Trapdoor>() {
                 if hatch.hinge == sim::trapdoor::Hinge::Swinging {
                     continue;

@@ -286,6 +286,16 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if statue::is_statue(&source.name) {
         let idol = statue::Statue::spawn(source.parameters);
         world.spawn((actor, idol)).id()
+    } else if swpush::is_swpush(&source.name) {
+        let button = swpush::Swpush::spawn(
+            source.parameters,
+            source.angle[2],
+            world.resource::<flags::Switches>(),
+        );
+        world.spawn((actor, button)).id()
+    } else if taglight::is_tag_light(&source.name) {
+        let spot = taglight::TagLight::spawn(source.parameters);
+        world.spawn((actor, spot)).id()
     } else if torch::is_torch(&source.name) {
         let brand = torch::Torch::spawn(source.parameters, 1.0);
         world.spawn((actor, brand)).id()
@@ -493,10 +503,12 @@ pub fn build(
                     shmrgrd::control.in_set(WwSimSet::Execute),
                     statue::control.in_set(WwSimSet::Execute),
                     schedule::control.in_set(WwSimSet::Execute),
+                    taglight::control.in_set(WwSimSet::Execute),
                     rockfall::control.in_set(WwSimSet::Execute),
                     wind::control.in_set(WwSimSet::Execute),
                     homen::control.in_set(WwSimSet::Execute),
                     leaves::control.in_set(WwSimSet::Execute),
+                    swpush::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
