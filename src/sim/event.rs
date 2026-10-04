@@ -804,6 +804,10 @@ fn staff_cut(
         cut_end(run, list, flags);
     } else if staff.name == "Bm1" {
         bm1_cut(run, list, flags, owner, actors);
+    } else if staff.name == "MknjD" {
+        statue_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "SHOKUDAI" {
+        torch_cut(run, list, flags, owner, commands);
     } else if staff.name == "Fmaster"
         && let Some(cut) = list.cuts.get(run.cut as usize)
         && matches!(cut.name.as_str(), "Dummy" | "WAIT")
@@ -826,6 +830,42 @@ fn staff_cut(
             _ => {}
         }
     }
+}
+
+fn statue_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "WAIT" | "SETGOAL" | "SETANGLE" => cut_end(run, list, flags),
+        "INPUT" | "LESSON" => talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo"),
+        _ => {}
+    }
+}
+
+fn torch_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    commands: &mut Commands,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if cut.name == "FIRE" {
+        commands.entity(owner).insert(FireLit(true));
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn bm1_cut(
