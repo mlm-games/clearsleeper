@@ -69,6 +69,7 @@ pub struct Chest {
     pub open_switch: u8,
     pub room: i8,
     pub opened: bool,
+    pub pressed: bool,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +95,7 @@ impl Chest {
             open_switch: angle_z as u8,
             room,
             opened: false,
+            pressed: false,
         }
     }
 

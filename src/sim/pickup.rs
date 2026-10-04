@@ -99,6 +99,7 @@ fn heart_floor(max: u8) -> u8 {
 }
 
 pub fn control(
+    do_intent: Res<super::intent::DoIntent>,
     mut health: ResMut<Health>,
     mut partner: ResMut<super::event::ItemPartner>,
     mut rupees: ResMut<Rupees>,
@@ -147,11 +148,16 @@ pub fn control(
         let _ = commands.entity(entity).despawn();
     }
     for (_, actor, mut chest, marker) in &mut chests {
+        let tapped = do_intent.0 && !chest.pressed;
+        chest.pressed = do_intent.0;
         if chest.opened || !super::chest::present(chest, &switches) {
             continue;
         }
         let forced = marker.is_some();
         if !forced {
+            if !tapped {
+                continue;
+            }
             let dx = player.pos.x - actor.pos.x;
             let dz = player.pos.z - actor.pos.z;
             let reach = super::chest::GRAB_RANGE;
@@ -161,7 +167,7 @@ pub fn control(
         }
         chest.opened = true;
         chest_flags.open(super::chest::stage_of(chest), chest.index);
-        if forced && chest.open_switch != super::chest::NO_SWITCH {
+        if chest.open_switch != super::chest::NO_SWITCH {
             switches.set(chest.open_switch);
         }
         super::chest::loot(chest, &mut rupees, &mut equipped, &mut got);
