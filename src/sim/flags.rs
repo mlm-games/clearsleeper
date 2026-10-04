@@ -15,6 +15,8 @@ const HOLD_KIND: u32 = 1;
 const STORY_BYTES: usize = 0x100;
 const SWITCH_BITS: u32 = 128;
 const FLAG_WORDS: usize = 320;
+pub const COLLECT_SLOTS: usize = 8;
+pub const COLLECT_ITEMS: u8 = 8;
 const FLAG_MAX: u32 = (FLAG_WORDS as u32) * 32;
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +66,48 @@ impl StoryBits {
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Collect {
+    bytes: [u8; COLLECT_SLOTS],
+}
+
+impl Default for Collect {
+    fn default() -> Self {
+        Self {
+            bytes: [0_u8; COLLECT_SLOTS],
+        }
+    }
+}
+
+impl Collect {
+    pub fn test(&self, idx: u8, item: u8) -> bool {
+        if item >= COLLECT_ITEMS {
+            return false;
+        }
+        self.bytes
+            .get(usize::from(idx))
+            .is_some_and(|byte| byte & (1 << item) != 0)
+    }
+
+    pub fn set(&mut self, idx: u8, item: u8) {
+        if item >= COLLECT_ITEMS {
+            return;
+        }
+        if let Some(byte) = self.bytes.get_mut(usize::from(idx)) {
+            *byte |= 1 << item;
+        }
+    }
+
+    pub fn clear(&mut self, idx: u8, item: u8) {
+        if item >= COLLECT_ITEMS {
+            return;
+        }
+        if let Some(byte) = self.bytes.get_mut(usize::from(idx)) {
+            *byte &= !(1 << item);
+        }
+    }
+}
+
 pub struct EventFlags {
     words: [u32; FLAG_WORDS],
 }

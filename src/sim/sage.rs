@@ -804,7 +804,7 @@ impl Text<'_> {
     }
 }
 
-struct Ctx<'a> {
+pub struct Ctx<'a> {
     entity: Entity,
     player: Option<Vec3>,
     player_face: i16,

@@ -35,6 +35,7 @@ pub const MEDLI_ACTOR: &str = "Md1";
 pub const ARC_NAME: &str = "Md";
 pub const ARC_NAME_SHIP: &str = "Md_ship";
 pub const STAFF_NAME: &str = "Md1";
+pub const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 
 pub const TALK_TYPE_SHIFT: u32 = 0x08;
 pub const TALK_TYPE_MASK: u32 = 0xFF;
@@ -317,6 +318,7 @@ pub const BIT_1504: u16 = 0x1504;
 pub const BIT_1608: u16 = 0x1608;
 pub const BIT_1620: u16 = 0x1620;
 pub const BIT_2C08: u16 = 0x2C08;
+pub const BIT_2E04: u16 = 0x2E04;
 pub const BIT_2E40: u16 = 0x2E40;
 pub const BIT_3310: u16 = 0x3310;
 pub const BIT_3320: u16 = 0x3320;
@@ -424,6 +426,7 @@ pub const MODE_EVENT6: i8 = 10;
 pub const MODE_EVENT7: i8 = 11;
 pub const MODE_EVENT8: i8 = 12;
 
+pub const EVENT_SLOTS: usize = 10;
 pub const NO_STATUS: u8 = 0xFF;
 pub const NO_INDEX: i16 = -1;
 pub const NO_STAFF: usize = usize::MAX;
@@ -605,13 +608,6 @@ pub enum Arg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LookTarget {
-    None,
-    Player,
-    Point,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cut {
     Wait,
     CreateItem,
@@ -771,8 +767,12 @@ pub struct Medli {
     pub old: Vec3,
     pub link: Option<Vec3>,
     pub link_hidden: bool,
-    pub pos_move: bool,
     pub pending_se: u32,
+    pub stick_angle: i16,
+    pub player_yaw: i16,
+    pub player_shape: i16,
+    pub frame_ended: bool,
+    pub ripple: bool,
 }
 
 impl Medli {
@@ -892,6 +892,9 @@ impl Medli {
             link: None,
             link_hidden: false,
             pending_se: 0,
+            stick_angle: 0,
+            player_yaw: 0,
+            player_shape: 0,
             frame_ended: false,
             ripple: false,
         }
@@ -1381,6 +1384,9 @@ pub struct Ctx<'a> {
     pub ship_yaw: i16,
     pub ship_speed: f32,
     pub room_drawn: bool,
+    pub cancel_button: bool,
+    pub pos_move: bool,
+    pub ship_riding: bool,
     pub staff_cut: Option<usize>,
     pub stories: &'a mut StoryBits,
     pub switches: &'a mut Switches,
@@ -1410,7 +1416,6 @@ pub struct Ctx<'a> {
     pub link_hidden: bool,
     pub link_move: Option<(Vec3, i16)>,
     pub cut_end_mode: i32,
-    pub collect_slot_2: bool,
     pub tact_song: i32,
     pub tact_ended: bool,
     pub link_eye: Option<Vec3>,
@@ -1528,22 +1533,21 @@ impl Medli {
         let table_idx = ANM_TBL_IDX.get(slot).copied().unwrap_or(0);
         let arm_idx = ANM_TBL_ARM.get(slot).copied().unwrap_or(0);
         let btp_idx = ANM_TBL_BTP.get(slot).copied().unwrap_or(0);
-        let loop_mode = ANM_TBL_LOOP.get(slot).copied().unwrap_or(false);
         let table_speed = ANM_TBL_SPEED.get(slot).copied().unwrap_or(1.0);
-        let mut speed = table_speed;
-        let mut morf = ANM_TBL_MORF.get(slot).copied().unwrap_or(8.0);
+        let mut _speed = table_speed;
+        let mut _morf = ANM_TBL_MORF.get(slot).copied().unwrap_or(8.0);
         if index == 6 {
-            speed = HIO_M118;
+            _speed = HIO_M118;
         } else if index == 9 || index == 10 {
-            speed = HIO_M11C;
+            _speed = HIO_M11C;
         } else if index == 0x2E {
-            speed = HIO_M124;
+            _speed = HIO_M124;
         } else if index == 0x28 {
-            morf = HIO5_M4;
-            speed = HIO5_M8;
+            _morf = HIO5_M4;
+            _speed = HIO5_M8;
         }
         if index == 7 || index == 8 {
-            morf = HIO_M1A8;
+            _morf = HIO_M1A8;
         }
         self.anm = index;
         let mut ret = false;
@@ -1581,9 +1585,6 @@ impl Medli {
         } else {
             self.clr_stts(STTS_UNK4000);
         }
-        let _ = speed;
-        let _ = morf;
-        let _ = loop_mode;
         ret
     }
 
@@ -1882,7 +1883,7 @@ impl Medli {
         }
     }
 
-    pub fn talk(&mut self, input: i32, ctx: &mut Ctx<'_>) -> bool {
+    pub fn talk(&mut self, tact: bool, cancel: bool, ctx: &mut Ctx<'_>) -> bool {
         let msg_status = ctx.text.status().unwrap_or(NO_STATUS);
         let msg_anm_atr = ctx.text.info.mesg_anime;
         if msg_status == STATUS_MSG_DISPLAYED {
@@ -1897,8 +1898,8 @@ impl Medli {
                 self.msg_attr = 0;
             }
         } else if msg_status == STATUS_INPUT {
-            if input != 0 {
-                if input == 2 {
+            if tact {
+                if cancel {
                     ctx.text.set_status(STATUS_MSG_ENDS);
                     ctx.text.flags.message_send_on();
                     self.set_stts(STTS_UNK200);
@@ -2124,7 +2125,7 @@ impl Medli {
         let mut delta = Vec3::new(self.pos.x - player.x, 0.0, self.pos.z - player.z);
         if abs_xz(delta) < HIO_NPC_MAX_ATTN_DIST_XZ + ATTN_BONUS_DIST {
             delta = normalize_zp(delta);
-            let angle = if delta.x.abs() < CONTACT_EPS && delta.z.abs() < CONTACT_EPS {
+            let angle = if delta.x.abs() < NORMAL_EPS && delta.z.abs() < NORMAL_EPS {
                 0
             } else {
                 walk::to_s16(delta.x.atan2(delta.z))
@@ -2808,7 +2809,7 @@ impl Medli {
                     self.step_stat = STEP_ONGOING_3;
                 }
             } else if self.step_stat == STEP_ONGOING_3 {
-                if self.talk(0, ctx) {
+                if self.talk(false, false, ctx) {
                     if self.is_type_atorizk() || self.is_type_dra09() {
                         self.step_stat = STEP_ONGOING_4;
                     } else if self.is_type_adanmae() {
@@ -2857,7 +2858,7 @@ impl Medli {
                 if self.talk_init(ctx) {
                     self.step_stat = STEP_ONGOING_2;
                 }
-            } else if self.talk(0, ctx) {
+            } else if self.talk(false, false, ctx) {
                 ctx.reset_event = true;
                 self.set_npc_action(Step::Ship, Arg::None);
             }
@@ -4359,9 +4360,9 @@ impl Medli {
     }
 
     pub fn action_msg_end(&mut self, cut: usize, ctx: &mut Ctx<'_>) -> bool {
-        let result = self.talk(0, ctx);
+        let result = self.talk(false, false, ctx);
         if result {
-            self.initial_end(cut, ctx);
+            self.initial_end(cut, ctx.list, ctx);
         }
         self.look_back(true, false, false);
         self.set_attention(true, self.pos, ctx.is_player);
@@ -4567,8 +4568,8 @@ impl Medli {
         true
     }
 
-    pub fn initial_end(&mut self, _cut: usize, ctx: &mut Ctx<'_>) {
-        let mode = ctx.cut_end_mode;
+    pub fn initial_end(&mut self, cut: usize, list: &EventList, ctx: &mut Ctx<'_>) {
+        let mode = list.cut_number(cut, "EndMode").unwrap_or(0);
         match mode {
             -2 => {
                 if self.msg_no == 0x19de {
@@ -4607,7 +4608,7 @@ impl Medli {
         if song >= 0 {
             self.set_stts(STTS_UNK400);
         }
-        let result = self.talk(1, ctx);
+        let result = self.talk(true, ctx.cancel_button, ctx);
         if result {
             if self.has_stts(STTS_UNK400) {
                 self.clr_stts(STTS_UNK400);
@@ -4853,9 +4854,6 @@ impl Medli {
         if !ctx.event_run() || self.check_command_talk(ctx) {
             return false;
         }
-        if let Some(cut) = ctx.staff_cut {
-            ctx.cut_end_mode = ctx.list.cut_number(cut, "EndMode").unwrap_or(0);
-        }
         if self.is_event_accepted() {
             let index = self.cur_event;
             if index >= 0 {
@@ -4995,17 +4993,20 @@ impl Medli {
         ctx.ground_room.unwrap_or(ctx.actor_room)
     }
 
-    pub fn create_ok(&self, ctx: &Ctx<'_>) -> bool {
-        match ctx.stage {
-            "M_DaiB" => ctx.collect_slot_2,
-            "sea" => ctx.stories.test(BIT_2E04) && !ctx.stories.test(BIT_1820),
-            "Atorizk" => !ctx.stories.test(BIT_2E04),
-            "Adanmae" => ctx.stories.test(BIT_2E04),
-            "M_Dra09" => !ctx.stories.test(BIT_2E04) && !ctx.stories.test(BIT_1101),
-            "Edaichi" => ctx.stories.test(BIT_2E04) && !ctx.stories.test(BIT_2920),
-            "M_Dai" => ctx.stories.test(BIT_2E04) && ctx.stories.test(BIT_2920),
-            _ => true,
-        }
+}
+
+pub const COLLECT_MEDLI_ITEM: u8 = 2;
+
+pub fn create_ok(stories: &StoryBits, stage: &str, collect_slot_2: bool) -> bool {
+    match stage {
+        "M_DaiB" => collect_slot_2,
+        "sea" => stories.test(BIT_2E04) && !stories.test(BIT_1820),
+        "Atorizk" => !stories.test(BIT_2E04),
+        "Adanmae" => stories.test(BIT_2E04),
+        "M_Dra09" => !stories.test(BIT_2E04) && !stories.test(BIT_1101),
+        "Edaichi" => stories.test(BIT_2E04) && !stories.test(BIT_2920),
+        "M_Dai" => stories.test(BIT_2E04) && stories.test(BIT_2920),
+        _ => true,
     }
 }
 
@@ -5074,6 +5075,7 @@ pub fn control(
         medli.do_held = do_intent.0;
         medli.stick_angle = stick_angle;
         medli.player_yaw = player.map_or(0, |link| walk::to_s16(link.yaw));
+        medli.player_shape = player.map_or(0, |link| walk::to_s16(link.face));
         let mut text = Text {
             procs: &mut *dialogue.procs,
             info: &mut *dialogue.info,
@@ -5134,6 +5136,7 @@ pub fn control(
             ship_speed: ship.map_or(0.0, |ship| ship.speed),
             ship_riding: ship.is_some_and(|ship| ship.riding),
             room_drawn: true,
+            cancel_button: target.0,
             staff_cut,
             stories: &mut *stories,
             switches: &mut *switches,
@@ -5165,7 +5168,6 @@ pub fn control(
             link_hidden: false,
             pos_move: false,
             cut_end_mode: 0,
-            collect_slot_2: false,
             move_block: None,
         };
         if !medli.entered {

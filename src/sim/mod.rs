@@ -121,7 +121,19 @@ pub enum WwSimSet {
 }
 
 pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) {
+    let stage = tables.name().to_owned();
     for source in tables.actors() {
+        if medli::is_medli(&source.name)
+            && !medli::create_ok(
+                world.resource::<flags::StoryBits>(),
+                &stage,
+                world
+                    .resource::<flags::Collect>()
+                    .test(0, medli::COLLECT_MEDLI_ITEM),
+            )
+        {
+            continue;
+        }
         spawn_actor(world, source);
     }
 }
@@ -503,6 +515,7 @@ pub fn build(
     sim.world.insert_resource(crate::text::msgbox1::Msg1Box::default());
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
+    sim.world.insert_resource(flags::Collect::default());
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());

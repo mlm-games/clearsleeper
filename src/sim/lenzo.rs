@@ -1880,7 +1880,7 @@ impl Text<'_> {
     }
 }
 
-struct Ctx<'a> {
+pub struct Ctx<'a> {
     entity: Entity,
     stories: &'a mut StoryBits,
     got: &'a Got,
