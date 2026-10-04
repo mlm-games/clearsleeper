@@ -33,3 +33,13 @@ pub fn surface(collision: Option<&Collision>, pos: Vec3) -> Option<f32> {
         None => Some(0.0),
     }
 }
+
+pub fn slope_normal(collision: Option<&Collision>, pos: Vec3) -> Vec3 {
+    match collision {
+        Some(collision) => collision
+            .ground_normal(pos.x, pos.z)
+            .unwrap_or(Vec3::Y),
+        None => Vec3::Y,
+    }
+}
+

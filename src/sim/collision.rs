@@ -287,6 +287,10 @@ impl Collision {
         self.ground_hit(x, z).map(|(y, _)| y)
     }
 
+    pub fn ground_normal(&self, x: f32, z: f32) -> Option<Vec3> {
+        self.ground_hit(x, z).map(|(_, index)| self.planes[index].normal)
+    }
+
     pub fn exit_at(&self, x: f32, z: f32) -> Option<u8> {
         let (_, index) = self.ground_hit(x, z)?;
         self.exits.get(index).copied()

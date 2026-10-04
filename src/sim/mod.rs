@@ -3,6 +3,7 @@ pub mod area;
 pub mod arrow;
 pub mod balloon;
 pub mod barrier;
+pub mod barrel;
 pub mod barricade;
 pub mod bird;
 pub mod bomb;
@@ -51,6 +52,7 @@ pub mod shop;
 pub mod sea;
 pub mod ship;
 pub mod stone;
+pub mod stream;
 pub mod swim;
 pub mod tag;
 pub mod trapdoor;
@@ -205,6 +207,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if barrel::is_barrel(&source.name) {
+        let cask = barrel::Barrel::spawn(source.parameters);
+        world.spawn((actor, cask)).id()
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, block)).id()
@@ -355,6 +360,7 @@ pub fn build(
                     barricade::control.in_set(WwSimSet::Execute),
                     trapdoor::control.in_set(WwSimSet::Execute),
                     torch::control.in_set(WwSimSet::Execute),
+                    barrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),

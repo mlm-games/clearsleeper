@@ -116,6 +116,24 @@ pub(super) fn add_calc_angle_s(
     value
 }
 
+pub(super) fn chase_angle_s(value: &mut i16, target: i16, step: i16) -> bool {
+    if step == 0 {
+        let done = *value == target;
+        if done {
+            *value = target;
+        }
+        return done;
+    }
+    let step = if value.wrapping_sub(target) > 0 { -step } else { step };
+    *value = value.wrapping_add(step);
+    if step.wrapping_mul(value.wrapping_sub(target)) >= 0 {
+        *value = target;
+        true
+    } else {
+        false
+    }
+}
+
 fn set_normal_speed(
     player: &mut Player,
     desired: f32,
