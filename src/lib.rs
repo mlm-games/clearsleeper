@@ -329,7 +329,7 @@ impl App {
                 }
                 continue;
             }
-            if let Some(boom) = entity.get::<sim::item::Boomerang>() {
+            if let Some(boom) = entity.get::<sim::boomerang::Boomerang>() {
                 out.push(view::ActorView {
                     pos: boom.pos,
                     kind: view::ActorKind::Boomerang,

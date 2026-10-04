@@ -4,6 +4,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::{Combat, HitPoints};
 use super::damage;
@@ -19,7 +20,7 @@ use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::Swim;
 use super::talk::Dialogue;
-use super::walk::{swept, within};
+use super::walk::within;
 
 pub const FIRST_BOMB: u8 = 0x0B;
 pub const LAST_BOMB: u8 = 0x0E;
@@ -38,16 +39,8 @@ const BOMB_POWER: i32 = damage::BOMB;
 const BOMB_THROW: f32 = 50.0;
 const BOMB_LIFT: f32 = 40.0;
 const BOMB_GRAVITY: f32 = -2.5;
-const BOOM_SPEED: f32 = 60.0;
-const BOOM_LIFETIME: u32 = 300;
-const BOOM_LOCKS: usize = 2;
-const BOOM_CATCH: f32 = 120.0;
-const BOOM_RETURN_TICKS: u32 = 60;
-const BOOM_REACH: f32 = 30.0;
-const BOOM_POWER: i32 = damage::BOMERANG;
 const THROW_OFFSET: f32 = 20.0;
 const BOMB_FLINCH: u32 = 10;
-const BOOM_FLINCH: u32 = 6;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct InFlight;
@@ -72,16 +65,6 @@ pub struct Bomb {
     pub fuse: u32,
     pub vel: Vec3,
     pub rest: bool,
-}
-
-#[derive(Component, Debug, Clone, PartialEq)]
-pub struct Boomerang {
-    pub pos: Vec3,
-    pub vel: Vec3,
-    pub returning: bool,
-    pub out: u32,
-    pub life: u32,
-    pub struck: Vec<Entity>,
 }
 
 impl Held {
@@ -123,7 +106,14 @@ pub struct Gates<'w, 's> {
     jump: Res<'w, Jump>,
     combat: Res<'w, Combat>,
     dialogue: Res<'w, Dialogue>,
+    lock: Res<'w, super::lock::Lock>,
     ships: Query<'w, 's, &'static Ship>,
+}
+
+impl Gates<'_, '_> {
+    pub fn locked(&self) -> usize {
+        usize::from(self.lock.target.is_some())
+    }
 }
 
 impl Gates<'_, '_> {
@@ -142,7 +132,7 @@ impl Gates<'_, '_> {
 pub struct Shots<'w, 's> {
     bombs: Query<'w, 's, (Entity, &'static mut Bomb), Without<arrow::Arrow>>,
     nocked: Query<'w, 's, &'static arrow::Arrow>,
-    spin: Query<'w, 's, (Entity, &'static mut Boomerang), Without<Bomb>>,
+    spin: Query<'w, 's, (Entity, &'static mut boomerang::Boomerang), Without<Bomb>>,
 }
 
 impl Shots<'_, '_> {
@@ -152,12 +142,18 @@ impl Shots<'_, '_> {
 
     fn recall(&mut self) {
         for (_, mut boom) in &mut self.spin {
-            boom.returning = true;
+            boom.returning();
         }
     }
 }
 
-fn launch(player: &Player, held: &mut Held, rounds: u8, commands: &mut Commands) {
+fn launch(
+    player: &Player,
+    held: &mut Held,
+    rounds: u8,
+    locks: usize,
+    commands: &mut Commands,
+) {
     let Some(kind) = held.kind() else {
         return;
     };
@@ -186,17 +182,9 @@ fn launch(player: &Player, held: &mut Held, rounds: u8, commands: &mut Commands)
             commands.spawn((shaft, InFlight));
         }
         Kind::Boomerang => {
-            commands.spawn((
-                Boomerang {
-                    pos,
-                    vel: Vec3::new(BOOM_SPEED * sin, 0.0, BOOM_SPEED * cos),
-                    returning: false,
-                    out: 0,
-                    life: BOOM_LIFETIME,
-                    struck: Vec::new(),
-                },
-                InFlight,
-            ));
+            let mut boom = boomerang::Boomerang::nocked();
+            boom.toss(pos, player.face, 0.0, locks);
+            commands.spawn((boom, InFlight));
         }
     }
     held.count -= 1;
@@ -234,8 +222,9 @@ pub fn control(
                 .iter()
                 .next()
                 .map_or(0, |arrow| (arrow.round + 1) % arrow::ROUNDS);
+            let locks = gates.locked();
             for player in &players {
-                launch(player, &mut held, rounds, &mut commands);
+                launch(player, &mut held, rounds, locks, &mut commands);
             }
         }
     }
@@ -302,45 +291,10 @@ pub fn control(
         let _ = commands.entity(entity).despawn();
     }
 
-    let mut spent: Vec<Entity> = Vec::new();
-    let home = players.iter().next().map(|player| player.pos);
-    for (entity, mut boom) in &mut shots.spin {
-        let from = boom.pos;
-        boom.out = boom.out.saturating_add(1);
-        if boom.returning {
-            let target = home.unwrap_or(boom.pos);
-            let delta = target - boom.pos;
-            if delta.length() > BOOM_CATCH {
-                boom.vel = delta.normalize() * BOOM_SPEED;
-            }
-        }
-        let step = boom.vel;
-        boom.pos += step;
-        if !boom.returning {
-            for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
-                if !boom.struck.contains(&foe_entity) && swept(from, foe.pos, BOOM_REACH) {
-                    hp.0 -= BOOM_POWER;
-                    if let Some(hurt) = hurt.as_deref_mut() {
-                        hurt.0 = BOOM_FLINCH;
-                    }
-                    boom.struck.push(foe_entity);
-                }
-            }
-            if boom.struck.len() >= BOOM_LOCKS || boom.out >= BOOM_RETURN_TICKS {
-                boom.returning = true;
-            }
-        }
-        boom.life = boom.life.saturating_sub(1);
-        let caught = boom.returning && home.is_some_and(|pos| within(boom.pos, pos, BOOM_CATCH));
-        if caught || boom.life == 0 {
-            if held.item == BOOMERANG {
-                held.count = 1;
-            }
-            spent.push(entity);
-        }
-    }
-
-    for entity in spent {
+    for (entity, _) in &shots.spin {
         let _ = commands.entity(entity).despawn();
+        if held.item == BOOMERANG {
+            held.count = 1;
+        }
     }
 }

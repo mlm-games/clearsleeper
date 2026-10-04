@@ -4,6 +4,7 @@ pub mod arrow;
 pub mod balloon;
 pub mod bird;
 pub mod bomb;
+pub mod boomerang;
 pub mod chest;
 pub mod carry;
 pub mod cleared;
@@ -334,6 +335,7 @@ pub fn build(
                 (
                     combat::control.in_set(WwSimSet::Execute),
                     item::control.in_set(WwSimSet::Execute),
+                    boomerang::control.in_set(WwSimSet::Execute),
                     enemy::control.in_set(WwSimSet::Execute),
                     balloon::control.in_set(WwSimSet::Execute),
                     fire::control.in_set(WwSimSet::Execute),
