@@ -110,6 +110,10 @@ impl FallRock {
         Vec3::new(pos.x, pos.y + self.scale * LAVA_LIFT, pos.z)
     }
 
+    pub fn drowned(&self, floor: f32) -> bool {
+        floor <= 0.0
+    }
+
     pub fn tumble_step(&mut self) {
         self.tilt = self.tilt.wrapping_add(self.tumble);
     }
@@ -119,20 +123,31 @@ pub fn is_fallrock(name: &str) -> bool {
     name == FALLROCK_ACTOR
 }
 
-pub fn control(collision: Option<Res<Collision>>, mut rocks: Query<(&mut Actor, &mut FallRock)>) {
+pub fn control(
+    collision: Option<Res<Collision>>,
+    water: Option<Res<super::water::Water>>,
+    mut rocks: Query<(Entity, &mut Actor, &mut FallRock)>,
+    mut commands: Commands,
+) {
     let solid = collision.as_deref();
-    for (mut actor, mut rock) in &mut rocks {
+    let wet = water.as_deref().is_some_and(|water| water.in_area);
+    for (entity, mut actor, mut rock) in &mut rocks {
         if rock.gone {
             continue;
         }
+        let before = actor.pos;
         rock.frames += 1;
         actor.pos += rock.integrate(actor.angle[1]);
         let spent = rock.accumulate();
         let landed = ground::grounded(solid, actor.pos);
-        let lava = ground::surface(solid, rock.lava_probe(actor.pos))
+        let splash = wet && rock.drowned(actor.pos.y);
+        let lava = ground::surface(solid, rock.lava_probe(before))
             .is_some_and(|floor| floor > actor.pos.y + rock.scale * LAVA_LIFT);
-        rock.gone = spent || landed || lava;
+        rock.gone = spent || landed || splash || lava;
         rock.tumble_step();
         actor.angle[0] = rock.tilt;
+        if rock.gone {
+            let _ = commands.entity(entity).despawn();
+        }
     }
 }

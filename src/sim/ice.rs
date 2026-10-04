@@ -19,7 +19,7 @@ pub const PROFILE: i16 = 0x4000;
 pub const CHIPPED_AT: f32 = 0.1;
 pub const RELEASE_AT: f32 = 0.4;
 pub const FADE_FRAMES: i16 = 0x5A;
-pub const SOUND_MELT: u32 = 0x6E4C;
+pub const SOUND_MELT: u32 = 0x6A16;
 pub const STTS_WEIGHT: u8 = 0xFF;
 pub const STTS_POWER: u8 = 0xFF;
 
@@ -92,11 +92,11 @@ impl Ice {
     }
 
     pub fn hull(&self) -> f32 {
-        self.scale.x.max(self.scale.z) * RADII[SHELLS - 1]
+        self.radius * self.scale.x.max(self.scale.z) * RADII[SHELLS - 1]
     }
 
     pub fn hull_height(&self) -> f32 {
-        self.scale.y * HEIGHTS[0]
+        self.height * self.scale.y * HEIGHTS[0]
     }
 
     pub fn local_hit(&self, pos: Vec3, heading: i16, hit: Vec3) -> Option<Vec3> {
@@ -144,7 +144,7 @@ impl Ice {
         }
     }
 
-    pub fn thaw(&mut self) {
+    pub fn thaw(&mut self) -> bool {
         self.radius = (self.radius - THAW_STEP).max(0.0);
         self.alpha = (self.alpha - FADE_STEP).max(0.0);
         self.height = profile(self.radius);
@@ -152,9 +152,6 @@ impl Ice {
         if self.frames <= 0 {
             self.state = State::Gone;
         }
-    }
-
-    pub fn release(&self) -> bool {
         self.radius < RELEASE_AT
     }
 
@@ -175,12 +172,11 @@ pub fn is_ice(name: &str) -> bool {
 
 pub fn control(mut switches: ResMut<Switches>, mut blocks: Query<&mut Ice>) {
     for mut block in &mut blocks {
-        if block.state != State::Melting {
+        if !matches!(block.state, State::Melting | State::Chipped) {
             continue;
         }
-        if block.release() {
+        if block.thaw() {
             block.latch(&mut switches);
         }
-        block.thaw();
     }
 }

@@ -355,16 +355,20 @@ pub fn is_barrel(name: &str) -> bool {
     name == BARREL_ACTOR
 }
 
-pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor, &mut Barrel)>) {
+pub fn control(
+    collision: Option<Res<Collision>>,
+    mut barrels: Query<(Entity, &mut Actor, &mut Barrel)>,
+    mut commands: Commands,
+) {
     let solid = collision.as_deref();
-    for (mut actor, mut barrel) in &mut barrels {
+    for (entity, mut actor, mut barrel) in &mut barrels {
         if barrel.broken {
             continue;
         }
         let before = actor.pos;
         let grounded = ground::grounded(solid, actor.pos);
         let slope = ground::slope_normal(solid, actor.pos);
-        let sloped = slope.x.abs() >= SLOPE_EPSILON && slope.z.abs() >= SLOPE_EPSILON;
+        let tiltable = slope.x.abs() > SLOPE_EPSILON || slope.z.abs() > SLOPE_EPSILON;
         let heading = actor.angle[1];
         let next = match barrel.mode {
             Mode::Carry => continue,
@@ -381,7 +385,7 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
             }
             Mode::Wait => {
                 barrel.integrate(heading);
-                barrel.rest_step(grounded, sloped)
+                barrel.rest_step(grounded, tiltable)
             }
             Mode::Jump => {
                 if grounded {
@@ -396,7 +400,7 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
             Mode::Walk => {
                 if grounded {
                     barrel.drag_step(heading, Some(slope));
-                    barrel.roll_step(sloped)
+                    barrel.roll_step(tiltable && slope.x.abs() >= SLOPE_EPSILON && slope.z.abs() >= SLOPE_EPSILON)
                 } else {
                     barrel.drag_step(heading, None);
                     let tilt = LYING;
@@ -407,6 +411,7 @@ pub fn control(collision: Option<Res<Collision>>, mut barrels: Query<(&mut Actor
         };
         actor.pos += barrel.speed;
         if barrel.smash_check(grounded, grounded, actor.pos.y) {
+            let _ = commands.entity(entity).despawn();
             continue;
         }
         if let Some(next) = next {

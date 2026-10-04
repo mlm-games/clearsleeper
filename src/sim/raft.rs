@@ -73,11 +73,12 @@ pub struct Raft {
     pub swivel: i16,
     pub swivel_target: i16,
     pub roll_dir: u8,
+    pub seed: u32,
     pub timer: u16,
 }
 
 impl Raft {
-    pub fn spawn(parameters: u32, angle: [i16; 3], roll_dir: u8) -> Self {
+    pub fn spawn(parameters: u32, angle: [i16; 3]) -> Self {
         let kind = (parameters & 0xF) as u8;
         let packed = u32::from(angle[0] as u16);
         let path_no = if kind == TYPE_CRANE {
@@ -94,11 +95,13 @@ impl Raft {
             swing: PENDULUM,
             swivel: 0,
             swivel_target: 0,
-            roll_dir,
+            roll_dir: 0,
+            seed: 0x2540_F491,
             timer: 0,
         };
         if kind == TYPE_CRANE && path_no != NO_PATH {
             raft.mode = Mode::PathMove;
+            raft.roll_dir = if raft.rand() < ROLL_SPLIT { 0 } else { 1 };
         }
         if kind == TYPE_HUMAN || kind == TYPE_LARGE {
             raft.mode = Mode::StopTerry;
@@ -136,7 +139,14 @@ impl Raft {
     }
 
     pub fn flip(&mut self) {
-        self.roll_dir ^= 1;
+        self.roll_dir = if self.rand() < ROLL_SPLIT { 0 } else { 1 };
+    }
+
+    pub fn rand(&mut self) -> f32 {
+        self.seed ^= self.seed << 13;
+        self.seed ^= self.seed >> 17;
+        self.seed ^= self.seed << 5;
+        (self.seed >> 8) as f32 / 16777216.0
     }
 
     pub fn enter(&mut self, mode: Mode) {

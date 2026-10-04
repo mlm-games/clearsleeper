@@ -220,7 +220,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let tower = windmill::Windmill::spawn(source.parameters);
         world.spawn((actor, tower)).id()
     } else if buoybarrel::is_buoy_barrel(&source.name) {
-        let float = buoybarrel::BuoyBarrel::spawn(source.parameters);
+        let float = buoybarrel::BuoyBarrel::spawn(source.parameters, actor.pos);
         world.spawn((actor, float)).id()
     } else if ice::is_ice(&source.name) {
         let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
@@ -235,7 +235,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let fence = barricade::Barricade::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, fence)).id()
     } else if raft::is_raft(&source.name) {
-        let vessel = raft::Raft::spawn(source.parameters, source.angle, 0);
+        let vessel = raft::Raft::spawn(source.parameters, source.angle);
         world.spawn((actor, vessel)).id()
     } else if barrier::is_barrier(&source.name) {
         let field = barrier::Barrier::spawn(Vec3::ONE);

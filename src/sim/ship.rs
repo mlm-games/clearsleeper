@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 
 use super::actor::Actor;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
@@ -46,6 +46,13 @@ pub struct Ship {
     pub tiller: i16,
     pub riding: bool,
     held: bool,
+}
+
+impl Ship {
+    pub fn velocity(&self, heading: i16) -> Vec3 {
+        let yaw = from_s16(heading);
+        Vec3::new(self.speed * yaw.sin(), 0.0, self.speed * yaw.cos())
+    }
 }
 
 pub fn control(

@@ -120,6 +120,7 @@ pub struct BuoyBarrel {
     pub lean: Vec3,
     pub lean_vel: Vec3,
     pub wave: Vec3,
+    pub home: Vec3,
     pub timer: i32,
     pub trigger: u8,
     pub cooldown: u8,
@@ -131,7 +132,7 @@ pub struct BuoyBarrel {
 }
 
 impl BuoyBarrel {
-    pub fn spawn(parameters: u32) -> Self {
+    pub fn spawn(parameters: u32, home: Vec3) -> Self {
         let kind = ((parameters >> TYPE_SHIFT) & TYPE_MASK) as usize;
         let coming = parameters >> COMING_SHIFT & 1 != 0;
         let jitter = if coming && kind != KIND_MINE { 1.0 } else { 0.0 };
@@ -156,6 +157,7 @@ impl BuoyBarrel {
             lean: Vec3::new(jitter, 0.0, jitter),
             lean_vel: Vec3::ZERO,
             wave: Vec3::ZERO,
+            home,
             timer: 0,
             trigger: TRIGGER_NONE,
             cooldown: 0,
@@ -194,7 +196,7 @@ impl BuoyBarrel {
     }
 
     pub fn bob(&mut self) {
-        self.phase += (self.rand() + 1.0) as i32 * PHASE_STEP[self.kind] as i32;
+        self.phase += ((self.rand() + 1.0) * PHASE_STEP[self.kind]) as i32;
     }
 
     pub fn tick_cooldown(&mut self) {
@@ -203,7 +205,7 @@ impl BuoyBarrel {
         }
     }
 
-    pub fn float_step(&mut self, anchor: Vec3, pos: Vec3) {
+    pub fn float_step(&mut self, pos: Vec3) {
         let (decay, damp) = if self.coming {
             if self.heave > 0.0 {
                 (COMING_DECAY_HIGH, COMING_DAMP)
@@ -215,8 +217,8 @@ impl BuoyBarrel {
         };
         self.spring(decay, damp, if self.coming { COMING_CAP } else { SETTLED_CAP });
         self.bob();
-        self.drift_x = (self.drift_x + (pos.x - anchor.x) * DRIFT_PUSH) * DRIFT_DECAY;
-        self.drift_z = (self.drift_z + (pos.z - anchor.z) * DRIFT_PUSH) * DRIFT_DECAY;
+        self.drift_x = (self.drift_x + (pos.x - self.home.x) * DRIFT_PUSH) * DRIFT_DECAY;
+        self.drift_z = (self.drift_z + (pos.z - self.home.z) * DRIFT_PUSH) * DRIFT_DECAY;
         self.lean_step();
     }
 
@@ -242,6 +244,10 @@ impl BuoyBarrel {
         self.heave += self.heave_vel;
     }
 
+
+    pub fn sink_depth(&self) -> f32 {
+        -(BUOY_R[self.kind] * HEIGHT[self.kind] * SCALE[self.kind])
+    }
 
     pub fn sunk(&self, depth: f32) -> bool {
         self.heave <= self.sink_depth() - depth
@@ -354,7 +360,7 @@ pub fn is_buoy_barrel(name: &str) -> bool {
 
 pub fn control(
     mut switches: ResMut<super::flags::Switches>,
-    mut barrels: Query<(&mut Actor, &mut BuoyBarrel)>,
+    mut barrels: Query<(&mut Actor, &mut BuoyBarrel), Without<Ship>>,
     ships: Query<(&Actor, &Ship)>,
     players: Query<&Player>,
 ) {
@@ -395,10 +401,9 @@ pub fn control(
             _ => {}
         }
         barrel.trigger = TRIGGER_NONE;
-        let anchor = actor.pos;
         match barrel.mode {
             Mode::Afloat => {
-                barrel.float_step(anchor, actor.pos);
+                barrel.float_step(actor.pos);
                 actor.pos.x += barrel.drift_x;
                 actor.pos.z += barrel.drift_z;
             }
@@ -432,6 +437,8 @@ fn dispatch(actor: &Actor, barrel: &mut BuoyBarrel, ship: Option<(&Actor, &Ship)
         return;
     };
     let gap = hull.pos - actor.pos;
+    let touching = gap.x * gap.x + gap.z * gap.z < barrel.hull().1 * barrel.hull().1;
+    let velocity = ship.velocity(hull.angle[1]);
     if barrel.kind == KIND_MINE
         && barrel.mode != Mode::Explode
         && !barrel.mode.demo()
@@ -447,13 +454,16 @@ fn dispatch(actor: &Actor, barrel: &mut BuoyBarrel, ship: Option<(&Actor, &Ship)
         && barrel.within(barrel.damage_reach(), gap)
         && ship.riding
         && hull.pos.y < actor.pos.y + barrel.strike_lift()
-        && barrel.head_on(gap, ship_heading(gap, ship.speed))
+        && barrel.head_on(gap, velocity)
     {
         barrel.enter(Mode::DemoExplode0);
         return;
     }
+    if !touching {
+        return;
+    }
     if barrel.kind == 0 {
-        if ship.speed > barrel.ship_speed() && barrel.head_on(gap, ship_heading(gap, ship.speed)) {
+        if ship.speed > barrel.ship_speed() && barrel.head_on(gap, velocity) {
             barrel.crashed();
         } else if barrel.cooldown == 0 {
             barrel.clip_barge();
@@ -461,11 +471,4 @@ fn dispatch(actor: &Actor, barrel: &mut BuoyBarrel, ship: Option<(&Actor, &Ship)
     } else {
         barrel.touched();
     }
-}
-
-fn ship_heading(gap: Vec3, speed: f32) -> Vec3 {
-    if gap.x == 0.0 && gap.z == 0.0 {
-        return Vec3::Z * speed;
-    }
-    gap.normalize() * speed
 }

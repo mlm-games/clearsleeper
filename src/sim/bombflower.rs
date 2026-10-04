@@ -3,6 +3,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::bomb::Bomb;
 use super::collision::Collision;
 use super::combat::HitPoints;
 use super::damage;
@@ -189,16 +190,21 @@ pub fn flower_control(
 pub fn crawler_control(
     collision: Option<Res<Collision>>,
     mut zones: ResMut<ZoneActors>,
-    mut crawlers: Query<(Entity, &mut Actor, &mut Crawler)>,
+    mut crawlers: Query<(Entity, &mut Actor, &mut Crawler), Without<Bombflower>>,
     players: Query<&Player>,
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
         (Without<Bombflower>, Without<Crawler>),
     >,
     mut events: ResMut<super::events::SimEvents>,
-    mut fences: Query<&mut super::barricade::Barricade>,
-    mut blocks: Query<&mut super::ice::Ice>,
-    mut floats: Query<&mut super::buoybarrel::BuoyBarrel>,
+    mut fences: Query<
+        (&Actor, &mut super::barricade::Barricade),
+        (Without<Crawler>, Without<Bomb>),
+    >,
+    mut floats: Query<
+        (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
+        (Without<Crawler>, Without<Bomb>),
+    >,
     mut switches: ResMut<super::flags::Switches>,
     mut commands: Commands,
 ) {
@@ -252,7 +258,6 @@ pub fn crawler_control(
             &mut zones,
             &mut events,
             &mut fences,
-            &mut blocks,
             &mut floats,
             &mut switches,
             &mut commands,
@@ -265,23 +270,21 @@ pub fn blast(
     origin: Vec3,
     foes: &mut Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
-        (Without<Bombflower>, Without<Crawler>),
+        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
     >,
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
     events: &mut super::events::SimEvents,
-    mut fences: Query<&mut super::barricade::Barricade>,
-    mut blocks: Query<&mut super::ice::Ice>,
-    mut floats: Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel)>,
-    mut switches: ResMut<super::flags::Switches>,
+    fences: &mut Query<(&Actor, &mut super::barricade::Barricade)>,
+    floats: &mut Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel)>,
+    switches: &mut ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {
     let heat = super::barricade::AT_BOMB;
-    for mut fence in &mut fences {
-        super::barricade::strike(&mut fence, heat, 0, &mut switches);
-    }
-    for mut block in &mut blocks {
-        block.strike(heat);
+    for (actor, mut fence) in fences.iter_mut() {
+        if within(origin, actor.pos, BLAST_RADIUS) {
+            super::barricade::strike(&mut fence, heat, 0, switches);
+        }
     }
     for (entity, actor, mut float) in floats.iter_mut() {
         if float.has_buoy() && within(origin, actor.pos, BLAST_RADIUS) {

@@ -68,6 +68,7 @@ pub struct Barricade {
     pub halves: [u8; HALVES],
     pub counters: [i16; HALVES],
     pub alpha_out: i16,
+    pub lit: bool,
     pub hold: i16,
     pub switches: [u8; HALVES],
 }
@@ -95,6 +96,7 @@ impl Barricade {
             ],
             counters: [IDLE_FRAMES; HALVES],
             alpha_out: ALPHA_OUT,
+            lit: false,
             hold: 0,
             switches: [bottom, top],
         }
@@ -135,9 +137,10 @@ impl Barricade {
     }
 
     pub fn scorch(&mut self, switches: &mut Switches) {
-        if self.hold != 0 {
+        if self.lit {
             return;
         }
+        self.lit = true;
         for half in 0..HALVES {
             if self.halves[half] == WHOLE {
                 self.halves[half] = BURNING;

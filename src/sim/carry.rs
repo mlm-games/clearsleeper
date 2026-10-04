@@ -11,6 +11,9 @@ pub const CARRY_HEIGHT: f32 = 70.0;
 pub const CARRY_TURN_RATE: f32 = 0.4;
 pub const RELEASE_SPEED: f32 = 12.0;
 pub const CARRY_TRAIL: f32 = 47.0;
+const TURN_SCALE: i16 = 4;
+const TURN_MAX_STEP: i16 = 3000;
+const TURN_MIN_STEP: i16 = 10;
 pub const MAX_STACK: usize = 3;
 pub const STACK_SPACING: f32 = 40.0;
 
@@ -55,20 +58,19 @@ fn reach(a: Vec3, b: Vec3) -> f32 {
 }
 
 fn angle_of(yaw: f32) -> i16 {
-    (yaw / core::f32::consts::TAU * i16::MAX as f32) as i16
+    super::walk::to_s16(yaw)
 }
 
 fn turn_toward(from: i16, to: i16) -> i16 {
-    let diff = to.wrapping_sub(from);
-    from.wrapping_add(diff / 8)
+    super::walk::add_calc_angle_s(from, to, TURN_SCALE, TURN_MAX_STEP, TURN_MIN_STEP)
 }
 
 pub fn control(
     do_intent: Res<DoIntent>,
     intent: Res<MoveIntent>,
     mut carry: ResMut<Carry>,
-    carryables: Query<(Entity, &Actor, &Carryable)>,
-    mut moves: Query<&mut Actor>,
+    carryables: Query<(Entity, &Actor, &Carryable), Without<Player>>,
+    mut moves: Query<&mut Actor, Without<Player>>,
     mut pots: Query<&mut super::tsubo::Tsubo>,
     mut rocks: Query<&mut super::koisi::Koisi>,
     mut casks: Query<&mut super::barrel::Barrel>,
@@ -82,15 +84,14 @@ pub fn control(
     };
     let yaw = player.yaw + axis_yaw(intent.axis);
     let forward = Vec3::new(yaw.sin(), 0.0, yaw.cos());
-    if let Some(held) = carry.held {
-        let Some(mut cask) = casks.get_mut(held) else {
-            carry.held = None;
-            return;
-        };
-        cask.carry_step(true);
-    }
     match carry.held {
         Some(held) => {
+            let releasing = pressed;
+            if !releasing
+                && let Ok(mut cask) = casks.get_mut(held)
+            {
+                cask.carry_step(true);
+            }
             let chain = chain_from(&carryables, held);
             for (slot, entity) in chain.iter().enumerate() {
                 let Ok(mut actor) = moves.get_mut(*entity) else {
@@ -98,16 +99,13 @@ pub fn control(
                 };
                 let lift = CARRY_HEIGHT - STACK_SPACING * slot as f32;
                 let anchor = Vec3::new(player.pos.x, player.pos.y + lift, player.pos.z);
-                let trail = (actor.pos - player.pos).xz().length() - CARRY_TRAIL;
-                let step = CARRY_TURN_RATE.clamp(trail.max(0.0), 1.0);
+                let trail = ((actor.pos - player.pos).xz().length() - CARRY_TRAIL).max(0.0);
+                let step = (CARRY_TURN_RATE + trail.min(1.0)).min(1.0);
                 actor.pos = actor.pos.lerp(anchor, step);
                 actor.angle[1] = turn_toward(actor.angle[1], angle_of(yaw));
             }
-            if pressed {
+            if releasing {
                 carry.held = None;
-                if let Some(mut cask) = casks.get_mut(held) {
-                    cask.carry_step(false);
-                }
                 for entity in chain {
                     if let Ok(mut actor) = moves.get_mut(entity) {
                         actor.pos += forward * RELEASE_SPEED;
@@ -118,7 +116,7 @@ pub fn control(
                             rock.toss(forward, player.speed);
                         }
                         if let Ok(mut cask) = casks.get_mut(entity) {
-                            cask.dropped();
+                            cask.carry_step(false);
                         }
                     }
                 }
@@ -138,9 +136,14 @@ pub fn control(
                 if reach(pos, player.pos) > GRAB_RANGE * GRAB_RANGE {
                     return;
                 }
-                if let Ok(mut cask) = casks.get_mut(entity)
-                    && cask.liftable(true)
-                {
+                let liftable = match casks.get_mut(entity) {
+                    Ok(mut cask) => cask.liftable(true),
+                    Err(_) => true,
+                };
+                if !liftable {
+                    return;
+                }
+                if let Ok(mut cask) = casks.get_mut(entity) {
                     cask.pick_up(angle_of(yaw));
                 }
                 carry.held = Some(entity);

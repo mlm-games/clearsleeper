@@ -11,50 +11,27 @@ pub const TYPE_TOWER: u8 = 0;
 pub const TYPE_PINWHEEL: u8 = 1;
 
 pub const HEAP: [u32; 2] = [0x3A40, 0xA00];
-pub const CULL_MIN: [[f32; 3]; 2] = [[-1400.0, 0.0, -1400.0], [-500.0, -500.0, -50.0]];
-pub const CULL_MAX: [[f32; 3]; 2] = [[1400.0, 500.0, 1400.0], [500.0, 500.0, 150.0]];
-pub const CULL_FAR: f32 = 3.0;
+pub const EXTENT_MIN: [[f32; 3]; 2] = [[-1400.0, 0.0, -1400.0], [-500.0, -500.0, -50.0]];
+pub const EXTENT_MAX: [[f32; 3]; 2] = [[1400.0, 500.0, 1400.0], [500.0, 500.0, 150.0]];
+pub const EXTENT_FAR: f32 = 3.0;
 
-pub const HUB: Vec3 = Vec3::new(0.0, 0.0, 70.0);
-pub const BLADE: [Vec3; 4] = [
-    Vec3::new(450.0, 0.0, 70.0),
-    Vec3::new(-450.0, 0.0, 70.0),
-    Vec3::new(0.0, 450.0, 70.0),
-    Vec3::new(0.0, -450.0, 70.0),
-];
-pub const GATE_IN: [Vec3; 4] = [
-    Vec3::new(-1400.0, 290.0, 130.0),
-    Vec3::new(-1400.0, 290.0, -130.0),
-    Vec3::new(130.0, 290.0, -1400.0),
-    Vec3::new(-130.0, 290.0, -1400.0),
-];
-pub const GATE_OUT: [Vec3; 4] = [
-    Vec3::new(1400.0, 290.0, 130.0),
-    Vec3::new(1400.0, 290.0, -130.0),
-    Vec3::new(130.0, 290.0, 1400.0),
-    Vec3::new(-130.0, 290.0, 1400.0),
-];
-pub const SPOKE: [Vec3; 9] = [
-    Vec3::new(150.0, 0.0, 70.0),
-    Vec3::new(-150.0, 0.0, 70.0),
-    Vec3::new(0.0, 150.0, 70.0),
-    Vec3::new(0.0, -150.0, 70.0),
-    Vec3::new(0.0, 0.0, 70.0),
-    Vec3::new(350.0, 0.0, 70.0),
-    Vec3::new(-350.0, 0.0, 70.0),
-    Vec3::new(0.0, 350.0, 70.0),
-    Vec3::new(0.0, -350.0, 70.0),
-];
-
-pub const SPOKE_RADII: [f32; 9] = [60.0, 60.0, 60.0, 60.0, 90.0, 90.0, 90.0, 90.0, 90.0];
-pub const SPOKE_AT: u32 = 1 << 13;
-pub const CAPSULE_RADIUS: f32 = 200.0;
-pub const CAPSULE_HIT_RADIUS: f32 = 70.0;
-pub const CAPSULE_AT: u32 = 1 << 11;
-pub const CAPSULE_SPLASH: u32 = 1;
-pub const CAPSULE_SPLASH_RADIUS: f32 = 170.0;
 pub const POST_RADIUS: f32 = 250.0;
 pub const POST_HEIGHT: f32 = 400.0;
+
+pub const BLADE_TIP: f32 = 450.0;
+pub const BLADE_AXIS: f32 = 70.0;
+pub const BLADE_RADIUS: f32 = 70.0;
+pub const GATE_SPAN: f32 = 1400.0;
+pub const GATE_LIFT: f32 = 290.0;
+pub const GATE_SIDE: f32 = 130.0;
+pub const GATE_RADIUS: f32 = 200.0;
+pub const GATE_SWEEP: f32 = 170.0;
+pub const SPOKE_TIP: f32 = 350.0;
+pub const SPOKE_NEAR: f32 = 150.0;
+pub const SPOKE_RADIUS: f32 = 90.0;
+pub const SPOKE_AT: u32 = 1 << 13;
+pub const GATE_AT: u32 = 1 << 11;
+pub const GATE_SPLASH: u32 = 1;
 
 pub const SWING_TOP: i16 = 2500;
 pub const SWING_SCALE: i16 = 0xF;
@@ -78,7 +55,6 @@ pub struct Windmill {
     pub angle: i16,
     pub rate: i16,
     pub previous: i16,
-    pub gusting: bool,
 }
 
 impl Windmill {
@@ -88,11 +64,10 @@ impl Windmill {
             angle: 0,
             rate: 0,
             previous: 0,
-            gusting: false,
         }
     }
 
-    pub fn barred(&self) -> bool {
+    pub fn tower(&self) -> bool {
         self.kind == TYPE_TOWER
     }
 
@@ -100,7 +75,7 @@ impl Windmill {
         self.rate > ARMED
     }
 
-    pub fn stopped(&self) -> bool {
+    pub fn idling(&self) -> bool {
         self.rate <= ARMED
     }
 
@@ -114,18 +89,85 @@ impl Windmill {
             SWING_MAX_STEP,
             SWING_MIN_STEP,
         );
+        self.previous <= self.rate && self.rate != 0
+    }
+
+    pub fn spin(&mut self) -> i16 {
         self.angle = self.angle.wrapping_add(self.rate);
-        self.gusting = self.previous <= self.rate && self.rate != 0;
-        self.gusting
+        self.angle
     }
 
-    pub fn spin(&self) -> i16 {
-        self.angle.wrapping_add(self.rate)
+    pub fn extent(&self) -> ([f32; 3], [f32; 3]) {
+        let index = usize::from(self.kind) % EXTENT_MIN.len();
+        (EXTENT_MIN[index], EXTENT_MAX[index])
     }
 
-    pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
-        let index = usize::from(self.kind) % CULL_MIN.len();
-        (CULL_MIN[index], CULL_MAX[index])
+    pub fn hub(&self) -> Vec3 {
+        self.place(Vec3::new(0.0, 0.0, BLADE_AXIS))
+    }
+
+    pub fn blades(&self) -> [Vec3; 4] {
+        let span = BLADE_TIP;
+        let hub = Vec3::new(0.0, 0.0, BLADE_AXIS);
+        [
+            Vec3::new(span, 0.0, BLADE_AXIS),
+            Vec3::new(-span, 0.0, BLADE_AXIS),
+            Vec3::new(0.0, span, BLADE_AXIS),
+            Vec3::new(0.0, -span, BLADE_AXIS),
+        ]
+        .map(|tip| self.place(tip - hub))
+    }
+
+    pub fn gates(&self) -> ([Vec3; 4], [Vec3; 4]) {
+        let inner = [
+            Vec3::new(-GATE_SPAN, GATE_LIFT, GATE_SIDE),
+            Vec3::new(-GATE_SPAN, GATE_LIFT, -GATE_SIDE),
+            Vec3::new(GATE_SIDE, GATE_LIFT, -GATE_SPAN),
+            Vec3::new(-GATE_SIDE, GATE_LIFT, -GATE_SPAN),
+        ];
+        let outer = [
+            Vec3::new(GATE_SPAN, GATE_LIFT, GATE_SIDE),
+            Vec3::new(GATE_SPAN, GATE_LIFT, -GATE_SIDE),
+            Vec3::new(GATE_SIDE, GATE_LIFT, GATE_SPAN),
+            Vec3::new(-GATE_SIDE, GATE_LIFT, GATE_SPAN),
+        ];
+        (
+            inner.map(|gate| self.place(gate)),
+            outer.map(|gate| self.place(gate)),
+        )
+    }
+
+    pub fn spokes(&self) -> [Vec3; 9] {
+        [
+            Vec3::new(SPOKE_NEAR, 0.0, BLADE_AXIS),
+            Vec3::new(-SPOKE_NEAR, 0.0, BLADE_AXIS),
+            Vec3::new(0.0, SPOKE_NEAR, BLADE_AXIS),
+            Vec3::new(0.0, -SPOKE_NEAR, BLADE_AXIS),
+            Vec3::new(0.0, 0.0, BLADE_AXIS),
+            Vec3::new(SPOKE_TIP, 0.0, BLADE_AXIS),
+            Vec3::new(-SPOKE_TIP, 0.0, BLADE_AXIS),
+            Vec3::new(0.0, SPOKE_TIP, BLADE_AXIS),
+            Vec3::new(0.0, -SPOKE_TIP, BLADE_AXIS),
+        ]
+        .map(|spoke| self.place(spoke))
+    }
+
+    pub fn place(&self, local: Vec3) -> Vec3 {
+        let spin = walk::from_s16(self.angle.wrapping_add(self.rate));
+        let (sin_spin, cos_spin) = spin.sin_cos();
+        if self.tower() {
+            Vec3::new(
+                local.x * cos_spin + local.y * sin_spin,
+                -local.x * sin_spin + local.y * cos_spin,
+                local.z,
+            )
+        } else {
+            Vec3::new(
+                local.x,
+                local.y * cos_spin + local.z * sin_spin,
+                -local.y * sin_spin + local.z * cos_spin,
+            )
+        }
     }
 
     pub fn hull(&self) -> (f32, f32) {

@@ -166,6 +166,10 @@ impl Torch {
         }
     }
 
+    pub fn top(&self) -> f32 {
+        if self.solid() { TOP_HEIGHT } else { 0.0 }
+    }
+
     pub fn tick_burn(&mut self) {
         if self.burn > 0 && self.burn < BURN_CEILING {
             self.burn -= 1;
@@ -257,14 +261,14 @@ pub fn control(
                 if torch.pending != 0 {
                     torch.light = add_calc_zero(torch.light, IGNITE_SCALE, IGNITE_MAX_STEP);
                     torch.light_it(&mut switches);
+                } else {
+                    torch.state = State::Wake;
                 }
             }
             State::Wake => {
-                torch.light = add_calc_zero(torch.light, IGNITE_SCALE, IGNITE_MAX_STEP);
-                if torch.pending == 0 {
-                    torch.state = State::Burn;
-                    torch.peak = 1.0;
-                }
+                torch.state = State::Burn;
+                let peak = torch.peak;
+                torch.light = add_calc_two(torch.light, peak, BURN_SCALE, BURN_MAX_STEP);
             }
             State::Burn => {
                 let peak = torch.peak;
@@ -279,7 +283,8 @@ pub fn control(
             }
             State::Gone => {}
         }
-        let probe = Vec3::new(actor.pos.x, actor.pos.y + GROUND_PROBE, actor.pos.z);
-        torch.flood(ground::surface(solid, probe), actor.pos.y);
+        let top = actor.pos.y + torch.top();
+        let probe = Vec3::new(actor.pos.x, top + GROUND_PROBE, actor.pos.z);
+        torch.flood(ground::surface(solid, probe), top);
     }
 }
