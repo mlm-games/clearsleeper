@@ -180,6 +180,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if door::Door::is_sliding(&source.name) {
         let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Slide);
         world.spawn((actor, gate)).id()
+    } else if door::Door::is_key_door(&source.name) {
+        let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Key);
+        world.spawn((actor, gate)).id()
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters);
         world.spawn((actor, cell)).id()

@@ -25,6 +25,20 @@ pub const SLIDING_ACTORS: [&str; 8] = [
     "ZenS12",
 ];
 
+pub const KEY_DOOR_ACTORS: [&str; 5] = ["doorKD", "ZenshKD", "K_ZshKD", "doorSH", "doorSZ"];
+
+pub const ROCK_BARS: usize = 3;
+pub const ROCK_CALC: usize = 3;
+pub const ROCK_SEED: f32 = 5.0;
+pub const ROCK_RISE_STEP: f32 = 0.25;
+pub const ROCK_RISE_MIN: f32 = 0.3;
+pub const ROCK_DUST_STEP: f32 = 0.5;
+pub const ROCK_DUST_MIN: f32 = 0.3;
+pub const ROCK_FALL_STEP: f32 = 0.3;
+pub const ROCK_FALL_MIN: f32 = 0.3;
+pub const ROCK_PEAK: f32 = 0.9;
+pub const ROCK_FLOOR: f32 = 0.1;
+
 pub const JAIL_ACTOR: &str = "ATdoor";
 pub const NO_SWITCH: u8 = 0xFF;
 pub const BOSS_SWITCH_FLOOR: u8 = 0x80;
@@ -52,7 +66,10 @@ pub const KEY_HEIGHT: f32 = 150.0;
 pub const BOSS_KEY_HEIGHT: f32 = 230.0;
 pub const SHUTTER_CLEAR_TYPES: [u8; 3] = [0, 2, 3];
 pub const SLIDE_CLEAR_TYPES: [u8; 2] = [0, 2];
+pub const KEY_DOOR_CLEAR_TYPES: [u8; 2] = [0, 1];
 pub const SHUTTER_KEY_TYPES: [u8; 2] = [4, 5];
+pub const GENOCIDE_TYPES: [u8; 2] = [2, 4];
+pub const FEELER_TYPES: [u8; 2] = [3, 4];
 
 const ROOM_MASK: u32 = 0x3F;
 const ROOM_SHIFT: u32 = 6;
@@ -69,6 +86,7 @@ pub struct StayRoom(pub i8);
 pub enum Kind {
     Shutter,
     Slide,
+    Key,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +122,9 @@ pub struct Door {
     pub open_flag: bool,
     pub close_flag: bool,
     pub delay: u8,
+    pub rock_delay: [u8; ROCK_BARS],
+    pub rock: [f32; ROCK_BARS],
+    pub dust: [f32; ROCK_BARS],
 }
 
 impl Door {
@@ -132,6 +153,9 @@ impl Door {
             open_flag: false,
             close_flag: false,
             delay: DELAY_FRAMES,
+            rock_delay: [0; ROCK_BARS],
+            rock: [1.0; ROCK_BARS],
+            dust: [1.0; ROCK_BARS],
         }
     }
 
@@ -147,13 +171,18 @@ impl Door {
         SLIDING_ACTORS.contains(&name)
     }
 
+    pub fn is_key_door(name: &str) -> bool {
+        KEY_DOOR_ACTORS.contains(&name)
+    }
+
     pub fn key_kind(&self) -> u8 {
         match self.kind {
             Kind::Shutter if SHUTTER_KEY_TYPES.contains(&self.kind_bits) => KEY_NORMAL,
             Kind::Shutter if self.kind_bits == 1 => KEY_BOSS,
             Kind::Slide if self.kind_bits == 1 => KEY_NORMAL,
             Kind::Slide if self.kind_bits == 3 => KEY_BOSS,
-            Kind::Shutter | Kind::Slide => KEY_NONE,
+            Kind::Key if self.kind_bits == 2 => KEY_NORMAL,
+            Kind::Shutter | Kind::Slide | Kind::Key => KEY_NONE,
         }
     }
 
@@ -161,6 +190,7 @@ impl Door {
         match self.kind {
             Kind::Shutter => &SHUTTER_CLEAR_TYPES,
             Kind::Slide => &SLIDE_CLEAR_TYPES,
+            Kind::Key => &KEY_DOOR_CLEAR_TYPES,
         }
     }
 
@@ -168,6 +198,7 @@ impl Door {
         match self.kind {
             Kind::Shutter => 1,
             Kind::Slide => 3,
+            Kind::Key => 0xFF,
         }
     }
 
@@ -251,11 +282,32 @@ impl Door {
     }
 
     pub fn latching(&self) -> bool {
+        if self.kind == Kind::Key {
+            return self.genocide();
+        }
         self.front_check == 0 && self.kind_bits == 2 || self.front_check == 1 && self.kind_bits == 5
     }
 
+    pub fn genocide(&self) -> bool {
+        if self.kind != Kind::Key {
+            return false;
+        }
+        if self.front_check == 0 {
+            self.kind_bits == 1
+        } else {
+            GENOCIDE_TYPES.contains(&self.kind_bits)
+        }
+    }
+
+    pub fn feeler(&self) -> bool {
+        self.kind == Kind::Key && self.front_check == 0 && FEELER_TYPES.contains(&self.kind_bits)
+    }
+
     pub fn should_close(&self, switches: &Switches) -> bool {
-        if !self.makes_stop() || self.kind_bits == self.bare_type() {
+        if !self.makes_stop() || self.genocide() || self.feeler() {
+            return false;
+        }
+        if self.kind_bits == self.bare_type() {
             return false;
         }
         if self.front_check == 0 && self.kind_bits == 2 {
@@ -269,7 +321,7 @@ impl Door {
         self.bit() != NO_SWITCH && switches.test(self.bit())
     }
 
-    pub fn reopen_delay(&mut self) -> u8 {
+    pub fn reopen_delay(&self) -> u8 {
         if self.instant() {
             0
         } else {
@@ -343,6 +395,10 @@ pub fn control(
 }
 
 fn advance(door: &mut Door) {
+    if door.kind == Kind::Key {
+        rocks(door);
+        return;
+    }
     match door.bars {
         BAR_OPENED => {
             chase(&mut door.bars_speed, BAR_OPEN_SPEED, BAR_OPEN_ACCEL);
@@ -370,6 +426,41 @@ fn advance(door: &mut Door) {
         }
         Action::Init | Action::Wait | Action::StopClose => {}
     }
+}
+
+fn rocks(door: &mut Door) {
+    let opening = door.bars == BAR_OPENED;
+    for bar in 0..ROCK_BARS {
+        if door.rock_delay[bar] > 0 {
+            door.rock_delay[bar] -= 1;
+            continue;
+        }
+        if opening {
+            add_zero(&mut door.rock[bar], ROCK_RISE_STEP, ROCK_RISE_MIN);
+            add_zero(&mut door.dust[bar], ROCK_DUST_STEP, ROCK_DUST_MIN);
+        } else {
+            add_target(&mut door.dust[bar], 1.0, ROCK_DUST_STEP, ROCK_DUST_MIN);
+            add_target(&mut door.rock[bar], 1.0, ROCK_FALL_STEP, ROCK_FALL_MIN);
+        }
+    }
+}
+
+fn add_zero(current: &mut f32, max_step: f32, min_step: f32) {
+    let gap = current.abs();
+    if gap <= min_step {
+        *current = 0.0;
+        return;
+    }
+    *current -= current.signum() * max_step.min(gap);
+}
+
+fn add_target(current: &mut f32, target: f32, max_step: f32, min_step: f32) {
+    let gap = target - *current;
+    if gap.abs() <= min_step {
+        *current = target;
+        return;
+    }
+    *current += gap.signum() * max_step.min(gap.abs());
 }
 
 fn chase(current: &mut f32, target: f32, step: f32) -> bool {
