@@ -538,6 +538,135 @@ fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
     None
 }
 
+const MSG_ARCHIVE: &str = "files/res/Msg/bmgres.arc";
+const MSG_ARCHIVE_HYRULE: &str = "files/res/Msg/bmgresh.arc";
+const MSG_LINE_MAX: u16 = 4;
+
+pub fn load_msg_table() -> Option<crate::sim::msg::MsgTable> {
+    match msg_table_from_assets() {
+        Ok(table) => Some(table),
+        Err(error) => {
+            log::warn!("clearsleeper: message text unavailable ({error})");
+            None
+        }
+    }
+}
+
+fn msg_table_from_assets() -> Result<crate::sim::msg::MsgTable, AssetError> {
+    let root = AssetRoot::from_env()?;
+    let mut table = crate::sim::msg::MsgTable::default();
+    let archive = root.read_archive(MSG_ARCHIVE)?;
+    let data = archive.read("zel_00.bmg")?;
+    if msg_table_from_bmg(data, &mut table).is_none() {
+        return Err(AssetError::Corrupt {
+            path: root.root().join(MSG_ARCHIVE),
+            detail: "message archive header is malformed",
+        });
+    }
+    match root.read_archive(MSG_ARCHIVE_HYRULE) {
+        Ok(hyrule) => match hyrule.read("zel_01.bmg") {
+            Ok(data) => {
+                if msg_table_from_bmg(data, &mut table).is_none() {
+                    log::warn!("clearsleeper: hyrule message archive header is malformed");
+                }
+            }
+            Err(error) => log::warn!("clearsleeper: hyrule message entry unavailable ({error})"),
+        },
+        Err(error) => log::warn!("clearsleeper: hyrule message archive unavailable ({error})"),
+    }
+    Ok(table)
+}
+
+pub fn msg_table_from_bmg(data: &[u8], table: &mut crate::sim::msg::MsgTable) -> Option<()> {
+    if data.len() < 0x20 || data[0..4] != *b"MESG" || data[4..8] != *b"bmg1" {
+        return None;
+    }
+    let blocks = read_u32(data, 0x0C)? as usize;
+    let mut at = 0x20;
+    let mut info = None;
+    let mut text_block = None;
+    for _ in 0..blocks {
+        let size = read_u32(data, at + 4)? as usize;
+        if size < 8 || data.len() < at.saturating_add(size) {
+            return None;
+        }
+        let tag = [data[at], data[at + 1], data[at + 2], data[at + 3]];
+        if tag == *b"INF1" {
+            info = Some((at, size));
+        } else if tag == *b"DAT1" {
+            text_block = Some((at, size));
+        }
+        at += size;
+    }
+    let (info, info_size) = info?;
+    let (text_at, text_size) = text_block?;
+    let count = usize::from(read_u16(data, info + 8)?);
+    if read_u16(data, info + 0x0A)? != 0x18 || 0x10 + count * 0x18 > info_size {
+        return None;
+    }
+    let text = data.get(text_at + 8..text_at + text_size)?;
+    let mut found = Vec::with_capacity(count);
+    for index in 0..count {
+        let entry = info + 0x10 + index * 0x18;
+        let Some(offset) = read_u32(data, entry) else {
+            return None;
+        };
+        let Some(msg_no) = read_u16(data, entry + 4) else {
+            return None;
+        };
+        let (Some(textbox_type), Some(draw_type)) = (
+            data.get(entry + 0x0C).copied(),
+            data.get(entry + 0x0D).copied(),
+        ) else {
+            return None;
+        };
+        let offset = offset as usize;
+        if offset == 0 || offset >= text.len() {
+            continue;
+        }
+        let Some(bytes) = bmg_text(text, offset) else {
+            continue;
+        };
+        found.push((
+            u32::from(msg_no),
+            crate::sim::msg::MsgEntry {
+                text: bytes.to_vec(),
+                draw_type,
+                textbox_type,
+                lines: MSG_LINE_MAX,
+            },
+        ));
+    }
+    for (msg_no, entry) in found {
+        table.insert(msg_no, entry);
+    }
+    Some(())
+}
+
+fn bmg_text(data: &[u8], start: usize) -> Option<&[u8]> {
+    let mut at = start;
+    while at < data.len() {
+        let byte = data[at];
+        if byte == 0 {
+            return Some(&data[start..=at]);
+        }
+        if byte == 0x1A {
+            let size = usize::from(*data.get(at + 1)?);
+            if size == 0 {
+                return None;
+            }
+            at = at.saturating_add(size);
+            continue;
+        }
+        if byte >> 4 == 8 || byte >> 4 == 9 {
+            at += 2;
+            continue;
+        }
+        at += 1;
+    }
+    None
+}
+
 fn event_list_from_assets(stage: &str) -> Result<crate::sim::event::EventList, AssetError> {
     let root = AssetRoot::from_env()?;
     let map = root.read_archive(&stage_map(stage))?;
@@ -861,6 +990,11 @@ pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<(glam::Vec3,
         return Ok((spawn, f32::from(angle_y) * RAD_PER_UNIT));
     }
     Err(corrupt("dzr spawn point missing"))
+}
+
+fn read_u16(data: &[u8], at: usize) -> Option<u16> {
+    let bytes = data.get(at..at + 2)?;
+    Some(u16::from_be_bytes([bytes[0], bytes[1]]))
 }
 
 fn read_u32(data: &[u8], at: usize) -> Option<u32> {

@@ -2,9 +2,11 @@ use std::io::Write as _;
 use std::time::Duration;
 
 use clearsleeper::assets::{
-    Archive, AssetError, AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, stage_spawn, yaz0_decode,
+    Archive, AssetError, AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, msg_table_from_bmg, stage_spawn,
+    yaz0_decode,
 };
 use clearsleeper::btk::TexSrt;
+use clearsleeper::sim::msg::MsgTable;
 use glam::Vec3;
 
 #[test]
@@ -50,6 +52,59 @@ fn yaz0_and_rarc_reject_unexpected_magic() {
         }
         other => panic!("unexpected error: {other}"),
     }
+}
+
+#[test]
+fn golden_bmg_message_table_parses_entries_and_control_tags() {
+    let mut text = Vec::new();
+    text.extend_from_slice(b"\x1a\x05\x00\x00\x01You got a ");
+    text.extend_from_slice(b"\x1a\x06\xff\x00\x00\x07Rupee\x1a\x06\xff\x00\x00\x00!");
+    text.push(0);
+
+    let mut bmg = vec![0_u8; 0x20];
+    bmg[0..4].copy_from_slice(b"MESG");
+    bmg[4..8].copy_from_slice(b"bmg1");
+    bmg[0x0C..0x10].copy_from_slice(&3_u32.to_be_bytes());
+
+    let mut info = vec![0_u8; 0x40];
+    info[0..4].copy_from_slice(b"INF1");
+    info[4..8].copy_from_slice(&0x40_u32.to_be_bytes());
+    info[8..10].copy_from_slice(&2_u16.to_be_bytes());
+    info[10..12].copy_from_slice(&0x18_u16.to_be_bytes());
+    info[0x10..0x14].copy_from_slice(&1_u32.to_be_bytes());
+    info[0x14..0x16].copy_from_slice(&116_u16.to_be_bytes());
+    info[0x1C] = 9;
+    info[0x1D] = 2;
+    info[0x2C..0x2E].copy_from_slice(&999_u16.to_be_bytes());
+
+    let mut data_block = vec![0_u8];
+    data_block.extend_from_slice(&text);
+    let mut dat = vec![0_u8; 8];
+    dat[0..4].copy_from_slice(b"DAT1");
+    dat[4..8].copy_from_slice(&(8_u32 + data_block.len() as u32).to_be_bytes());
+    dat.extend_from_slice(&data_block);
+
+    let mut pad = vec![0_u8; 8];
+    pad[0..4].copy_from_slice(b"PAD1");
+    pad[4..8].copy_from_slice(&8_u32.to_be_bytes());
+
+    bmg.extend_from_slice(&info);
+    bmg.extend_from_slice(&dat);
+    bmg.extend_from_slice(&pad);
+
+    let mut table = MsgTable::default();
+    assert!(msg_table_from_bmg(&bmg, &mut table).is_some());
+    let entry = table.get(116).expect("the entry parses");
+    assert_eq!(entry.text, text);
+    assert_eq!(entry.draw_type, 2);
+    assert_eq!(entry.textbox_type, 9);
+    assert_eq!(entry.lines, 4);
+    assert!(table.get(999).is_none(), "an empty data offset is skipped");
+
+    let mut junk = vec![0_u8; 0x20];
+    junk[0..4].copy_from_slice(b"MESG");
+    junk[4..8].copy_from_slice(b"not1");
+    assert!(msg_table_from_bmg(&junk, &mut MsgTable::default()).is_none());
 }
 
 #[test]

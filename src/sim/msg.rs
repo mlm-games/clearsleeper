@@ -49,7 +49,7 @@ impl MsgTable {
         self.entries.insert(id, entry);
     }
 
-    fn get(&self, id: u32) -> Option<&MsgEntry> {
+    pub fn get(&self, id: u32) -> Option<&MsgEntry> {
         self.entries.get(&id)
     }
 }
