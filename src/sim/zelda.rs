@@ -17,7 +17,7 @@ const START_Z: f32 = 305.213;
 const START_YAW: i16 = 0x4000;
 const START_ROOM: u8 = 0;
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Zelda {
     pub order: u8,
     pub talkable: bool,

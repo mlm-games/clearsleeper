@@ -330,7 +330,7 @@ impl MsgBox {
             self.data.get(cursor + 5).copied(),
             self.data.get(cursor + 6).copied(),
         ) {
-            (Some(hi), Some(lo)) => i16::from(u16::from_be_bytes([hi, lo])),
+            (Some(hi), Some(lo)) => i16::from_be_bytes([hi, lo]),
             _ => 0,
         };
         self.cursor = (cursor + usize::from(len)).min(self.data.len());

@@ -38,7 +38,7 @@ pub const RISE_TICKS: u32 = 50;
 pub const CHARGE_TICKS: u32 = 30;
 pub const NOTALK_RANGE: f32 = 1000.0;
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Tingle {
     pub action: u8,
     pub mode: u8,

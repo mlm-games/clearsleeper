@@ -169,7 +169,8 @@ impl Shop {
         match self {
             Shop::General(4) => GENERAL_FOUR,
             Shop::General(5) => GENERAL_FIVE,
-            Shop::General(_) => GENERAL_THREE,
+            Shop::General(3) => GENERAL_THREE,
+            Shop::General(_) => [FEED_BAG, BAIT, PEAR],
             Shop::Bazaar => BAZAAR_STOCK,
         }
     }

@@ -41,13 +41,13 @@ pub mod swim;
 pub mod tag;
 pub mod talk;
 pub mod tingle;
-pub mod tsubo;
-pub mod wall;
 pub mod transition;
+pub mod tsubo;
 pub mod walk;
+pub mod wall;
 pub mod warship;
-pub mod zelda;
 pub mod water;
+pub mod zelda;
 
 use bevy_ecs::prelude::*;
 use glam::Vec3;
@@ -262,30 +262,36 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
-                death::freeze.in_set(WwSimSet::Execute),
-                carry::control.in_set(WwSimSet::Execute),
-                tsubo::control.in_set(WwSimSet::Execute),
-                bomb::control.in_set(WwSimSet::Execute),
-                tingle::control.in_set(WwSimSet::Execute),
-                select::control.in_set(WwSimSet::Execute),
-                talk::control.in_set(WwSimSet::Execute),
-                flags::control.in_set(WwSimSet::Execute),
-                event::control.in_set(WwSimSet::Execute),
-                msg::control.in_set(WwSimSet::Execute),
-                ending::control.in_set(WwSimSet::Execute),
-                ground::ground_check.in_set(WwSimSet::Execute),
-                water::water_probe.in_set(WwSimSet::Execute),
-                swim::control.in_set(WwSimSet::Execute),
-                lock::control.in_set(WwSimSet::Execute),
-                jump::control.in_set(WwSimSet::Execute),
-                roll::control.in_set(WwSimSet::Execute),
-                hop::control.in_set(WwSimSet::Execute),
-                combat::control.in_set(WwSimSet::Execute),
-                item::control.in_set(WwSimSet::Execute),
-                enemy::control.in_set(WwSimSet::Execute),
-                balloon::control.in_set(WwSimSet::Execute),
-                fire::control.in_set(WwSimSet::Execute),
-                gull::control.in_set(WwSimSet::Execute),
+                (
+                    death::freeze.in_set(WwSimSet::Execute),
+                    carry::control.in_set(WwSimSet::Execute),
+                    tsubo::control.in_set(WwSimSet::Execute),
+                    bomb::control.in_set(WwSimSet::Execute),
+                    tingle::control.in_set(WwSimSet::Execute),
+                    select::control.in_set(WwSimSet::Execute),
+                    talk::control.in_set(WwSimSet::Execute),
+                    flags::control.in_set(WwSimSet::Execute),
+                    event::control.in_set(WwSimSet::Execute),
+                    msg::control.in_set(WwSimSet::Execute),
+                    ending::control.in_set(WwSimSet::Execute),
+                    ground::ground_check.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
+                    water::water_probe.in_set(WwSimSet::Execute),
+                    swim::control.in_set(WwSimSet::Execute),
+                    lock::control.in_set(WwSimSet::Execute),
+                    jump::control.in_set(WwSimSet::Execute),
+                    roll::control.in_set(WwSimSet::Execute),
+                    hop::control.in_set(WwSimSet::Execute),
+                    combat::control.in_set(WwSimSet::Execute),
+                    item::control.in_set(WwSimSet::Execute),
+                    enemy::control.in_set(WwSimSet::Execute),
+                    balloon::control.in_set(WwSimSet::Execute),
+                    fire::control.in_set(WwSimSet::Execute),
+                    gull::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
                 bird::control.in_set(WwSimSet::Execute),
             )
                 .chain(),

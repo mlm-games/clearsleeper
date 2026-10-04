@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec3Swizzles};
 
 use super::actor::Actor;
 use super::intent::{DoIntent, MoveIntent};

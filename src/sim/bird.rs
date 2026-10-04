@@ -65,7 +65,7 @@ fn chase(current: f32, target: f32, step: f32) -> f32 {
 pub fn control(
     intent: Res<MoveIntent>,
     mut health: ResMut<Health>,
-    birds: Query<(Entity, &Actor, &mut Bird)>,
+    mut birds: Query<(Entity, &Actor, &mut Bird)>,
     players: Query<&Player>,
     mut commands: Commands,
 ) {

@@ -26,8 +26,7 @@ pub const PARAM_VERSION: u32 = 1;
 pub const PARAM_MARK: u32 = 0x8000_0000;
 
 const STATE_SHIFT: u32 = 0;
-const NO_GRAVITY_FLAG: u32 = 1 << 16;
-const VERSION_MASK: u32 = 1 << 31;
+
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Life {
@@ -94,7 +93,7 @@ pub fn arm(bombs: &mut Query<&mut Bomb>, entity: Entity) {
 pub fn control(
     collision: Option<Res<Collision>>,
     water: Option<Res<Water>>,
-    mut bombs: Query<(&mut super::actor::Actor, &mut Bomb)>,
+    mut bombs: Query<(Entity, &mut super::actor::Actor, &mut Bomb)>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();

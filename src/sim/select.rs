@@ -1,5 +1,4 @@
 use bevy_ecs::prelude::*;
-use glam::Vec2;
 
 use super::intent::{DoIntent, MoveIntent};
 

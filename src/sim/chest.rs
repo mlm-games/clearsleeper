@@ -97,7 +97,7 @@ pub fn is_chest(name: &str) -> bool {
     CHEST_ACTORS.contains(&name)
 }
 
-pub fn present(chest: &Chest, stage: u8, switches: &Switches) -> bool {
+pub fn present(chest: &Chest, switches: &Switches) -> bool {
     if chest.uses_switch() {
         return !switches.test(chest.switch_no);
     }

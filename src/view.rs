@@ -141,6 +141,7 @@ const BALLOON: Rgb = [0.86, 0.44, 0.52];
 const WARSHIP: Rgb = [0.30, 0.26, 0.32];
 const EMBER: Rgb = [0.94, 0.52, 0.18];
 const SEAGULL: Rgb = [0.94, 0.94, 0.90];
+const SCENERY: Rgb = [0.44, 0.62, 0.34];
 const SPEAR: Rgb = [0.70, 0.66, 0.52];
 
 pub fn item_hex(kind: crate::sim::item::Kind) -> &'static str {
@@ -183,6 +184,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Fire => EMBER,
         ActorKind::Gull => SEAGULL,
         ActorKind::Pickup => pickup_look(actor.item).0,
+        ActorKind::Scenery => SCENERY,
     }
 }
 
