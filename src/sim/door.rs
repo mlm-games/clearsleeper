@@ -78,6 +78,13 @@ const TYPE_MASK: u32 = 0xF;
 const EVENT_SHIFT: u32 = 0x0C;
 const BACK_SWITCH_SHIFT: u32 = 0x14;
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DoorCut {
+    pub staff: usize,
+    pub opening: bool,
+    pub armed: bool,
+}
+
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct StayRoom(pub i8);
 
@@ -345,14 +352,21 @@ impl Door {
 pub fn control(
     stay: Res<StayRoom>,
     mut switches: ResMut<Switches>,
-    mut doors: Query<&mut Door>,
+    mut doors: Query<(Entity, &mut Door)>,
     actors: Query<(&Actor, Option<&HitPoints>)>,
+    mut cuts: Query<&mut DoorCut>,
+    mut active: ResMut<super::event::ActiveEvents>,
+    list: Res<super::event::EventList>,
+    mut flags: ResMut<super::flags::EventFlags>,
 ) {
     let room = stay.0;
-    for mut door in &mut doors {
+    for (entity, mut door) in &mut doors {
         door.set_key(&switches);
         door.front_check = door.facing(room);
         door.barrier = door.barrier_value(room >= 0, &switches);
+        if let Ok(mut cut) = cuts.get_mut(entity) {
+            drive_cut(door, &mut cut, &mut switches, &active, &list, &mut flags);
+        }
         if !door.makes_stop() {
             advance(&mut door);
             continue;
@@ -382,6 +396,51 @@ pub fn control(
             door.bars = BAR_OPENED;
         }
         advance(&mut door);
+    }
+}
+
+fn drive_cut(
+    door: &mut Door,
+    cut: &mut DoorCut,
+    switches: &mut Switches,
+    active: &super::event::ActiveEvents,
+    list: &super::event::EventList,
+    flags: &mut super::flags::EventFlags,
+) {
+    if !cut.armed {
+        return;
+    }
+    let bit = door.bit();
+    let rising = match door.kind {
+        Kind::Slide => door.slide,
+        Kind::Key => door.rock[0],
+        Kind::Shutter => door.bars_y,
+    };
+    let done = if cut.opening {
+        door.bars = BAR_OPENED;
+        if door.kind == Kind::Slide {
+            door.action = Action::SlideOpen;
+        }
+        if bit != NO_SWITCH {
+            switches.set(bit);
+        }
+        rising >= BAR_HEIGHT || (door.kind == Kind::Key && rising >= 1.0)
+    } else {
+        door.bars = BAR_CLOSED;
+        if door.kind == Kind::Slide {
+            door.action = Action::SlideClose;
+        }
+        if bit != NO_SWITCH {
+            switches.clear(bit);
+        }
+        rising <= 0.0
+    };
+    if !done {
+        return;
+    }
+    cut.armed = false;
+    if let Some(flag) = active.staff_cut_flag(list, cut.staff) {
+        flags.set(flag as u32);
     }
 }
 

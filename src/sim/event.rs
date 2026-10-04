@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use super::actor::Actor;
 use super::chest::ChestOpen;
+use super::door::DoorCut;
 use super::flags::{EventFlags, StoryBits};
 use super::msg::{
     MsgBox, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING, MSG_CONTINUES,
@@ -363,6 +364,14 @@ impl ActiveEvent {
     pub fn cut_of(&self, index: usize, staff: usize) -> Option<i32> {
         let running = self.running.iter().find(|running| running.index == index)?;
         running.staffs.get(staff).map(|run| run.cut)
+    }
+pub fn staff_cut_flag(&self, list: &EventList, staff: usize) -> Option<i32> {
+        self.running
+            .iter()
+            .flat_map(|running| running.staffs.iter())
+            .find(|run| run.staff == staff)
+            .and_then(|run| list.cuts.get(run.cut as usize))
+            .map(|cut| cut.flag_id)
     }
 }
 
@@ -778,6 +787,8 @@ fn staff_cut(
     };
     if staff.name == "TREASURE" {
         treasure_cut(run, list, flags, owner, commands);
+    } else if staff.name == "SHUTTER_DOOR" {
+        door_cut(run, list, flags, owner, commands);
     } else if staff.kind == STAFF_CAMERA {
         camera_cut(run, list, flags);
     } else if staff.kind == STAFF_NORMAL {
@@ -793,6 +804,31 @@ fn staff_cut(
             _ => {}
         }
     }
+}
+
+fn door_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    commands: &mut Commands,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    let opening = matches!(
+        cut.name.as_str(),
+        "OPEN" | "OPEN_PUSH" | "OPEN_PULL" | "OPEN_PUSH2" | "OPEN_PULL2" | "STOP_OPEN"
+    );
+    if opening || matches!(cut.name.as_str(), "CLOSE" | "STOP_CLOSE") {
+        commands.entity(owner).insert(DoorCut {
+            staff: run.staff,
+            opening,
+            armed: true,
+        });
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn treasure_cut(
