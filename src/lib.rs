@@ -485,6 +485,9 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(mill) = entity.get::<sim::windmill::Windmill>() {
+                let (_, max) = mill.cull();
+                (view::ActorKind::Scenery, 0, max[1], max[0])
             } else if let Some(float) = entity.get::<sim::buoybarrel::BuoyBarrel>() {
                 if float.gone {
                     continue;

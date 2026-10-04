@@ -64,6 +64,7 @@ pub mod transition;
 pub mod tsubo;
 pub mod walk;
 pub mod wall;
+pub mod windmill;
 pub mod warship;
 pub mod water;
 pub mod zelda;
@@ -208,6 +209,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if windmill::is_windmill(&source.name) {
+        let tower = windmill::Windmill::spawn(source.parameters);
+        world.spawn((actor, tower)).id()
     } else if buoybarrel::is_buoy_barrel(&source.name) {
         let float = buoybarrel::BuoyBarrel::spawn(source.parameters);
         world.spawn((actor, float)).id()
@@ -275,6 +279,7 @@ pub fn build(
     sim.world.insert_resource(intent::UseIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
+    sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(events::SimEvents::default());
     sim.world.insert_resource(events::Stride::default());
     sim.world.insert_resource(water::Water::default());
@@ -365,6 +370,7 @@ pub fn build(
                     trapdoor::control.in_set(WwSimSet::Execute),
                     torch::control.in_set(WwSimSet::Execute),
                     barrel::control.in_set(WwSimSet::Execute),
+                    windmill::control.in_set(WwSimSet::Execute),
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
