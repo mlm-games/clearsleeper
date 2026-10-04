@@ -485,6 +485,16 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(block) = entity.get::<sim::ice::Ice>() {
+                if block.gone {
+                    continue;
+                }
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    block.hull_height(),
+                    block.hull(),
+                )
             } else if let Some(brand) = entity.get::<sim::torch::Torch>() {
                 if brand.gone {
                     continue;

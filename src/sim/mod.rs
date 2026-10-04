@@ -30,6 +30,7 @@ pub mod gull;
 pub mod health;
 pub mod hookshot;
 pub mod hop;
+pub mod ice;
 pub mod intent;
 pub mod inventory;
 pub mod item;
@@ -204,6 +205,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if ice::is_ice(&source.name) {
+        let block = ice::Ice::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, block)).id()
     } else if torch::is_torch(&source.name) {
         let brand = torch::Torch::spawn(source.parameters);
         world.spawn((actor, brand)).id()
@@ -351,6 +355,7 @@ pub fn build(
                     barricade::control.in_set(WwSimSet::Execute),
                     trapdoor::control.in_set(WwSimSet::Execute),
                     torch::control.in_set(WwSimSet::Execute),
+                    ice::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
