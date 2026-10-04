@@ -36,6 +36,7 @@ pub mod ship;
 pub mod swim;
 pub mod tag;
 pub mod talk;
+pub mod tingle;
 pub mod tsubo;
 pub mod transition;
 pub mod walk;
@@ -137,6 +138,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == zelda::ZELDA_ACTOR {
         let princess = zelda::Zelda::spawn(source.parameters);
         world.spawn((actor, princess)).id()
+    } else if source.name == tingle::TINGLE_ACTOR {
+        world.spawn((actor, tingle::Tingle::spawn())).id()
     } else {
         world.spawn(actor).id()
     }
@@ -241,6 +244,7 @@ pub fn build(
                 death::freeze.in_set(WwSimSet::Execute),
                 carry::control.in_set(WwSimSet::Execute),
                 tsubo::control.in_set(WwSimSet::Execute),
+                tingle::control.in_set(WwSimSet::Execute),
                 select::control.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
