@@ -835,6 +835,8 @@ fn staff_cut(
         );
     } else if staff.name == "Os" {
         os_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Warpf" {
+        warp_cut(run, list, flags);
     } else if let Some((messages, key)) = npc_staff(&staff.name) {
         npc_cut(run, list, flags, owner, actors, players, talks, msg, table, messages, key);
     } else if staff.kind == STAFF_CAMERA {
@@ -851,6 +853,27 @@ fn staff_cut(
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
         }
+    }
+}
+
+fn warp_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "WARP_1" => {
+            if run.advance > 0 {
+                run.timer = 180;
+            }
+            wait_proc(run, list, flags);
+        }
+        "WARP_2" | "WARP_3" => {
+            if run.advance > 0 {
+                run.timer = 5;
+            }
+            wait_proc(run, list, flags);
+        }
+        _ => cut_end(run, list, flags),
     }
 }
 
