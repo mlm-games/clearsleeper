@@ -55,6 +55,7 @@ pub mod tag;
 pub mod trapdoor;
 pub mod talk;
 pub mod tingle;
+pub mod torch;
 pub mod transition;
 pub mod tsubo;
 pub mod walk;
@@ -203,6 +204,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if torch::is_torch(&source.name) {
+        let brand = torch::Torch::spawn(source.parameters);
+        world.spawn((actor, brand)).id()
     } else if trapdoor::is_trapdoor(&source.name) {
         let hatch = trapdoor::Trapdoor::spawn();
         world.spawn((actor, hatch)).id()
@@ -346,6 +350,7 @@ pub fn build(
                     raft::control.in_set(WwSimSet::Execute),
                     barricade::control.in_set(WwSimSet::Execute),
                     trapdoor::control.in_set(WwSimSet::Execute),
+                    torch::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),

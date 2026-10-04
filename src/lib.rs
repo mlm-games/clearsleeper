@@ -485,6 +485,16 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(brand) = entity.get::<sim::torch::Torch>() {
+                if brand.gone {
+                    continue;
+                }
+                (
+                    view::ActorKind::Fire,
+                    0,
+                    sim::torch::POST_TOP,
+                    sim::torch::POST_RADIUS,
+                )
             } else if let Some(hatch) = entity.get::<sim::trapdoor::Trapdoor>() {
                 if hatch.hinge == sim::trapdoor::Hinge::Swinging {
                     continue;
