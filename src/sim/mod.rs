@@ -28,6 +28,7 @@ pub mod event;
 pub mod events;
 pub mod fallrock;
 pub mod fire;
+pub mod figure;
 pub mod flags;
 pub mod frame;
 pub mod ghostship;
@@ -167,6 +168,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if flags::is_event_switch(&source.name) {
         let switch = flags::EventSwitch::spawn(source.parameters);
         world.spawn((actor, switch)).id()
+    } else if figure::is_figure(&source.name) {
+        world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
         world.spawn((actor, scenery::Scenery)).id()
     } else if tsubo::is_tsubo(&source.name) {
@@ -606,6 +609,7 @@ pub fn build(
                     mflft::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
+                    figure::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),
                     redead::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
