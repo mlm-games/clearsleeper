@@ -2,6 +2,7 @@ pub mod actor;
 pub mod ajav;
 pub mod area;
 pub mod armos;
+pub mod aryll;
 pub mod arrow;
 pub mod balloon;
 pub mod barrier;
@@ -33,6 +34,7 @@ pub mod fire;
 pub mod figure;
 pub mod flags;
 pub mod frame;
+pub mod floormaster;
 pub mod ghostship;
 pub mod ground;
 pub mod gull;
@@ -198,6 +200,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if merchant::is_merchant(&source.name) {
         let trader = merchant::Merchant::spawn(source.parameters);
         world.spawn((actor, trader)).id()
+    } else if aryll::is_aryll(&source.name) {
+        let seer = aryll::Aryll::spawn(source.parameters);
+        world.spawn((actor, seer)).id()
+    } else if floormaster::is_floormaster(&source.name) {
+        let robot = floormaster::Floormaster::spawn(source.parameters);
+        world.spawn((actor, robot)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -601,6 +609,8 @@ pub fn build(
                     sage::control.in_set(WwSimSet::Execute),
                     servant::control.in_set(WwSimSet::Execute),
                     merchant::control.in_set(WwSimSet::Execute),
+                    aryll::control.in_set(WwSimSet::Execute),
+                    floormaster::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     zunari::control.in_set(WwSimSet::Execute),

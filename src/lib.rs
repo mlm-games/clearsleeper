@@ -418,6 +418,7 @@ impl App {
                 || entity.contains::<sim::shop::Shop>()
                 || entity.contains::<sim::lenzo::Lenzo>()
                 || entity.contains::<sim::zunari::Zunari>()
+                || entity.contains::<sim::aryll::Aryll>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
@@ -568,6 +569,13 @@ impl App {
                     continue;
                 }
                 let (min, max) = statuette.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
+                if !robot.drawn() {
+                    continue;
+                }
+                let (min, max) = robot.cull();
                 lift = min[1];
                 (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(idol) = entity.get::<sim::figure::Figure>() {
