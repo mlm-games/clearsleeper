@@ -15,8 +15,8 @@ use super::swim::Swim;
 use super::walk::{RAD_PER_UNIT, target_yaw, to_s16};
 
 const STICK_GATE: f32 = 0.05;
-const BACK_SPEED: f32 = 22.5;
-const BACK_RISE: f32 = 19.0;
+pub(crate) const BACK_SPEED: f32 = 22.5;
+pub(crate) const BACK_RISE: f32 = 19.0;
 pub(crate) const BACK_GRAVITY: f32 = -3.0;
 const SIDE_PITCH: f32 = 6200.0 * RAD_PER_UNIT;
 const SIDE_SPEED: f32 = 30.0;

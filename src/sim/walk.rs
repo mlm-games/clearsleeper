@@ -12,7 +12,9 @@ use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
 use super::ground;
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
-use super::jump::{BACK_GRAVITY, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
+use super::jump::{
+    BACK_GRAVITY, BACK_RISE, BACK_SPEED, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET,
+};
 use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
@@ -218,6 +220,8 @@ pub fn walk(
         let player = &mut *player;
         if partner.demo_fall {
             slowfall_tick(player, &mut partner, collision.as_deref(), &water);
+        } else if partner.demo_backjump {
+            backjump_tick(player, &mut partner, collision.as_deref(), &water);
         } else if partner.demo_stick.is_some() {
             demo_walk_tick(player, &partner, &mut stride, &mut events);
         } else if swim.active {
@@ -328,6 +332,40 @@ fn demo_walk_tick(
         stride,
         events,
     );
+}
+
+fn backjump_tick(
+    player: &mut Player,
+    partner: &mut ItemPartner,
+    collision: Option<&Collision>,
+    water: &Water,
+) {
+    if partner.demo_landed {
+        return;
+    }
+    if partner.demo_launch {
+        partner.demo_launch = false;
+        player.speed_y = BACK_RISE;
+    }
+    let heading = from_s16(partner.move_angle);
+    player.speed = BACK_SPEED;
+    player.pos.x += BACK_SPEED * heading.sin();
+    player.pos.z += BACK_SPEED * heading.cos();
+    let surface = match ground::surface(collision, player.pos) {
+        Some(height) => Some(height),
+        None if water.in_area => Some(water.surface),
+        None => None,
+    };
+    player.speed_y = (player.speed_y + BACK_GRAVITY).max(MAX_FALL_SPEED);
+    player.pos.y += player.speed_y;
+    if let Some(surface) = surface
+        && player.pos.y <= surface
+    {
+        player.pos.y = surface;
+        player.speed_y = 0.0;
+        player.speed = 0.0;
+        partner.demo_landed = true;
+    }
 }
 
 fn slowfall_tick(

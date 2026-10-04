@@ -283,6 +283,8 @@ pub struct ItemPartner {
     pub move_angle: i16,
     pub demo_stick: Option<f32>,
     pub demo_fall: bool,
+    pub demo_backjump: bool,
+    pub demo_launch: bool,
     pub fall_cap: f32,
     pub demo_landed: bool,
 }
@@ -687,6 +689,8 @@ pub fn control(
 ) {
     partner.demo_stick = None;
     partner.demo_fall = false;
+    partner.demo_backjump = false;
+    partner.demo_launch = false;
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
             && list
@@ -1066,6 +1070,21 @@ fn link_cut(
             5 => {
                 if let Some(angle) = turn {
                     partner.move_angle = angle as i16;
+                }
+            }
+            16 => {
+                partner.demo_backjump = true;
+                if run.advance > 0 {
+                    partner.demo_landed = false;
+                    if !ships.iter().any(|ship| ship.riding)
+                        && let Some((_, mut player)) = players.iter_mut().next()
+                    {
+                        partner.move_angle = to_s16(player.face + std::f32::consts::PI);
+                        partner.demo_launch = true;
+                    }
+                }
+                if partner.demo_landed {
+                    cut_end(run, list, flags);
                 }
             }
             64 => {
