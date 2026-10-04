@@ -57,6 +57,7 @@ pub mod layer;
 pub mod leaves;
 pub mod lenzo;
 pub mod lock;
+pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
@@ -201,6 +202,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if merchant::is_merchant(&source.name) {
         let trader = merchant::Merchant::spawn(source.parameters);
         world.spawn((actor, trader)).id()
+    } else if makar::is_makar(&source.name) {
+        let sage3 = makar::Makar::spawn(source.parameters);
+        world.spawn((actor, sage3)).id()
     } else if medli::is_medli(&source.name) {
         let sage2 = medli::Medli::spawn(source.parameters);
         world.spawn((actor, sage2)).id()
@@ -615,6 +619,7 @@ pub fn build(
                     merchant::control.in_set(WwSimSet::Execute),
                     aryll::control.in_set(WwSimSet::Execute),
                     medli::control.in_set(WwSimSet::Execute),
+                    makar::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     zunari::control.in_set(WwSimSet::Execute),

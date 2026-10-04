@@ -420,6 +420,7 @@ impl App {
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
                 || entity.contains::<sim::medli::Medli>()
+                || entity.contains::<sim::makar::Makar>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
