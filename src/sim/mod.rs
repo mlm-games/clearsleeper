@@ -61,6 +61,7 @@ pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
+pub mod molgera;
 pub mod msg;
 pub mod nh;
 pub mod pickup;
@@ -381,6 +382,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, eye, hit_points, enemy::Hurt::default()))
             .id()
+    } else if molgera::is_molgera(&source.name) {
+        world.spawn((actor, molgera::Molgera::spawn())).id()
     } else if pirateship::is_pirateship(&source.name) {
         let vessel = pirateship::Pirate::spawn(source.parameters);
         world.spawn((actor, vessel)).id()
@@ -688,6 +691,7 @@ pub fn build(
                     iball::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
+                    molgera::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
