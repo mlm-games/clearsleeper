@@ -849,6 +849,10 @@ fn staff_cut(
         warp_cut(run, list, flags);
     } else if people_staff(&staff.name) {
         people_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Auction" {
+        auction_cut(run, list, flags, owner, talks, msg, table);
+    } else if staff.name == "Zl1" {
+        zl1_cut(run, list, flags);
     } else if staff.name == "Tc" {
         tc_cut(run, list, flags);
     } else if staff.name == "Mk" {
@@ -1015,6 +1019,65 @@ fn people_cut(
         ) => {}
         _ => cut_end(run, list, flags),
     }
+}
+
+fn auction_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    match cut.name.as_str() {
+        "MES_SET" => {
+            if let Ok(mut talk) = talks.get_mut(owner) {
+                if run.advance > 0 {
+                    talk.msg_curr =
+                        list.cut_number(run.cut as usize, "MsgNo").unwrap_or(0) as u32;
+                    talk.msg_end = -1;
+                    run.talk_open = true;
+                }
+                npc_talk(&mut talk, msg, table);
+            }
+            cut_end(run, list, flags);
+        }
+        "MES_END" => {
+            let Ok(mut talk) = talks.get_mut(owner) else {
+                cut_end(run, list, flags);
+                return;
+            };
+            if npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED {
+                cut_end(run, list, flags);
+            }
+        }
+        "END" => {
+            if run.advance > 0 {
+                run.timer = 20;
+            }
+            if run.timer > 0 {
+                run.timer -= 1;
+            } else {
+                cut_end(run, list, flags);
+            }
+        }
+        "START" | "MAIN" | "GET_ITEM" | "GET_ITEM_NPC" | "GET_ITEM_MES" => {}
+        _ => cut_end(run, list, flags),
+    }
+}
+
+fn zl1_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+    let Some(cut) = list.cuts.get(run.cut as usize) else {
+        return;
+    };
+    if matches!(cut.name.as_str(), "OKIRU" | "OKIRU_2" | "JMP_OFF") {
+        return;
+    }
+    cut_end(run, list, flags);
 }
 
 fn tc_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
