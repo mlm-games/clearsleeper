@@ -869,7 +869,7 @@ fn staff_cut(
     } else if people_staff(&staff.name) {
         people_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Ls1" {
-        hold_cut(run, list, flags, &["WAI"]);
+        hold_cut(run, list, flags, &["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"]);
     } else if staff.name == "Ba1" {
         hold_cut(run, list, flags, &["ACTION", "START_TALE1"]);
     } else if staff.name == "Hdai1" || staff.name == "Hdai2" || staff.name == "Hdai3" {
