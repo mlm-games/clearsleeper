@@ -30,6 +30,7 @@ pub mod player;
 pub mod roll;
 pub mod scenery;
 pub mod select;
+pub mod shop;
 pub mod sea;
 pub mod ship;
 pub mod swim;
@@ -129,6 +130,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == marlon::MARLON_ACTOR {
         let friend = marlon::Marlon::spawn(source.parameters);
         world.spawn((actor, friend)).id()
+    } else if source.name == shop::SHOP_ACTOR {
+        let store = shop::Shop::spawn(source.parameters);
+        world.spawn((actor, store)).id()
     } else {
         world.spawn(actor).id()
     }
