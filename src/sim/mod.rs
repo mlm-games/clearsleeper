@@ -83,6 +83,7 @@ pub mod stone;
 pub mod stream;
 pub mod swim;
 pub mod swhammer;
+pub mod swlight;
 pub mod swpush;
 pub mod tag;
 pub mod taglight;
@@ -365,6 +366,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             world.resource::<flags::Switches>(),
         );
         world.spawn((actor, gate)).id()
+    } else if swlight::is_swlight(&source.name) {
+        let moon = swlight::Swlight::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, moon)).id()
     } else if canon::is_canon(&source.name) {
         match canon::Canon::spawn(source.parameters, world.resource::<flags::Switches>()) {
             Some(gun) => world.spawn((actor, gun)).id(),
@@ -632,6 +636,7 @@ pub fn build(
                     shmrgrd::control.in_set(WwSimSet::Execute),
                     statue::control.in_set(WwSimSet::Execute),
                     taglight::control.in_set(WwSimSet::Execute),
+                    swlight::control.in_set(WwSimSet::Execute),
                     rockfall::control.in_set(WwSimSet::Execute),
                     wind::control.in_set(WwSimSet::Execute),
                     homen::control.in_set(WwSimSet::Execute),
