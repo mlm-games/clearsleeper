@@ -84,11 +84,20 @@ pub struct StageExit {
     pub wipe: u8,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StageHeader {
+    pub time_h: i8,
+    pub stage_type: u32,
+    pub schbit_start: u8,
+    pub schbit_sec: u8,
+    pub schbit_enable: u8,
+    pub far_plane: f32,
+}
+
 pub struct StageTables {
     placements: Vec<Placement>,
     room_groups: Vec<Vec<u8>>,
-    time_h: Option<i8>,
+    stag: Option<StageHeader>,
     envr: Vec<[u8; 8]>,
     colo: Vec<[u8; 8]>,
     palettes: Vec<PaletteEntry>,
@@ -163,9 +172,9 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_room_groups(data, count, offset)?,
         None => Vec::new(),
     };
-    let time_h = match locate(b"STAG") {
-        Some((count, offset)) if count > 0 => Some(parse_time_h(data, offset)?),
-        _ => None,
+    let stag = match locate(b"STAG") {
+        Some((_, offset)) => Some(parse_stag(data, offset)?),
+        None => None,
     };
     let envr = match locate(b"EnvR") {
         Some((count, offset)) => {
@@ -203,7 +212,7 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
     Ok(StageTables {
         placements,
         room_groups,
-        time_h,
+        stag,
         envr,
         colo,
         palettes,
@@ -283,12 +292,22 @@ fn parse_records<T>(
     Ok(records)
 }
 
-fn parse_time_h(data: &[u8], offset: u32) -> Result<i8, DzsError> {
+fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
     let end = table_end(offset as usize, 1, STAG_LEN)?;
     if end > data.len() {
         return Err(DzsError::BadTable);
     }
-    Ok(read_u8(data, offset as usize + 0x0D)? as i8)
+    let at = offset as usize;
+    let type_and_schbit = read_u32(data, at + 0x0C)?;
+    let enable_and_far = read_u32(data, at + 0x10)?;
+    Ok(StageHeader {
+        time_h: read_u8(data, at + 0x0D)? as i8,
+        stage_type: (type_and_schbit >> 16) & 7,
+        schbit_start: (type_and_schbit >> 8) & 0xFF,
+        schbit_sec: (type_and_schbit & 0xFF) as u8,
+        schbit_enable: (enable_and_far >> 16) as u8,
+        far_plane: (enable_and_far & 0xFFFF) as u16 as f32,
+    })
 }
 
 fn parse_palette(data: &[u8], at: usize) -> Result<PaletteEntry, DzsError> {
@@ -420,8 +439,12 @@ impl StageTables {
         self.has_sea
     }
 
+    pub fn stag(&self) -> Option<StageHeader> {
+        self.stag
+    }
+
     pub fn boot_time(&self) -> f32 {
-        match self.time_h {
+        match self.stag.map(|stag| stag.time_h) {
             Some(hours) if hours >= 0 => hours as f32 * TIME_H_SCALE,
             _ => BOOT_TIME,
         }

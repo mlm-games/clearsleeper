@@ -49,8 +49,10 @@ pub mod msg;
 pub mod pickup;
 pub mod player;
 pub mod raft;
+pub mod rockfall;
 pub mod roll;
 pub mod scenery;
+pub mod schedule;
 pub mod select;
 pub mod shop;
 pub mod sea;
@@ -218,6 +220,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if barrel::is_barrel(&source.name) {
         let cask = barrel::Barrel::spawn(source.parameters);
         world.spawn((actor, cask, carry::Carryable::Barrel)).id()
+    } else if rockfall::is_rockfall(&source.name) {
+        let shower = rockfall::Rockfall::spawn(source.parameters);
+        world.spawn((actor, shower)).id()
     } else if fallrock::is_fallrock(&source.name) {
         let stone = fallrock::FallRock::spawn(1.0);
         world.spawn((actor, stone)).id()
@@ -323,6 +328,9 @@ pub fn build(
     sim.world.insert_resource(inventory::Equipped::default());
     sim.world.insert_resource(inventory::Got::default());
     sim.world.insert_resource(clock::Clock::default());
+    sim.world.insert_resource(schedule::Schedule::from_header(
+        tables.and_then(|tables| tables.stag()).as_ref(),
+    ));
     sim.world.insert_resource(select::Select::default());
     sim.world.insert_resource(carry::Carry::default());
     sim.world.insert_resource(chest::Chests::default());
@@ -445,6 +453,8 @@ pub fn build(
                     swhammer::control.in_set(WwSimSet::Execute),
                     shmrgrd::control.in_set(WwSimSet::Execute),
                     statue::control.in_set(WwSimSet::Execute),
+                    schedule::control.in_set(WwSimSet::Execute),
+                    rockfall::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
