@@ -381,6 +381,16 @@ pub const CUT_NAMES: [&str; 21] = [
     "LOOK_DOWN",
 ];
 pub const CUT_LOOK_UP: &str = "LOOK_UP";
+
+pub fn cut_of(name: &str) -> Option<Cut> {
+    if name == CUT_LOOK_UP {
+        return Some(Cut::LookUp);
+    }
+    CUT_NAMES
+        .iter()
+        .position(|cut| *cut == name)
+        .and_then(|index| CUTS.get(index).copied())
+}
 pub const CUT_SLOTS: usize = 22;
 
 pub const MSG_TACT: u32 = 0x5AC;
@@ -4998,14 +5008,17 @@ impl Medli {
 pub const COLLECT_MEDLI_ITEM: u8 = 2;
 
 pub fn create_ok(stories: &StoryBits, stage: &str, collect_slot_2: bool) -> bool {
+    if collect_slot_2 {
+        return stage == "M_DaiB";
+    }
     match stage {
-        "M_DaiB" => collect_slot_2,
-        "sea" => stories.test(BIT_2E04) && !stories.test(BIT_1820),
+        "sea" => !stories.test(BIT_2E04) && stories.test(BIT_1820),
         "Atorizk" => !stories.test(BIT_2E04),
-        "Adanmae" => stories.test(BIT_2E04),
+        "Adanmae" => !stories.test(BIT_2E04),
         "M_Dra09" => !stories.test(BIT_2E04) && !stories.test(BIT_1101),
         "Edaichi" => stories.test(BIT_2E04) && !stories.test(BIT_2920),
         "M_Dai" => stories.test(BIT_2E04) && stories.test(BIT_2920),
+        "M_DaiB" => false,
         _ => true,
     }
 }

@@ -378,6 +378,34 @@ impl ActiveEvent {
         let running = self.running.iter().find(|running| running.index == index)?;
         running.staffs.get(staff).map(|run| run.cut)
     }
+
+    pub fn end_staff_cut(&mut self, list: &EventList, flags: &mut EventFlags, name: &str) {
+        let Some(slot) = list.staff_of(name) else {
+            return;
+        };
+        let cut = self
+            .running
+            .iter()
+            .filter_map(|running| running.staffs.get(slot))
+            .find_map(|run| usize::try_from(run.cut).ok())
+            .and_then(|cut| list.cuts.get(cut));
+        if let Some(cut) = cut {
+            flags.set(cut.flag_id as u32);
+        }
+    }
+
+    pub fn staff_cut(&self, list: &EventList, name: &str) -> Option<(usize, bool)> {
+        let slot = list.staff_of(name)?;
+        for running in &self.running {
+            let Some(run) = running.staffs.get(slot) else {
+                continue;
+            };
+            if let Ok(index) = usize::try_from(run.cut) {
+                return Some((index, run.advance != 0));
+            }
+        }
+        None
+    }
 }
 
 struct Reader<'a> {

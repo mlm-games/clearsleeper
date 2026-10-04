@@ -7,7 +7,7 @@ use super::carry::Carry;
 use super::collision::Collision;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
-use super::flags::StoryBits;
+use super::flags::{EventFlags, StoryBits};
 use super::ground;
 use super::intent::{CameraYaw, DoIntent, MoveIntent, TargetIntent};
 use super::flags::Collect;
@@ -2540,6 +2540,7 @@ impl Makar {
                     self.speed_f = 0.0;
                 }
                 if self.ev_run(cut, ctx) {
+                    ctx.active.end_staff_cut(ctx.list, ctx.ev_flags, STAFF_NAME);
                 }
             }
             self.player_action = Step::None;
@@ -3294,6 +3295,7 @@ pub struct Ctx<'a> {
     pub list: &'a EventList,
     pub active: &'a mut ActiveEvent,
     pub stories: &'a mut StoryBits,
+    pub ev_flags: &'a mut EventFlags,
     pub events: &'a mut SimEvents,
     pub next: &'a mut NextStage,
     pub text: Text<'a>,
@@ -3389,6 +3391,7 @@ pub struct World<'w> {
     pub stories: ResMut<'w, StoryBits>,
     pub events: ResMut<'w, SimEvents>,
     pub next: ResMut<'w, NextStage>,
+    pub event_flags: ResMut<'w, EventFlags>,
 }
 
 #[derive(SystemParam)]
@@ -3435,6 +3438,13 @@ pub fn control(
     for (entity, actor, makar) in &mut actors {
         let actor = &mut *actor;
         let makar = &mut *makar;
+        let current = ActiveEvent::staff_cut(&world.active, &world.list, STAFF_NAME)
+            .and_then(|(index, advance)| {
+                world
+                    .list
+                    .cut_name(index)
+                    .map(|name| (index, advance, Cut::of_name(name)))
+            });
         let mut ctx = Ctx {
             entity,
             player: link.map(|player| player.pos),
@@ -3446,6 +3456,7 @@ pub fn control(
             list: &world.list,
             active: &mut world.active,
             stories: &mut world.stories,
+            ev_flags: &mut world.event_flags,
             events: &mut world.events,
             next: &mut world.next,
             text: Text {
@@ -3457,9 +3468,9 @@ pub fn control(
                 archive,
                 clear_count,
             },
-            cut: None,
-            cut_index: None,
-            advance: false,
+            cut: current.and_then(|(_, _, cut)| cut),
+            cut_index: current.map(|(index, _, _)| index),
+            advance: current.is_some_and(|(_, advance, _)| advance),
             event_mode,
             player_door: false,
             initial_room_ok: true,
