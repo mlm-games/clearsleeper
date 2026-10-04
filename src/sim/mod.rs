@@ -1,6 +1,7 @@
 pub mod actor;
 pub mod area;
 pub mod balloon;
+pub mod carry;
 pub mod cleared;
 pub mod collision;
 pub mod combat;
@@ -114,10 +115,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, scenery::Scenery)).id()
     } else if tsubo::is_tsubo(&source.name) {
         let pot = tsubo::Tsubo::spawn(source.parameters);
-        world.spawn((actor, pot)).id()
+        world.spawn((actor, pot, carry::Carryable::Tsubo)).id()
     } else if tag::is_tag(&source.name) {
         let marker = tag::Tag::spawn(source.parameters, actor.pos, source.angle[1]);
         world.spawn((actor, marker)).id()
+    } else if source.name == carry::PIG_ACTOR {
+        world.spawn((actor, carry::Carryable::Pig)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -172,6 +175,7 @@ pub fn build(
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
     sim.world.insert_resource(select::Select::default());
+    sim.world.insert_resource(carry::Carry::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Arrivals::default());
@@ -219,6 +223,7 @@ pub fn build(
         (
             (
                 death::freeze.in_set(WwSimSet::Execute),
+                carry::control.in_set(WwSimSet::Execute),
                 select::control.in_set(WwSimSet::Execute),
                 talk::control.in_set(WwSimSet::Execute),
                 flags::control.in_set(WwSimSet::Execute),
