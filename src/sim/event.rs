@@ -282,6 +282,9 @@ pub struct ItemPartner {
     pub max_life: u8,
     pub move_angle: i16,
     pub demo_stick: Option<f32>,
+    pub demo_fall: bool,
+    pub fall_cap: f32,
+    pub demo_landed: bool,
 }
 
 const PRESENT_ACTOR: &str = "PresentItem";
@@ -683,6 +686,7 @@ pub fn control(
     mut commands: Commands,
 ) {
     partner.demo_stick = None;
+    partner.demo_fall = false;
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
             && list
@@ -1062,6 +1066,19 @@ fn link_cut(
             5 => {
                 if let Some(angle) = turn {
                     partner.move_angle = angle as i16;
+                }
+            }
+            64 => {
+                partner.demo_fall = true;
+                if run.advance > 0 {
+                    partner.fall_cap = -20.0;
+                    partner.demo_landed = false;
+                    if let Some((_, mut player)) = players.iter_mut().next() {
+                        player.speed = 0.0;
+                    }
+                }
+                if partner.demo_landed {
+                    cut_end(run, list, flags);
                 }
             }
             _ => {}

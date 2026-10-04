@@ -5,9 +5,11 @@ use std::f32::consts::TAU;
 use bevy_ecs::prelude::*;
 use glam::{Vec2, Vec3};
 
+use super::collision::Collision;
 use super::combat::Combat;
 use super::event::ItemPartner;
 use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
+use super::ground;
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
 use super::jump::{BACK_GRAVITY, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
@@ -18,6 +20,7 @@ use super::swim::{
     BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE, SWIM_MAX_SPEED,
     SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE, Swim,
 };
+use super::water::Water;
 
 const STICK_GATE: f32 = 0.05;
 pub(crate) const MAX_NORMAL_SPEED: f32 = 17.0;
@@ -200,7 +203,9 @@ pub fn walk(
     roll: Res<Roll>,
     jump: Res<Jump>,
     combat: Res<Combat>,
-    partner: Res<ItemPartner>,
+    mut partner: ResMut<ItemPartner>,
+    collision: Option<Res<Collision>>,
+    water: Res<Water>,
     ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -211,7 +216,9 @@ pub fn walk(
     }
     for mut player in &mut players {
         let player = &mut *player;
-        if partner.demo_stick.is_some() {
+        if partner.demo_fall {
+            slowfall_tick(player, &mut partner, collision.as_deref(), &water);
+        } else if partner.demo_stick.is_some() {
             demo_walk_tick(player, &partner, &mut stride, &mut events);
         } else if swim.active {
             swim_tick(player, &intent, &camera);
@@ -321,6 +328,36 @@ fn demo_walk_tick(
         stride,
         events,
     );
+}
+
+fn slowfall_tick(
+    player: &mut Player,
+    partner: &mut ItemPartner,
+    collision: Option<&Collision>,
+    water: &Water,
+) {
+    if partner.demo_landed {
+        return;
+    }
+    let surface = match ground::surface(collision, player.pos) {
+        Some(height) => Some(height),
+        None if water.in_area => Some(water.surface),
+        None => None,
+    };
+    if let Some(surface) = surface
+        && player.pos.y - surface < 200.0
+    {
+        partner.fall_cap = (partner.fall_cap + 1.0).min(-5.0);
+    }
+    player.speed_y = (player.speed_y + GRAVITY).max(partner.fall_cap);
+    player.pos.y += player.speed_y;
+    if let Some(surface) = surface
+        && player.pos.y <= surface
+    {
+        player.pos.y = surface;
+        player.speed_y = 0.0;
+        partner.demo_landed = true;
+    }
 }
 
 fn locomote(
