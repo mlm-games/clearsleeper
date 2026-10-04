@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use glam::{Vec2, Vec3};
 
 use super::combat::Combat;
+use super::event::ItemPartner;
 use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
@@ -199,6 +200,7 @@ pub fn walk(
     roll: Res<Roll>,
     jump: Res<Jump>,
     combat: Res<Combat>,
+    partner: Res<ItemPartner>,
     ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -209,7 +211,9 @@ pub fn walk(
     }
     for mut player in &mut players {
         let player = &mut *player;
-        if swim.active {
+        if partner.demo_stick.is_some() {
+            demo_walk_tick(player, &partner, &mut stride, &mut events);
+        } else if swim.active {
             swim_tick(player, &intent, &camera);
         } else if hop.active {
             hop_tick(player);
@@ -301,10 +305,34 @@ fn walk_tick(
     events: &mut SimEvents,
 ) {
     let stick = intent.axis.length().min(1.0);
+    locomote(player, target_yaw(intent, camera), stick, stride, events);
+}
+
+fn demo_walk_tick(
+    player: &mut Player,
+    partner: &ItemPartner,
+    stride: &mut Stride,
+    events: &mut SimEvents,
+) {
+    locomote(
+        player,
+        partner.move_angle,
+        partner.demo_stick.unwrap_or(0.0),
+        stride,
+        events,
+    );
+}
+
+fn locomote(
+    player: &mut Player,
+    target: i16,
+    stick: f32,
+    stride: &mut Stride,
+    events: &mut SimEvents,
+) {
     let stick_sq = stick * stick;
     let desired = MAX_NORMAL_SPEED * stick_sq;
     let accel = if stick > STICK_GATE {
-        let target = target_yaw(intent, camera);
         let yaw = to_s16(player.yaw);
         if angle_distance(target, yaw) > REVERSAL_LIMIT {
             player.yaw = from_s16(add_calc_angle_s(

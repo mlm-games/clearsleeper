@@ -275,12 +275,13 @@ struct StaffRun {
     get_msg_live: bool,
 }
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
 pub struct ItemPartner {
     pub entity: Option<Entity>,
     pub item: u8,
     pub max_life: u8,
     pub move_angle: i16,
+    pub demo_stick: Option<f32>,
 }
 
 const PRESENT_ACTOR: &str = "PresentItem";
@@ -681,6 +682,7 @@ pub fn control(
     mut presents: Query<&mut PresentItem>,
     mut commands: Commands,
 ) {
+    partner.demo_stick = None;
     for running in active.running.iter_mut() {
         if running.stage == Stage::Play
             && list
@@ -1041,10 +1043,20 @@ fn link_cut(
                 }
             }
             2 | 3 => {
+                partner.demo_stick = Some(0.0);
                 if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
-                    && let Some((_, player)) = players.iter().next()
+                    && let Some((_, mut player)) = players.iter_mut().next()
                 {
                     partner.move_angle = target_angle_y(player.pos, pos);
+                    let delta = pos - player.pos;
+                    let flat = delta.x * delta.x + delta.z * delta.z;
+                    if flat < 100.0 || (flat < 2500.0 && player.speed.abs() < 0.001) {
+                        player.speed = 0.0;
+                        cut_end(run, list, flags);
+                    } else if flat >= 2500.0 {
+                        partner.demo_stick =
+                            Some(list.cut_float(run.cut as usize, "stick").unwrap_or(1.0));
+                    }
                 }
             }
             5 => {
