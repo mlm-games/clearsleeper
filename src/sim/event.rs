@@ -837,6 +837,8 @@ fn staff_cut(
         os_cut(run, list, flags, owner, talks, msg, table);
     } else if staff.name == "Warpf" {
         warp_cut(run, list, flags);
+    } else if people_staff(&staff.name) {
+        people_cut(run, list, flags, owner, talks, msg, table);
     } else if let Some((messages, key)) = npc_staff(&staff.name) {
         npc_cut(run, list, flags, owner, actors, players, talks, msg, table, messages, key);
     } else if staff.kind == STAFF_CAMERA {
@@ -954,6 +956,50 @@ fn os_cut(
             ("MSGSET", "MSGEND"),
             "MsgNo",
         ),
+    }
+}
+
+fn people_staff(name: &str) -> bool {
+    matches!(
+        name,
+        "Uo1" | "Uo2"
+            | "Uo3"
+            | "Ub1"
+            | "Ub2"
+            | "Ub3"
+            | "Ub4"
+            | "Uw1"
+            | "Uw2"
+            | "Um1"
+            | "Um2"
+            | "Um3"
+            | "Sa1"
+            | "Sa2"
+            | "Sa3"
+            | "Sa4"
+            | "Sa5"
+            | "Ug1"
+            | "Ug2"
+    )
+}
+
+fn people_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    talks: &mut Query<&mut Talk>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+) {
+    match list.cuts.get(run.cut as usize).map(|cut| cut.name.as_str()) {
+        Some("MES_SET" | "MES_SET_TP" | "MES_SET_PO") => {
+            talk_cut(run, list, flags, owner, talks, msg, table, false, "MsgNo");
+        }
+        Some(
+            "MES_SET2" | "UB1_TALK" | "UB1_TALK_XY" | "UB2_TALK" | "UB_SET_ANM" | "TURN_TO_PLAYER",
+        ) => {}
+        _ => cut_end(run, list, flags),
     }
 }
 
