@@ -3,6 +3,7 @@ pub mod area;
 pub mod arrow;
 pub mod balloon;
 pub mod barrier;
+pub mod barricade;
 pub mod bird;
 pub mod bomb;
 pub mod bombflower;
@@ -201,6 +202,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == bombflower::BOMB_ACTOR {
         let crawling = bombflower::Crawler::spawn(source.parameters);
         world.spawn((actor, crawling)).id()
+    } else if barricade::is_barricade(&source.name) {
+        let fence = barricade::Barricade::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, fence)).id()
     } else if raft::is_raft(&source.name) {
         let vessel = raft::Raft::spawn(source.parameters, source.angle, true);
         world.spawn((actor, vessel)).id()
@@ -336,6 +340,7 @@ pub fn build(
                     hookshot::control.in_set(WwSimSet::Execute),
                     barrier::control.in_set(WwSimSet::Execute),
                     raft::control.in_set(WwSimSet::Execute),
+                    barricade::control.in_set(WwSimSet::Execute),
                     door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),

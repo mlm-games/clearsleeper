@@ -485,6 +485,16 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Ship, 0, 300.0, 150.0)
+            } else if let Some(fence) = entity.get::<sim::barricade::Barricade>() {
+                if !fence.blocking(0) {
+                    continue;
+                }
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    fence.standing(),
+                    sim::barricade::POST_SIDE,
+                )
             } else if let Some(flower) = entity.get::<sim::bombflower::Bombflower>() {
                 (
                     view::ActorKind::Scenery,
