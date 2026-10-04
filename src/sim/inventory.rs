@@ -125,3 +125,85 @@ impl Got {
         Self { flags }
     }
 }
+
+pub const ITEM_TELESCOPE: u8 = 0x20;
+pub const ITEM_PIRATES_CHARM: u8 = 0x42;
+pub const ITEM_HEROS_CHARM: u8 = 0x43;
+pub const ITEM_TRIFORCE_1: u8 = 0x61;
+pub const ITEM_PEARL_NAYRU: u8 = 0x69;
+pub const ITEM_PEARL_DIN: u8 = 0x6A;
+pub const ITEM_PEARL_FARORE: u8 = 0x6B;
+pub const ITEM_WINDS_REQUIEM: u8 = 0x6D;
+pub const ITEM_BALLAD_OF_GALES: u8 = 0x6E;
+pub const ITEM_COMMAND_MELODY: u8 = 0x6F;
+pub const ITEM_EARTH_GODS_LYRIC: u8 = 0x70;
+pub const ITEM_WIND_GODS_ARIA: u8 = 0x71;
+pub const ITEM_SONG_OF_PASSING: u8 = 0x72;
+
+pub fn check_get_item(
+    equipped: &Equipped,
+    collect: &super::flags::Collect,
+    item: u8,
+) -> bool {
+    let tact = |no: u8| item == ITEM_WINDS_REQUIEM + no;
+    if tact(0) {
+        return collect.is_tact(0);
+    }
+    if tact(1) {
+        return collect.is_tact(1);
+    }
+    if tact(2) {
+        return collect.is_tact(2);
+    }
+    if tact(3) {
+        return collect.is_tact(3);
+    }
+    if tact(4) {
+        return collect.is_tact(4);
+    }
+    if tact(5) {
+        return collect.is_tact(5);
+    }
+    let triforce = |no: u8| item == ITEM_TRIFORCE_1 + no;
+    if triforce(0) {
+        return collect.is_triforce(0);
+    }
+    if triforce(1) {
+        return collect.is_triforce(1);
+    }
+    if triforce(2) {
+        return collect.is_triforce(2);
+    }
+    if triforce(3) {
+        return collect.is_triforce(3);
+    }
+    if triforce(4) {
+        return collect.is_triforce(4);
+    }
+    if triforce(5) {
+        return collect.is_triforce(5);
+    }
+    if triforce(6) {
+        return collect.is_triforce(6);
+    }
+    if triforce(7) {
+        return collect.is_triforce(7);
+    }
+    let pearl = |no: u8| item == ITEM_PEARL_NAYRU + no;
+    if pearl(0) {
+        return collect.is_symbol(super::flags::SYMBOL_NAYRU);
+    }
+    if pearl(1) {
+        return collect.is_symbol(super::flags::SYMBOL_DIN);
+    }
+    if pearl(2) {
+        return collect.is_symbol(super::flags::SYMBOL_FARORE);
+    }
+    if item == ITEM_PIRATES_CHARM {
+        return collect.test(3, 0);
+    }
+    if item == ITEM_HEROS_CHARM {
+        return collect.test(4, 0);
+    }
+    (0..60).any(|slot| equipped.item(slot) == item)
+}

@@ -69,12 +69,18 @@ impl StoryBits {
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Collect {
     bytes: [u8; COLLECT_SLOTS],
+    pub tact: u8,
+    pub triforce: u8,
+    pub symbol: u8,
 }
 
 impl Default for Collect {
     fn default() -> Self {
         Self {
             bytes: [0_u8; COLLECT_SLOTS],
+            tact: 0,
+            triforce: 0,
+            symbol: 0,
         }
     }
 }
@@ -106,7 +112,41 @@ impl Collect {
             *byte &= !(1 << item);
         }
     }
+
+    pub fn is_tact(&self, no: u8) -> bool {
+        no < 8 && self.tact & (1 << no) != 0
+    }
+
+    pub fn on_tact(&mut self, no: u8) {
+        if no < 8 {
+            self.tact |= 1 << no;
+        }
+    }
+
+    pub fn is_triforce(&self, no: u8) -> bool {
+        no < 8 && self.triforce & (1 << no) != 0
+    }
+
+    pub fn on_triforce(&mut self, no: u8) {
+        if no < 8 {
+            self.triforce |= 1 << no;
+        }
+    }
+
+    pub fn is_symbol(&self, no: u8) -> bool {
+        no < 8 && self.symbol & (1 << no) != 0
+    }
+
+    pub fn on_symbol(&mut self, no: u8) {
+        if no < 8 {
+            self.symbol |= 1 << no;
+        }
+    }
 }
+
+pub const SYMBOL_NAYRU: u8 = 0;
+pub const SYMBOL_DIN: u8 = 1;
+pub const SYMBOL_FARORE: u8 = 2;
 
 pub struct EventFlags {
     words: [u32; FLAG_WORDS],
