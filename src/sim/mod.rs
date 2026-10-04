@@ -20,6 +20,7 @@ pub mod events;
 pub mod fire;
 pub mod flags;
 pub mod frame;
+pub mod ghostship;
 pub mod ground;
 pub mod gull;
 pub mod health;
@@ -183,6 +184,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if door::Door::is_key_door(&source.name) {
         let gate = door::Door::spawn(source.parameters, source.angle, door::Kind::Key);
         world.spawn((actor, gate)).id()
+    } else if source.name == ghostship::GHOSTSHIP_ACTOR {
+        let wreck = ghostship::Ghostship::spawn(source.parameters, actor.angle[1] as f32);
+        world.spawn((actor, wreck)).id()
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters);
         world.spawn((actor, cell)).id()
@@ -246,6 +250,8 @@ pub fn build(
     sim.world.insert_resource(chest::Chests::default());
     sim.world.insert_resource(flags::StoryBits::default());
     sim.world.insert_resource(flags::Switches::default());
+    sim.world.insert_resource(flags::EventReg::default());
+    sim.world.insert_resource(flags::Charts::default());
     sim.world.insert_resource(flags::Arrivals::default());
     sim.world.insert_resource(ending::Ending::default());
     let event_list = tables
@@ -312,6 +318,7 @@ pub fn build(
                     talk::control.in_set(WwSimSet::Execute),
                     flags::control.in_set(WwSimSet::Execute),
                     clock::control.in_set(WwSimSet::Execute),
+                    ghostship::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
                     ending::control.in_set(WwSimSet::Execute),

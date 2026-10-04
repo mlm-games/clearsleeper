@@ -202,6 +202,137 @@ impl Arrivals {
     }
 }
 
+pub const REG_PAGES: usize = 256;
+pub const REG_GHOST_SHIP: u16 = 0x8803;
+pub const REG_GHOST_SHIP_ROOM: u16 = 0xC3FF;
+pub const REG_GHOST_SHIP_START: u16 = 0x85FF;
+pub const GHOST_SHIP_DONE: u8 = 3;
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EventReg {
+    bytes: [u8; REG_PAGES],
+}
+
+impl Default for EventReg {
+    fn default() -> Self {
+        Self {
+            bytes: [0; REG_PAGES],
+        }
+    }
+}
+
+impl EventReg {
+    pub fn get(&self, reg: u16) -> u8 {
+        let mask = (reg & 0xFF) as u8;
+        self.bytes
+            .get(usize::from(reg >> 8))
+            .map_or(0, |page| page & mask)
+    }
+
+    pub fn set(&mut self, reg: u16, value: u8) {
+        let mask = (reg & 0xFF) as u8;
+        if let Some(page) = self.bytes.get_mut(usize::from(reg >> 8)) {
+            *page &= !mask;
+            *page |= value & mask;
+        }
+    }
+}
+
+pub const CHART_SLOTS: usize = 128;
+pub const CHART_WORDS: usize = CHART_SLOTS / 32;
+pub const CHART_COUNT: usize = 61;
+pub const CHART_GREAT_SEA_A: usize = 35;
+pub const CHART_GREAT_SEA_B: usize = 36;
+pub const CHART_MIN_SECRET: usize = 52;
+pub const TRIFORCE_SLOTS: u8 = 8;
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Charts {
+    got: [u32; CHART_WORDS],
+    open: [u32; CHART_WORDS],
+    done: [u32; CHART_WORDS],
+    triforce: u8,
+}
+
+impl Default for Charts {
+    fn default() -> Self {
+        Self {
+            got: [0; CHART_WORDS],
+            open: [0; CHART_WORDS],
+            done: [0; CHART_WORDS],
+            triforce: 0,
+        }
+    }
+}
+
+impl Charts {
+    fn test(words: &[u32; CHART_WORDS], slot: usize) -> bool {
+        words
+            .get(slot >> 5)
+            .is_some_and(|word| word & (1 << (slot & 0x1F)) != 0)
+    }
+
+    fn mark(words: &mut [u32; CHART_WORDS], slot: usize, on: bool) {
+        if let Some(word) = words.get_mut(slot >> 5) {
+            if on {
+                *word |= 1 << (slot & 0x1F);
+            } else {
+                *word &= !(1 << (slot & 0x1F));
+            }
+        }
+    }
+
+    pub fn has(&self, slot: usize) -> bool {
+        Self::test(&self.got, slot)
+    }
+
+    pub fn is_open(&self, slot: usize) -> bool {
+        Self::test(&self.open, slot)
+    }
+
+    pub fn is_done(&self, slot: usize) -> bool {
+        Self::test(&self.done, slot)
+    }
+
+    pub fn give(&mut self, slot: usize) {
+        Self::mark(&mut self.got, slot, true);
+        Self::mark(&mut self.open, slot, true);
+    }
+
+    pub fn open(&mut self, slot: usize) {
+        Self::mark(&mut self.open, slot, true);
+    }
+
+    pub fn close(&mut self, slot: usize) {
+        Self::mark(&mut self.open, slot, false);
+    }
+
+    pub fn complete(&mut self, slot: usize) {
+        Self::mark(&mut self.done, slot, true);
+    }
+
+    pub fn triforce(&self, slot: u8) -> bool {
+        slot < TRIFORCE_SLOTS && self.triforce & (1 << slot) != 0
+    }
+
+    pub fn set_triforce(&mut self, slot: u8) {
+        if slot < TRIFORCE_SLOTS {
+            self.triforce |= 1 << slot;
+        }
+    }
+
+    pub fn total(&self) -> usize {
+        (1..=CHART_COUNT)
+            .filter(|slot| {
+                *slot != CHART_GREAT_SEA_A
+                    && *slot != CHART_GREAT_SEA_B
+                    && *slot < CHART_MIN_SECRET
+                    && self.has(*slot - 1)
+            })
+            .count()
+    }
+}
+
 const NO_SET_ID: u16 = 0xFFFF;
 const SET_ID_WORDS: usize = 16;
 const SET_ID_MAX: usize = SET_ID_WORDS * 32;
