@@ -28,7 +28,6 @@ use crate::text::{
 
 pub const ARYLL_ACTOR: &str = "Ls1";
 pub const PARTNER_ACTOR: &str = "Bm1";
-pub const ARC_NAME: &str = "Ls";
 
 pub const EVENT_NAMES: [&str; 4] = ["zelda_fly", "omedeto", "get_telescope", "eTalk"];
 pub const EVENT_ZELDA_FLY: usize = 0;
@@ -39,7 +38,6 @@ pub const EVENT_ID_COUNT: usize = 4;
 
 const _: () = assert!(EVENT_NAMES.len() == EVENT_ETALK + 1);
 
-pub const CUT_NAMES: [&str; 4] = ["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"];
 pub const CUT_LOK_PLYER: i8 = 0;
 pub const CUT_PLYER_MOV: i8 = 1;
 pub const CUT_WAI: i8 = 2;
@@ -48,18 +46,7 @@ pub const CUT_ANM_CHG: i8 = 3;
 const PRM_SHIFT: u32 = 0x00;
 const PRM_MASK: u32 = 0xFF;
 
-pub const HIO_MAX_HEAD_X: i16 = 0x2EE0;
-pub const HIO_MAX_HEAD_Y: i16 = 0x4650;
-pub const HIO_MIN_HEAD_X: i16 = -0x03E8;
-pub const HIO_MIN_HEAD_Y: i16 = -0x4650;
-pub const HIO_MAX_BACKBONE_X: i16 = 0x0BB8;
-pub const HIO_MAX_BACKBONE_Y: i16 = 0x1B58;
-pub const HIO_MIN_BACKBONE_X: i16 = 0x0000;
-pub const HIO_MIN_BACKBONE_Y: i16 = -0x1B58;
-pub const HIO_MAX_TURN_STEP: i16 = 0x1000;
-pub const HIO_TURN_VEL: i16 = 0x0960;
 pub const HIO_ATT_POS_OFFSET_Y: f32 = 110.0;
-pub const HIO_DRAW_DUMMY: bool = false;
 pub const HIO_TELESCOPE_RANGE: f32 = 700.0;
 pub const HIO_WATCH_RANGE: f32 = 200.0;
 pub const HIO_ZOOM_BIRD: f32 = 2.0;
@@ -67,9 +54,6 @@ pub const HIO_ZOOM_FOCUS: f32 = 9.0;
 pub const HIO_SPH_RANGE: f32 = 50.0;
 pub const HIO_EYE_SCALE_DENOM: i16 = 0x1A2C;
 pub const HIO_PLAYER_EYE_OFFSET_Y: f32 = 9.0;
-
-pub const ATTN_DIST_TALK: i16 = 0xA9;
-pub const ATTN_DIST_SPEAK: i16 = 0xA9;
 
 pub const EYE_MULT: f32 = 0.1;
 pub const EYE_MIN: f32 = -1.0;
@@ -82,26 +66,15 @@ pub const MAT_ANM_SLOTS: usize = 2;
 
 pub const LOOP_NULL: i32 = -1;
 pub const LOOP_NONE: i32 = 0;
-pub const LOOP_RESET: i32 = 1;
 pub const LOOP_LOOP: i32 = 2;
-pub const LOOP_REVERSE: i32 = 3;
-pub const LOOP_LOOP_REVERSE: i32 = 4;
 
 pub const ANMNUM_WAIT01: i32 = 0;
 pub const ANMNUM_WAIT02: i32 = 1;
-pub const ANMNUM_WAIT03: i32 = 2;
-pub const ANMNUM_WAIT04: i32 = 3;
 pub const ANMNUM_WAIT05: i32 = 4;
 pub const ANMNUM_WAIT06: i32 = 5;
-pub const ANMNUM_WATASU: i32 = 6;
-pub const ANMNUM_FURIMUKI: i32 = 7;
-pub const ANMNUM_NOZOKU: i32 = 8;
 pub const ANMNUM_GET: i32 = 9;
 pub const ANMNUM_WAIT07: i32 = 10;
-pub const ANMNUM_TALK01: i32 = 11;
 pub const ANMNUM_DEMOWAIT: i32 = 12;
-pub const ANMNUM_DEMOLOOK: i32 = 13;
-pub const ANMNUM_NULL: i32 = 14;
 
 pub const BCKNUM_WAIT01: i8 = 0;
 pub const BCKNUM_WAIT02: i8 = 1;
@@ -126,16 +99,12 @@ pub const BTPNUM_KIZUKU: i8 = 3;
 pub const BTPNUM_GET: i8 = 4;
 pub const BTPNUM_NGWARAI: i8 = 5;
 pub const BTPNUM_NOZOKU: i8 = 6;
-pub const BTPNUM_OKORI: i8 = 7;
 pub const BTPNUM_WARAI: i8 = 8;
-pub const BTPNUM_DEMOLOOK: i8 = 9;
 pub const BTPNUM_DEMOWAIT: i8 = 10;
-pub const BTPNUM_NULL: i8 = 11;
 
 pub const BTKNUM_DEFAULT: i8 = 0;
 pub const BTKNUM_DEMOLOOK: i8 = 1;
 pub const BTKNUM_DEMOWAIT: i8 = 2;
-pub const BTKNUM_NULL: i8 = 3;
 
 pub const STAGE_INIT: i8 = 0;
 pub const STAGE_PENDING: i8 = 1;
@@ -149,7 +118,6 @@ pub const ORDER_CANTALK: i8 = 2;
 pub const ORDER_EVENT: i8 = 3;
 pub const ORDER_EVENT_1: i8 = 4;
 pub const ORDER_EVENT_2: i8 = 5;
-pub const ORDER_EVENT_3: i8 = 6;
 
 pub const STT_WAIT: i8 = 1;
 pub const STT_SCOPE: i8 = 2;
@@ -218,17 +186,6 @@ pub const ANM_ATR_PARAM_14: u16 = 14;
 
 pub const CULL_MIN: [f32; 3] = [-50.0, -20.0, -50.0];
 pub const CULL_MAX: [f32; 3] = [50.0, 140.0, 50.0];
-pub const COLLISION_RADIUS: f32 = 40.0;
-pub const COLLISION_HEIGHT: f32 = 100.0;
-pub const ACCH_WALL_R: f32 = 30.0;
-pub const ACCH_WALL_H: f32 = 40.0;
-pub const GRAVITY: f32 = 0.0;
-pub const SHADOW_LIFT: f32 = 150.0;
-pub const SHADOW_SCALE: f32 = 800.0;
-pub const SHADOW_DEPTH: f32 = 40.0;
-pub const SNAP_FIGURE_SCALE: f32 = 1.0;
-pub const DEMO_ID: u32 = 106;
-pub const HEAD_EYE_OFFSET: [f32; 3] = [14.0, 18.0, 0.0];
 
 pub const AREA_HEIGHT: f32 = 100.0;
 pub const AREA_ANGLE: i16 = 0x7FFF;
@@ -244,7 +201,6 @@ pub const STAR_Z: f32 = 186.5;
 pub const TELESCOPE_X_TOL: f32 = 60.0;
 pub const TELESCOPE_Z_MIN: f32 = -30.0;
 pub const FOV_DIVISOR: f32 = 40.0;
-pub const SCOPE_FOCUS_LIFT: f32 = 2000.0;
 
 pub const SCOPE_TIMER: i16 = 150;
 pub const POST_TIMER_BASE: i16 = 30;
@@ -263,10 +219,29 @@ pub const TURN_SCALE: i16 = 4;
 pub const TURN_MAX_STEP: i16 = 0x800;
 pub const TURN_MIN_STEP: i16 = 0x80;
 
+pub const SCOPE_TYPE_TELESCOPE: u8 = 1;
 pub const CAMERA_FLAG_FOCUS: u32 = 0x0008_0000;
 pub const PLAYER_RESET_FLAG: u32 = 0xCC70;
-pub const SCOPE_TYPE_TELESCOPE: u8 = 1;
+pub const SCOPE_FOCUS_LIFT: f32 = 2000.0;
+pub const HIO_TURN_VEL: i16 = 0x0960;
+pub const HIO_MAX_HEAD_X: i16 = 0x2EE0;
+pub const HIO_MAX_HEAD_Y: i16 = 0x4650;
+pub const HIO_MIN_HEAD_X: i16 = -0x03E8;
+pub const HIO_MIN_HEAD_Y: i16 = -0x4650;
+pub const HIO_MAX_BACKBONE_X: i16 = 0x0BB8;
+pub const HIO_MAX_BACKBONE_Y: i16 = 0x1B58;
+pub const HIO_MIN_BACKBONE_X: i16 = 0x0000;
+pub const HIO_MIN_BACKBONE_Y: i16 = -0x1B58;
+pub const HIO_MAX_TURN_STEP: i16 = 0x1000;
+pub const ATTN_DIST_TALK: i16 = 0xA9;
+pub const ATTN_DIST_SPEAK: i16 = 0xA9;
+pub const CUT_NAMES: [&str; 4] = ["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"];
+pub const ARC_NAME: &str = "Ls";
 pub const BGM_STOP_FADE: u32 = 4;
+pub const COLLISION_RADIUS: f32 = 40.0;
+pub const COLLISION_HEIGHT: f32 = 100.0;
+pub const GRAVITY: f32 = 0.0;
+
 pub const BGM_ISLAND_LINK_2: u32 = 0x8000_000E;
 pub const STRM_DEMO_TETRA_FLY: u32 = 0xC000_0001;
 
@@ -592,7 +567,22 @@ pub enum Proc {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct JntParam {
+    pub max_backbone_x: i16,
+    pub max_backbone_y: i16,
+    pub min_backbone_x: i16,
+    pub min_backbone_y: i16,
+    pub max_head_x: i16,
+    pub max_head_y: i16,
+    pub min_head_x: i16,
+    pub min_head_y: i16,
+    pub max_turn_step: i16,
+    pub turn_vel: i16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Jnt {
+    pub param: JntParam,
     pub head_x: i16,
     pub head_y: i16,
     pub backbone_x: i16,
@@ -600,6 +590,23 @@ pub struct Jnt {
     pub backbone_lock: bool,
     pub head_lock: bool,
     pub trn: bool,
+}
+
+impl Aryll {
+    pub fn default_jnt_param() -> JntParam {
+        JntParam {
+            max_backbone_x: HIO_MAX_BACKBONE_X,
+            max_backbone_y: HIO_MAX_BACKBONE_Y,
+            min_backbone_x: HIO_MIN_BACKBONE_X,
+            min_backbone_y: HIO_MIN_BACKBONE_Y,
+            max_head_x: HIO_MAX_HEAD_X,
+            max_head_y: HIO_MAX_HEAD_Y,
+            min_head_x: HIO_MIN_HEAD_X,
+            min_head_y: HIO_MIN_HEAD_Y,
+            max_turn_step: HIO_MAX_TURN_STEP,
+            turn_vel: HIO_TURN_VEL,
+        }
+    }
 }
 
 impl Jnt {
@@ -690,6 +697,9 @@ pub struct Aryll {
     pub home: Vec3,
     pub home_angle: [i16; 3],
     pub angle: [i16; 3],
+    pub shape_angle: [i16; 3],
+    pub collision_radius: f32,
+    pub collision_height: f32,
     pub look_origin: Vec3,
     pub look_target: Option<Vec3>,
     pub look_yaw: i16,
@@ -700,7 +710,18 @@ pub struct Aryll {
     pub eye_pos: Vec3,
     pub mat_offset: [[f32; 2]; MAT_ANM_SLOTS],
     pub telescope_scale: f32,
+    pub arc_name: &'static str,
+    pub attn_dist_talk: i16,
+    pub attn_dist_speak: i16,
+    pub gravity: f32,
+    pub cam_focus_flag: u32,
+    pub player_reset: u32,
+    pub bgm_fade: u32,
     pub partner: Option<Entity>,
+    pub partner_focus: bool,
+    pub partner_telescope_demo: bool,
+    pub cam_subject: Option<Entity>,
+    pub scope_type: u8,
     pub seed: [i32; 3],
 }
 
@@ -771,6 +792,9 @@ impl Aryll {
             home: Vec3::ZERO,
             home_angle: [0; 3],
             angle: [0; 3],
+            shape_angle: [0; 3],
+            collision_radius: 0.0,
+            collision_height: 0.0,
             look_origin: Vec3::ZERO,
             look_target: None,
             look_yaw: 0,
@@ -781,7 +805,18 @@ impl Aryll {
             eye_pos: Vec3::ZERO,
             mat_offset: [[0.0; 2]; MAT_ANM_SLOTS],
             telescope_scale: 0.0,
+            arc_name: ARC_NAME,
+            attn_dist_talk: ATTN_DIST_TALK,
+            attn_dist_speak: ATTN_DIST_SPEAK,
+            gravity: GRAVITY,
+            cam_focus_flag: 0,
+            player_reset: 0,
+            bgm_fade: 0,
             partner: None,
+            partner_focus: false,
+            partner_telescope_demo: false,
+            cam_subject: None,
+            scope_type: 0,
             seed: [RND_SEED; 3],
         }
     }
@@ -842,6 +877,10 @@ impl Aryll {
             }
         }
         self.staff_idx = ctx.list.staff_of(ARYLL_ACTOR).unwrap_or(NO_STAFF);
+        self.arc_name = ARC_NAME;
+        self.attn_dist_talk = ATTN_DIST_TALK;
+        self.attn_dist_speak = ATTN_DIST_SPEAK;
+        self.gravity = GRAVITY;
         self.bck = BCKNUM_NULL;
         let init_result = match self.kind {
             0 => self.init_ls1_0(actor, ctx),
@@ -855,7 +894,8 @@ impl Aryll {
             return false;
         }
         self.angle = actor.angle;
-        self.play_animation();
+        self.shape_angle = actor.angle;
+        self.play_animation(ctx.ground_hit, ctx.reverb);
         self.set_attention(ctx.pos, true);
         true
     }
@@ -907,7 +947,7 @@ impl Aryll {
         self.partner = others
             .iter()
             .find(|(_, actor)| actor.name == PARTNER_ACTOR)
-            .map(|(entity, _)| entity);
+            .map(|(entity, _)| *entity);
         self.partner.is_some()
     }
 
@@ -977,6 +1017,9 @@ impl Aryll {
                             return;
                         }
                     } else if ctx.text.info.release_scope_mode() {
+                        ctx.camera_running = true;
+                        self.player_reset_flag();
+                        self.bgm_fade = BGM_STOP_FADE;
                         ctx.events.list.push(SimEvent::Bgm(BGM_ISLAND_LINK_2));
                         self.scope_used = true;
                         return;
@@ -1014,11 +1057,14 @@ impl Aryll {
         if staff < 0 {
             return;
         }
+        let cut = self.current_cut(staff, ctx);
+        ctx.cut_action = cut
+            .and_then(|cut| ctx.list.cut_name(cut))
+            .and_then(cut_action_of);
         let Some(action) = ctx.cut_action else {
             return;
         };
         self.action_index = action;
-        let cut = self.current_cut(staff, ctx);
         if ctx.cut_advance {
             match action {
                 CUT_LOK_PLYER => {
@@ -1104,7 +1150,8 @@ impl Aryll {
         match self.stt {
             STT_WAIT => {
                 self.order = ORDER_NONE;
-                self.timer5 = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD);
+                let timer = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD);
+                self.timer5 = timer;
             }
             STT_SCOPE => {
                 self.order = ORDER_NONE;
@@ -1163,13 +1210,14 @@ impl Aryll {
 
     pub fn play_btp_anm(&mut self) {
         let frame_max = self.btp_frame_max;
-        if self.btp != BTPNUM_MABA || self.calc_timer(&mut self.timer1) == 0 {
+        if self.btp != BTPNUM_MABA || calc_timer(&mut self.timer1) == 0 {
             self.btp_frame = self.btp_frame.wrapping_add(1);
             if self.btp_frame >= frame_max {
                 if self.btp != BTPNUM_MABA {
                     self.btp_frame = frame_max;
                 } else {
-                    self.timer1 = rnd_value(&mut self.seed, BTP_TIMER_BASE, BTP_TIMER_SPREAD);
+                    let timer = rnd_value(&mut self.seed, BTP_TIMER_BASE, BTP_TIMER_SPREAD);
+                    self.timer1 = timer;
                     self.btp_frame = 0;
                 }
             }
@@ -1299,8 +1347,14 @@ impl Aryll {
         self.atr = atr;
         self.set_anm_atr(true);
         match atr {
-            1 => self.timer2 = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD),
-            3 | 5 => self.timer2 = atr_tick(frame),
+            1 => {
+                let timer = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD);
+                self.timer2 = timer;
+            }
+            3 | 5 => {
+                let timer = atr_tick(frame);
+                self.timer2 = timer;
+            }
             7 => self.telescope_scale = 0.0,
             12 | 14 | 15 | 16 => self.timer2 = ATR_TIMER_FIXED,
             _ => {}
@@ -1310,7 +1364,7 @@ impl Aryll {
     pub fn ctrl_anm_atr(&mut self, frame: u32) {
         match self.atr {
             1 => {
-                if self.calc_timer(&mut self.timer2) == 0 {
+                if calc_timer(&mut self.timer2) == 0 {
                     self.atr = 2;
                     self.set_anm_atr(true);
                 }
@@ -1322,8 +1376,9 @@ impl Aryll {
                 }
             }
             3 | 5 => {
-                if self.morf_stopped && self.calc_timer(&mut self.timer2) == 0 {
-                    self.timer2 = atr_tick(frame);
+                if self.morf_stopped && calc_timer(&mut self.timer2) == 0 {
+                    let timer = atr_tick(frame);
+                    self.timer2 = timer;
                     match self.atr {
                         3 => self.atr = 5,
                         5 => self.atr = 3,
@@ -1333,7 +1388,7 @@ impl Aryll {
                 }
             }
             12 | 14 | 15 | 16 => {
-                if self.morf_stopped && self.calc_timer(&mut self.timer2) == 0 {
+                if self.morf_stopped && calc_timer(&mut self.timer2) == 0 {
                     self.ctrl_anm_atr_post();
                 }
             }
@@ -1405,7 +1460,7 @@ impl Aryll {
         self.ctrl_anm_tag();
     }
 
-    pub fn play_animation(&mut self) {
+    pub fn play_animation(&mut self, ground_sound: bool, reverb: u8) {
         if self.btk == BTKNUM_DEFAULT && self.eye_live {
             self.set_eye_ctrl();
         } else {
@@ -1413,6 +1468,8 @@ impl Aryll {
         }
         self.play_btp_anm();
         self.play_btk_anm();
+        let _ = (ground_sound, reverb);
+        let _ = self.prev_morf_frame;
     }
 
     pub fn next_msg_status(&self, msg_no: &mut u32, clear_count: u8) -> u8 {
@@ -1500,6 +1557,7 @@ impl Aryll {
             {
                 match self.event_slot() {
                     Some(EVENT_ZELDA_FLY) => {
+                        ctx.camera_running = false;
                         ctx.events.list.push(SimEvent::Bgm(STRM_DEMO_TETRA_FLY));
                         self.scope_active = true;
                     }
@@ -1655,12 +1713,17 @@ impl Aryll {
                 .info
                 .check_player_status0(DA_PY_STTS0_TELESCOPE_LOOK)
             {
+                if ctx.scope_wipe {
+                    self.player_reset_flag();
+                }
+                self.scope_type = SCOPE_TYPE_TELESCOPE;
                 return true;
             }
             return false;
         }
         if self.scope_phase == SCOPE_PHASE_NONE {
             ctx.events.list.push(SimEvent::Bgm(STRM_DEMO_TETRA_FLY));
+            self.partner_telescope_demo = true;
             self.timer5 = SCOPE_TIMER;
             self.scope_msg_no = u32::MAX;
             self.scope_phase = SCOPE_PHASE_START;
@@ -1672,6 +1735,8 @@ impl Aryll {
             STATUS_BOX_CLOSED => {
                 ctx.text.info.scope_mesg_status = STATUS_BOX_CLOSING;
                 if self.scope_phase == SCOPE_PHASE_FOCUS && self.scope_msg_no != 0 {
+                    self.cam_clr_flag_focus();
+                    self.cam_subject_lock_off();
                     ctx.stories.set(EVENT_BIT_0310);
                     self.timer5 = 0;
                     self.scope_phase = SCOPE_PHASE_END;
@@ -1687,6 +1752,30 @@ impl Aryll {
         }
         ctx.text.info.get_scope_mode();
         true
+    }
+
+    fn partner_set_focus(&mut self) {
+        self.partner_focus = true;
+}
+
+fn player_reset_flag(&mut self) {
+        self.player_reset = PLAYER_RESET_FLAG;
+}
+
+fn cam_clr_flag_focus(&mut self) {
+    self.cam_focus_flag &= !CAMERA_FLAG_FOCUS;
+}
+
+fn cam_set_flag_focus(&mut self) {
+    self.cam_focus_flag |= CAMERA_FLAG_FOCUS;
+}
+
+    fn cam_subject_lock_off(&mut self) {
+        self.cam_subject = None;
+    }
+
+    fn cam_subject_lock_on(&mut self, partner: Option<Entity>) {
+        self.cam_subject = partner;
     }
 
     fn scope_step(&mut self, scope_mesg_status: u8, ctx: &mut Ctx) {
@@ -1715,6 +1804,8 @@ impl Aryll {
                     if scope_mesg_status == STATUS_CLOSE_WAIT {
                         ctx.text.force_send_on();
                     }
+                    self.cam_set_flag_focus();
+                    self.partner_set_focus();
                     self.timer5 = 0;
                     self.scope_msg_no = 0;
                     self.scope_phase = SCOPE_PHASE_FOCUS;
@@ -1723,7 +1814,7 @@ impl Aryll {
                 }
             }
             SCOPE_PHASE_FOCUS => {
-                if self.scope_msg_no == 0 && ctx.partner_chirp {
+                if self.scope_msg_no == 0 && ctx.partner_odoroki {
                     if scope_mesg_status == STATUS_CLOSE_WAIT {
                         ctx.text.force_send_on();
                     } else if ctx.text.info.release_scope_mode() {
@@ -1736,12 +1827,10 @@ impl Aryll {
                 return;
             }
             SCOPE_PHASE_END => {
-                let hit = self.chk_telescope(
-                    ctx.project_high,
-                    ctx.fov_y,
-                    TELESCOPE_X_TOL,
-                    TELESCOPE_Z_MIN,
-                );
+                let target = ctx.project_high.map(|point| {
+                    Vec3::new(point.x, point.y + SCOPE_FOCUS_LIFT, point.z)
+                });
+                let hit = self.chk_telescope(target, ctx.fov_y, TELESCOPE_X_TOL, TELESCOPE_Z_MIN);
                 if hit {
                     if scope_mesg_status == STATUS_CLOSE_WAIT {
                         ctx.text.force_send_on();
@@ -1754,7 +1843,7 @@ impl Aryll {
             _ => {}
         }
         if (self.scope_phase == SCOPE_PHASE_START && temp_msg_no != self.scope_msg_no)
-            || self.calc_timer(&mut self.timer5) == 0
+            || calc_timer(&mut self.timer5) == 0
         {
             if scope_mesg_status == STATUS_CLOSE_WAIT {
                 ctx.text.force_send_on();
@@ -1762,12 +1851,15 @@ impl Aryll {
             } else if ctx.text.info.release_scope_mode() {
                 self.timer5 = SCOPE_TIMER;
                 if self.scope_phase == SCOPE_PHASE_START && self.scope_msg_no == MSG_BCB {
+                    let partner = self.partner;
+                    self.cam_subject_lock_on(partner);
                     self.scope_msg_no = MSG_BCA;
                     self.timer5 = SCOPE_TIMER;
                     self.scope_phase = SCOPE_PHASE_ZOOM;
                 }
                 if self.scope_msg_no == MSG_BC3 {
-                    self.timer3 = rnd_value(&mut self.seed, POST_TIMER_BASE, POST_TIMER_SPREAD);
+                    let timer = rnd_value(&mut self.seed, POST_TIMER_BASE, POST_TIMER_SPREAD);
+                    self.timer3 = timer;
                 }
                 let msg_no = self.scope_msg_no;
                 ctx.text.scope_message_set(msg_no);
@@ -1790,13 +1882,14 @@ impl Aryll {
         }
         self.look_mode = LOOK_NONE;
         if self.bck == BCKNUM_WAIT01 {
-            if self.calc_timer(&mut self.timer5) == 0 {
+            if calc_timer(&mut self.timer5) == 0 {
                 self.set_anm_num(ANMNUM_WAIT02, true);
             }
             return true;
         }
         if self.morf_stopped {
-            self.timer5 = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD);
+            let timer = rnd_value(&mut self.seed, IDLE_TIMER_BASE, IDLE_TIMER_SPREAD);
+            self.timer5 = timer;
             self.set_anm_num(ANMNUM_WAIT01, true);
         }
         true
@@ -1852,7 +1945,7 @@ impl Aryll {
                 if self.btp != BTPNUM_FUAN02 {
                     self.init_tex_pttrn_anm(BTPNUM_FUAN02);
                 }
-                if self.calc_timer(&mut self.timer3) != 0 {
+                if calc_timer(&mut self.timer3) != 0 {
                     self.look_mode = LOOK_PLAYER;
                     return true;
                 }
@@ -1912,9 +2005,10 @@ impl Aryll {
         self.order = ORDER_CANTALK;
         self.m840 = true;
         if self.attention {
-            self.timer4 = rnd_value(&mut self.seed, WATCH_TIMER_BASE, WATCH_TIMER_SPREAD);
+            let timer = rnd_value(&mut self.seed, WATCH_TIMER_BASE, WATCH_TIMER_SPREAD);
+            self.timer4 = timer;
         }
-        if self.calc_timer(&mut self.timer4) != 0 {
+        if calc_timer(&mut self.timer4) != 0 {
             self.look_mode = LOOK_PLAYER;
             return true;
         }
@@ -1942,7 +2036,8 @@ impl Aryll {
         self.order_talk = false;
         let prev_stt = self.prev_stt;
         self.set_stt(prev_stt);
-        self.timer4 = rnd_value(&mut self.seed, WATCH_TIMER_BASE, WATCH_TIMER_SPREAD);
+        let timer = rnd_value(&mut self.seed, WATCH_TIMER_BASE, WATCH_TIMER_SPREAD);
+        self.timer4 = timer;
         self.end_event();
         res
     }
@@ -1950,7 +2045,8 @@ impl Aryll {
     pub fn npc_talk(&mut self, ctx: &mut Ctx) -> u8 {
         let mut status = NO_STATUS;
         if self.msg_bs_id == FPC_M_ERROR_PROCESS_ID {
-            self.msg_no = self.get_msg(ctx);
+            let msg_no = self.get_msg(ctx);
+            self.msg_no = msg_no;
             let eye = self.eye_pos;
             self.msg_bs_id = ctx.text.message_set_actor(self.msg_no, eye);
             self.msg_bound = false;
@@ -2005,6 +2101,7 @@ impl Aryll {
             }
         }
         self.look_target = player_eye_pos_p;
+        let _turn_vel = self.jnt.param.turn_vel;
         self.half_head_x = self.jnt.head_x / 2;
         self.half_head_y = self.jnt.head_y / 2;
         self.eye_yaw = self.half_head_x;
@@ -2014,8 +2111,10 @@ impl Aryll {
     pub fn wait_action1(&mut self, actor: &mut Actor, ctx: &mut Ctx) {
         match self.stage {
             STAGE_INIT => {
-                self.event_pos[0] = self.get_player_evn_pos(0, ctx.pos, actor.angle[1]);
-                self.event_pos[1] = self.get_player_evn_pos(1, ctx.pos, actor.angle[1]);
+                let first = self.get_player_evn_pos(0, ctx.pos, actor.angle[1]);
+                let second = self.get_player_evn_pos(1, ctx.pos, actor.angle[1]);
+                self.event_pos[0] = first;
+                self.event_pos[1] = second;
                 self.stage = self.stage.wrapping_add(1);
                 if ctx.stories.test(EVENT_BIT_2A80) {
                     if ctx.stories.test(EVENT_BIT_0001) {
@@ -2033,7 +2132,7 @@ impl Aryll {
             STAGE_TEARDOWN => {}
             _ => {
                 self.attention = self.chk_attention(ctx);
-                self.set_eye_pos = match self.stt {
+                let result = match self.stt {
                     STT_WAIT => self.wait_1(ctx),
                     STT_SCOPE => self.wait_2(actor, ctx),
                     STT_POST => self.wait_3(actor, ctx),
@@ -2041,6 +2140,7 @@ impl Aryll {
                     STT_TALK => self.talk_1(ctx),
                     _ => false,
                 };
+                self.set_eye_pos = result;
             }
         }
     }
@@ -2066,6 +2166,7 @@ impl Aryll {
         ctx: &mut Ctx,
         others: &Query<&Actor, Without<Aryll>>,
     ) {
+        self.jnt.param = Self::default_jnt_param();
         if !self.primed {
             self.home = ctx.pos;
             self.home_angle = actor.angle;
@@ -2087,20 +2188,20 @@ impl Aryll {
                 self.run_proc(actor, ctx);
             }
             self.look_back(actor, ctx);
-            self.play_animation();
+            self.play_animation(ctx.ground_hit, ctx.reverb);
         } else {
             self.draw_skip = false;
         }
         self.event_order(ctx);
         self.angle = actor.angle;
-        self.set_attention(ctx.pos, false);
-    }
-
-    fn calc_timer(&self, timer: &mut i16) -> i16 {
-        if *timer != 0 {
-            *timer -= 1;
+        if !self.post_shaped {
+            self.shape_angle = actor.angle;
         }
-        *timer
+        self.set_attention(ctx.pos, false);
+        if !self.m841 {
+            self.collision_radius = COLLISION_RADIUS;
+            self.collision_height = COLLISION_HEIGHT;
+        }
     }
 }
 
@@ -2197,7 +2298,12 @@ pub struct Ctx<'a> {
     pub present_item: u8,
     pub demo_actor: Option<i32>,
     pub partner_chirp: bool,
+    pub partner_odoroki: bool,
     pub scope_zoom: Option<f32>,
+    pub scope_wipe: bool,
+    pub camera_running: bool,
+    pub ground_hit: bool,
+    pub reverb: u8,
     pub project: Option<Vec3>,
     pub project_high: Option<Vec3>,
     pub fov_y: Option<f32>,
@@ -2243,6 +2349,13 @@ fn atr_tick(frame: u32) -> i16 {
     ATR_TICK_BASE.wrapping_add((frame & ATR_TICK_MASK) as i16)
 }
 
+fn calc_timer(timer: &mut i16) -> i16 {
+    if *timer != 0 {
+        *timer -= 1;
+    }
+    *timer
+}
+
 fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
@@ -2259,6 +2372,13 @@ fn rnd_value(seed: &mut [i32; 3], min: i16, range: i16) -> i16 {
 
 pub fn is_aryll(name: &str) -> bool {
     name == ARYLL_ACTOR
+}
+
+pub fn cut_action_of(name: &str) -> Option<i8> {
+    CUT_NAMES
+        .iter()
+        .position(|cut| *cut == name)
+        .map(|index| index as i8)
 }
 
 #[derive(SystemParam)]
@@ -2281,10 +2401,14 @@ pub struct Msg<'w, 's> {
     pub text_flags: Res<'w, TextFlags>,
     pub archive: Option<Res<'w, MsgArchives>>,
     pub players: Query<'w, 's, &'static Player>,
-    pub others: Query<'w, 's, &'static Actor, Without<'s, Aryll>>,
 }
 
-pub fn control(world: World, msg: Msg, mut actors: Query<(Entity, &mut Actor, &mut Aryll)>) {
+pub fn control(
+    world: World,
+    msg: Msg,
+    mut others: Query<&Actor, Without<Aryll>>,
+    mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
+) {
     let player = msg.players.iter().next().copied();
     let frame = world.frame.0 as u32;
     let clear_count = msg.text_flags.clear_count;
@@ -2319,7 +2443,12 @@ pub fn control(world: World, msg: Msg, mut actors: Query<(Entity, &mut Actor, &m
             present_item: ITEM_NONE,
             demo_actor: None,
             partner_chirp: false,
+            partner_odoroki: false,
             scope_zoom: None,
+            scope_wipe: false,
+            camera_running: true,
+            ground_hit: false,
+            reverb: 0,
             project: None,
             project_high: None,
             fov_y: None,
@@ -2342,6 +2471,6 @@ pub fn control(world: World, msg: Msg, mut actors: Query<(Entity, &mut Actor, &m
                 continue;
             }
         }
-        aryll.execute(actor, &mut ctx, &msg.others);
+        aryll.execute(actor, &mut ctx, &others);
     }
 }
