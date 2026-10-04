@@ -120,7 +120,7 @@ pub fn control(
     mut ships: Query<(&Actor, &mut Ghostship)>,
     players: Query<&Player>,
 ) {
-    if regs.get(REG_GHOST_SHIP) >= GHOST_SHIP_DONE {
+    if regs.reg(REG_GHOST_SHIP) >= GHOST_SHIP_DONE {
         return;
     }
     let home = players.iter().next().map(|player| player.pos);

@@ -379,9 +379,9 @@ pub fn control(
                     if lift.settle != 0 {
                         lift.settle -= 1;
                         if lift.settle == 0 && lift.mask != 0 {
-                            let reg = regs.get(EVENT_REG);
+                            let reg = regs.reg(EVENT_REG);
                             if reg < EVENT_REG_TOP {
-                                regs.set(EVENT_REG, reg + 1);
+                                regs.set_reg(EVENT_REG, reg + 1);
                             }
                         }
                     }

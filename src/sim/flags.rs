@@ -61,13 +61,6 @@ impl StoryBits {
         self.bytes[cell] |= value;
     }
 
-    pub fn get(&self, reg: u16) -> u8 {
-        self.reg(reg)
-    }
-
-    pub fn set(&mut self, reg: u16, value: u8) {
-        self.set_reg(reg, value)
-    }
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
@@ -416,7 +409,7 @@ fn letter_msg(regs: &EventReg) -> u32 {
     TPOST_LETTERS
         .iter()
         .skip(1)
-        .find(|(_, reg)| regs.get(*reg) == LETTER_STOCK)
+        .find(|(_, reg)| regs.reg(*reg) == LETTER_STOCK)
         .map_or(0, |(msg, _)| *msg)
 }
 

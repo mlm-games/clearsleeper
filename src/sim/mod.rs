@@ -16,6 +16,7 @@ pub mod bombflower;
 pub mod boomerang;
 pub mod chest;
 pub mod carry;
+pub mod chuchu;
 pub mod cleared;
 pub mod clock;
 pub mod collision;
@@ -70,6 +71,7 @@ pub mod sage;
 pub mod scenery;
 pub mod schedule;
 pub mod select;
+pub mod merchant;
 pub mod shop;
 pub mod sea;
 pub mod servant;
@@ -189,6 +191,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if zunari::is_zunari(&source.name) {
         let stall = zunari::Zunari::spawn(source.parameters);
         world.spawn((actor, stall)).id()
+    } else if chuchu::is_chuchu(&source.name) {
+        let slime = chuchu::Chuchu::spawn(source.parameters);
+        world.spawn((actor, slime)).id()
+    } else if merchant::is_merchant(&source.name) {
+        let trader = merchant::Merchant::spawn(source.parameters);
+        world.spawn((actor, trader)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -588,6 +596,7 @@ pub fn build(
                     msg::control.in_set(WwSimSet::Execute),
                     sage::control.in_set(WwSimSet::Execute),
                     servant::control.in_set(WwSimSet::Execute),
+                    merchant::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                     zunari::control.in_set(WwSimSet::Execute),
@@ -631,6 +640,10 @@ pub fn build(
                     mflft::control.in_set(WwSimSet::Execute),
                     ylzou::control.in_set(WwSimSet::Execute),
                     kn::control.in_set(WwSimSet::Execute),
+                    chuchu::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     figure::control.in_set(WwSimSet::Execute),
                     armos::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),

@@ -669,6 +669,17 @@ impl App {
             } else if let Some(hoist) = entity.get::<sim::mflft::Mflft>() {
                 let (half, top) = hoist.cull();
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(slime) = entity.get::<sim::chuchu::Chuchu>() {
+                if !slime.drawn() {
+                    continue;
+                }
+                let (min, max) = slime.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(trader) = entity.get::<sim::merchant::Merchant>() {
+                let (min, max) = trader.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
             } else if let Some(crab) = entity.get::<sim::kn::Kn>() {
                 if !crab.drawn() {
                     continue;

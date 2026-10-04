@@ -411,7 +411,7 @@ impl Figure {
             return false;
         }
         let bit = self.figure % 8;
-        let reg = regs.get(FIGURE_COMP.get(usize::from(group)).copied().unwrap_or(0));
+        let reg = regs.reg(FIGURE_COMP.get(usize::from(group)).copied().unwrap_or(0));
         reg & (1 << bit) != 0
     }
 
