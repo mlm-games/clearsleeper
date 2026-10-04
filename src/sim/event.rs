@@ -10,7 +10,7 @@ use super::msg::{
 };
 use super::player::Player;
 use super::sea::Sea;
-use super::ship::{Ship, SHIP_ACTOR};
+use super::ship::{DECK_RISE, GET_OFF_SPEED, LEDGE_OFFSET_X, Ship, SHIP_ACTOR};
 use super::talk::Talk;
 use super::transition::{NextStage, Target};
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
@@ -991,7 +991,7 @@ fn link_cut(
     list: &EventList,
     flags: &mut EventFlags,
     actors: &mut Query<(Entity, &mut Actor)>,
-    ships: &Query<&mut Ship>,
+    ships: &mut Query<&mut Ship>,
     msg: &mut MsgBox,
     table: &MsgTable,
     partner: &mut ItemPartner,
@@ -1106,6 +1106,25 @@ fn link_cut(
                     if let Some((_, mut player)) = players.iter_mut().next() {
                         player.speed = 0.0;
                     }
+                }
+            }
+            71 => {
+                if run.advance > 0
+                    && let Some((ship_id, _, _)) = ship_pos(actors)
+                    && let Ok((_, mut body)) = actors.get_mut(ship_id)
+                    && let Some((_, mut player)) = players.iter_mut().next()
+                {
+                    let yaw = from_s16(body.angle[1].wrapping_sub(0x4000));
+                    player.pos.x += yaw.sin() * LEDGE_OFFSET_X;
+                    player.pos.y = body.pos.y + DECK_RISE;
+                    player.pos.z += yaw.cos() * LEDGE_OFFSET_X;
+                    player.yaw = yaw;
+                    player.speed = GET_OFF_SPEED;
+                    player.speed_y = 0.0;
+                    if let Ok(mut sail) = ships.get_mut(ship_id) {
+                        sail.riding = false;
+                    }
+                    cut_end(run, list, flags);
                 }
             }
             _ => {}
