@@ -144,6 +144,7 @@ pub fn control(
     collision: Option<Res<Collision>>,
     mut hooks: Query<(Entity, &mut Hookshot)>,
     carryables: Query<(Entity, &Actor, &Carryable)>,
+    targets: Query<(Entity, &Actor)>,
     mut players: Query<&mut Player>,
     mut commands: Commands,
 ) {
@@ -189,7 +190,7 @@ pub fn control(
                     continue;
                 }
                 if let Some(target) = hook.carry
-                    && let Ok((_, actor, _)) = carryables.get(target)
+                    && let Ok((_, actor)) = targets.get(target)
                 {
                     hook.pos = actor.pos + hook.carry_offset;
                 }
@@ -201,7 +202,7 @@ pub fn control(
                     continue;
                 }
                 if let Some(target) = hook.carry
-                    && let Ok((_, actor, _)) = carryables.get(target)
+                    && let Ok((_, actor)) = targets.get(target)
                 {
                     let carried = hook.pos + hook.carry_offset;
                     let mut probe = carried;
