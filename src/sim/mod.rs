@@ -55,6 +55,7 @@ pub mod hop;
 pub mod iball;
 pub mod ice;
 pub mod intent;
+pub mod ivan;
 pub mod inventory;
 pub mod item;
 pub mod jump;
@@ -106,6 +107,7 @@ pub mod stream;
 pub mod swim;
 pub mod swhammer;
 pub mod swlight;
+pub mod swc00;
 pub mod swpush;
 pub mod tag;
 pub mod taglight;
@@ -323,6 +325,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if bomb::is_bomb(&source.name) {
         let shell = bomb::Bomb::spawn(source.parameters);
         world.spawn((actor, shell)).id()
+    } else if swc00::is_swc00(&source.name) {
+        let trigger = swc00::Swc00::spawn(source.parameters, &mut world.resource_mut::<flags::Switches>());
+        match trigger {
+            Some(trigger) => world.spawn((actor, trigger)).id(),
+            None => world.spawn(actor).id(),
+        }
     } else if spotbox::is_spotbox(&source.name) {
         let spot = spotbox::SpotBox::spawn(source.parameters);
         world.spawn((actor, spot)).id()
@@ -712,6 +720,7 @@ pub fn build(
                     ice::control.in_set(WwSimSet::Execute),
                     kytag04::control.in_set(WwSimSet::Execute),
                     spotbox::control.in_set(WwSimSet::Execute),
+                    swc00::control.in_set(WwSimSet::Execute),
                     rectangle::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
