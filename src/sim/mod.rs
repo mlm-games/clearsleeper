@@ -91,6 +91,7 @@ pub mod msdan2;
 pub mod msg;
 pub mod nh;
 pub mod npc_bmsw;
+pub mod npc_btsw;
 pub mod npc_mt;
 pub mod npc_p1;
 pub mod npc_tc;
@@ -350,6 +351,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if ganon_form3::is_ganon_form3(&source.name) {
         let ganonForm3 = ganon_form3::GanonForm3::spawn(source.parameters);
         world.spawn((actor, ganonForm3)).id()
+    } else if npc_btsw::is_npc_btsw(&source.name) {
+        let btsw = npc_btsw::NpcBtsw::spawn(source.parameters);
+        world.spawn((actor, btsw)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -857,6 +861,7 @@ pub fn build(
                     npc_tc::control.in_set(WwSimSet::Execute),
                     movebox::control.in_set(WwSimSet::Execute),
                     npc_bmsw::control.in_set(WwSimSet::Execute),
+                    npc_btsw::control.in_set(WwSimSet::Execute),
                     auction::control.in_set(WwSimSet::Execute),
                     kamome::control.in_set(WwSimSet::Execute),
                     npc_mt::control.in_set(WwSimSet::Execute),
