@@ -38,7 +38,10 @@ pub fn is_carryable(name: &str) -> bool {
         || name == PIG_ACTOR
 }
 
-fn chain_from<D: bevy_ecs::query::QueryFilter>(carryables: &Query<(Entity, &Actor, &Carryable), D>, base: Entity) -> Vec<Entity> {
+fn chain_from<D: bevy_ecs::query::QueryFilter>(
+    carryables: &Query<(Entity, &mut Actor, &Carryable), D>,
+    base: Entity,
+) -> Vec<Entity> {
     let mut out = vec![base];
     for (entity, _, _) in carryables.iter() {
         if out.len() >= MAX_STACK {
@@ -69,8 +72,7 @@ pub fn control(
     do_intent: Res<DoIntent>,
     intent: Res<MoveIntent>,
     mut carry: ResMut<Carry>,
-    carryables: Query<(Entity, &Actor, &Carryable), Without<Player>>,
-    mut moves: Query<&mut Actor, Without<Player>>,
+    mut carryables: Query<(Entity, &mut Actor, &Carryable), Without<Player>>,
     mut pots: Query<&mut super::tsubo::Tsubo>,
     mut rocks: Query<&mut super::koisi::Koisi>,
     mut casks: Query<&mut super::barrel::Barrel>,
@@ -94,7 +96,7 @@ pub fn control(
             }
             let chain = chain_from(&carryables, held);
             for (slot, entity) in chain.iter().enumerate() {
-                let Ok(mut actor) = moves.get_mut(*entity) else {
+                let Ok((_, mut actor, _)) = carryables.get_mut(*entity) else {
                     continue;
                 };
                 let lift = CARRY_HEIGHT - STACK_SPACING * slot as f32;
@@ -107,7 +109,7 @@ pub fn control(
             if releasing {
                 carry.held = None;
                 for entity in chain {
-                    if let Ok(mut actor) = moves.get_mut(entity) {
+                    if let Ok((_, mut actor, _)) = carryables.get_mut(entity) {
                         actor.pos += forward * RELEASE_SPEED;
                         if let Ok(mut pot) = pots.get_mut(entity) {
                             pot.toss(forward, player.speed);

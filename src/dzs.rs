@@ -98,6 +98,7 @@ pub struct StageHeader {
     pub far_plane: f32,
 }
 
+#[derive(Debug)]
 pub struct StageTables {
     placements: Vec<Placement>,
     room_groups: Vec<Vec<u8>>,
@@ -364,7 +365,7 @@ fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
     Ok(StageHeader {
         time_h: read_u8(data, at + 0x0D)? as i8,
         stage_type: (type_and_schbit >> 16) & 7,
-        schbit_start: (type_and_schbit >> 8) & 0xFF,
+        schbit_start: ((type_and_schbit >> 8) & 0xFF) as u8,
         schbit_sec: (type_and_schbit & 0xFF) as u8,
         schbit_enable: (enable_and_far >> 16) as u8,
         far_plane: (enable_and_far & 0xFFFF) as u16 as f32,

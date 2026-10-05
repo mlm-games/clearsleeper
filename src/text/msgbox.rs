@@ -1133,7 +1133,7 @@ impl TextBox {
     pub fn resize(
         &mut self,
         parent: Option<&mut Pane>,
-        current: [f32; 2],
+        current: [f32; 4],
         w: f32,
         h: f32,
     ) -> [f32; 2] {

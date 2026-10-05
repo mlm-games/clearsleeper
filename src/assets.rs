@@ -531,7 +531,7 @@ fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
     let blocks = read_u32(data, 0x0C)? as usize;
     let mut at = 0x20;
     for _ in 0..blocks {
-        if data.len() < at.saturating_add(0x0C) || read_u32(data, at + 4)? < 8 {
+        if data.len() < usize::try_from(at).unwrap_or(usize::MAX).saturating_add(0x0C) || read_u32(data, at + 4)? < 8 {
             return None;
         }
         if data[at..at + 4] == *b"ANK1" {
