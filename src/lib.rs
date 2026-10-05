@@ -161,7 +161,7 @@ impl App {
     }
 
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
-        if self.menu.screen != menus::Screen::Playing {
+        if self.intro.is_some() || self.menu.screen != menus::Screen::Playing {
             self.stage_axis(glam::Vec2::ZERO);
             self.stage_damage(0);
             self.stage_do(false);
@@ -174,7 +174,7 @@ impl App {
         } else {
             Vec::new()
         };
-        if self.menu.screen == menus::Screen::Title && self.movie_done {
+        if self.intro.is_none() && self.menu.screen == menus::Screen::Title && self.movie_done {
             cmds.push(menus::Cmd::Confirm);
             self.movie_done = false;
         }
@@ -1474,12 +1474,37 @@ pub fn root_view(
                 held.kind().is_some().then_some(held),
             )
         }
-        menus::Screen::Title => ZStack(Modifier::new().fill_max_size())
-            .child([title_movie(app, ctx), menus::title_view()]),
+        menus::Screen::Title => match app.intro.as_ref() {
+            Some(_) => intro_view(app, ctx),
+            None => ZStack(Modifier::new().fill_max_size())
+                .child([title_movie(app, ctx), menus::title_view()]),
+        },
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
     };
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
+}
+
+fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.intro.as_ref() else {
+        return Spacer();
+    };
+    if stage.canvas.pixels.is_empty() {
+        return Spacer();
+    }
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        ctx.set_image_rgba8(handle, 640, 480, stage.canvas.pixels.clone(), true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
 }
 
 fn title_movie(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
