@@ -2701,7 +2701,7 @@ pub struct Watch<'w, 's> {
     medlis: Query<'w, 's, &'static Medli>,
     makars: Query<'w, 's, &'static Makar>,
     ships: Query<'w, 's, &'static super::ship::Ship>,
-    bombs: Query<'w, 's, (&'static Actor, &'static bomb::Bomb)>,
+    bombs: Query<'w, 's, (&'static Actor, &'static bomb::Bomb), Without<Agbsw0>>,
 }
 
 impl Facts {
