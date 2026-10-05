@@ -888,9 +888,10 @@ impl App {
                     (max.x - min.x) * 0.5,
                 )
             } else if entity.contains::<sim::spotbox::SpotBox>() {
+                lift = -(sim::spotbox::HALF);
                 (
                     view::ActorKind::Scenery,
-                    -sim::spotbox::HALF,
+                    0,
                     sim::spotbox::HALF * 2.0,
                     sim::spotbox::HALF,
                 )
