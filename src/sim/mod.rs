@@ -10,6 +10,7 @@ pub mod barrel;
 pub mod bemos;
 pub mod barricade;
 pub mod bird;
+pub mod boko;
 pub mod buoybarrel;
 pub mod canon;
 pub mod bomb;
@@ -465,6 +466,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, foe, points, enemy::Hurt::default()))
             .id()
+    } else if boko::is_boko(&source.name) {
+        match boko::Boko::spawn(source.parameters) {
+            Some(stick) => world.spawn((actor, stick)).id(),
+            None => world.spawn(actor).id(),
+        }
     } else if source.name == door::JAIL_ACTOR {
         let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
         world.spawn((actor, cell)).id()
@@ -720,6 +726,7 @@ pub fn build(
                     figure::control.in_set(WwSimSet::Execute),
                     armos::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),
+                    boko::control.in_set(WwSimSet::Execute),
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),

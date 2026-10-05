@@ -536,6 +536,10 @@ impl App {
                 }
                 let (height, radius) = float.hull();
                 (view::ActorKind::Scenery, 0, height, radius)
+            } else if let Some(stick) = entity.get::<sim::boko::Boko>() {
+                let (min, max) = stick.cull();
+                lift = min.y;
+                (view::ActorKind::Scenery, 0, max.y - min.y, max.x)
             } else if let Some(cask) = entity.get::<sim::barrel::Barrel>() {
                 if cask.broken {
                     continue;

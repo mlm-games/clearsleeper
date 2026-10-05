@@ -13,11 +13,10 @@ const EVENT_SHIFT: u32 = 8;
 const KIND_SHIFT: u32 = 24;
 const HOLD_KIND: u32 = 1;
 const STORY_BYTES: usize = 0x100;
+pub const FLAG_BYTES: usize = 0x100;
 const SWITCH_BITS: u32 = 128;
-const FLAG_WORDS: usize = 320;
 pub const COLLECT_SLOTS: usize = 8;
 pub const COLLECT_ITEMS: u8 = 8;
-const FLAG_MAX: u32 = (FLAG_WORDS as u32) * 32;
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StoryBits {
@@ -156,53 +155,56 @@ pub const SYMBOL_NAYRU: u8 = 0;
 pub const SYMBOL_DIN: u8 = 1;
 pub const SYMBOL_FARORE: u8 = 2;
 
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventFlags {
-    words: [u32; FLAG_WORDS],
+    pub bytes: [u8; FLAG_BYTES],
 }
 
 impl Default for EventFlags {
     fn default() -> Self {
         Self {
-            words: [0_u32; FLAG_WORDS],
+            bytes: [0_u8; FLAG_BYTES],
         }
     }
 }
 
 impl EventFlags {
-    fn slot(&self, flag: u32) -> Option<(usize, u32)> {
-        if flag >= FLAG_MAX {
+    fn slot(&self, flag: u32) -> Option<(usize, u8)> {
+        let byte = (flag >> 8) as usize;
+        if byte >= FLAG_BYTES {
             return None;
         }
-        Some(((flag / 0x20) as usize, 1 << (flag & 0x1F)))
+        Some((byte, (flag & 0xFF) as u8))
     }
 
     pub fn test(&self, flag: u32) -> bool {
         match self.slot(flag) {
-            Some((word, bit)) => self.words[word] & bit != 0,
+            Some((byte, mask)) => self.bytes[byte] & mask != 0,
             None => false,
         }
     }
 
     pub fn set(&mut self, flag: u32) {
-        if let Some((word, bit)) = self.slot(flag) {
-            self.words[word] |= bit;
+        if let Some((byte, mask)) = self.slot(flag) {
+            self.bytes[byte] |= mask;
         }
     }
 
     pub fn clear(&mut self, flag: u32) {
-        if let Some((word, bit)) = self.slot(flag) {
-            self.words[word] &= !bit;
+        if let Some((byte, mask)) = self.slot(flag) {
+            self.bytes[byte] &= !mask;
         }
     }
 
-    pub fn words(&self) -> &[u32; FLAG_WORDS] {
-        &self.words
+    pub fn words(&self) -> &[u8; FLAG_BYTES] {
+        &self.bytes
     }
 
-    pub fn from_words(words: [u32; FLAG_WORDS]) -> Self {
-        Self { words }
+    pub fn from_words(bytes: [u8; FLAG_BYTES]) -> Self {
+        Self { bytes }
     }
 }
+
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct OrderFlags {

@@ -17,12 +17,12 @@ use crate::{App, assets};
 pub const SAVE_VERSION: u32 = 1;
 pub const DEFAULT_NAME: &str = "Link";
 pub const SLOTS: usize = 3;
-const FLAG_WORDS: usize = 320;
+const FLAG_BYTES: usize = 0x100;
 const STORY_BYTES: usize = 0x100;
 const ARRIVAL_BYTES: usize = 49;
 
-fn padded_words(saved: &[u32]) -> [u32; FLAG_WORDS] {
-    let mut out = [0_u32; FLAG_WORDS];
+fn padded_flags(saved: &[u8]) -> [u8; FLAG_BYTES] {
+    let mut out = [0_u8; FLAG_BYTES];
     for (slot, word) in out.iter_mut().zip(saved) {
         *slot = *word;
     }
@@ -67,7 +67,7 @@ pub struct SaveGame {
     #[serde(default)]
     pub rupees: u32,
     #[serde(default)]
-    pub events: Vec<u32>,
+    pub events: Vec<u8>,
     #[serde(default)]
     pub switches: [u32; 4],
     #[serde(default)]
@@ -228,7 +228,7 @@ impl App {
             *world.resource_mut::<Health>() = save.health.clone().into();
             *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
             *world.resource_mut::<EventFlags>() =
-                EventFlags::from_words(padded_words(save.events.as_slice()));
+                EventFlags::from_words(padded_flags(save.events.as_slice()));
             *world.resource_mut::<Switches>() = Switches::from_words(save.switches);
             *world.resource_mut::<Arrivals>() =
                 Arrivals::from_bytes(padded_arrivals(save.arrivals.as_slice()));
