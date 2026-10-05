@@ -3540,7 +3540,11 @@ pub struct Watch<'w, 's> {
         'w,
         's,
         (Entity, &'static mut Actor, &'static mut bomb::Bomb),
-        (With<bomb::Bomb>, Without<Gohdan>),
+        (
+            With<bomb::Bomb>,
+            Without<Gohdan>,
+            Without<pickup::Pickup>,
+        ),
     >,
     items: Query<
         'w,
