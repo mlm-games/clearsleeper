@@ -108,6 +108,7 @@ pub mod stream;
 pub mod swim;
 pub mod swhammer;
 pub mod swlight;
+pub mod swtdoor;
 pub mod swpush;
 pub mod tag;
 pub mod taglight;
