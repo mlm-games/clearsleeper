@@ -92,7 +92,7 @@ impl App {
             movie_frame: 0,
             movie_clock: 0.0,
             movie_pixels: Vec::new(),
-            movie_size: (movie::WIDTH, movie::HEIGHT),
+            movie_size: (0, 0),
             movie_image: Cell::new(None),
             movie_uploaded: Cell::new(usize::MAX),
         };
