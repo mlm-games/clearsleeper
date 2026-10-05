@@ -37,9 +37,6 @@ const EVENT_BIT_LAST_DAMAGE: u16 = 0x3C01;
 const TMP_BIT_SHUTTER: u32 = 0x0401;
 
 const HIO_M005: u8 = 0;
-const HIO_M008: f32 = 1.0;
-const HIO_M00C: f32 = 4.0;
-const HIO_M010: f32 = 1.5;
 const HIO_M014: u8 = 0;
 const HIO_M018: f32 = 20.0;
 const HIO_M01C: f32 = 2.0;
@@ -125,14 +122,12 @@ const REG13_S8: i16 = 0;
 
 const REG14_F2: f32 = 0.0;
 const REG14_F4: f32 = 0.0;
-const REG14_F5: f32 = 0.0;
 const REG14_S9: i16 = 0;
 
 
 const AREA_X: f32 = 3600.0;
 const AREA_Y: f32 = 9800.0;
 const AREA_Z: f32 = -3800.0;
-const AREA2_Y: f32 = 9720.0;
 
 pub const CULL_MIN: [f32; 3] = [-650.0, -20.0, -400.0];
 pub const CULL_MAX: [f32; 3] = [650.0, 790.0, 320.0];
@@ -162,8 +157,6 @@ const FOOT_RADIUS_T_FLY: f32 = 300.0;
 const TOSAKA_RADIUS: f32 = 80.0;
 const WIND_RADIUS: f32 = 300.0;
 const WIND_RADIUS_BATTLE: f32 = 600.0;
-const MODEL_SCALE: f32 = 1.0;
-const MODEL_SCALE_BATTLE: f32 = 0.85;
 const HEAD_OFF_Y: f32 = -10000.0;
 
 const JOINT_ATAMA1: [f32; 3] = [0.0, 592.90, 135.00];
@@ -365,7 +358,7 @@ const TIMER_COUNT: usize = 5;
 const SMOKE_COUNT: usize = 4;
 const FOOT_COUNT: usize = 2;
 const EFFECT_LIFE: i16 = 2000;
-const EFFECT_LIFE_LIMIT: i16 = 0x26;
+const EFFECT_LIFE_LIMIT: u8 = 0x26;
 const LANDING_AREA: f32 = 1400.0;
 const LANDING_LIFT: f32 = 600.0;
 const APPROACH: f32 = 1300.0;
@@ -384,7 +377,7 @@ const BEAK_SWING: f32 = -200.0;
 const BEAK_WOBBLE: f32 = -2000.0;
 const CAM_NEAR_X: f32 = -50.0;
 const TURN_CAP: f32 = 0x800;
-const TURN_BANK: f32 = 5500.0;
+const TURN_BANK_I32: i32 = 5500;
 const TURN_STEP: f32 = 0.05;
 const TURN_STEP_GROUND: f32 = 0.1;
 const SPEED_STEP: f32 = 1.0;
@@ -866,7 +859,6 @@ impl Env<'_> {
 pub struct Orders {
     pub purge_mobs: bool,
     pub purge_shards: bool,
-    pub peck_broken: bool,
 }
 
 pub struct Sink<'a> {
@@ -900,7 +892,6 @@ impl Sink<'_> {
     fn purge_shards(&mut self) {
         self.orders.purge_shards = true;
     }
-
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -942,7 +933,6 @@ pub struct Helmaroc {
     pub cam_look: Vec3,
     pub cam_eye: Vec3,
     pub cam_yaw: i16,
-    pub cam_pitch: i16,
     pub fov: f32,
     pub demo_param: f32,
     pub demo_radius: f32,
@@ -1002,8 +992,6 @@ pub struct Helmaroc {
     pub wind_move: [Vec3; WIND_COUNT],
     pub wind_radius: [f32; WIND_COUNT],
     pub wind_anchor: Vec3,
-    pub wind_radius: [f32; WIND_COUNT],
-    pub wind_anchor: Vec3,
     pub piece_live: [i8; PIECE_COUNT],
     pub piece_pos: [Vec3; PIECE_COUNT],
     pub piece_prev: [Vec3; PIECE_COUNT],
@@ -1036,7 +1024,6 @@ impl Helmaroc {
         morph.attribute = EMODE_LOOP;
         morph.set_loop(0.0);
         morph.set_morf(0.0);
-        let centre = Vec3::new(AREA_X, 5000.0, AREA_Z);
         Self {
             battle_mode: 1,
             morph,
@@ -1051,7 +1038,7 @@ impl Helmaroc {
             turn_step: 0.0,
             speed_f: 0.0,
             speed_step: 0.0,
-            timers: [0x168, 0, 0, 0, 0],
+            timers: [0; TIMER_COUNT],
             tail_hold: 0,
             hit_stop: 0,
             mask_timer: 0,
@@ -1075,7 +1062,6 @@ impl Helmaroc {
             cam_look: Vec3::ZERO,
             cam_eye: Vec3::ZERO,
             cam_yaw: 0,
-            cam_pitch: 0,
             fov: 45.0,
             demo_param: 0.0,
             demo_radius: 0.0,
@@ -1135,8 +1121,6 @@ impl Helmaroc {
             wind_move: [Vec3::ZERO; WIND_COUNT],
             wind_radius: [WIND_RADIUS; WIND_COUNT],
             wind_anchor: Vec3::ZERO,
-            wind_radius: [WIND_RADIUS; WIND_COUNT],
-            wind_anchor: Vec3::ZERO,
             piece_live: [0; PIECE_COUNT],
             piece_pos: [Vec3::ZERO; PIECE_COUNT],
             piece_prev: [Vec3::ZERO; PIECE_COUNT],
@@ -1160,12 +1144,6 @@ impl Helmaroc {
             shape_angle: [0; 3],
             seed: [RND_SEED; 3],
         }
-        .placed(centre)
-    }
-
-    fn placed(mut self, pos: Vec3) -> Self {
-        self.target = pos;
-        self
     }
 
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
@@ -1213,14 +1191,6 @@ impl Helmaroc {
         self.morph.frame as i32
     }
 
-    fn scale_now(&self) -> f32 {
-        if self.battle_mode == 1 {
-            MODEL_SCALE_BATTLE * HIO_M008
-        } else {
-            MODEL_SCALE * HIO_M008
-        }
-    }
-
     fn pos_move(&mut self, actor: &mut Actor) {
         let diff = self.target - actor.pos;
         let target_xz = bearing(actor.pos, self.target);
@@ -1232,8 +1202,8 @@ impl Helmaroc {
             REG0_S3 + 10,
             (self.turn_scale * self.turn_step) as i16,
         );
-        let mut bank = (before.wrapping_sub(actor.angle[ANGLE_Y])) as f32 * 0x20;
-        let cap = REG0_S1 + TURN_BANK;
+        let mut bank = (i32::from(before) - i32::from(actor.angle[ANGLE_Y])) as f32 * 0x20;
+        let cap = i32::from(REG0_S1) + TURN_BANK_I32;
         if bank > cap {
             bank = cap;
         } else if bank < -cap {
@@ -1274,7 +1244,7 @@ impl Helmaroc {
         actor.pos += self.speed;
     }
 
-    fn ground_move(&mut self, actor: &mut Actor, env: &Env<'_>) {
+    fn ground_move(&mut self, actor: &mut Actor) {
         add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
         add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
         add_calc2(
@@ -1296,16 +1266,11 @@ impl Helmaroc {
             (self.turn_scale * self.turn_step) as i16,
         );
         add_calc2(&mut self.turn_step, SPEED_STEP, SPEED_STEP, TURN_STEP_GROUND);
-        let _ = env;
     }
 
     fn pl_view_check(&self, actor: &Actor, env: &Env<'_>) -> bool {
-        let mut angle = env.player_bearing(actor.pos);
-        angle = actor.angle[ANGLE_Y].wrapping_sub(angle);
-        if angle < 0 {
-            angle = -angle;
-        }
-        angle.abs() < VIEW_LIMIT
+        let angle = actor.angle[ANGLE_Y].wrapping_sub(env.player_bearing(actor.pos));
+        angle.unsigned_abs() < VIEW_LIMIT
     }
 
     fn eff_hane_set(&mut self, offset: Vec3, count: i32, mode: i8) {
@@ -1363,10 +1328,11 @@ impl Helmaroc {
         }
     }
 
-    fn up_fly(&mut self, actor: &mut Actor, env: &Env<'_>) {
+    fn up_fly(&mut self, actor: &mut Actor) {
         let mut move_pos = false;
-        self.track_player = true;
-        match self.state {
+        let mut arm = self.state;
+        loop {
+            match arm {
             0 => {
                 self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
                 self.rise_smoke = 0x19;
@@ -1376,6 +1342,7 @@ impl Helmaroc {
                 self.speed_f = 0.0;
                 self.speed_step = 1.0;
                 actor.speed_f_walk = 0.0;
+                break;
             }
             1 => {
                 if self.morph.frame == f32::from(REG0_S7 + 0x17) {
@@ -1384,8 +1351,10 @@ impl Helmaroc {
                     self.speed_f = 40.0;
                     self.speed_step = REG0_F9 + 1.0;
                     actor.angle[ANGLE_X] = -0x3000;
+                    arm = 2;
                 } else {
                     move_pos = true;
+                    break;
                 }
             }
             2 => {
@@ -1395,16 +1364,17 @@ impl Helmaroc {
                     self.fly_ca = -1;
                     self.state = 0;
                 }
+                break;
             }
-            _ => {}
+            _ => break,
+            }
         }
         if !move_pos {
             self.pos_move(actor);
         }
-        let _ = env;
     }
 
-    fn fly(&mut self, actor: &mut Actor, env: &Env<'_>) {
+    fn fly(&mut self, actor: &mut Actor) {
         self.track_player = true;
         match self.fly_ca {
             0 => {}
@@ -1478,7 +1448,6 @@ impl Helmaroc {
             _ => {}
         }
         self.pos_move(actor);
-        let _ = env;
     }
 
     fn landing(&mut self, actor: &mut Actor, env: &Env<'_>) {
@@ -1755,7 +1724,7 @@ impl Helmaroc {
                 _ => break,
             }
         }
-        self.ground_move(actor, env);
+        self.ground_move(actor);
     }
 
     fn jump(&mut self, actor: &mut Actor, env: &Env<'_>) {
@@ -1802,7 +1771,7 @@ impl Helmaroc {
                 _ => break,
             }
         }
-        self.ground_move(actor, env);
+        self.ground_move(actor);
     }
 
     fn jida_attack(&mut self, actor: &mut Actor, env: &Env<'_>) {
@@ -2748,8 +2717,8 @@ impl Helmaroc {
 
     fn move_actor(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         match self.action {
-            Action::Fly => self.fly(actor, env),
-            Action::UpFly => self.up_fly(actor, env),
+            Action::Fly => self.fly(actor),
+            Action::UpFly => self.up_fly(actor),
             Action::Landing => self.landing(actor, env),
             Action::Wait => self.wait(actor, env),
             Action::Jump => self.jump(actor, env),

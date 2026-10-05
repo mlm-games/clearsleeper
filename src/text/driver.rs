@@ -4,6 +4,7 @@ use glam::Vec3;
 use super::font::{FontBank, ResFont};
 use super::fontdata;
 use super::msgbox::{Msg2Box, Msg2Ctx, Msg2Env, Msg2Hio, Msg2Screen, Msg2Stick};
+use super::msgdata::MsgStickFlags;
 use super::msgbox1::{Msg1Box, Msg1Ctx, Msg1Env, Msg1Hio, Msg1Screen, Msg1Stick};
 use super::msgdata::MsgLenState;
 use super::msgproc::{MeterMsgHio, MsgGameInfo, MsgProcs, FPC_NM_MSG2};
@@ -47,7 +48,10 @@ impl TextEnv {
 pub struct Stick {
     pub pad0_y: f32,
     pub pad3_y: f32,
+    pub pad0_x: f32,
     pub trig_a: bool,
+    pub trig_b: bool,
+    pub trigger: MsgStickFlags,
 }
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq)]
@@ -114,36 +118,6 @@ pub struct Layout {
     pub npc_name_msg_no: u32,
     pub item_name_msg_no: u32,
     pub password_msg_no: u32,
-    pub npc_name: [u8; 256],
-    pub item_name: [u8; 256],
-    pub password: [u8; 256],
-    pub color_clt1: [u8; 256],
-}
-
-impl Layout {
-    fn npc_name(&self) -> &[u8] {
-        self.npc_name.as_slice()
-    }
-
-    fn item_name(&self) -> &[u8] {
-        self.item_name.as_slice()
-    }
-
-    fn password(&self) -> &[u8] {
-        self.password.as_slice()
-    }
-
-    fn color(&self) -> &[u8] {
-        self.color_clt1.as_slice()
-    }
-
-    fn set(&mut self, dst: &mut [u8; 256], bytes: &[u8]) {
-        let take = bytes.len().min(256);
-        dst.fill(0);
-        if let Some(slot) = dst.get_mut(..take) {
-            slot.copy_from_slice(bytes.get(..take).unwrap_or(&[]));
-        }
-    }
 }
 
 #[derive(Resource, Debug, Clone, Copy, Default)]
@@ -327,9 +301,9 @@ pub fn control(
             {
                 let len = driver.len_state();
                 let layout = driver.layout_state(
-                    driver.layout.npc_name(),
-                    driver.layout.item_name(),
-                    driver.layout.password(),
+                    driver.names.npc().as_bytes(),
+                    driver.names.item().as_bytes(),
+                    driver.names.password().as_bytes(),
                 );
                 let mut ctx = Msg2Ctx {
                     hio: &driver.msg2_hio,
@@ -357,9 +331,9 @@ pub fn control(
         let outcome = {
             let len = driver.len_state();
             let layout = driver.layout_state(
-                driver.layout.npc_name(),
-                driver.layout.item_name(),
-                driver.layout.password(),
+                driver.names.npc().as_bytes(),
+                driver.names.item().as_bytes(),
+                driver.names.password().as_bytes(),
             );
             let mut ctx = Msg2Ctx {
                 hio: &driver.msg2_hio,
@@ -394,9 +368,9 @@ pub fn control(
         {
             let len = driver.len_state();
             let layout = driver.layout_state(
-                driver.layout.npc_name(),
-                driver.layout.item_name(),
-                driver.layout.password(),
+                driver.names.npc().as_bytes(),
+                driver.names.item().as_bytes(),
+                driver.names.password().as_bytes(),
             );
             let mut ctx = Msg1Ctx {
                 hio: &driver.msg1_hio,
@@ -410,9 +384,11 @@ pub fn control(
                 layout: &layout,
                 out_hio: &driver.out_hio,
                 stick: Msg1Stick {
-                    pad0_y: driver.stick.pad0_y,
-                    pad3_y: driver.stick.pad3_y,
+                    stick_x: driver.stick.pad0_x,
+                    stick_y: driver.stick.pad0_y,
                     trig_a: driver.stick.trig_a,
+                    trig_b: driver.stick.trig_b,
+                    trigger: driver.stick.trigger,
                 },
             };
             one.create(&mut ctx, &mut info);
@@ -421,9 +397,9 @@ pub fn control(
     }
     let len = driver.len_state();
     let layout = driver.layout_state(
-        driver.layout.npc_name(),
-        driver.layout.item_name(),
-        driver.layout.password(),
+        driver.names.npc().as_bytes(),
+        driver.names.item().as_bytes(),
+        driver.names.password().as_bytes(),
     );
     let mut env = Msg1Env::default();
     let mut ctx = Msg1Ctx {
@@ -438,9 +414,11 @@ pub fn control(
         layout: &layout,
         out_hio: &driver.out_hio,
         stick: Msg1Stick {
-            pad0_y: driver.stick.pad0_y,
-            pad3_y: driver.stick.pad3_y,
+            stick_x: driver.stick.pad0_x,
+            stick_y: driver.stick.pad0_y,
             trig_a: driver.stick.trig_a,
+            trig_b: driver.stick.trig_b,
+            trigger: driver.stick.trigger,
         },
     };
     if !one.execute(&mut ctx, &mut info) {

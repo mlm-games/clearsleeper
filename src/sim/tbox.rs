@@ -154,7 +154,7 @@ impl Tbox {
                     self.genocide_delay = GENOCIDE_DELAY;
                     self.flags |= FLG_UNK_01 | FLG_UNK_02;
                 }
-                FUNC_TYPE_SWITCH | FUNC_TYPE_EXTRA_SAVE_INFO_SPAWN => {
+                FUNC_TYPE_SWITCH | FUNC_EXTRA_SAVE_INFO_SPAWN => {
                     self.action = Action::SwOnWait;
                     self.flags |= FLG_UNK_01 | FLG_UNK_02;
                 }
