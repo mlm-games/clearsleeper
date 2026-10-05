@@ -198,7 +198,7 @@ pub fn contact(hammer: &Swhammer, base: Vec3, player: &Player) -> bool {
     let reach = CYL_RADIUS_TG + hammer::AT_RADIUS;
     let gap = player.pos - base;
     gap.x * gap.x + gap.z * gap.z <= reach * reach
-        && gap.y.unsigned_abs() <= hammer.cyl_height() * 0.5
+        && gap.y.abs() <= hammer.cyl_height() * 0.5
 }
 
 pub fn control(

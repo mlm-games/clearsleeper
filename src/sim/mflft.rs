@@ -299,7 +299,7 @@ impl Mflft {
         }
         let gap = at - self.anchor[index];
         gap.x * gap.x + gap.z * gap.z <= reach * reach
-            && gap.y.unsigned_abs() <= CYL_HEIGHT * 0.5
+            && gap.y.abs() <= CYL_HEIGHT * 0.5
     }
 
     fn clash(&mut self, index: usize, at: Vec3, reach: f32, power: i32) -> Option<u32> {

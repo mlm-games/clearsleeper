@@ -371,6 +371,30 @@ const EFF_COUNT: usize = 40;
 const EFF_ROCK: usize = 0x27;
 const WIND_COUNT: usize = 10;
 const PIECE_COUNT: usize = 4;
+const PIECE_FLOOR: f32 = 8000.0;
+const PIECE_GROUND_LIFT: f32 = 15.0;
+const PIECE_SPIN: f32 = 3000.0;
+const PIECE_SPIN_STEP: i32 = 0x2000;
+const PIECE_SPIN_SPREAD: i32 = 0x3000;
+const PIECE_BOUNCE_CAP: f32 = -30.0;
+const PIECE_PUSH_STEP: f32 = 0.2;
+const SHUTTER_BATTLE_Y: f32 = -500.0;
+const SHUTTER_X: f32 = 4600.0 + 155.0;
+const SHUTTER_Z: f32 = 4700.0;
+const GROCK_DROP: f32 = -10.0;
+const EFF_FALL: f32 = -130.0;
+const EFF_RISE_CAP: f32 = 2.0;
+const EFF_RISE: f32 = 10.0;
+const EFF_UP: f32 = 15000.0;
+const EFF_CAP: f32 = 1000.0;
+const EFF_UP_CALM: f32 = 8000.0;
+const EFF_CAP_CALM: f32 = 200.0;
+const EFF_CEIL: f32 = 9930.0;
+const EFF_FLOOR: f32 = 9700.0;
+const EFF_AREA: f32 = 3000.0;
+const EFF_GROUND_LIFT: f32 = 20.0;
+const EFF_RISE_STEP: f32 = 0.1;
+const EFF_FLOOR_CLAMP: f32 = -5.0;
 const TAIL_COUNT: usize = 4;
 const TIMER_COUNT: usize = 5;
 const SMOKE_COUNT: usize = 4;
@@ -502,9 +526,10 @@ pub struct Eff {
     pub speed: f32,
     pub fall: f32,
     pub scale: f32,
-    pub sway: f32,
-    pub spin: [f32; 3],
-    pub tumble: [f32; 3],
+    pub rise: f32,
+    pub sway_rate: f32,
+    pub spin: [i16; 3],
+    pub tumble: [i16; 3],
     pub count: i16,
     pub life: i16,
     pub chase: u8,
@@ -520,9 +545,10 @@ impl Eff {
             speed: 0.0,
             fall: 0.0,
             scale: 0.0,
-            sway: 0.0,
-            spin: [0.0; 3],
-            tumble: [0.0; 3],
+            rise: 0.0,
+            sway_rate: 0.0,
+            spin: [0; 3],
+            tumble: [0; 3],
             count: 0,
             life: 0,
             chase: 0,
@@ -887,6 +913,13 @@ impl Env<'_> {
     fn landed(&self, pos: Vec3) -> bool {
         pos.y <= self.ground_h(pos) + 1.0
     }
+
+    fn crossed(&self, from: Vec3, to: Vec3) -> bool {
+        match self.solid {
+            Some(solid) => solid.slide(from, to) != to,
+            None => false,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -994,6 +1027,7 @@ pub struct Helmaroc {
     pub effect_cursor: u8,
     pub smoke_timer: [i16; SMOKE_COUNT],
     pub shutter_y: f32,
+    pub shutter_yaw: f32,
     pub shutter_roll: f32,
     pub shutter_ring: f32,
     pub shutter_shift: f32,
@@ -1034,6 +1068,8 @@ pub struct Helmaroc {
     pub wind_active: [u8; WIND_COUNT],
     pub wind_pos: [Vec3; WIND_COUNT],
     pub wind_move: [Vec3; WIND_COUNT],
+    pub wind_radius: [f32; WIND_COUNT],
+    pub wind_anchor: Vec3,
     pub wind_radius: [f32; WIND_COUNT],
     pub wind_anchor: Vec3,
     pub piece_live: [i8; PIECE_COUNT],
@@ -1124,6 +1160,7 @@ impl Helmaroc {
             effect_cursor: 0,
             smoke_timer: [0; SMOKE_COUNT],
             shutter_y: 0.0,
+            shutter_yaw: 0.0,
             shutter_roll: 0.0,
             shutter_ring: -630.0,
             shutter_shift: -70.0,
@@ -1164,6 +1201,8 @@ impl Helmaroc {
             wind_active: [0; WIND_COUNT],
             wind_pos: [Vec3::ZERO; WIND_COUNT],
             wind_move: [Vec3::ZERO; WIND_COUNT],
+            wind_radius: [WIND_RADIUS; WIND_COUNT],
+            wind_anchor: Vec3::ZERO,
             wind_radius: [WIND_RADIUS; WIND_COUNT],
             wind_anchor: Vec3::ZERO,
             piece_live: [0; PIECE_COUNT],
@@ -1334,7 +1373,7 @@ impl Helmaroc {
         if angle < 0 {
             angle = -angle;
         }
-        angle.unsigned_abs() < VIEW_LIMIT
+        angle.abs() < VIEW_LIMIT
     }
 
     fn eff_hane_set(&mut self, offset: Vec3, count: i32, mode: i8) {
@@ -1347,8 +1386,8 @@ impl Helmaroc {
                 self.effect_cursor = 0;
             }
             let roll = self.rnd_f(0x10000 as f32) as i32 as i16;
-            let z_spin = self.rnd_fx(1200.0 + REG8_F10);
-            let x_spin = self.rnd_fx(800.0 + REG8_F16);
+            let z_spin = self.rnd_fx(1200.0 + REG8_F10) as i16;
+            let x_spin = self.rnd_fx(800.0 + REG8_F16) as i16;
             let base_yaw = self.shape_angle[ANGLE_Y];
             let (spin_y, speed, sway, chase) = if mode > 0 {
                 let spin_y = base_yaw.wrapping_add(self.rnd_fx(5000.0) as i16);
@@ -1381,11 +1420,11 @@ impl Helmaroc {
             if mode > 0 {
                 eff.spin[1] = spin_y;
                 eff.speed = speed;
-                eff.sway = sway;
+                eff.rise = sway;
                 eff.chase = chase;
             } else {
                 eff.speed = speed;
-                eff.sway = sway;
+                eff.rise = sway;
                 eff.spin[1] = spin_y;
             }
             index += 1;
@@ -2880,6 +2919,191 @@ impl Helmaroc {
                 self.wind_active[index] += 1;
                 if self.wind_active[index] > 25 {
                     self.wind_active[index] = 0;
+                }
+            }
+        }
+    }
+
+    fn kamen_break_move(&mut self, env: &Env<'_>, out: &mut Sink<'_>) {
+        for index in 0..PIECE_COUNT {
+            if self.piece_live[index] == 0 {
+                continue;
+            }
+            let mut rot_x = 0;
+            let mut rot_z = 0;
+            if self.piece_hold[index] == 0 {
+                self.piece_prev[index] = self.piece_pos[index];
+                self.piece_pos[index] += self.piece_move[index];
+                self.piece_move[index].y -= 5.0;
+                if self.piece_pos[index].y < PIECE_FLOOR {
+                    self.piece_live[index] = 0;
+                }
+                let probe = Vec3::new(
+                    self.piece_pos[index].x,
+                    self.piece_pos[index].y + 200.0,
+                    self.piece_pos[index].z,
+                );
+                let ground = env.ground_h(probe) + PIECE_GROUND_LIFT + REG0_F11;
+                if self.piece_pos[index].y <= ground {
+                    self.piece_pos[index].y = ground;
+                    self.piece_push[index][0] = 0;
+                    self.piece_push[index][1] = 0;
+                    if self.piece_move[index].y < REG0_F2 + PIECE_BOUNCE_CAP {
+                        self.piece_move[index].y = 4.0 + (10.0 + REG0_F3);
+                        self.piece_roll[index] = REG0_F4 + PIECE_SPIN;
+                        self.piece_rot[index][2] = KAMEN_BREAK_Z2[index];
+                        out.se(SE_CM_MAGBALL_BOUND);
+                    } else {
+                        self.piece_move[index].y = 0.0;
+                        let swing = self.piece_roll[index]
+                            * sin_s(
+                                self.frame_count
+                                    .wrapping_add(PIECE_SPIN_STEP)
+                                    .wrapping_add(index as i32 * PIECE_SPIN_SPREAD) as i16,
+                            );
+                        add_calc0(&mut self.piece_roll[index], 1.0, 200.0 + REG0_F5);
+                        add_calc_angle_s2(
+                            &mut self.piece_rot[index][2],
+                            KAMEN_BREAK_Z1[index].wrapping_add(swing as i16),
+                            1,
+                            0x1000,
+                        );
+                    }
+                    let push = turned(
+                        self.piece_angle[index],
+                        [0.0, 0.0, self.piece_speed[index]],
+                    );
+                    self.piece_move[index].x = push.x;
+                    self.piece_move[index].z = push.z;
+                    self.piece_rot[index][1] = self.piece_rot[index][1].wrapping_add(
+                        (self.piece_sway_speed[index] * self.piece_speed[index]) as i16,
+                    );
+                    add_calc0(&mut self.piece_speed[index], 1.0, REG0_F5 + PIECE_PUSH_STEP);
+                    add_calc_angle_s2(&mut self.piece_rot[index][0], 0x4000, 1, 0x2000);
+                }
+                let travel = self.piece_pos[index] - self.piece_prev[index];
+                if travel.length() > 0.0 {
+                    let step = turned(bearing(Vec3::ZERO, travel), [0.0, 30.0, 20.0]);
+                    let from = Vec3::new(
+                        self.piece_pos[index].x,
+                        self.piece_pos[index].y + 30.0,
+                        self.piece_pos[index].z,
+                    );
+                    if env.crossed(from, self.piece_pos[index] + step) {
+                        self.piece_pos[index].x = self.piece_prev[index].x;
+                        self.piece_pos[index].z = self.piece_prev[index].z;
+                        self.piece_push[index] = [0, 0, 0];
+                        self.piece_speed[index] = 0.0;
+                    }
+                }
+            } else {
+                self.piece_hold[index] -= 1;
+                if self.piece_hold[index] < 0x14 {
+                    rot_x = (sin_s(self.piece_hold[index].wrapping_mul(3300)) * 200.0) as i16;
+                    rot_z = (cos_s(self.piece_hold[index].wrapping_mul(4800)) * 200.0) as i16;
+                }
+            }
+            self.piece_rot[index][0] = self.piece_rot[index][0].wrapping_add(rot_x);
+            self.piece_rot[index][2] = self.piece_rot[index][2].wrapping_add(rot_z);
+            for axis in 0..3 {
+                self.piece_sway[index][axis] =
+                    self.piece_sway[index][axis].wrapping_add(self.piece_push[index][axis]);
+            }
+        }
+    }
+
+    fn obj_move(&mut self) {
+        if self.stage_boss_enemy {
+            add_calc2(&mut self.shutter_y, SHUTTER_BATTLE_Y, 1.0, 20.0);
+        }
+        self.shutter_ring = REG0_F10 + SHUTTER_X;
+        self.shutter_shift = AREA_Y + self.shutter_y + REG8_F2;
+        self.shutter_yaw = REG0_F12 - SHUTTER_Z;
+    }
+
+    fn eff_hane_move(&mut self, index: usize, env: &Env<'_>) {
+        let mut accel = EFF_FALL;
+        let mut rise_cap = EFF_RISE_CAP;
+        let eff = &mut self.effects[index];
+        if eff.chase != 0 {
+            eff.chase -= 1;
+        }
+        let step = turned(eff.spin[1], [0.0, 0.0, eff.speed]);
+        eff.prev = eff.pos;
+        eff.pos += Vec3::new(step.x, eff.rise, step.z);
+        let travel = eff.pos - eff.prev;
+        if travel.length() > 0.0 {
+            let probe = turned(bearing(Vec3::ZERO, travel), [0.0, 30.0, 20.0]);
+            let from = Vec3::new(eff.pos.x, eff.pos.y + 30.0, eff.pos.z);
+            if env.crossed(from, eff.pos + probe) {
+                eff.pos.x = eff.prev.x;
+                eff.pos.z = eff.prev.z;
+                eff.speed = 0.0;
+            }
+        }
+        let height =
+            env.ground_h(Vec3::new(eff.pos.x, eff.pos.y + 200.0, eff.pos.z)) + EFF_GROUND_LIFT;
+        eff.rise -= EFF_RISE_STEP + REG8_F14;
+        if eff.rise < REG8_F15 + EFF_FLOOR_CLAMP {
+            eff.rise = REG8_F15 + EFF_FLOOR_CLAMP;
+        }
+        if eff.pos.y <= height {
+            eff.pos.y = height;
+            add_calc0(&mut eff.speed, 1.0, 0.1);
+            eff.spin[1] = eff.spin[1].wrapping_add(eff.tumble[0]);
+            add_calc_angle_s2(&mut eff.tumble[0], 0, 10, 10);
+            add_calc_angle_s2(&mut eff.tumble[2], 0, 10, 10);
+            add_calc_angle_s2(&mut eff.spin[0], 0, 10, 200);
+            add_calc_angle_s2(&mut eff.spin[2], 0, 10, 200);
+        } else {
+            eff.spin[0] = (eff.sway_rate * sin_s(eff.count.wrapping_mul(0x500))) as i16;
+            eff.spin[2] = (eff.sway_rate * cos_s(eff.count.wrapping_mul(0x400))) as i16;
+            let (up, cap) = if eff.chase != 0 {
+                accel = REG8_F8 + EFF_FALL;
+                rise_cap = EFF_RISE;
+                (REG8_F7 + EFF_UP, EFF_CAP)
+            } else {
+                (EFF_UP_CALM, EFF_CAP_CALM)
+            };
+            add_calc2(&mut eff.sway_rate, up, 1.0, cap);
+        }
+        eff.tumble[1] = eff.tumble[1].wrapping_add(eff.tumble[2]);
+        if eff.pos.y > REG8_F11 + EFF_CEIL {
+            add_calc2(&mut eff.fall, accel, 0.1, rise_cap);
+        } else {
+            add_calc0(&mut eff.fall, 0.1, 1.3);
+        }
+        if eff.life != 0 {
+            eff.life -= 1;
+        }
+        if eff.pos.y < EFF_FLOOR || eff.life == 0 || !land_area_check(eff.pos, EFF_AREA) {
+            eff.done = 1;
+        }
+        if eff.done != 0 {
+            add_calc0(&mut eff.scale, 1.0, 0.05);
+            if eff.scale < 0.05 {
+                eff.kind = 0;
+            }
+        }
+    }
+
+    fn eff_grock_move(&mut self, index: usize) {
+        let drop = if self.effects[index].count == 1 {
+            GROCK_DROP
+        } else {
+            0.0
+        };
+        self.effects[index].prev.y = drop;
+    }
+
+    fn my_effect_move(&mut self, env: &Env<'_>) {
+        for index in 0..EFF_COUNT {
+            if self.effects[index].kind != 0 {
+                self.effects[index].count += 1;
+                if self.effects[index].kind == 1 {
+                    self.eff_hane_move(index, env);
+                } else if self.effects[index].kind == 2 {
+                    self.eff_grock_move(index);
                 }
             }
         }

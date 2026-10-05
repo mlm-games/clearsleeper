@@ -168,7 +168,7 @@ pub fn contact(guard: &Shmrgrd, base: Vec3, player: &Player) -> bool {
     let reach = CYL_RADIUS_TG + hammer::AT_RADIUS;
     let gap = player.pos - base;
     gap.x * gap.x + gap.z * gap.z <= reach * reach
-        && gap.y.unsigned_abs() <= CYL_HEIGHT_TG * 0.5
+        && gap.y.abs() <= CYL_HEIGHT_TG * 0.5
 }
 
 pub fn facing(base: Vec3, player: &Player) -> bool {
