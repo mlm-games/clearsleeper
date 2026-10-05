@@ -551,7 +551,7 @@ pub const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
 pub const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
 pub const RND_SEED: i32 = 100;
 
-pub const MSG_ANM: [i32; 43] = [
+pub const MSG_ANM: [i32; 44] = [
     0x00, 0x02, 0x02, 0x03, 0x04, 0x05, 0x06, 0x0B, 0x07, 0x09, 0x0C, 0x0D, 0x0E, 0x0F, 0x11, 0x14,
     0x12, 0x1B, 0x1C, 0x15, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1D, 0x1A, 0x10, 0x1F, 0x20, 0x22, 0x1E,
     0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x31,
@@ -1947,12 +1947,12 @@ impl Medli {
         let mut src = Vec3::ZERO;
         let desired = self.shape[1];
         if self.jnt_trn_chk() {
-            let vel = if waist != 0 { HIO_M1BC } else { HIO_NPC_MAX_HEAD_TURN_VEL };
+            let vel = if waist { HIO_M1BC } else { HIO_NPC_MAX_HEAD_TURN_VEL };
             stream::add_calc_angle_s2(&mut self.turn_vel, vel, HEAD_SCALE, HEAD_MAX_STEP);
         } else {
             self.turn_vel = 0;
         }
-        if use_player != 0 {
+        if use_player {
             if let Some(link) = self.link {
                 dst = Some(player_eye_pos(link));
                 src = Vec3::new(self.pos.x, self.eye.y, self.pos.z);
@@ -1963,7 +1963,7 @@ impl Medli {
         self.shape[1] = yaw;
     }
 
-    pub fn look_back_at(&mut self, target: Option<Vec3>, waist: i32, enable: bool) {
+    pub fn look_back_at(&mut self, target: Option<Vec3>, waist: bool, enable: bool) {
         let mut dst = None;
         let mut src = Vec3::ZERO;
         let desired = self.shape[1];
@@ -1977,7 +1977,7 @@ impl Medli {
         } else {
             self.turn_vel = 0;
         }
-        if waist != 0 {
+        if waist {
             dst = target;
             src = Vec3::new(self.pos.x, self.eye.y, self.pos.z);
         }
@@ -5053,8 +5053,8 @@ pub struct Dialogue<'w, 's> {
 }
 
 pub fn control(
-    world: World,
-    dialogue: Dialogue,
+    mut world: World,
+    mut dialogue: Dialogue,
     intent: Res<MoveIntent>,
     do_intent: Res<DoIntent>,
     target: Res<TargetIntent>,
@@ -5063,11 +5063,11 @@ pub fn control(
     mut commands: Commands,
 ) {
     let World {
-        stories,
-        switches,
-        events,
+        mut stories,
+        mut switches,
+        mut events,
         list,
-        active,
+        mut active,
         carry,
         water,
         stage,
