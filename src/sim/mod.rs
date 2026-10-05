@@ -23,6 +23,7 @@ pub mod cleared;
 pub mod clock;
 pub mod collision;
 pub mod combat;
+pub mod daiocta;
 pub mod damage;
 pub mod death;
 pub mod door;
@@ -202,6 +203,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if nh::is_nh(&source.name) {
         let firefly = nh::Nh::spawn(source.parameters, actor.pos);
         world.spawn((actor, firefly)).id()
+    } else if tbox::is_tbox(&source.name) {
+        let box_ = tbox::Tbox::spawn(
+            source.parameters,
+            source.angle[0],
+            world.resource::<chest::Chests>(),
+            world.resource::<flags::Switches>(),
+        );
+        world.spawn((actor, box_)).id()
     } else if pickup::is_pickup(&source.name) {
         world
             .spawn((actor, pickup::Pickup::spawn(source.parameters)))
@@ -419,6 +428,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if gryw::is_gryw(&source.name) {
         let pool = gryw::Gryw::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, pool)).id()
+    } else if daiocta::is_daiocta(&source.name) {
+        match daiocta::Daiocta::spawn(source.parameters, world.resource::<flags::Switches>()) {
+            Some(octo) => world.spawn((actor, octo)).id(),
+            None => world.spawn(actor).id(),
+        }
     } else if hmlif::is_hmlif(&source.name) {
         let platform = hmlif::Hmlif::spawn(source.parameters, source.angle[2]);
         world.spawn((actor, platform)).id()
@@ -660,6 +674,7 @@ pub fn build(
                 (
                     talk::control.in_set(WwSimSet::Execute),
                     flags::control.in_set(WwSimSet::Execute),
+                    tbox::control.in_set(WwSimSet::Execute),
                     clock::control.in_set(WwSimSet::Execute),
                     ghostship::control.in_set(WwSimSet::Execute),
                     volcano::control.in_set(WwSimSet::Execute),

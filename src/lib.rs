@@ -435,8 +435,13 @@ impl App {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::tingle::Tingle>() {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
-            } else if entity.contains::<sim::chest::Chest>() {
+            } else if entity.contains::<sim::chest::Chest>()
+                || entity.contains::<sim::tbox::Tbox>()
+            {
                 if entity.get::<sim::chest::Chest>().is_some_and(|c| c.opened) {
+                    continue;
+                }
+                if entity.get::<sim::tbox::Tbox>().is_some_and(|t| !t.drawn()) {
                     continue;
                 }
                 (view::ActorKind::Scenery, 0, 24.0, 12.0)
@@ -542,6 +547,15 @@ impl App {
                 }
                 let (height, radius) = float.hull();
                 (view::ActorKind::Scenery, 0, height, radius)
+            } else if let Some(octo) = entity.get::<sim::daiocta::Daiocta>() {
+                let (min, max) = octo.cull();
+                lift = min.y;
+                (
+                    view::ActorKind::Enemy,
+                    0,
+                    max.y - min.y,
+                    (max.x - min.x) * 0.5,
+                )
             } else if let Some(stick) = entity.get::<sim::boko::Boko>() {
                 let (min, max) = stick.cull();
                 lift = min.y;
