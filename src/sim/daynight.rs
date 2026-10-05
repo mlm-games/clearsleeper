@@ -1,7 +1,5 @@
 use bevy_ecs::prelude::*;
 
-use super::flags::Switches;
-use super::frame::CurrentFrame;
 
 pub const TIME_DAY: i32 = 0;
 pub const TIME_NIGHT: i32 = 1;
@@ -92,13 +90,7 @@ impl DayNight {
     }
 }
 
-pub fn control(
-    frame: Res<CurrentFrame>,
-    switches: Res<Switches>,
-    mut day: ResMut<DayNight>,
-) {
-    let _ = switches;
-    let _ = frame;
+pub fn control(mut day: ResMut<DayNight>) {
     day.advance(1.0);
 }
 
