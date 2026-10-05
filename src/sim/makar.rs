@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, AtomicI16, AtomicU16, AtomicU32, Ordering};
+
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
@@ -5,6 +7,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::carry::Carry;
 use super::collision::Collision;
+use super::movebox::Movebox;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{EventFlags, StoryBits};
@@ -90,7 +93,7 @@ pub const HIO_CHASE_DIST_SCALE: f32 = 0.05;
 pub const HIO_MAX_WALK_SPEED: f32 = 9.0;
 pub const HIO_MIN_WALK_SPEED: f32 = 3.0;
 pub const HIO_FORWARD_ACCEL: f32 = 0.4;
-pub const HIO_WALK_SCALE: i16 = 0xEC;
+pub const HIO_WALK_SCALE: i16 = 0x3;
 pub const HIO_WALK_MAX_STEP: i16 = 0x8FC;
 pub const HIO_WALK_MIN_STEP: i16 = 0x320;
 pub const HIO_DECEL_SCALE: f32 = 0.9;
@@ -171,7 +174,7 @@ pub const ANM_15: u8 = 0x15;
 pub const ANM_16: u8 = 0x16;
 pub const ANM_17: u8 = 0x17;
 
-pub const ANM_ROWS: usize = 24;
+pub const ANM_ROWS: usize = 28;
 
 pub const ANM_TABLE: [[i8; 6]; ANM_ROWS] = [
     [0x17, 0x02, 0x08, 0x01, -1, -1],
@@ -198,9 +201,14 @@ pub const ANM_TABLE: [[i8; 6]; ANM_ROWS] = [
     [0x05, 0x00, 0x08, 0x01, -1, 0x00],
     [0x07, 0x00, 0x08, 0x01, -1, 0x17],
     [0x06, 0x02, 0x08, 0x01, -1, -1],
+    [0x08, 0x02, 0x08, 0x01, -1, -1],
+    [0x19, 0x02, 0x08, 0x01, 0x03, 0x00],
+    [0x0A, 0x02, 0x08, 0x01, -1, -1],
+    [0x17, 0x02, 0x08, 0x01, -1, -1],
 ];
 
-pub const ANM_PRM: [i8; ANM_ROWS] = [
+pub const ANM_PRM_ROWS: usize = 24;
+pub const ANM_PRM: [i8; ANM_PRM_ROWS] = [
     0, 1, 2, 3, 4, 5, 4, 6, 7, 0x10, 8, 0xA, 0xB, 0xC, 0xE, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
     0x1A, 0x1B, 0x09,
 ];
@@ -282,8 +290,50 @@ pub const SE_CM_CB_BOUND: u32 = 0x5945;
 pub const SE_CTRL_NPC_TO_LINK: u32 = 0x0886;
 pub const BGM_MAKORE_TAKT_8: u32 = 0x8000_005F;
 
+pub const CYL_SRC_RADIUS: f32 = 30.0;
+pub const CYL_SRC_HEIGHT: f32 = 80.0;
 pub const CYL_RADIUS: f32 = 20.0;
 pub const CYL_HEIGHT: f32 = 60.0;
+
+pub const AT_TYPE_BOOMERANG: u32 = 1 << 6;
+pub const AT_TYPE_WATER: u32 = 1 << 8;
+pub const AT_TYPE_UNK20000: u32 = 1 << 17;
+pub const AT_TYPE_WIND: u32 = 1 << 21;
+pub const AT_TYPE_UNK400000: u32 = 1 << 22;
+pub const AT_TYPE_LIGHT: u32 = 1 << 23;
+pub const AT_TYPE_ALL: u32 = !0u32;
+
+pub const CCT_TG_SET: u32 = 0x01;
+pub const CCT_TG_IS_PLAYER: u32 = 0x04;
+
+pub const CCC_CO_SET: u32 = 0x01;
+pub const CCC_CO_IS_PLAYER: u32 = 0x04;
+pub const CCC_CO_VS_ENEMY: u32 = 0x10;
+pub const CCC_CO_VS_PLAYER: u32 = 0x20;
+pub const CCC_CO_VS_OTHER: u32 = 0x40;
+
+pub const CYL_AT_TYPE: u32 = 0;
+pub const CYL_AT_ATP: u8 = 0;
+pub const CYL_AT_SPRM: u32 = 0;
+pub const CYL_TG_TYPE: u32 = AT_TYPE_ALL & !AT_TYPE_BOOMERANG & !AT_TYPE_WIND & !AT_TYPE_LIGHT;
+pub const CYL_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_PLAYER;
+pub const CYL_CO_SPRM: u32 =
+    CCC_CO_SET | CCC_CO_IS_PLAYER | CCC_CO_VS_ENEMY | CCC_CO_VS_PLAYER | CCC_CO_VS_OTHER;
+
+pub const WIND_CYL_TG_TYPE: u32 =
+    AT_TYPE_ALL & !AT_TYPE_WATER & !AT_TYPE_UNK20000 & !AT_TYPE_UNK400000 & !AT_TYPE_LIGHT;
+pub const WIND_CYL_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_PLAYER;
+pub const WIND_CYL_CO_SPRM: u32 = 0;
+
+pub const STTS_MIN: u8 = 0xFE;
+pub const STTS_MAX: u8 = 0xFF;
+
+pub const PLAYER_TG_REACH: f32 = 30.0;
+
+pub const MOVEBOX_SEARCH: f32 = 300.0;
+pub const MOVEBOX_MOVE_MIN: f32 = 0.001;
+pub const MOVEBOX_DOT_LIMIT: f32 = -0.707099974155426;
+pub const MOVEBOX_ABOVE: f32 = 100.0;
 pub const CARRY_ANM_SPEED: f32 = 2.0;
 pub const CARRY_SET_MORF: f32 = 4.0;
 pub const JUMP_LIFT: f32 = 10.0;
@@ -324,6 +374,7 @@ pub const NO_INDEX: i16 = -1;
 pub const DEG2S: f32 = 32768.0 / 180.0;
 pub const NO_GROUND: f32 = -1.0e7;
 pub const IS_ZERO: f32 = 8e-11;
+pub const CM3D_ABS_MIN: f32 = 3.8146973e-06;
 pub const SQUARE_400: f32 = 400.0 * 400.0;
 pub const SQUARE_600: f32 = 600.0 * 600.0;
 
@@ -533,16 +584,103 @@ impl Cut {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Cyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub at_type: u32,
+    pub at_atp: u8,
+    pub at_sprm: u32,
+    pub tg_type: u32,
+    pub tg_sprm: u32,
+    pub co_sprm: u32,
+    pub stts_min: u8,
+    pub stts_max: u8,
+    pub registered: bool,
+    pub co_hit: bool,
+    pub tg_hit: bool,
+    pub tg_pos: Vec3,
+    pub tg_rvec: Vec3,
+    pub tg_wind: bool,
+}
+
+impl Cyl {
+    const SRC: Cyl = Cyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: CYL_SRC_HEIGHT,
+        at_type: CYL_AT_TYPE,
+        at_atp: CYL_AT_ATP,
+        at_sprm: CYL_AT_SPRM,
+        tg_type: CYL_TG_TYPE,
+        tg_sprm: CYL_TG_SPRM,
+        co_sprm: CYL_CO_SPRM,
+        stts_min: STTS_MIN,
+        stts_max: STTS_MAX,
+        registered: false,
+        co_hit: false,
+        tg_hit: false,
+        tg_pos: Vec3::ZERO,
+        tg_rvec: Vec3::ZERO,
+        tg_wind: false,
+    };
+
+    pub fn touches(&self, at: Vec3, reach: f32) -> bool {
+        let dx = self.centre.x - at.x;
+        let dz = self.centre.z - at.z;
+        let flat = (dx * dx + dz * dz).sqrt();
+        if flat >= self.radius + reach {
+            return false;
+        }
+        let hi = at.y + reach;
+        let lo = at.y - reach;
+        hi >= self.centre.y && lo <= self.centre.y + self.height
+    }
+
+    pub fn blocks(&self, at: Vec3) -> bool {
+        self.co_set() && self.touches(at, 0.0)
+    }
+
+    pub fn co_set(&self) -> bool {
+        self.registered && self.co_sprm & CCC_CO_SET != 0
+    }
+
+    pub fn can_hit(&self, at: Vec3, reach: f32) -> bool {
+        self.registered && self.tg_sprm & CCT_TG_SET != 0 && self.touches(at, reach)
+    }
+
+    const WIND_SRC: Cyl = Cyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: CYL_SRC_HEIGHT,
+        at_type: CYL_AT_TYPE,
+        at_atp: CYL_AT_ATP,
+        at_sprm: CYL_AT_SPRM,
+        tg_type: WIND_CYL_TG_TYPE,
+        tg_sprm: WIND_CYL_TG_SPRM,
+        co_sprm: WIND_CYL_CO_SPRM,
+        stts_min: STTS_MIN,
+        stts_max: STTS_MAX,
+        registered: false,
+        co_hit: false,
+        tg_hit: false,
+        tg_pos: Vec3::ZERO,
+        tg_rvec: Vec3::ZERO,
+        tg_wind: false,
+    };
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Makar {
     pub prm: u32,
-    pub status: u16,
     pub npc_action: Step,
     pub player_action: Step,
     pub act_step: i8,
     pub act_param: Param,
     pub entered: bool,
     pub anm: u8,
+    pub anm_file: u8,
     pub anm_row: i8,
     pub anm_frame: f32,
     pub anm_last: f32,
@@ -559,9 +697,12 @@ pub struct Makar {
     pub attn_dist_talk: u32,
     pub attn_dist_speak: u32,
     pub attn_dist_carry: u32,
-    pub cyl_radius: f32,
-    pub cyl_height: f32,
+    pub cyl: Cyl,
+    pub wind_cyl: Cyl,
     pub move_block: i8,
+    pub ground_hit: bool,
+    pub npc_call_request: bool,
+    pub practice_on: bool,
     pub do_status: u8,
     pub ship_atn: Vec3,
     pub changed_player: bool,
@@ -575,7 +716,6 @@ pub struct Makar {
     pub head_x_rest: i16,
     pub spine_x_rest: i16,
     pub msg_no: u32,
-    pub msg_id: u32,
     pub timer: i16,
     pub ev_order: i16,
     pub ev_slot: i16,
@@ -627,27 +767,25 @@ pub struct Makar {
     pub ground_h: f32,
     pub floor_count: i8,
     pub damage_timer: i16,
-    pub flying: bool,
-    pub fly_timer: i16,
-    pub player_room: bool,
     pub staff_idx: usize,
     pub grounded: bool,
     pub ship_present: bool,
     pub link_present: bool,
     pub as_player: bool,
+    pub carried_now: bool,
 }
 
 impl Makar {
     pub fn spawn(parameters: u32) -> Self {
         Self {
             prm: parameters & PRM_TYPE_MASK,
-            status: 0,
             npc_action: Step::None,
             player_action: Step::None,
             act_step: ACT_INIT,
             act_param: Param::Null,
             entered: false,
             anm: EV_NONE_U8,
+            anm_file: 0,
             anm_row: 0,
             anm_frame: 0.0,
             anm_last: 0.0,
@@ -664,8 +802,11 @@ impl Makar {
             attn_dist_talk: ATTN_DIST_TALK,
             attn_dist_speak: ATTN_DIST_SPEAK,
             attn_dist_carry: ATTN_DIST_CARRY,
-            cyl_radius: CYL_RADIUS,
-            cyl_height: CYL_HEIGHT,
+            cyl: Cyl::SRC,
+            wind_cyl: Cyl::WIND_SRC,
+            ground_hit: false,
+            npc_call_request: false,
+            practice_on: false,
             move_block: 0,
             do_status: 0,
             ship_atn: Vec3::ZERO,
@@ -680,7 +821,6 @@ impl Makar {
             head_x_rest: 0,
             spine_x_rest: 0,
             msg_no: 0,
-            msg_id: FPC_M_ERROR_PROCESS_ID,
             timer: 0,
             ev_order: ORDER_OFF,
             ev_slot: EV_NONE,
@@ -732,14 +872,12 @@ impl Makar {
             ground_h: NO_GROUND,
             floor_count: 0,
             damage_timer: 0,
-            flying: false,
-            fly_timer: 0,
-            player_room: false,
             staff_idx: NO_STAFF,
             grounded: false,
             ship_present: false,
             link_present: false,
             as_player: false,
+            carried_now: false,
         }
     }
 
@@ -748,6 +886,26 @@ impl Makar {
             [CULL_MIN[0], CULL_MIN[1], CULL_MIN[2]],
             [CULL_MAX[0], CULL_MAX[1], CULL_MAX[2]],
         )
+    }
+
+    pub fn is_tag_check_ok(&self) -> bool {
+        if self.npc_action == Step::Wait || self.npc_action == Step::Search {
+            return true;
+        }
+        self.npc_action == Step::Carry && !self.carried_now
+    }
+
+    pub fn set_message_animation(&mut self, attr: u8, ctx: &mut Ctx) {
+        if !ctx.carry_now && ctx.event_mode {
+            let wait = ctx
+                .cut_index
+                .and_then(|cut| ctx.list.cut_name(cut))
+                .is_some_and(|name| name == CUT_NAMES[Cut::Wait as usize]);
+            if wait {
+                let anm = self.get_anm_type(i32::from(attr));
+                self.set_anm(anm, ctx);
+            }
+        }
     }
 
     pub fn drawn(&self) -> bool {
@@ -784,111 +942,111 @@ impl Makar {
     }
 
     pub fn is_no_carry_action(&self) -> bool {
-        self.status & STTS_NO_CARRY_ACTION != 0
+        status_get() & STTS_NO_CARRY_ACTION != 0
     }
 
-    pub fn on_no_carry_action(&mut self) {
-        self.status |= STTS_NO_CARRY_ACTION;
+    pub fn on_no_carry_action(&self) {
+        status_set(STTS_NO_CARRY_ACTION);
     }
 
-    pub fn off_no_carry_action(&mut self) {
-        self.status &= !STTS_NO_CARRY_ACTION;
+    pub fn off_no_carry_action(&self) {
+        status_unset(STTS_NO_CARRY_ACTION);
     }
 
     pub fn is_tact(&self) -> bool {
-        self.status & STTS_TACT != 0
+        status_get() & STTS_TACT != 0
     }
 
-    pub fn on_tact(&mut self) {
-        self.status |= STTS_TACT;
+    pub fn on_tact(&self) {
+        status_set(STTS_TACT);
     }
 
-    pub fn off_tact(&mut self) {
-        self.status &= !STTS_TACT;
+    pub fn off_tact(&self) {
+        status_unset(STTS_TACT);
     }
 
     pub fn is_tact_correct(&self) -> bool {
-        self.status & STTS_TACT_CORRECT != 0
+        status_get() & STTS_TACT_CORRECT != 0
     }
 
-    pub fn on_tact_correct(&mut self) {
-        self.status |= STTS_TACT_CORRECT;
+    pub fn on_tact_correct(&self) {
+        status_set(STTS_TACT_CORRECT);
     }
 
-    pub fn off_tact_correct(&mut self) {
-        self.status &= !STTS_TACT_CORRECT;
+    pub fn off_tact_correct(&self) {
+        status_unset(STTS_TACT_CORRECT);
     }
 
     pub fn is_tact_cancel(&self) -> bool {
-        self.status & STTS_TACT_CANCEL != 0
+        status_get() & STTS_TACT_CANCEL != 0
     }
 
-    pub fn on_tact_cancel(&mut self) {
-        self.status |= STTS_TACT_CANCEL;
+    pub fn on_tact_cancel(&self) {
+        status_set(STTS_TACT_CANCEL);
     }
 
-    pub fn off_tact_cancel(&mut self) {
-        self.status &= !STTS_TACT_CANCEL;
+    pub fn off_tact_cancel(&self) {
+        status_unset(STTS_TACT_CANCEL);
     }
 
     pub fn is_music(&self) -> bool {
-        self.status & STTS_MUSIC != 0
+        status_get() & STTS_MUSIC != 0
     }
 
-    pub fn on_music(&mut self) {
-        self.status |= STTS_MUSIC;
+    pub fn on_music(&self) {
+        status_set(STTS_MUSIC);
     }
 
-    pub fn off_music(&mut self) {
-        self.status &= !STTS_MUSIC;
+    pub fn off_music(&self) {
+        status_unset(STTS_MUSIC);
     }
 
     pub fn is_nut(&self) -> bool {
-        self.status & STTS_NUT != 0
+        status_get() & STTS_NUT != 0
     }
 
-    pub fn on_nut(&mut self) {
-        self.status |= STTS_NUT;
+    pub fn on_nut(&self) {
+        status_set(STTS_NUT);
     }
 
-    pub fn off_nut(&mut self) {
-        self.status &= !STTS_NUT;
+    pub fn off_nut(&self) {
+        status_unset(STTS_NUT);
     }
 
     pub fn is_ship_ride(&self) -> bool {
-        self.status & STTS_SHIP_RIDE != 0
+        status_get() & STTS_SHIP_RIDE != 0
     }
 
-    pub fn on_ship_ride(&mut self) {
-        self.status |= STTS_SHIP_RIDE;
+    pub fn on_ship_ride(&self) {
+        status_set(STTS_SHIP_RIDE);
     }
 
-    pub fn off_ship_ride(&mut self) {
-        self.status &= !STTS_SHIP_RIDE;
+    pub fn off_ship_ride(&self) {
+        status_unset(STTS_SHIP_RIDE);
     }
 
     pub fn is_player_find(&self) -> bool {
-        self.status & STTS_PLAYER_FIND != 0
+        status_get() & STTS_PLAYER_FIND != 0
     }
 
-    pub fn on_player_find(&mut self) {
-        self.status |= STTS_PLAYER_FIND;
+    pub fn on_player_find(&self) {
+        status_set(STTS_PLAYER_FIND);
     }
 
-    pub fn off_player_find(&mut self) {
-        self.status &= !STTS_PLAYER_FIND;
+    pub fn off_player_find(&self) {
+        status_unset(STTS_PLAYER_FIND);
     }
 
     pub fn is_floor_seen(&self) -> bool {
-        self.status & STTS_UNK_0100 != 0
+        status_get() & STTS_UNK_0100 != 0
     }
 
-    pub fn on_floor_seen(&mut self) {
-        self.status |= STTS_UNK_0100;
+    pub fn on_floor_seen(&self) {
+        status_set(STTS_UNK_0100);
     }
 
-    pub fn off_floor_seen(&mut self) {
-        self.status &= !STTS_UNK_0100;
+    pub fn off_floor_seen(&self) {
+        status_unset(STTS_UNK_0100);
     }
 
     pub fn backbone_x(&self) -> i16 {
@@ -921,8 +1079,66 @@ impl Makar {
 const CULL_MIN: [f32; 3] = [-70.0, -100.0, -80.0];
 const CULL_MAX: [f32; 3] = [70.0, 240.0, 100.0];
 
+static STATUS: AtomicU16 = AtomicU16::new(0);
+static FLYING: AtomicBool = AtomicBool::new(false);
+static PLAYER_ROOM: AtomicBool = AtomicBool::new(false);
+static FLYING_TIMER: AtomicI16 = AtomicI16::new(0);
+static L_MSG_ID: AtomicU32 = AtomicU32::new(FPC_M_ERROR_PROCESS_ID);
+
+fn status_get() -> u16 {
+    STATUS.load(Ordering::Relaxed)
+}
+
+fn status_set(bit: u16) {
+    STATUS.fetch_or(bit, Ordering::Relaxed);
+}
+
+fn status_unset(bit: u16) {
+    STATUS.fetch_and(!bit, Ordering::Relaxed);
+}
+
+fn status_set_all(value: u16) {
+    STATUS.store(value, Ordering::Relaxed);
+}
+
+fn flying_get() -> bool {
+    FLYING.load(Ordering::Relaxed)
+}
+
+fn flying_set(value: bool) {
+    FLYING.store(value, Ordering::Relaxed);
+}
+
+fn player_room_get() -> bool {
+    PLAYER_ROOM.load(Ordering::Relaxed)
+}
+
+fn player_room_set(value: bool) {
+    PLAYER_ROOM.store(value, Ordering::Relaxed);
+}
+
+fn flying_timer_get() -> i16 {
+    FLYING_TIMER.load(Ordering::Relaxed)
+}
+
+fn flying_timer_set(value: i16) {
+    FLYING_TIMER.store(value, Ordering::Relaxed);
+}
+
+fn l_msg_id_get() -> u32 {
+    L_MSG_ID.load(Ordering::Relaxed)
+}
+
+fn l_msg_id_set(value: u32) {
+    L_MSG_ID.store(value, Ordering::Relaxed);
+}
+
 fn is_zero(value: f32) -> bool {
     value.abs() < IS_ZERO
+}
+
+fn m3d_is_zero(value: f32) -> bool {
+    value.abs() < CM3D_ABS_MIN
 }
 
 fn ssin(angle: i16) -> f32 {
@@ -948,6 +1164,14 @@ fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
 fn target_angle_x(from: Vec3, to: Vec3) -> i16 {
     let delta = to - from;
     atan2s(delta.y, (delta.x * delta.x + delta.z * delta.z).sqrt())
+}
+
+fn normalize_zp(v: Vec3) -> Option<Vec3> {
+    let len = (v.x * v.x + v.z * v.z).sqrt();
+    if len == 0.0 || !len.is_finite() {
+        return None;
+    }
+    Some(Vec3::new(v.x / len, 0.0, v.z / len))
 }
 
 fn abs_xz(v: Vec3) -> f32 {
@@ -1246,15 +1470,15 @@ impl Makar {
         self.anm_row = row;
         let index = usize::try_from(row).unwrap_or(0);
         let data = ANM_TABLE.get(index).copied().unwrap_or(ANM_TABLE[0]);
+        self.anm_file = data[0].unsigned_abs() as u8;
         self.anm_frame = 0.0;
         self.anm_last = 0.0;
-        self.anm_end = MORPH_END_FRAME;
-        self.anm_speed = ((data[3]) as f32).max(1.0);
+        self.anm_end = if secondary { data[2] as f32 } else { 0.0 };
+        self.anm_speed = data[3] as f32;
         self.anm_loop = data[1] == ANM_LOOP;
-        let _ = (data[0].unsigned_abs(), if secondary { data[2] } else { 0 }, data[5]);
         self.anm_done = false;
         self.anm_count = 0;
-        if data[4] < 0 {
+        if data[0] < 0 {
             self.on_music();
         } else {
             self.off_music();
@@ -1277,23 +1501,25 @@ impl Makar {
     }
 
     pub fn play_anm(&mut self, ctx: &mut Ctx) {
-        if self.anm_end > 0.0 && self.anm_frame >= self.anm_end {
+        let previous = self.anm_last;
+        if self.anm_speed == 0.0 {
+            self.anm_speed = 1.0;
+        }
+        self.anm_frame += self.anm_speed;
+        if self.anm_end > 0.0 && self.anm_frame > self.anm_end {
             if self.anm_loop {
                 self.anm_frame = 0.0;
-                self.anm_count += 1;
-                self.anm_done = true;
             }
-        } else if self.anm_end > 0.0 {
-            self.anm_frame += self.anm_speed;
         }
-        if self.anm_frame < self.anm_last {
+        let finished = (self.anm_end > 0.0 && self.anm_frame == 0.0) || self.anm_frame < previous;
+        if finished {
             self.anm_count += 1;
             self.anm_done = true;
         }
         if self.anm_done {
             let index = usize::try_from(self.anm_row).unwrap_or(0);
             let data = ANM_TABLE.get(index).copied().unwrap_or(ANM_TABLE[0]);
-            let mut limit = data[5];
+            let mut limit = data[4];
             if self.is_type_kaze_boss() && limit == ANM_KAZE_BOSS_END {
                 limit = ANM_KAZE_BOSS_ALT;
             }
@@ -1325,26 +1551,30 @@ impl Makar {
         );
         let mut delta = self.nut_pos - joint;
         let gap = delta.length();
-        if !is_zero(gap) {
+        if !m3d_is_zero(gap) {
             delta *= NUT_STIFF / gap;
         }
         self.nut_pos = joint + delta;
         self.nut_speed += delta * NUT_DAMP;
         self.nut_speed.y += NUT_GRAVITY;
         let drag = self.nut_speed.length();
-        if !is_zero(drag) {
+        if !m3d_is_zero(drag) {
             self.nut_speed *= NUT_DRAG / drag;
         }
     }
 
     fn music_play(&mut self, ctx: &mut Ctx) {
-        if self.is_type_kaze_boss() {
+        if !self.is_type_kaze_boss() {
+            self.practice_on = true;
+        } else {
             ctx.events.list.push(SimEvent::Bgm(BGM_MAKORE_TAKT_8));
         }
     }
 
-    fn music_stop(&mut self, ctx: &mut Ctx) {
-        let _ = ctx;
+    fn music_stop(&mut self, _ctx: &mut Ctx) {
+        if !self.is_type_kaze_boss() {
+            self.practice_on = false;
+        }
     }
 }
 
@@ -1365,7 +1595,7 @@ impl Makar {
         } else {
             self.player_action
         };
-        self.fly_timer = 0;
+        flying_timer_set(0);
         self.off_flying();
         if current == next {
             return;
@@ -1426,7 +1656,9 @@ impl Makar {
     fn run_player(&mut self, ctx: &mut Ctx) {
         match self.player_action {
             Step::WaitPlayer => self.wait_player_action(ctx),
-            Step::WalkPlayer => self.walk_player_action(ctx),
+            Step::WalkPlayer => {
+                self.walk_player_action(ctx);
+            }
             Step::HitPlayer => self.hit_player_action(ctx),
             Step::JumpPlayer => self.jump_player_action(ctx),
             Step::FlyPlayer => self.fly_player_action(ctx),
@@ -1466,6 +1698,7 @@ impl Makar {
             self.speed_f = 0.0;
             self.set_player_action(Step::WaitPlayer, ctx);
         }
+        ctx.do_status = ACT_STTS_FLY;
         self.run_player(ctx);
     }
 
@@ -1479,12 +1712,36 @@ impl Makar {
         }
     }
 
-    pub fn off_flying(&mut self) {
-        self.flying = false;
+    pub fn off_flying(&self) {
+        flying_set(false);
     }
 
-    pub fn on_flying(&mut self) {
-        self.flying = true;
+    pub fn on_flying(&self) {
+        flying_set(true);
+    }
+
+    pub fn is_flying(&self) -> bool {
+        flying_get()
+    }
+
+    pub fn is_player_room(&self) -> bool {
+        player_room_get()
+    }
+
+    pub fn get_flying_timer(&self) -> i16 {
+        flying_timer_get()
+    }
+
+    pub fn set_flying_timer(&self, time: i16) {
+        flying_timer_set(time);
+    }
+
+    pub fn practice(&self) -> bool {
+        self.practice_on
+    }
+
+    pub fn npc_called(&self) -> bool {
+        self.npc_call_request
     }
 
     pub fn breaking(&mut self) {
@@ -1498,8 +1755,13 @@ impl Makar {
     }
 
     pub fn calc_flying_timer(&mut self) -> bool {
-        if self.fly_timer != 0 && calc_timer(&mut self.fly_timer) != 0 {
-            return true;
+        if flying_timer_get() != 0 {
+            let mut timer = flying_timer_get();
+            if calc_timer(&mut timer) != 0 {
+                flying_timer_set(timer);
+                return true;
+            }
+            flying_timer_set(timer);
         }
         false
     }
@@ -1527,6 +1789,11 @@ impl Makar {
             if ctx.special_code != SPECIAL_CODE_NONE {
                 ctx.events.list.push(SimEvent::Se(SE_CV_CB_LANDING));
             }
+            ctx.land = Some((LAND_BIG_SCALE, LAND_BIG_Y, LAND_BIG_Z));
+            ctx.land_key = LAND_KEY;
+        } else {
+            ctx.land = Some((LAND_SMALL_SCALE, LAND_SMALL_Y, LAND_SMALL_Z));
+            ctx.land_key = LAND_KEY;
         }
     }
 
@@ -1596,7 +1863,7 @@ impl Makar {
                 };
                 if !self.npc_call {
                     if ctx.stories.test(BIT_1610) && dist_sq < SQUARE_400 {
-                        watch = true;
+                        self.npc_call_request = true;
                         watch = true;
                     }
                 } else {
@@ -1613,7 +1880,7 @@ impl Makar {
 
     fn talk_npc_action(&mut self, ctx: &mut Ctx) {
         if self.act_step == ACT_INIT {
-            self.msg_id = FPC_M_ERROR_PROCESS_ID;
+            l_msg_id_set(FPC_M_ERROR_PROCESS_ID);
             self.msg_no = self.get_msg(ctx);
             self.attn_flags &= !ATTN_ACTION_CARRY;
             if !self.is_music() {
@@ -1702,14 +1969,14 @@ impl Makar {
             self.speed_f = HIO_NPC_FLY_LAUNCH_SPEED_F;
             self.speed.y = HIO_NPC_FLY_LAUNCH_SPEED_Y;
             self.set_anm(ANM_04, ctx);
-            self.fly_timer = HIO_NPC_FLY_TIMER;
+            flying_timer_set(HIO_NPC_FLY_TIMER);
             self.fall_sum = (HIO_FLY_FALL_STEP) as f32 + 1.0;
             ctx.events.list.push(SimEvent::Se(SE_CV_CB_THROW));
         } else if step != ACT_EXIT {
             self.fly_action(self.steer == 0, 0.0, 0, false, ctx);
             if step != 1 && HIO_FLY_FRAME_LIMIT != 0 {
                 let limit = i32::from(HIO_FLY_FRAME_LIMIT);
-                self.steer = (((i32::from(self.steer) + 1) % limit) as i8);
+                self.steer = ((i32::from(self.steer) + 1) % limit) as i8;
             }
         }
     }
@@ -1760,7 +2027,7 @@ impl Makar {
         } else if self.act_step != ACT_EXIT && !self.is_type_kaze_boss() {
             self.shape_yaw = walk::add_calc_angle_s(
                 self.shape_yaw,
-                self.yaw,
+                self.home_angle[1],
                 TURN_SCALE,
                 TURN_MAX_STEP,
                 TURN_MIN_STEP,
@@ -2012,6 +2279,7 @@ impl Makar {
             ctx.events.list.push(SimEvent::Se(SE_CM_CB_BOUND));
             self.set_anm(ANM_02, ctx);
         } else if self.act_step != ACT_EXIT && self.grounded {
+            ctx.r_status = ACT_STTS_RETURN;
             self.return_link = true;
             self.speed_f = 0.0;
         }
@@ -2043,9 +2311,10 @@ impl Makar {
         if self.act_step == ACT_INIT {
             self.speed.y = HIO_FLY_LAUNCH_SPEED_Y;
             self.set_anm(ANM_04, ctx);
-            self.fly_timer = HIO_PLAYER_FLY_TIMER;
+            flying_timer_set(HIO_PLAYER_FLY_TIMER);
             ctx.events.list.push(SimEvent::Se(SE_CV_CB_LEAF_OUT));
         } else if self.act_step != ACT_EXIT {
+            ctx.a_status = ACT_STTS_LET_GO;
             let speed = ctx.stick * HIO_STICK_FLY_SPEED_SCALE;
             let angle = self.get_stick_angle(ctx);
             self.fly_action(ctx.trig_a, speed, angle, ctx.trig_b, ctx);
@@ -2148,10 +2417,11 @@ impl Makar {
                 push.z += drive * scos(drive_angle);
             }
             if !self.is_music() && ctx.wind_tg {
-                let hit = ctx.wind_push;
-                push += hit * 0.01;
-                flat = WIND_CATCH_SPEED;
-                y_limit = WIND_CATCH_LIMIT;
+                if ctx.wind_is_wind {
+                    push += ctx.wind_push * 0.01;
+                    flat = WIND_CATCH_SPEED;
+                    y_limit = WIND_CATCH_LIMIT;
+                }
                 self.fly_speed = HIO_FLY_SPEED_RESET;
                 caught = true;
             } else {
@@ -2182,7 +2452,7 @@ impl Makar {
             self.look_back(false, ctx.player);
             self.speed += push;
             let magnitude = self.speed.length();
-            if !is_zero(magnitude) && magnitude > flat {
+            if !m3d_is_zero(magnitude) && magnitude > flat {
                 let mut cap = magnitude;
                 walk::chase_f(&mut cap, flat, 1.0);
                 if cap > WIND_MAX {
@@ -2211,14 +2481,14 @@ impl Makar {
                 ctx.events.list.push(SimEvent::Se(SE_CM_PRAPELLO_OPEN));
             }
         } else if self.act_step == 2 {
-            if as_player && (caught || self.fly_timer < HIO_FLY_END_LIMIT) {
+            if as_player && (caught || flying_timer_get() < HIO_FLY_END_LIMIT) {
                 if self.set_anm(ANM_15, ctx) && caught {
                     ctx.events.list.push(SimEvent::Se(SE_CV_CB_FLY_END));
                 }
             } else if self.anm_row != NUT_SOW_STOP && self.fall_sum > HIO_FLY_FALL_STEP as f32 {
                 self.set_anm(ANM_07, ctx);
             }
-            if self.fly_timer != 0 && hold {
+            if flying_timer_get() != 0 && hold {
                 chase_s(&mut self.fly_speed, HIO_FLY_SPEED_MAX, HIO_FLY_SPEED_STEP);
                 self.land_timer = 0;
             } else {
@@ -2255,7 +2525,7 @@ impl Makar {
                 ctx.events.list.push(SimEvent::Se(SE_CM_PRAPELLO_OPEN));
             }
             if self.grounded {
-                if self.ev_order == ORDER_OFF && self.act_step == 3 {
+                if !self.ground_hit && self.act_step == 3 {
                     if ctx.special_code != SPECIAL_CODE_NONE {
                         self.speed.y = HIO_LANDING_BOUNCE;
                         self.check_landing(ctx);
@@ -2330,6 +2600,7 @@ impl Makar {
             let temp = self.pos;
             self.pos = self.old;
             self.speed_f = 0.0;
+            self.ground_hit = true;
             self.grounded = true;
             if self.normal != Vec3::ZERO
                 && i32::from(distance_angle_s(*angle, atan2s(self.normal.x, self.normal.z)))
@@ -2431,15 +2702,16 @@ impl Makar {
     }
 
     pub fn init_talk(&mut self, ctx: &mut Ctx) -> bool {
-        if self.msg_id == FPC_M_ERROR_PROCESS_ID {
-            self.msg_id = if self.msg_no == MSG_TACT_INPUT {
+        if l_msg_id_get() == FPC_M_ERROR_PROCESS_ID {
+            let id = if self.msg_no == MSG_TACT_INPUT {
                 ctx.text.tact_message_set()
             } else {
                 ctx.text.message_set(self.msg_no)
             };
+            l_msg_id_set(id);
             false
         } else {
-            ctx.text.procs.search_by_id(self.msg_id).is_some()
+            ctx.text.procs.search_by_id(l_msg_id_get()).is_some()
         }
     }
 
@@ -2645,7 +2917,7 @@ impl Makar {
     }
 
     fn ev_init_msg_set(&mut self, ctx: &mut Ctx) {
-        self.msg_id = FPC_M_ERROR_PROCESS_ID;
+        l_msg_id_set(FPC_M_ERROR_PROCESS_ID);
         if let Some(msg) = ctx.cut_number("MsgNo").and_then(as_u32) {
             self.msg_no = msg;
             if self.msg_no == MSG_WATERFALL_TACT_FIRST && ctx.stories.test(BIT_1840) {
@@ -2685,6 +2957,7 @@ impl Makar {
     fn ev_init_offset_link(&mut self, ctx: &mut Ctx) {
         if let Some(to) = ctx.cut_vec("To") {
             let dest = offset_pos(self.pos, self.shape_yaw, to);
+            ctx.link_move = Some((dest, target_angle_y(dest, self.pos)));
         }
         if let Some(from) = ctx.cut_vec("From") {
             if let Some(link) = ctx.link {
@@ -2693,8 +2966,8 @@ impl Makar {
         }
         if let Some(player) = ctx.player {
             self.yaw = target_angle_y(self.pos, player);
-            self.shape_yaw = self.yaw;
         }
+        self.shape_yaw = self.yaw;
     }
 
     fn ev_init_walk(&mut self, ctx: &mut Ctx) {
@@ -2745,7 +3018,7 @@ impl Makar {
         }
         if self.grounded {
             self.walk_action(walk_speed, HIO_FORWARD_ACCEL, angle, ctx);
-        } else if self.ev_order != ORDER_OFF {
+        } else if self.ground_hit {
             self.speed.y = JUMP_LIFT;
         }
         let _ = face;
@@ -2849,6 +3122,7 @@ impl Makar {
     fn ev_act_sow(&mut self, ctx: &mut Ctx) -> bool {
         if self.nut_done && self.is_nut() {
             self.off_nut();
+            ctx.sow_grow = true;
         }
         if self.anm_done {
             self.set_anm(ANM_00, ctx);
@@ -2947,10 +3221,10 @@ impl Makar {
         self.shape_roll = actor.angle[2];
         self.home_room = actor.room;
         self.gravity = HIO_GRAVITY;
-        self.player_room = false;
+        player_room_set(false);
         self.off_flying();
-        self.fly_timer = 0;
-        self.status = 0;
+        flying_timer_set(0);
+        status_set_all(0);
         self.attn_dist_talk = ATTN_DIST_TALK;
         self.attn_dist_speak = ATTN_DIST_SPEAK;
         self.attn_dist_carry = ATTN_DIST_CARRY;
@@ -2987,15 +3261,20 @@ impl Makar {
             self.set_npc_action(Step::Wait, Param::Null, ctx);
             self.off_music();
         }
-        self.cyl_radius = CYL_RADIUS;
-        self.cyl_height = CYL_HEIGHT;
+        self.cyl = Cyl::SRC;
+        self.wind_cyl = Cyl::WIND_SRC;
+        self.npc_call_request = false;
+        self.practice_on = false;
+        self.ground_hit = false;
+        self.carried_now = false;
         self.staff_idx = ctx.list.staff_of(STAFF_NAME).unwrap_or(NO_STAFF);
     }
 
     pub fn execute(&mut self, ctx: &mut Ctx) -> bool {
         self.old = self.pos;
         self.off_floor_seen();
-        self.player_room = ctx.player_room;
+        self.npc_call_request = false;
+        player_room_set(ctx.player_room);
         if !self.is_ship_ride() && !ctx.carry_now {
             self.grounded = ground::grounded(ctx.collision, self.pos);
             self.home_room = match ctx.room_loaded {
@@ -3007,6 +3286,10 @@ impl Makar {
             }
             if !ctx.initial_room_ok {
                 self.home_room = ROOM_NO_RESET;
+                return true;
+            }
+            if !self.is_ship_ride() && ctx.move_stop {
+                self.set_wait_npc_action(ctx);
                 return true;
             }
             if self.grounded && ctx.safe_poly && ctx.move_bg {
@@ -3028,7 +3311,8 @@ impl Makar {
                 self.max_fall = MOVE_FALL_SPEED;
                 self.gravity = HIO_GRAVITY;
             }
-            self.grounded = ground::grounded(ctx.collision, self.pos);
+            self.ground_hit = ground::grounded(ctx.collision, self.pos);
+            self.grounded = self.ground_hit;
             self.ground_h = ground::surface(ctx.collision, self.pos).unwrap_or(f32::NEG_INFINITY);
             if self.grounded && self.ground_h != f32::NEG_INFINITY {
                 self.pos.y = self.ground_h;
@@ -3072,18 +3356,21 @@ impl Makar {
                     }
                 }
             }
+            self.set_collision(ctx);
         }
         if ctx.now_pos_move {
             self.play_anm(ctx);
         }
         if self.as_player {
             ctx.do_status = ACT_STTS_BLANK;
+            ctx.a_status = ACT_STTS_HIDDEN;
+            ctx.r_status = if self.grounded { ACT_STTS_RETURN } else { ACT_STTS_BLANK };
         }
         if !self.event_proc(ctx) {
             self.off_tact();
             if !self.is_fly_action() && !self.is_music() && ctx.wind_tg {
                 push = ctx.wind_push;
-                let mut reach = abs_xz(ctx.wind_push);
+                let reach = abs_xz(ctx.wind_push);
                 if reach < WIND_CATCH_FLOOR {
                     push = (self.pos - ctx.wind_tg_pos) * WIND_CATCH_SCALE;
                 }
@@ -3115,8 +3402,14 @@ impl Makar {
                     }
                 }
                 self.do_status = ctx.do_status;
+                ctx.status_map = MAP_NONE;
             } else {
                 self.move_block = self.chk_move_block(ctx);
+                ctx.status_map = if ctx.stories.test(BIT_1610) {
+                    MAP_CB1
+                } else {
+                    MAP_NPC
+                };
                 self.carry_check(ctx);
                 self.check_order(ctx);
                 self.npc_action(ctx);
@@ -3151,6 +3444,37 @@ impl Makar {
         true
     }
 
+    pub fn set_collision(&mut self, ctx: &Ctx) {
+        self.cyl.centre = self.pos;
+        self.cyl.radius = CYL_RADIUS;
+        self.cyl.height = CYL_HEIGHT;
+        self.cyl.registered = true;
+        self.cyl.co_hit = ctx.co_hit;
+        self.cyl.tg_hit = ctx.tg_hit;
+        self.cyl.tg_pos = ctx.tg_pos;
+
+        self.wind_cyl.centre = self.pos;
+        self.wind_cyl.radius = CYL_RADIUS;
+        self.wind_cyl.height = CYL_HEIGHT;
+        self.wind_cyl.registered = true;
+        self.wind_cyl.tg_hit = ctx.wind_tg;
+        self.wind_cyl.tg_pos = ctx.wind_tg_pos;
+        self.wind_cyl.tg_rvec = ctx.wind_push;
+        self.wind_cyl.tg_wind = ctx.wind_is_wind;
+    }
+
+    pub fn hulls(&self) -> (Cyl, Cyl) {
+        (self.cyl, self.wind_cyl)
+    }
+
+    pub fn damages_player(&self) -> bool {
+        self.cyl.at_type != 0 && self.cyl.at_atp != 0
+    }
+
+    pub fn blocks_player(&self) -> bool {
+        self.cyl.co_set() && self.cyl.registered
+    }
+
     fn move_step(&mut self, ctx: &Ctx) {
         let mut y = self.speed.y + self.gravity;
         if y < self.max_fall {
@@ -3164,8 +3488,35 @@ impl Makar {
         self.pos += self.speed + ctx.move_step;
     }
 
-    fn chk_move_block(&self, ctx: &Ctx) -> i8 {
-        let _ = ctx;
+    fn chk_move_block(&mut self, ctx: &Ctx) -> i8 {
+        let Some((block_pos, block_old, rel)) = ctx.movebox else {
+            return 0;
+        };
+        let block_vel = block_pos - block_old;
+        if block_vel.length() <= MOVEBOX_MOVE_MIN {
+            return 0;
+        }
+        self.block = block_vel;
+        let mut rel_pos = rel;
+        rel_pos.y = 0.0;
+        rel_pos = match normalize_zp(rel_pos) {
+            Some(unit) => unit,
+            None => return 0,
+        };
+        let mut vel = block_vel;
+        vel.y = 0.0;
+        let vel_flat = match normalize_zp(vel) {
+            Some(unit) => unit,
+            None => return 0,
+        };
+        let dot = rel_pos.dot(vel_flat);
+        let cross = rel_pos.cross(vel);
+        if dot < MOVEBOX_DOT_LIMIT {
+            return if cross.y < 0.0 { -1 } else { 1 };
+        }
+        if block_pos.y > self.pos.y + MOVEBOX_ABOVE {
+            return if cross.y < 0.0 { -1 } else { 1 };
+        }
         0
     }
 }
@@ -3324,6 +3675,9 @@ pub struct Ctx<'a> {
     pub wind_tg: bool,
     pub wind_tg_pos: Vec3,
     pub wind_push: Vec3,
+    pub wind_is_wind: bool,
+    pub movebox: Option<(Vec3, Vec3, Vec3)>,
+    pub link_move: Option<(Vec3, i16)>,
     pub wind: (Vec3, f32),
     pub ship_pos: Option<Vec3>,
     pub player_ship_ride: bool,
@@ -3346,6 +3700,13 @@ pub struct Ctx<'a> {
     pub player_anim: f32,
     pub player_anim_end: f32,
     pub do_status: u8,
+    pub a_status: u8,
+    pub r_status: u8,
+    pub status_map: u32,
+    pub move_stop: bool,
+    pub sow_grow: bool,
+    pub land: Option<(f32, f32, f32)>,
+    pub land_key: i32,
     pub shock: Option<i32>,
     pub boss_enemy: bool,
     pub drawn: bool,
@@ -3417,10 +3778,16 @@ pub struct Pad<'w> {
     pub lock: Res<'w, Lock>,
 }
 
+#[derive(SystemParam)]
+pub struct Boxes<'w, 's> {
+    pub moveboxes: Query<'w, 's, (Entity, &'static Actor, &'static Movebox), Without<Makar>>,
+}
+
 pub fn control(
     mut world: World,
     mut talk: Talk,
     pad: Pad,
+    boxes: Boxes,
     collision: Option<Res<Collision>>,
     mut actors: Query<(Entity, &mut Actor, &mut Makar)>,
 ) {
@@ -3485,13 +3852,18 @@ pub fn control(
             ground_code: GROUND_CODE_NONE,
             special_code: SPECIAL_CODE_NONE,
             wall_hit: false,
-            co_hit: false,
-            tg_hit: false,
-            tg_pos: Vec3::ZERO,
+            co_hit: link.is_some_and(|player| makar.cyl.blocks(player.pos)),
+            tg_hit: link.is_some_and(|player| {
+                makar.cyl.tg_sprm & CCT_TG_SET != 0 && makar.cyl.touches(player.pos, PLAYER_TG_REACH)
+            }),
+            tg_pos: link.map_or(Vec3::ZERO, |player| player.pos),
             wind_tg: false,
             wind_tg_pos: Vec3::ZERO,
             wind_push: Vec3::ZERO,
+            wind_is_wind: false,
             wind: (Vec3::ZERO, 0.0),
+            movebox: None,
+            link_move: None,
             ship_pos: None,
             player_ship_ride: false,
             tact_music: NO_TACT_MUSIC,
@@ -3513,11 +3885,33 @@ pub fn control(
             player_anim: 0.0,
             player_anim_end: 0.0,
             do_status: 0,
+            a_status: 0,
+            r_status: 0,
+            status_map: MAP_NONE,
+            move_stop: false,
+            sow_grow: false,
+            land: None,
+            land_key: LAND_KEY,
             shock: None,
             boss_enemy: false,
             drawn: true,
         };
+        if let Some((box_actor, box_state)) = boxes
+            .moveboxes
+            .iter()
+            .filter(|(other, _, _)| other != &entity)
+            .map(|(_, other, box_state)| {
+                let gap = other.pos - actor.pos;
+                (gap.length(), other, box_state)
+            })
+            .filter(|(gap, _, _)| *gap <= MOVEBOX_SEARCH)
+            .min_by(|left, right| left.0.total_cmp(&right.0))
+            .map(|(_, other, box_state)| (other, box_state))
+        {
+            ctx.movebox = Some((box_actor.pos, box_state.pos, box_actor.pos - actor.pos));
+        }
         makar.as_player = pad.carry.held == Some(entity) && !makar.changed_player;
+        makar.carried_now = pad.carry.held.is_some();
         makar.ship_present = ctx.ship_pos.is_some();
         makar.link_present = ctx.link.is_some();
         if !makar.entered {
