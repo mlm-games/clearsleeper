@@ -1202,7 +1202,6 @@ pub fn root_view(
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
 }
 
-/// The decoded title frame, uploaded to a texture the first time it changes.
 fn title_movie(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     if app.movie_pixels.is_empty() {
         return Spacer();

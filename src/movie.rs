@@ -100,7 +100,6 @@ impl Movie {
         1.0 / self.rate()
     }
 
-    /// Decode one frame's image to packed 8-bit RGB with its pixel dimensions.
     pub fn frame(&mut self, index: usize) -> Result<(u32, u32, Vec<u8>), MovieError> {
         let at = self.frames.get(index).ok_or(MovieError)?.at;
         let span = self.read(at, self.frames[index].image.max(1))?;
@@ -113,8 +112,6 @@ impl Movie {
         Ok((u32::from(info.width), u32::from(info.height), pixels))
     }
 
-    /// The frame's audio block: two channels of 4-bit deltas after the
-    /// per-block coefficient and scale tables.
     pub fn audio(&mut self, index: usize) -> Result<AudioBlock, MovieError> {
         let frame = self.frames.get(index).ok_or(MovieError)?;
         let (at, len) = (frame.at + frame.image as u64, frame.audio);
@@ -157,9 +154,6 @@ pub struct AudioBlock {
     pub channels: [Vec<u8>; 2],
 }
 
-/// Every frame's image starts with a JPEG start-of-image, and the 16 bytes
-/// ahead of it hold the next and previous frame sizes plus the sizes of the
-/// image and audio blocks that follow.
 fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<Vec<Frame>, MovieError> {
     let mut marks = Vec::with_capacity(declared.min(8192));
     let mut at = first as u64;
@@ -213,12 +207,10 @@ fn table(span: &[u8], at: usize) -> [i16; 16] {
     std::array::from_fn(|index| i16_at(span, at + 2 * index))
 }
 
-/// Title loop shipped alongside the stage data.
 pub fn title_path() -> PathBuf {
     crate::assets::asset_root().join("files/thpdemo/title_loop.thp")
 }
 
-/// Expand packed RGB to the RGBA order the renderer uploads.
 pub fn to_rgba(rgb: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(rgb.len() / 3 * 4);
     for pixel in rgb.chunks_exact(3) {
