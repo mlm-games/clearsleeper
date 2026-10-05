@@ -1,5 +1,6 @@
 pub mod actor;
 pub mod agbsw0;
+pub mod ajavw;
 pub mod ajav;
 pub mod area;
 pub mod amos_knight;
@@ -32,6 +33,7 @@ pub mod daiocta;
 pub mod damage;
 pub mod death;
 pub mod door;
+pub mod dmgroom;
 pub mod demokmm;
 pub mod dummy;
 pub mod ending;
@@ -52,12 +54,14 @@ pub mod gohdan;
 pub mod gohma;
 pub mod ground;
 pub mod grammarian;
+pub mod gnbtaki;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
 pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
+pub mod hotfloor;
 pub mod hmlif;
 pub mod homen;
 pub mod hookshot;
@@ -147,6 +151,7 @@ pub mod swpush;
 pub mod tag;
 pub mod tagkb;
 pub mod tag_msg;
+pub mod tagkk1;
 pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
@@ -165,6 +170,7 @@ pub mod vmsdz;
 pub mod walk;
 pub mod wall;
 pub mod wind;
+pub mod xfuta;
 pub mod windmill;
 pub mod warship;
 pub mod water;
@@ -705,6 +711,19 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if spcitem::is_spcitem(&source.name) {
         let item = spcitem::SpcItem::spawn(source.parameters, world.resource::<flags::EventFlags>());
         world.spawn((actor, item)).id()
+    } else if hotfloor::is_hotfloor(&source.name) {
+        world.spawn((actor, hotfloor::HotFloor::spawn())).id()
+    } else if ajavw::is_ajavw(&source.name) {
+        world.spawn((actor, ajavw::Ajavw::spawn())).id()
+    } else if gnbtaki::is_gnbtaki(&source.name) {
+        world.spawn((actor, gnbtaki::Gnbtaki::spawn())).id()
+    } else if dmgroom::is_dmgroom(&source.name) {
+        world.spawn((actor, dmgroom::Dmgroom::spawn())).id()
+    } else if tagkk1::is_tagkk1(&source.name) {
+        world.spawn((actor, tagkk1::TagKk1::spawn())).id()
+    } else if xfuta::is_xfuta(&source.name) {
+        let home = actor.pos;
+        world.spawn((actor, xfuta::Xfuta::spawn(home))).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -908,7 +927,12 @@ pub fn build(
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
                     kytag02::control.in_set(WwSimSet::Execute),                    retag::control.in_set(WwSimSet::Execute),                    turu::control.in_set(WwSimSet::Execute),
-                    spcitem::control.in_set(WwSimSet::Execute),
+                    spcitem::control.in_set(WwSimSet::Execute),                    ajavw::control.in_set(WwSimSet::Execute),
+                    gnbtaki::control.in_set(WwSimSet::Execute),
+                    dmgroom::control.in_set(WwSimSet::Execute),                    hotfloor::control.in_set(WwSimSet::Execute),
+                    tagkk1::control.in_set(WwSimSet::Execute),
+
+
 
 
                 )
@@ -1040,7 +1064,8 @@ pub fn build(
                     gohdan::control.in_set(WwSimSet::Execute),
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
-                    puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),
+                    puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),
+
 
                 )
                     .chain(),
