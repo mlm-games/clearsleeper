@@ -43,6 +43,7 @@ pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
 pub mod ghostship;
+pub mod gntakie;
 pub mod gohdan;
 pub mod gohma;
 pub mod ground;
@@ -86,12 +87,14 @@ pub mod mflft;
 pub mod morth;
 pub mod molgera;
 pub mod movebox;
+pub mod msdan2;
 pub mod msg;
 pub mod nh;
 pub mod npc_bmsw;
 pub mod npc_mt;
 pub mod npc_p1;
 pub mod npc_tc;
+pub mod pbka;
 pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
@@ -141,6 +144,7 @@ pub mod transition;
 pub mod tsubo;
 pub mod volcano;
 pub mod vgnfd;
+pub mod vmsdz;
 pub mod walk;
 pub mod wall;
 pub mod wind;
@@ -636,6 +640,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         }
     } else if dummy::is_dummy(&source.name) {
         world.spawn((actor, dummy::Dummy::spawn())).id()
+    } else if msdan2::is_msdan2(&source.name) {
+        let ring = msdan2::Msdan2::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, ring)).id()
+    } else if pbka::is_pbka(&source.name) {
+        world.spawn((actor, pbka::Pbka::spawn())).id()
+    } else if gntakie::is_gntakie(&source.name) {
+        world.spawn((actor, gntakie::Gntakie::spawn())).id()
+    } else if vmsdz::is_vmsdz(&source.name) {
+        world.spawn((actor, vmsdz::Vmsdz::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -814,6 +827,10 @@ pub fn build(
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
+                    pbka::control.in_set(WwSimSet::Execute),
+                    gntakie::control.in_set(WwSimSet::Execute),
+                    vmsdz::control.in_set(WwSimSet::Execute),
+
                 )
                     .chain(),
                 (
@@ -855,6 +872,7 @@ pub fn build(
                     clock::control.in_set(WwSimSet::Execute),
                     ghostship::control.in_set(WwSimSet::Execute),
                     volcano::control.in_set(WwSimSet::Execute),
+                    msdan2::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
                     sage::control.in_set(WwSimSet::Execute),
