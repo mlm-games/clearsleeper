@@ -60,6 +60,7 @@ pub mod item;
 pub mod jump;
 pub mod kita;
 pub mod kn;
+pub mod kytag04;
 pub mod ladder;
 pub mod koisi;
 pub mod layer;
@@ -270,6 +271,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if floormaster::is_floormaster(&source.name) {
         let robot = floormaster::Floormaster::spawn(source.parameters);
         world.spawn((actor, robot)).id()
+    } else if gohdan::is_gohdan(&source.name) {
+        let boss = gohdan::Gohdan::spawn(source.parameters);
+        world.spawn((actor, boss)).id()
+    } else if gohma::is_gohma(&source.name) {
+        let boss = gohma::Gohma::spawn(source.parameters);
+        world.spawn((actor, boss)).id()
+    } else if phantom_ganon::is_phantom_ganon(&source.name) {
+        let boss = phantom_ganon::PhantomGanon::spawn(source.parameters);
+        world.spawn((actor, boss)).id()
+    } else if puppet_ganon::is_puppet_ganon(&source.name) {
+        let boss = puppet_ganon::PuppetGanon::spawn(source.parameters);
+        world.spawn((actor, boss)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -309,6 +322,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if bomb::is_bomb(&source.name) {
         let shell = bomb::Bomb::spawn(source.parameters);
         world.spawn((actor, shell)).id()
+    } else if kytag04::is_kytag04(&source.name) {
+        let tag = kytag04::Kytag04::spawn(source.angle);
+        world.spawn((actor, tag)).id()
     } else if ladder::is_ladder(&source.name) {
         let climb = ladder::Ladder::spawn(source.parameters);
         world.spawn((actor, climb)).id()
@@ -598,6 +614,7 @@ pub fn build(
     sim.world.insert_resource(talk::Dialogue::default());
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::Collect::default());
+    sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -689,6 +706,7 @@ pub fn build(
                     windmill::control.in_set(WwSimSet::Execute),
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
+                    kytag04::control.in_set(WwSimSet::Execute),
                     rectangle::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
@@ -786,6 +804,13 @@ pub fn build(
                     molgera::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                     helmaroc::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
+                    gohdan::control.in_set(WwSimSet::Execute),
+                    gohma::control.in_set(WwSimSet::Execute),
+                    phantom_ganon::control.in_set(WwSimSet::Execute),
+                    puppet_ganon::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
