@@ -99,6 +99,7 @@ pub mod servant;
 pub mod ship;
 pub mod shmrgrd;
 pub mod stalfos;
+pub mod spotbox;
 pub mod statue;
 pub mod stone;
 pub mod stream;
@@ -322,6 +323,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if bomb::is_bomb(&source.name) {
         let shell = bomb::Bomb::spawn(source.parameters);
         world.spawn((actor, shell)).id()
+    } else if spotbox::is_spotbox(&source.name) {
+        let spot = spotbox::SpotBox::spawn(source.parameters);
+        world.spawn((actor, spot)).id()
     } else if kytag04::is_kytag04(&source.name) {
         let tag = kytag04::Kytag04::spawn(source.angle);
         world.spawn((actor, tag)).id()
@@ -707,6 +711,7 @@ pub fn build(
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     kytag04::control.in_set(WwSimSet::Execute),
+                    spotbox::control.in_set(WwSimSet::Execute),
                     rectangle::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),

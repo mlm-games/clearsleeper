@@ -1256,7 +1256,7 @@ impl PuppetGanon {
         for i in 0..TAIL_MAX {
             self.tail[i as usize].scale = HIO_M114 - (fvar2 * i as f32);
         }
-        self.right_leg[CHAIN_TAIL_ALIAS].scale = HIO_M114 * 0.7;
+        self.tail[CHAIN_TAIL_ALIAS].scale = HIO_M114 * 0.7;
         self.tail[TAIL_MAX as usize].scale = HIO_M114 * 0.7;
     }
 

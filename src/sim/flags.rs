@@ -155,6 +155,105 @@ pub const SYMBOL_NAYRU: u8 = 0;
 pub const SYMBOL_DIN: u8 = 1;
 pub const SYMBOL_FARORE: u8 = 2;
 
+pub const DI_MAP: u8 = 0;
+pub const DI_COMPASS: u8 = 1;
+pub const DI_BOSS_KEY: u8 = 2;
+pub const DI_STAGE_BOSS_ENEMY: u8 = 3;
+pub const DI_STAGE_LIFE: u8 = 4;
+pub const DI_STAGE_BOSS_DEMO: u8 = 5;
+pub const DI_COUNT: u8 = 6;
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MemBits {
+    pub dungeon_item: u8,
+}
+
+impl Default for MemBits {
+    fn default() -> Self {
+        Self { dungeon_item: 0 }
+    }
+}
+
+impl MemBits {
+    pub fn byte(&self) -> u8 {
+        self.dungeon_item
+    }
+
+    pub fn from_byte(byte: u8) -> Self {
+        Self {
+            dungeon_item: byte & 0x3F,
+        }
+    }
+
+    pub fn is_dungeon_item(&self, no: u8) -> bool {
+        no < DI_COUNT && self.dungeon_item & (1 << no) != 0
+    }
+
+    pub fn on_dungeon_item(&mut self, no: u8) {
+        if no < DI_COUNT {
+            self.dungeon_item |= 1 << no;
+        }
+    }
+
+    pub fn off_dungeon_item(&mut self, no: u8) {
+        if no < DI_COUNT {
+            self.dungeon_item &= !(1 << no);
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        self.is_dungeon_item(DI_MAP)
+    }
+
+    pub fn on_map(&mut self) {
+        self.on_dungeon_item(DI_MAP);
+    }
+
+    pub fn is_compass(&self) -> bool {
+        self.is_dungeon_item(DI_COMPASS)
+    }
+
+    pub fn on_compass(&mut self) {
+        self.on_dungeon_item(DI_COMPASS);
+    }
+
+    pub fn is_boss_key(&self) -> bool {
+        self.is_dungeon_item(DI_BOSS_KEY)
+    }
+
+    pub fn on_boss_key(&mut self) {
+        self.on_dungeon_item(DI_BOSS_KEY);
+    }
+
+    pub fn is_stage_boss_enemy(&self) -> bool {
+        self.is_dungeon_item(DI_STAGE_BOSS_ENEMY)
+    }
+
+    pub fn on_stage_boss_enemy(&mut self) {
+        self.on_dungeon_item(DI_STAGE_BOSS_ENEMY);
+    }
+
+    pub fn off_stage_boss_enemy(&mut self) {
+        self.off_dungeon_item(DI_STAGE_BOSS_ENEMY);
+    }
+
+    pub fn is_stage_life(&self) -> bool {
+        self.is_dungeon_item(DI_STAGE_LIFE)
+    }
+
+    pub fn on_stage_life(&mut self) {
+        self.on_dungeon_item(DI_STAGE_LIFE);
+    }
+
+    pub fn is_stage_boss_demo(&self) -> bool {
+        self.is_dungeon_item(DI_STAGE_BOSS_DEMO)
+    }
+
+    pub fn on_stage_boss_demo(&mut self) {
+        self.on_dungeon_item(DI_STAGE_BOSS_DEMO);
+    }
+}
+
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventFlags {
     pub bytes: [u8; FLAG_BYTES],

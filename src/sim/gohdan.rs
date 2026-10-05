@@ -10,6 +10,7 @@ use super::bombflower;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
+use super::flags::MemBits;
 use super::hammer;
 use super::item::{self, Held};
 use super::msg::{MsgBox, MsgTable};
@@ -677,6 +678,21 @@ struct Sink<'a> {
     taken: &'a mut Vec<Entity>,
     eaten: &'a mut Vec<Entity>,
     dragged: &'a mut Option<(Entity, Vec3)>,
+    mem: &'a mut MemBits,
+}
+
+impl Sink<'_> {
+    fn is_stage_boss_enemy(&self) -> bool {
+        self.mem.is_stage_boss_enemy()
+    }
+
+    fn is_stage_boss_demo(&self) -> bool {
+        self.mem.is_stage_boss_demo()
+    }
+
+    fn on_stage_boss_enemy(&mut self) {
+        self.mem.on_stage_boss_enemy();
+    }
 }
 
 impl Sink<'_> {
@@ -855,8 +871,6 @@ pub struct Gohdan {
     pub finger_co: [bool; FINGER_COUNT],
     pub eye_sph: [Vec3; EYE_COUNT],
     pub eye_radius: [f32; EYE_COUNT],
-    pub stage_boss_enemy: bool,
-    pub stage_boss_demo: bool,
     pub entered: bool,
     pub seed: [i32; 3],
 }
@@ -994,8 +1008,6 @@ impl Gohdan {
             finger_co: [false; FINGER_COUNT],
             eye_sph: [Vec3::ZERO; EYE_COUNT],
             eye_radius: [EYE_RADIUS; EYE_COUNT],
-            stage_boss_enemy: false,
-            stage_boss_demo: false,
             entered: false,
             seed,
         }
@@ -2580,11 +2592,11 @@ impl Gohdan {
                     break;
                 }
                 1 => {
-                    if self.stage_boss_enemy || REG0_S5 != 0 {
+                    if sink.is_stage_boss_enemy() && REG0_S5 == 0 {
                         break;
                     }
                     self.status |= STTS_SHOWMAP;
-                    if self.stage_boss_demo {
+                    if sink.is_stage_boss_demo() {
                         self.cam_test = 1;
                         sink.bgm(BGM_BST_BATTLE);
                         self.action = ACTION_FLY;
@@ -3088,7 +3100,7 @@ impl Gohdan {
                     if self.demo_count == 300 {
                         self.demo = 0;
                         self.battle = 10;
-                        self.stage_boss_demo = true;
+                        sink.mem.on_stage_boss_demo();
                         sink.bgm(BGM_BST_BATTLE);
                         self.cam_test = 1;
                         self.blure = 1;
@@ -3223,7 +3235,7 @@ impl Gohdan {
                     self.damage = 10;
                     self.kan_state = 4;
                     self.kan_amount = 1.0;
-                    self.stage_boss_enemy = true;
+                    sink.on_stage_boss_enemy();
                     sink.spawn_warp(Vec3::ZERO, [0; 3], self.room, self.set_id);
                     arm = 54;
                 }
@@ -3530,7 +3542,12 @@ pub struct Watch<'w, 's> {
         (Entity, &'static mut Actor, &'static mut bomb::Bomb),
         (With<bomb::Bomb>, Without<Gohdan>),
     >,
-    items: Query<'w, 's, (Entity, &'static Actor), With<pickup::Pickup>>,
+    items: Query<
+        'w,
+        's,
+        (Entity, &'static Actor),
+        (With<pickup::Pickup>, Without<Gohdan>),
+    >,
 }
 
 pub fn control(
@@ -3538,6 +3555,7 @@ pub fn control(
     table: Res<MsgTable>,
     mut events: ResMut<SimEvents>,
     mut msgbox: ResMut<MsgBox>,
+    mut mem: ResMut<MemBits>,
     mut commands: Commands,
     mut bosses: Query<(Entity, &mut Actor, &mut Gohdan), (With<Gohdan>, Without<Player>)>,
 ) {
@@ -3614,6 +3632,7 @@ pub fn control(
                 taken: &mut taken,
                 eaten: &mut eaten,
                 dragged: &mut dragged,
+                mem: &mut mem,
             };
             let prev = me.state.pos;
             me.state.execute(prev, &mut env, &parts, &shells, &mut writes, &mut sink);
