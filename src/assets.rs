@@ -255,6 +255,14 @@ struct ArchiveEntry {
 }
 
 impl Archive {
+    pub fn entries(&self) -> Vec<&str> {
+        self.files
+            .iter()
+            .filter(|file| !file.dir)
+            .map(|file| file.name.as_str())
+            .collect()
+    }
+
     pub fn parse(data: Vec<u8>, path: impl Into<PathBuf>) -> Result<Self, AssetError> {
         let path = path.into();
         if data.len() < 4 {
@@ -411,6 +419,14 @@ impl Archive {
     }
 
     pub fn read(&self, entry: &str) -> Result<&[u8], AssetError> {
+        if let Some(index) = self
+            .files
+            .iter()
+            .find(|file| !file.dir && file.name == entry)
+        {
+            let start = self.data_start + index.offset;
+            return Ok(&self.data[start..start + index.size]);
+        }
         let mut dir_index = 0_usize;
         let mut parts = entry.split('/').peekable();
         loop {
