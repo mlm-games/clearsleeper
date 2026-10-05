@@ -23,6 +23,7 @@ pub mod btk;
 pub mod dzs;
 pub mod hud;
 pub mod input;
+pub mod intro;
 pub mod j2d;
 pub mod menus;
 pub mod movie;
@@ -57,6 +58,17 @@ pub struct App {
     movie_uploaded: Cell<usize>,
     movie_sound: bool,
     movie_done: bool,
+    pub intro: Option<IntroStage>,
+}
+
+pub struct IntroStage {
+    pub intro: intro::Intro,
+    screen: j2d::Screen,
+    fonts: text::font::FontBank,
+    canvas: text::raster::Canvas,
+    image: Cell<Option<repose_core::ImageHandle>>,
+    uploaded: Cell<u64>,
+    revision: u64,
 }
 
 impl App {
@@ -100,6 +112,7 @@ impl App {
             movie_uploaded: Cell::new(usize::MAX),
             movie_sound: false,
             movie_done: false,
+            intro: None,
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -208,7 +221,69 @@ impl App {
         if let Err(e) = self.write_slot(slot) {
             log::warn!("clearsleeper: slot {slot} write failed ({e})");
         }
+        self.begin_intro();
+        self.menu.screen = menus::Screen::Title;
+    }
+
+    fn begin_intro(&mut self) {
+        let Some(root) = assets::AssetRoot::from_env().ok() else {
+            self.enter_play();
+            return;
+        };
+        let Ok(arc) = root.read_archive("files/res/Object/Opening.arc") else {
+            self.enter_play();
+            return;
+        };
+        let Some(blo) = arc.read("opening.blo").ok() else {
+            self.enter_play();
+            return;
+        };
+        let Some(screen) = j2d::parse(blo) else {
+            self.enter_play();
+            return;
+        };
+        let archives = assets::MsgArchives::load(&root);
+        let mut fonts = text::font::FontBank::new();
+        text::driver::load_fonts(&mut fonts);
+        let mut machine = intro::Intro::default();
+        machine.start(&mut fonts, &archives);
+        self.intro = Some(IntroStage {
+            intro: machine,
+            screen,
+            fonts,
+            canvas: text::raster::Canvas::new(640, 480),
+            image: Cell::new(None),
+            uploaded: Cell::new(0),
+            revision: 0,
+        });
+    }
+
+    fn enter_play(&mut self) {
+        self.intro = None;
         self.menu.screen = menus::Screen::Playing;
+    }
+
+    fn step_intro(&mut self) {
+        let Some(stage) = self.intro.as_mut() else {
+            return;
+        };
+        let Ok(root) = assets::AssetRoot::from_env() else {
+            self.intro = None;
+            self.enter_play();
+            return;
+        };
+        let archives = assets::MsgArchives::load(&root);
+        stage.intro.step(&mut stage.fonts, &archives);
+        stage.canvas = text::raster::Canvas::new(640, 480);
+        let IntroStage {
+            intro,
+            screen,
+            fonts,
+            canvas,
+            ..
+        } = stage;
+        intro::render(canvas, screen, intro, fonts, &|_c, _n, _b, _a| {});
+        stage.revision = stage.revision.wrapping_add(1);
     }
 
     fn step_movie(&mut self, dt: Duration) {
@@ -990,6 +1065,10 @@ impl App {
                 let (min, max) = sim::cafelmp::Cafelmp::spawn().cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::komore::Komore>() {
+                let (min, max) = sim::komore::Komore::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::pbka::Pbka>() {
                 let (min, max) = sim::pbka::Pbka::spawn().cull();
                 lift = min[1];
@@ -1022,14 +1101,6 @@ impl App {
                 let (base, height, half) = gun.hull();
                 lift = base;
                 (view::ActorKind::Scenery, 0, height, half)
-            } else if entity.contains::<sim::spotbox::SpotBox>() {
-                lift = -(sim::spotbox::HALF);
-                (
-                    view::ActorKind::Scenery,
-                    0,
-                    sim::spotbox::HALF * 2.0,
-                    sim::spotbox::HALF,
-                )
             } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
                 if cell.open() {
                     continue;

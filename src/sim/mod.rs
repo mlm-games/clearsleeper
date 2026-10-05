@@ -15,6 +15,7 @@ pub mod barricade;
 pub mod bird;
 pub mod boko;
 pub mod cafelmp;
+pub mod bscurtain;
 pub mod buoybarrel;
 pub mod canon;
 pub mod bomb;
@@ -31,6 +32,7 @@ pub mod daiocta;
 pub mod damage;
 pub mod death;
 pub mod door;
+pub mod demokmm;
 pub mod dummy;
 pub mod ending;
 pub mod enemy;
@@ -45,6 +47,7 @@ pub mod floormaster;
 pub mod ganon_form3;
 pub mod ghostship;
 pub mod gntakie;
+pub mod gntakis;
 pub mod gohdan;
 pub mod gohma;
 pub mod ground;
@@ -70,6 +73,7 @@ pub mod kalle_demos;
 pub mod kamome;
 pub mod kita;
 pub mod kn;
+pub mod komore;
 pub mod kytag02;
 pub mod kytag01;
 pub mod kytag04;
@@ -98,6 +102,7 @@ pub mod npc_btsw;
 pub mod npc_mt;
 pub mod npc_p1;
 pub mod npc_tc;
+pub mod pbco;
 pub mod pbka;
 pub mod pickup;
 pub mod pirateship;
@@ -106,6 +111,7 @@ pub mod player;
 pub mod raft;
 pub mod rectangle;
 pub mod redead;
+pub mod retag;
 pub mod rockfall;
 pub mod roll;
 pub mod sage;
@@ -670,6 +676,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, timer)).id()
     } else if kytag02::is_kytag02(&source.name) {
         world.spawn((actor, kytag02::Kytag02::spawn())).id()
+    } else if demokmm::is_demokmm(&source.name) {
+        world.spawn((actor, demokmm::DemoKmm::spawn())).id()
+    } else if komore::is_komore(&source.name) {
+        world.spawn((actor, komore::Komore::spawn())).id()
+    } else if bscurtain::is_bscurtain(&source.name) {
+        world.spawn((actor, bscurtain::BsCurtain::spawn())).id()
+    } else if gntakis::is_gntakis(&source.name) {
+        world.spawn((actor, gntakis::Gntakis::spawn())).id()
+    } else if pbco::is_pbco(&source.name) {
+        world.spawn((actor, pbco::Pbco::spawn())).id()
+    } else if retag::is_retag(&source.name) {
+        world.spawn((actor, retag::ReTag::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -861,7 +879,8 @@ pub fn build(
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
-                    kytag02::control.in_set(WwSimSet::Execute),
+                    kytag02::control.in_set(WwSimSet::Execute),                    retag::control.in_set(WwSimSet::Execute),
+
                 )
                     .chain(),
                 (
@@ -871,7 +890,11 @@ pub fn build(
                     tingle::control.in_set(WwSimSet::Execute),
                     select::control.in_set(WwSimSet::Execute),
                     canon::control.in_set(WwSimSet::Execute),
-                    mbdoor::control.in_set(WwSimSet::Execute),
+                    mbdoor::control.in_set(WwSimSet::Execute),                    demokmm::control.in_set(WwSimSet::Execute),
+                    komore::control.in_set(WwSimSet::Execute),
+                    bscurtain::control.in_set(WwSimSet::Execute),
+                    pbco::control.in_set(WwSimSet::Execute),
+
                 )
                     .chain(),
                 (
@@ -986,7 +1009,8 @@ pub fn build(
                     gohdan::control.in_set(WwSimSet::Execute),
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
-                    puppet_ganon::control.in_set(WwSimSet::Execute),
+                    puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),
+
                 )
                     .chain(),
             )
