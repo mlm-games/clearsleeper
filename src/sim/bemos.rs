@@ -327,7 +327,7 @@ pub fn control(
     for (entity, actor, mut beamos, hit_points) in &mut beamoses {
         if hit_points.0 <= 0 {
             if beamos.kind != KIND_YELLOW {
-                shatter(actor, &bemos, &mut events, &mut commands);
+                shatter(actor, &beamos, &mut events, &mut commands);
             }
             if let Some(ray) = beamos.ray {
                 let _ = commands.entity(ray).despawn();
@@ -336,109 +336,109 @@ pub fn control(
             let _ = commands.entity(entity).despawn();
             continue;
         }
-        if bemos.ray.is_none() {
-            let ray = spawn_ray(&mut commands, actor, &bemos);
-            bemos.ray = Some(ray);
+        if beamos.ray.is_none() {
+            let ray = spawn_ray(&mut commands, actor, &beamos);
+            beamos.ray = Some(ray);
         }
-        let mut ray = match bemos.ray {
+        let mut ray = match beamos.ray {
             Some(id) => rays.get_mut(id).ok().map(|(_, body, beam)| (body, beam)),
             None => None,
         };
         let pos = actor.pos;
-        let lift = bemos.eye.y - pos.y;
-        let tip = bemos.eye + aim(bemos.pitch, bemos.body.wrapping_add(bemos.yaw)) * BEAM_TIP;
-        match bemos.state {
-            Eye::Wait => match bemos.kind {
+        let lift = beamos.eye.y - pos.y;
+        let tip = beamos.eye + aim(beamos.pitch, beamos.body.wrapping_add(beamos.yaw)) * BEAM_TIP;
+        match beamos.state {
+            Eye::Wait => match beamos.kind {
                 KIND_YELLOW => {
-                    if bemos.switch_no != NO_SWITCH && switches.test(bemos.switch_no) {
+                    if beamos.switch_no != NO_SWITCH && switches.test(beamos.switch_no) {
                         if let Some((_, beam)) = ray.as_mut()
                             && beam.lit
                         {
                             ramp_down(&mut *beam);
                         }
                     } else {
-                        bemos.state = Eye::Search;
-                        bemos.charge = 0.0;
+                        beamos.state = Eye::Search;
+                        beamos.charge = 0.0;
                     }
                 }
                 KIND_RED => {
-                    if red_range(&mut bemos, &player, pos, lift).is_some() {
-                        bemos.state = Eye::Charge;
-                        bemos.charge = 0.0;
-                        bemos.hold = 0;
-                        bemos.gate = RED_HOLD;
+                    if red_range(&mut beamos, &player, pos, lift).is_some() {
+                        beamos.state = Eye::Charge;
+                        beamos.charge = 0.0;
+                        beamos.hold = 0;
+                        beamos.gate = RED_HOLD;
                     } else {
-                        add_calc_angle_s2(&mut bemos.pitch, 0, TURN_DIV, TURN_CAP);
-                        bemos.yaw = bemos.yaw.wrapping_add(bemos.sway);
+                        add_calc_angle_s2(&mut beamos.pitch, 0, TURN_DIV, TURN_CAP);
+                        beamos.yaw = beamos.yaw.wrapping_add(beamos.sway);
                     }
                 }
                 _ => {
-                    if blue_range(&mut bemos, &player, pos, lift).is_some() {
-                        bemos.state = Eye::Charge;
-                        bemos.charge = 0.0;
-                        bemos.hold = 0;
-                        bemos.gate = BLUE_HOLD_FIRST;
+                    if blue_range(&mut beamos, &player, pos, lift).is_some() {
+                        beamos.state = Eye::Charge;
+                        beamos.charge = 0.0;
+                        beamos.hold = 0;
+                        beamos.gate = BLUE_HOLD_FIRST;
                     }
                 }
             },
             Eye::Charge => {
-                if bemos.kind == KIND_RED {
-                    if let Some((pitch, _)) = red_range(&mut bemos, &player, pos, lift) {
-                        chase_f(&mut bemos.open, 1.0, RED_OPEN);
-                        if bemos.hold > bemos.gate {
-                            add_calc_angle_s2(&mut bemos.pitch, pitch, TURN_DIV_RED, TURN_CAP);
-                            if bemos.open == 1.0 {
-                                bemos.charge += 1.0;
-                                if bemos.charge >= CHARGE_FRAMES {
-                                    bemos.state = Eye::Search;
-                                    bemos.grace = RED_GRACE;
+                if beamos.kind == KIND_RED {
+                    if let Some((pitch, _)) = red_range(&mut beamos, &player, pos, lift) {
+                        chase_f(&mut beamos.open, 1.0, RED_OPEN);
+                        if beamos.hold > beamos.gate {
+                            add_calc_angle_s2(&mut beamos.pitch, pitch, TURN_DIV_RED, TURN_CAP);
+                            if beamos.open == 1.0 {
+                                beamos.charge += 1.0;
+                                if beamos.charge >= CHARGE_FRAMES {
+                                    beamos.state = Eye::Search;
+                                    beamos.grace = RED_GRACE;
                                 }
                             }
                         } else {
-                            bemos.hold = bemos.hold.wrapping_add(1);
+                            beamos.hold = beamos.hold.wrapping_add(1);
                         }
-                    } else if bemos.hold <= 0 {
-                        chase_f(&mut bemos.open, 0.0, RED_SHUT);
-                        if bemos.open == 0.0 {
-                            bemos.state = Eye::Wait;
+                    } else if beamos.hold <= 0 {
+                        chase_f(&mut beamos.open, 0.0, RED_SHUT);
+                        if beamos.open == 0.0 {
+                            beamos.state = Eye::Wait;
                         }
-                        add_calc_angle_s2(&mut bemos.pitch, 0, TURN_DIV, TURN_CAP);
-                        if bemos.charge > 0.0 {
-                            bemos.charge -= 1.0;
+                        add_calc_angle_s2(&mut beamos.pitch, 0, TURN_DIV, TURN_CAP);
+                        if beamos.charge > 0.0 {
+                            beamos.charge -= 1.0;
                         }
                     } else {
-                        bemos.hold = bemos.hold.wrapping_sub(1);
+                        beamos.hold = beamos.hold.wrapping_sub(1);
                     }
-                } else if let Some(pitch) = blue_range(&mut bemos, &player, pos, lift) {
-                    chase_f(&mut bemos.open, 1.0, BLUE_OPEN);
-                    if bemos.hold > bemos.gate {
-                        if bemos.open == 1.0 {
-                            bemos.charge += 1.0;
-                            if bemos.charge >= CHARGE_FRAMES {
-                                bemos.charge = 0.0;
-                                bemos.state = Eye::Search;
+                } else if let Some(pitch) = blue_range(&mut beamos, &player, pos, lift) {
+                    chase_f(&mut beamos.open, 1.0, BLUE_OPEN);
+                    if beamos.hold > beamos.gate {
+                        if beamos.open == 1.0 {
+                            beamos.charge += 1.0;
+                            if beamos.charge >= CHARGE_FRAMES {
+                                beamos.charge = 0.0;
+                                beamos.state = Eye::Search;
                             }
                         }
                     } else {
-                        bemos.hold = bemos.hold.wrapping_add(1);
+                        beamos.hold = beamos.hold.wrapping_add(1);
                     }
-                    add_calc_angle_s2(&mut bemos.pitch, pitch, TURN_DIV, TURN_CAP);
-                } else if bemos.hold <= 0 {
-                    chase_f(&mut bemos.open, 0.0, BLUE_SHUT);
-                    if bemos.open == 0.0 {
-                        bemos.state = Eye::Wait;
+                    add_calc_angle_s2(&mut beamos.pitch, pitch, TURN_DIV, TURN_CAP);
+                } else if beamos.hold <= 0 {
+                    chase_f(&mut beamos.open, 0.0, BLUE_SHUT);
+                    if beamos.open == 0.0 {
+                        beamos.state = Eye::Wait;
                     }
-                    add_calc_angle_s2(&mut bemos.pitch, 0, TURN_DIV, TURN_CAP);
-                    if bemos.charge > 0.0 {
-                        bemos.charge -= 1.0;
+                    add_calc_angle_s2(&mut beamos.pitch, 0, TURN_DIV, TURN_CAP);
+                    if beamos.charge > 0.0 {
+                        beamos.charge -= 1.0;
                     }
                 } else {
-                    bemos.hold = bemos.hold.wrapping_sub(1);
+                    beamos.hold = beamos.hold.wrapping_sub(1);
                 }
             }
-            Eye::Search => match bemos.kind {
+            Eye::Search => match beamos.kind {
                 KIND_YELLOW => {
-                    let armed = bemos.switch_no == NO_SWITCH || !switches.test(bemos.switch_no);
+                    let armed = beamos.switch_no == NO_SWITCH || !switches.test(beamos.switch_no);
                     if armed {
                         if let Some((_, beam)) = ray.as_mut() {
                             ramp_up(&mut *beam);
@@ -446,55 +446,55 @@ pub fn control(
                     } else if ray.as_mut()
                         .map_or(true, |(_, beam)| ramp_down(&mut *beam))
                     {
-                        bemos.state = Eye::Wait;
+                        beamos.state = Eye::Wait;
                     }
                 }
                 KIND_RED => {
-                    if let Some((pitch, yaw)) = red_range(&mut bemos, &player, pos, lift) {
-                        add_calc_angle_s2(&mut bemos.pitch, pitch, TURN_DIV, TURN_CAP);
-                        add_calc_angle_s2(&mut bemos.yaw, yaw, TURN_DIV_YAW, RED_YAW_STEP);
+                    if let Some((pitch, yaw)) = red_range(&mut beamos, &player, pos, lift) {
+                        add_calc_angle_s2(&mut beamos.pitch, pitch, TURN_DIV, TURN_CAP);
+                        add_calc_angle_s2(&mut beamos.yaw, yaw, TURN_DIV_YAW, RED_YAW_STEP);
                         if let Some((body, beam)) = ray.as_mut() {
                             body.pos = tip;
-                            body.angle = [bemos.pitch, bemos.body.wrapping_add(bemos.yaw), 0];
+                            body.angle = [beamos.pitch, beamos.body.wrapping_add(beamos.yaw), 0];
                             ramp_up(&mut *beam);
                         }
-                        if bemos.grace > 0 {
-                            bemos.grace -= 1;
+                        if beamos.grace > 0 {
+                            beamos.grace -= 1;
                         } else {
-                            bemos.lock = Some(player.pos);
+                            beamos.lock = Some(player.pos);
                         }
                     } else if ray.as_mut()
                         .map_or(true, |(_, beam)| ramp_down(&mut *beam))
                     {
-                        bemos.state = Eye::Charge;
-                        bemos.hold = RED_HOLD;
-                        bemos.gate = RED_HOLD;
+                        beamos.state = Eye::Charge;
+                        beamos.hold = RED_HOLD;
+                        beamos.gate = RED_HOLD;
                     }
                 }
                 _ => {
-                    if let Some(pitch) = blue_range(&mut bemos, &player, pos, lift) {
-                        add_calc_angle_s2(&mut bemos.pitch, pitch, TURN_DIV, TURN_CAP);
+                    if let Some(pitch) = blue_range(&mut beamos, &player, pos, lift) {
+                        add_calc_angle_s2(&mut beamos.pitch, pitch, TURN_DIV, TURN_CAP);
                         if let Some((body, beam)) = ray.as_mut() {
                             body.pos = tip;
-                            body.angle = [bemos.pitch, bemos.body.wrapping_add(bemos.yaw), 0];
+                            body.angle = [beamos.pitch, beamos.body.wrapping_add(beamos.yaw), 0];
                             ramp_up(&mut *beam);
                         }
                     } else if ray.as_mut()
                         .map_or(true, |(_, beam)| ramp_down(&mut *beam))
                     {
-                        bemos.state = Eye::Charge;
-                        bemos.hold = BLUE_HOLD_AGAIN;
-                        bemos.gate = BLUE_HOLD_AGAIN;
+                        beamos.state = Eye::Charge;
+                        beamos.hold = BLUE_HOLD_AGAIN;
+                        beamos.gate = BLUE_HOLD_AGAIN;
                     }
                 }
             },
         }
-        if bemos.kind == KIND_YELLOW && bemos.switch_no != NO_SWITCH {
-            let on = switches.test(bemos.switch_no);
-            if on != bemos.latched && on && !lit.test(EVENT_LIT) {
+        if beamos.kind == KIND_YELLOW && beamos.switch_no != NO_SWITCH {
+            let on = switches.test(beamos.switch_no);
+            if on != beamos.latched && on && !lit.test(EVENT_LIT) {
                 lit.set(EVENT_LIT);
             }
-            bemos.latched = on;
+            beamos.latched = on;
         }
     }
 }

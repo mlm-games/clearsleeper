@@ -157,14 +157,14 @@ pub const NPC_PLAYER_EYE_LIFT: f32 = 0.0;
 pub const NPC_COLLIDE_Z: f32 = -50.0;
 pub const NPC_ATTN_DIST: f32 = 200.0;
 pub const NPC_ATTN_DIST_BONUS: f32 = 40.0;
-pub const NPC_ATTN_RANGE: s16 = 0x7FFF;
+pub const NPC_ATTN_RANGE: i16 = 0x7FFF;
 pub const NPC_ATTN_ANGLE_BONUS: i32 = 1820;
 pub const NPC_ANM_SCALE: f32 = 0.3;
 pub const NPC_WALK_SPEED: f32 = 5.0;
 pub const NPC_WALK_SPEED_SCALE: f32 = 1.3;
-pub const NPC_TURN_STEP: s16 = 0x0708;
+pub const NPC_TURN_STEP: i16 = 0x0708;
 pub const NPC_TURN_TARGET: i16 = 0x0320;
-pub const NPC_ATTN_RELEASE: s16 = 30;
+pub const NPC_ATTN_RELEASE: i16 = 30;
 
 pub const JNT_HEAD_MAX_X: i16 = 0x09C4;
 pub const JNT_HEAD_MAX_Y: i16 = 0x07D0;
@@ -438,16 +438,16 @@ pub struct Lenzo {
     pub act_idx: i8,
     pub btp_index: i8,
     pub btp_frame: u8,
-    pub btp_timer: s16,
-    pub mode_timer: s16,
-    pub attn_release: s16,
-    pub home_angle: s16,
-    pub eye_timer: s16,
-    pub attn_range: s16,
+    pub btp_timer: i16,
+    pub mode_timer: i16,
+    pub attn_release: i16,
+    pub home_angle: i16,
+    pub eye_timer: i16,
+    pub attn_range: i16,
     pub attn_flags: u8,
-    pub turn_target: s16,
-    pub turn_rate: s16,
-    pub desired_angle: s16,
+    pub turn_target: i16,
+    pub turn_rate: i16,
+    pub desired_angle: i16,
     pub talking: bool,
     pub attention: bool,
     pub demo_talk: bool,

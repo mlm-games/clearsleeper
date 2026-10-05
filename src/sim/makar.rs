@@ -974,7 +974,7 @@ fn distance_angle_s(x: i16, y: i16) -> u16 {
     x.wrapping_sub(y).unsigned_abs()
 }
 
-fn chase_s(value: &mut i16, target: i16, step: i16) -> bool {
+fn walk::chase_s(value: &mut i16, target: i16, step: i16) -> bool {
     walk::chase_angle_s(value, target, step)
 }
 
@@ -1531,7 +1531,7 @@ impl Makar {
     }
 
     pub fn walk_action(&mut self, target_speed: f32, accel: f32, target_angle: i16, ctx: &mut Ctx) -> bool {
-        chase_angle_s(&mut self.yaw, target_angle, TURN_WALK);
+        walk::chase_angle_s(&mut self.yaw, target_angle, TURN_WALK);
         self.look_back(true, ctx.player);
         self.shape_yaw = self.yaw;
         if walk::chase_f(&mut self.speed_f, target_speed, accel) && target_speed == 0.0 {
@@ -1676,7 +1676,7 @@ impl Makar {
                 walk::chase_f(&mut self.carry_offset.x, HIO_CARRY_X, 1.0);
                 walk::chase_f(&mut self.carry_offset.y, HIO_CARRY_Y, 1.0);
                 walk::chase_f(&mut self.carry_offset.z, HIO_CARRY_Z, 1.0);
-                chase_angle_s(&mut self.carry_angle, 0, TURN_EVENT);
+                walk::chase_angle_s(&mut self.carry_angle, 0, TURN_EVENT);
                 self.shape_yaw = ctx.player_shape_yaw.wrapping_add(self.carry_angle);
             }
             if !ctx.carry_now {
@@ -2084,7 +2084,7 @@ impl Makar {
     fn get_stick_angle(&self, ctx: &Ctx) -> i16 {
         TURN_FLIP
             .wrapping_add(ctx.stick_angle)
-            .wrapping_add(to_s16(ctx.camera))
+            .wrapping_add(walk::to_s16(ctx.camera))
     }
 
     fn calc_stick_pos(&self, mut angle: i16, ctx: &Ctx) -> (i32, Vec3) {
@@ -2129,8 +2129,8 @@ impl Makar {
         let mut caught = false;
         if self.grounded {
             self.breaking();
-            chase_angle_s(&mut self.shape_pitch, 0, HIO_FLY_TURN_STEP);
-            chase_angle_s(&mut self.shape_roll, 0, HIO_FLY_TURN_STEP);
+            walk::chase_angle_s(&mut self.shape_pitch, 0, HIO_FLY_TURN_STEP);
+            walk::chase_angle_s(&mut self.shape_roll, 0, HIO_FLY_TURN_STEP);
             self.gravity = HIO_FLY_GRAVITY + lift;
         } else if self.act_step < 3 {
             let timed = self.calc_flying_timer();
@@ -2177,8 +2177,8 @@ impl Makar {
             }
             let cos = (tilt * scos(angle)) as i32 as i16;
             let sin = (-tilt * ssin(angle)) as i32 as i16;
-            chase_angle_s(&mut self.shape_pitch, cos, HIO_FLY_TURN_STEP);
-            chase_angle_s(&mut self.shape_roll, sin, HIO_FLY_TURN_STEP);
+            walk::chase_angle_s(&mut self.shape_pitch, cos, HIO_FLY_TURN_STEP);
+            walk::chase_angle_s(&mut self.shape_roll, sin, HIO_FLY_TURN_STEP);
             self.look_back(false, ctx.player);
             self.speed += push;
             let magnitude = self.speed.length();
@@ -2219,11 +2219,11 @@ impl Makar {
                 self.set_anm(ANM_07, ctx);
             }
             if self.fly_timer != 0 && hold {
-                chase_s(&mut self.fly_speed, HIO_FLY_SPEED_MAX, HIO_FLY_SPEED_STEP);
+                walk::chase_s(&mut self.fly_speed, HIO_FLY_SPEED_MAX, HIO_FLY_SPEED_STEP);
                 self.land_timer = 0;
             } else {
                 let stop = if self.grounded { HIO_FLY_SPEED_STOP } else { 0 };
-                chase_s(&mut self.fly_speed, stop, HIO_FLY_LAND_STEP);
+                walk::chase_s(&mut self.fly_speed, stop, HIO_FLY_LAND_STEP);
             }
             self.propeller = self.propeller.wrapping_add(self.fly_speed);
             self.fall_sum += self.pos.y - self.old.y;
@@ -2632,7 +2632,7 @@ impl Makar {
 
     fn ev_act_wait(&mut self, ctx: &mut Ctx) -> bool {
         let before = self.timer;
-        if chase_s(&mut self.timer, 0, 1) {
+        if walk::chase_s(&mut self.timer, 0, 1) {
             if before < 0 {
                 ctx.reset_event();
             }
@@ -2826,7 +2826,7 @@ impl Makar {
                 None => self.shape_yaw,
             }
         };
-        if chase_angle_s(&mut self.shape_yaw, angle, TURN_EVENT) {
+        if walk::chase_angle_s(&mut self.shape_yaw, angle, TURN_EVENT) {
             self.shape_yaw = angle;
             self.yaw = angle;
             return true;
@@ -2877,12 +2877,12 @@ impl Makar {
         self.gravity = 0.0;
         if self.timer < 0 {
             if walk::chase_f(&mut self.speed.y, 0.0, WARP_BRACE)
-                && chase_s(&mut self.timer, 0, 1)
+                && walk::chase_s(&mut self.timer, 0, 1)
             {
                 self.timer = 0;
             }
         } else {
-            if chase_s(&mut self.timer, WARP_SPIN_STEP, WARP_SPIN_RATE) {
+            if walk::chase_s(&mut self.timer, WARP_SPIN_STEP, WARP_SPIN_RATE) {
                 walk::chase_f(&mut self.speed.y, WARP_DOWN_SPEED, WARP_DOWN_STEP);
                 walk::chase_f(&mut self.scale.x, 0.0, WARP_SCALE_SPEED);
                 self.scale.z = self.scale.x;

@@ -9,6 +9,7 @@ use super::bombflower;
 use super::carry;
 use super::collision::Collision;
 use super::combat::{Combat, CutKind};
+use super::events::{SimEvent, SimEvents};
 use super::flags::{Switches, ZoneActors};
 use super::ground;
 use super::hammer;
@@ -140,6 +141,7 @@ const LIFT_SOFT: f32 = 12.0;
 const LIFT_HIGH: f32 = 20.0;
 const LIFT_LEAP: f32 = 25.0;
 const SPEED_SLOW: f32 = 7.0;
+const SPEED_LEAP: f32 = 10.0;
 const SPEED_RETREAT: f32 = 9.0;
 const SPEED_WINDUP: f32 = 20.0;
 const SPEED_THROW: f32 = 35.0;
@@ -321,7 +323,7 @@ impl Step {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum At {
+pub enum At {
     Idle,
     Sword,
     Hook,
@@ -367,12 +369,12 @@ impl At {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct Blow {
-    at: At,
-    blade: u8,
-    soup: bool,
-    crit: bool,
-    turn: bool,
+pub struct Blow {
+    pub at: At,
+    pub blade: u8,
+    pub soup: bool,
+    pub crit: bool,
+    pub turn: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -931,6 +933,7 @@ impl Armos {
                 self.hit_code = HIT_BOOMERANG;
                 return false;
             }
+            At::Idle | At::Hook => events.list.push(SimEvent::Se(SE_MS_HIT)),
             At::Arrow | At::FireArrow | At::IceArrow => {
                 self.hit_code = HIT_ARROW;
                 events.list.push(SimEvent::Se(SE_MS_HIT));
@@ -1381,7 +1384,7 @@ impl Armos {
                         self.shapes.needle_hit = true;
                         self.speed.y = LIFT_LEAP;
                         self.gravity = GRAVITY_RISE;
-                        self.speed_f = SPEED_SLOW;
+                        self.speed_f = SPEED_LEAP;
                         self.countdown[CD_BURST] = BURST_FRAMES;
                         self.heading = search_angle(actor.pos, player.pos);
                         self.anm_init(BCK_DEAD2, 1.0, EMODE_NONE, 1.0);
@@ -1400,7 +1403,7 @@ impl Armos {
                         events.list.push(SimEvent::Se(SE_JITABATA));
                         self.speed.y = LIFT_LEAP;
                         self.gravity = GRAVITY_RISE;
-                        self.speed_f = SPEED_SLOW;
+                        self.speed_f = SPEED_LEAP;
                     }
                     if self.countdown[CD_BURST] == 0 {
                         self.anm_init(BCK_DEAD3, 1.0, EMODE_NONE, 1.0);
