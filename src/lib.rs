@@ -46,6 +46,10 @@ pub struct App {
     save_dir: PathBuf,
     name: String,
     menu_prev: HashSet<PhysicalKey>,
+    movie: Option<movie::Movie>,
+    movie_frame: usize,
+    movie_clock: f32,
+    movie_pixels: Vec<u8>,
 }
 
 impl App {
@@ -80,7 +84,12 @@ impl App {
             save_dir: save::slots_dir(),
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
+            movie: None,
+            movie_frame: 0,
+            movie_clock: 0.0,
+            movie_pixels: Vec::new(),
         };
+        app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
         app
     }
@@ -181,6 +190,35 @@ impl App {
             log::warn!("clearsleeper: slot {slot} write failed ({e})");
         }
         self.menu.screen = menus::Screen::Playing;
+    }
+
+    fn step_movie(&mut self, dt: Duration) {
+        let Some(movie) = self.movie.as_mut() else {
+            return;
+        };
+        if self.movie_pixels.is_empty() {
+            self.movie_frame = 0;
+        } else {
+            let interval = movie.interval();
+            self.movie_clock += dt.as_secs_f32();
+            if self.movie_clock >= interval {
+                self.movie_clock -= interval;
+                self.movie_frame = (self.movie_frame + 1) % movie.len().max(1);
+            } else {
+                return;
+            }
+        }
+        if let Ok(pixels) = movie.frame(self.movie_frame) {
+            self.movie_pixels = movie::to_rgba(&pixels);
+        }
+    }
+
+    pub fn movie_pixels(&self) -> Option<&[u8]> {
+        if self.movie_pixels.is_empty() {
+            None
+        } else {
+            Some(&self.movie_pixels)
+        }
     }
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
@@ -825,6 +863,9 @@ impl App {
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
+        if self.menu.screen == menus::Screen::Title {
+            self.step_movie(dt);
+        }
         let steps = self.sim.step(dt);
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
         if game_over && self.menu.screen == menus::Screen::Playing {

@@ -451,6 +451,11 @@ impl Archive {
     }
 }
 
+/// Root of the extracted disc tree, if the environment points at one.
+pub fn asset_root() -> PathBuf {
+    AssetRoot::from_env().map_or_else(|_| PathBuf::new(), |root| root.root.clone())
+}
+
 pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
     match stage_from_assets(stage) {
         Ok(stage) => Some(stage),

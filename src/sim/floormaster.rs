@@ -752,6 +752,7 @@ pub struct Floormaster {
     pub area_radius: f32,
     pub demo_mode: bool,
     pub boss_won: bool,
+    pub caught: bool,
     pub phase: Phase,
     pub morph: Frame,
     pub anm_prm: u8,
@@ -838,6 +839,7 @@ impl Floormaster {
             area_radius: RADIUS_FIXED,
             demo_mode: false,
             boss_won: false,
+            caught: false,
             phase: Phase::SwWait,
             morph,
             anm_prm: 0,
@@ -1723,7 +1725,7 @@ impl Floormaster {
         }
     }
 
-    fn execute(&mut self, actor: &mut Actor, mut ctx: Ctx<'_, '_>) {
+    fn execute(&mut self, actor: &mut Actor, mut ctx: Ctx<'_, '_>, commands: &mut Commands) {
         self.hand = actor.pos + turned(actor.angle[1], HIO_HAND_OFFSET);
         self.tip = self.hand + turned(actor.angle[1], HIO_TIP_OFFSET);
         if self.is_hole_appear() {
@@ -1780,8 +1782,8 @@ impl Floormaster {
             Phase::Attack => self.mode_attack(actor, &mut ctx),
             Phase::Throw => self.mode_throw(actor, &mut ctx),
             Phase::Damage => self.mode_damage(actor, &mut ctx),
-            Phase::PrepareItem => self.mode_prepare_item(actor, &mut ctx),
-            Phase::Death => self.mode_death(actor, &mut ctx),
+            Phase::PrepareItem => self.mode_prepare_item(actor, &mut ctx, commands),
+            Phase::Death => self.mode_death(actor, &mut ctx, commands),
             Phase::Grab => self.mode_grab(actor, &mut ctx),
             Phase::GrabDemo => self.mode_grab_demo(actor, &mut ctx),
             Phase::GrabFootDemo => self.mode_grab_foot_demo(actor, &mut ctx),
@@ -2352,9 +2354,9 @@ impl Floormaster {
         }
     }
 
-    fn mode_death(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
+    fn mode_death(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>, commands: &mut Commands) {
         if self.anm_prm == 8 && self.set_hole_scale(HIO_120, HOLE_SCALE, HIO_128) {
-            ctx.commands.spawn((
+            commands.spawn((
                 Actor {
                     name: IBALL_ACTOR.to_owned(),
                     parameters: 0,
@@ -2369,13 +2371,13 @@ impl Floormaster {
         }
     }
 
-    fn mode_prepare_item(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
+    fn mode_prepare_item(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>, commands: &mut Commands) {
         if self.check_tg_hit(actor, ctx) {
             return;
         }
         let step = self.anm_prm;
         if step == 3 && self.morph.is_stop() {
-            ctx.commands.spawn((
+            commands.spawn((
                 Actor {
                     name: TSUBO_ACTOR.to_owned(),
                     parameters: SKULL_PARAM,
@@ -2428,7 +2430,6 @@ struct Ctx<'a, 'b> {
     list: &'b EventList,
     active: &'a mut ActiveEvent,
     events: &'a mut SimEvents,
-    commands: &'a mut Commands,
     self_entity: Entity,
 }
 
@@ -2600,7 +2601,7 @@ pub fn control(
         return;
     };
     let mut spent: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, boss) in &mut bosses {
+    for (entity, mut actor, mut boss) in &mut bosses {
         let actor = &mut *actor;
         let boss = &mut *boss;
         if !boss.entered {
@@ -2638,10 +2639,9 @@ pub fn control(
             list: &watch.list,
             active: &mut active,
             events: &mut events,
-            commands: &mut commands,
             self_entity: entity,
         };
-        boss.execute(actor, ctx);
+        boss.execute(actor, ctx, &mut commands);
         if boss.doomed {
             spent.push((entity, actor.room, actor.set_id));
         }

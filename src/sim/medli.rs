@@ -4687,13 +4687,16 @@ impl Medli {
         self.link_hidden = false;
     }
 
-    pub fn initial_turn(&mut self, cut: usize) {
+    pub fn initial_turn(&mut self, cut: usize, ctx: &mut Ctx<'_>) {
         self.wait_timer = ctx
             .list
             .cut_number(cut, "Timer")
             .and_then(|value| i16::try_from(value).ok())
             .unwrap_or(0);
-        self.turn_pos = list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
+        self.turn_pos = ctx
+            .list
+            .cut_vec(cut, "Pos")
+            .unwrap_or(Vec3::ZERO);
     }
 
     pub fn action_turn(&mut self, cut: usize, ctx: &mut Ctx<'_>) -> bool {

@@ -77,6 +77,7 @@ const REG6_F16: f32 = 0.0;
 const REG6_F17: f32 = 0.0;
 const REG6_F18: f32 = 0.0;
 const REG6_F19: f32 = 0.0;
+const REG6_S0: i16 = 0;
 const REG6_S1: i16 = 0;
 const REG6_S2: i16 = 0;
 const REG6_S3: i16 = 0;
@@ -340,6 +341,7 @@ const PIECE_PUSH_STEP: f32 = 0.2;
 const SHUTTER_BATTLE_Y: f32 = -500.0;
 const SHUTTER_X: f32 = 4600.0 + 155.0;
 const SHUTTER_Z: f32 = 4700.0;
+const SHUTTER_YAW: f32 = 7000.0;
 const GROCK_DROP: f32 = -10.0;
 const EFF_FALL: f32 = -130.0;
 const EFF_RISE_CAP: f32 = 2.0;
@@ -948,6 +950,7 @@ pub struct Helmaroc {
     pub effect_cursor: u8,
     pub smoke_timer: [i16; SMOKE_COUNT],
     pub shutter_y: f32,
+    pub shutter_aim: Vec3,
     pub shutter_yaw: f32,
     pub shutter_roll: f32,
     pub shutter_ring: f32,
@@ -1007,6 +1010,8 @@ pub struct Helmaroc {
     pub max_health: i32,
     pub stage_boss_enemy: bool,
     pub stage_boss_demo: bool,
+    pub entered: bool,
+    pub peck_done: Option<Entity>,
     pub speed: Vec3,
     pub speed_f_walk: f32,
     pub gravity: f32,
@@ -1077,6 +1082,7 @@ impl Helmaroc {
             effect_cursor: 0,
             smoke_timer: [0; SMOKE_COUNT],
             shutter_y: 0.0,
+            shutter_aim: Vec3::ZERO,
             shutter_yaw: 0.0,
             shutter_roll: 0.0,
             shutter_ring: -630.0,
@@ -1136,6 +1142,8 @@ impl Helmaroc {
             max_health: MAX_HEALTH,
             stage_boss_enemy: false,
             stage_boss_demo: false,
+            entered: false,
+            peck_done: None,
             speed: Vec3::ZERO,
             speed_f_walk: 0.0,
             gravity: 0.0,
@@ -2145,7 +2153,7 @@ impl Helmaroc {
         self.action = Action::End;
         self.effects[EFF_ROCK].kind = 0;
         if actor.pos.y < 9810.0 {
-            if self.body.y < 10000.0 {
+            if self.head.pos.y < 10000.0 {
                 self.state = 0;
             } else {
                 self.state = 1;
@@ -2210,7 +2218,7 @@ impl Helmaroc {
             out.se(SE_CV_DK_DAMAGE);
             self.beak_timer = REG0_S5 + 0x1E;
             self.beak_aim = bearing(env.player_pos, actor.eye);
-            if self.action == Action::KutiAttack && self.body.y < 10000.0 {
+            if self.action == Action::KutiAttack && self.head.pos.y < 10000.0 {
                 self.anm_init(BCK_DAMAGE1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                 self.state = 10;
                 self.beat_count = self.beat_count.wrapping_add(1);
@@ -2913,8 +2921,12 @@ impl Helmaroc {
             add_calc2(&mut self.shutter_y, SHUTTER_BATTLE_Y, 1.0, 20.0);
         }
         self.shutter_ring = REG0_F10 + SHUTTER_X;
-        self.shutter_shift = AREA_Y + self.shutter_y + REG8_F2;
-        self.shutter_yaw = REG0_F12 - SHUTTER_Z;
+        self.shutter_aim = Vec3::new(
+            REG0_F10 + SHUTTER_X,
+            self.shutter_shift + AREA_Y + REG8_F2,
+            REG0_F12 - SHUTTER_Z,
+        );
+        self.shutter_yaw = REG6_S0 - SHUTTER_YAW;
     }
 
     fn eff_hane_move(&mut self, index: usize, env: &Env<'_>) {
@@ -3072,9 +3084,6 @@ impl Helmaroc {
                     if self.demo_sub == REG13_S6 + 0xD2 {
                         out.bgm(STRM_DK_START);
                     }
-                    if self.demo_sub == REG13_S6 + 0xBE {
-                        out.shutter_smoke();
-                    }
                     self.shake = REG13_F18 + 1.5;
                     out.se(SE_ATM_MJT_JINARI);
                     add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
@@ -3168,6 +3177,7 @@ impl Helmaroc {
                     self.state = 0;
                     self.gravity = REG0_F4 + GRAVITY;
                     self.battle_mode = 0;
+                    self.shape_angle[ANGLE_X] = 0;
                     out.bgm(BGM_DK_BATTLE);
                 }
             }
@@ -3229,11 +3239,7 @@ impl Helmaroc {
                 }
                 self.cam_eye = self.head.pos;
                 self.cam_eye.y += REG6_F16 - 100.0;
-                let look = turned(
-                    self.cam_pitch as i16,
-                    [0.0, 0.0, self.demo_radius + REG6_F17],
-                );
-                let look = turned(self.cam_yaw, [look.x, look.y, look.z]);
+                let look = turned(self.cam_yaw, [0.0, 0.0, self.demo_radius + REG6_F17]);
                 let look = look + self.cam_eye;
                 add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
                 if self.flown_high == 0 {
@@ -3256,7 +3262,7 @@ impl Helmaroc {
                 self.cam_eye.z = AREA_Z;
                 add_calc2(&mut self.cam_look.z, 30449.0, 0.02, self.demo_param * 75.33);
                 if self.demo_sub > REG6_S2 {
-                    add_calc2(&mut self.demo_param, REG6_S1 + 1.5, 1.0, REG6_F2 + 0.02);
+                    add_calc2(&mut self.demo_param, f32::from(REG6_S1) + 1.5, 1.0, REG6_F2 + 0.02);
                 }
             }
             0x70 => {
@@ -3267,8 +3273,7 @@ impl Helmaroc {
             }
             0x71 => {
                 if self.demo_sub == 0x78 {
-                    let mut at = Vec3::new(AREA_X, 10300.0, AREA_Z);
-                    at.y = 10300.0;
+                    let at = Vec3::new(AREA_X, 10300.0, AREA_Z);
                     self.eff_hane_set(at, 0x27, -1);
                 }
                 if self.demo_sub > REG12_S7 + 0x43 {
@@ -3438,7 +3443,6 @@ impl Helmaroc {
             }
             self.damage_check(actor, env, out);
         }
-        self.shape_angle[ANGLE_X] = 0;
         self.col_set(actor);
         if self.beak_free != 0 {
             self.beak_step(actor, env);
