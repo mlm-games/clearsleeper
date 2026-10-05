@@ -622,6 +622,7 @@ pub struct Gohma {
     pub morph_bck: i32,
     pub demo_mode: bool,
     pub entered: bool,
+    pub home: Vec3,
     pub seed: [i32; 3],
 }
 
@@ -771,6 +772,7 @@ impl Gohma {
             morph_bck: BCK_WAIT1,
             demo_mode: false,
             entered: false,
+            home: Vec3::ZERO,
             seed: [RND_SEED; 3],
         }
     }
@@ -874,6 +876,7 @@ impl Gohma {
 
     fn begin(&mut self, actor: &mut Actor, env: &Env, out: &mut Sink<'_>) {
         self.entered = true;
+        self.home = actor.pos;
         self.health = MAX_HEALTH;
         self.max_health = MAX_HEALTH;
         self.eye_radius = EYE_RADIUS;
@@ -1910,7 +1913,7 @@ impl Gohma {
             1 => {
                 self.kankyo_state = 8;
                 self.anm_init(BCK_SSTART, 1.0, EMODE_NONE, 1.0, -1);
-                actor.pos.y = actor.pos.y;
+                actor.pos.y = self.home.y;
                 self.gohma_state = 2;
                 out.se(SE_CV_BTD_ENTER);
             }
