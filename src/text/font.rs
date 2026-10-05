@@ -400,22 +400,31 @@ impl ResFont {
             return;
         }
         let glyph = self.glyph_at(i).unwrap_or_default();
-        let page_num_cells = glyph.num_rows as i32 * glyph.num_columns as i32;
+        let cell_w = glyph.cell_width.max(1) as i32;
+        let cell_h = glyph.cell_height.max(1) as i32;
+        let across = i32::from(glyph.texture_width) / cell_w;
+        let down = i32::from(glyph.texture_height) / cell_h;
+        if across < 1 || down < 1 {
+            return;
+        }
+        let page_num_cells = across * down;
         let page_idx = safe_div(code, page_num_cells);
         let cell_idx = safe_rem(code, page_num_cells);
-        let cell_col = safe_rem(cell_idx, glyph.num_rows as i32);
-        let cell_row = safe_div(cell_idx, glyph.num_rows as i32);
-        self.cell_x = cell_col * glyph.cell_width as i32;
-        self.cell_y = cell_row * glyph.cell_height as i32;
+        let cell_col = safe_rem(cell_idx, across);
+        let cell_row = safe_div(cell_idx, across);
+        self.cell_x = cell_col * cell_w;
+        self.cell_y = cell_row * cell_h;
 
+        let image_bytes = (usize::from(glyph.texture_width) * usize::from(glyph.texture_height) / 2)
+            .max(1);
         let page_at = self
             .gly1_at
             .wrapping_add(GLYPH_HEADER_SIZE)
-            .wrapping_add((page_idx as usize).wrapping_mul(glyph.texture_size as usize));
+            .wrapping_add((page_idx as usize).wrapping_mul(image_bytes));
         if page_idx != self.tex_page_idx || i as u16 != self.glyph_block {
             self.tex = TexObj {
                 data_at: page_at,
-                data_size: glyph.texture_size,
+                data_size: image_bytes as u32,
                 width: glyph.texture_width,
                 height: glyph.texture_height,
                 format: glyph.texture_format,

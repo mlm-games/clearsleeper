@@ -1,51 +1,44 @@
 use clearsleeper::text::font::{FontBank, ResFont};
-use clearsleeper::text::msgbox::TextPrint;
-use clearsleeper::text::raster::Canvas;
-
-const WHITE: u32 = 0xFFFF_FFFF;
 
 fn main() {
     let root = std::env::var("CS_ASSETS").expect("CS_ASSETS");
     let bytes = std::fs::read(format!("{root}/files/res/Menu/kanfont_fix16.bfn")).expect("font");
     let mut bank = FontBank::new();
     bank.insert(ResFont::from_bytes(&bytes));
-
-    let encoded = [0x81u8, 0x41, 0x81, 0x42, 0x81, 0x40, 0x81, 0x43];
-    let mut print = TextPrint::default();
-    print.private_initiate(&bank, Some(0), 0.0, 0.0, WHITE, WHITE, 0, WHITE, false);
-    print.set_font_size(32.0, 32.0);
-    print.locate(0.0, 0.0);
-    let layout = print.print_return(&mut bank, &encoded, 660.0, 32.0, 0, 0, 0.0, 0.0, 0xFF);
-    println!("quads {}", layout.quads.len());
-    for run in &layout.quads {
-        println!(
-            "code 0x{:04x} x={:.0} uv={:?} u0={:.1} v0={:.1}",
-            run.code,
-            run.quad.pos[0][0],
-            run.quad.uv[0],
-            run.quad.uv[0][0] as f32 / 32768.0 * 512.0,
-            run.quad.uv[0][1] as f32 / 32768.0 * 512.0,
-        );
-    }
-
-    let mut canvas = Canvas::new(700, 60);
-    canvas.draw_layout(&layout, bank.get(0).unwrap(), [0.0, 8.0], 0xFF);
-    for y in 0..56 {
-        let row: String = (0..700)
-            .map(|x| {
-                let a = canvas.pixels[(y * 700 + x) * 4 + 3];
-                if a > 200 {
-                    '#'
-                } else if a > 40 {
-                    '+'
-                } else {
-                    ' '
+    let font = bank.get_mut(0).unwrap();
+    let code = font.font_code(0x8141);
+    font.load_image(code as u16);
+    let font = bank.get(0).unwrap();
+    println!("font_code(0x8141)={code} cell=({},{})", font.cell_x, font.cell_y);
+    println!(
+        "page={}B data_at={} data_size={} tex={}x{}",
+        font.tex_page().len(),
+        font.tex.data_at,
+        font.tex.data_size,
+        font.tex.width,
+        font.tex.height
+    );
+    let page = font.tex_page().to_vec();
+    let (w, h) = (
+        usize::from(font.glyph.texture_width),
+        usize::from(font.glyph.texture_height),
+    );
+    const TILE: usize = 8;
+    let mut out = vec![0_u8; w * h];
+    let mut tile = 0_usize;
+    for by in 0..h / TILE {
+        for bx in 0..w / TILE {
+            for row in 0..TILE {
+                let at = tile * 32 + row * (TILE / 2);
+                for col in 0..TILE {
+                    let b = page.get(at + col / 2).copied().unwrap_or(0);
+                    out[(by * TILE + row) * w + bx * TILE + col] =
+                        if col % 2 == 0 { b >> 4 } else { b & 0x0F };
                 }
-            })
-            .collect();
-        let trimmed = row.trim_end();
-        if !trimmed.is_empty() {
-            println!("{trimmed}");
+            }
+            tile += 1;
         }
     }
+    std::fs::write("/tmp/opencode/rust_page.raw", &out).unwrap();
+    println!("wrote {} texels ink {}", out.len(), out.iter().filter(|v| **v > 0).count());
 }
