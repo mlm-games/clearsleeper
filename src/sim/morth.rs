@@ -8,7 +8,6 @@ use super::area::StageName;
 use super::boomerang;
 use super::bomb;
 use super::bombflower;
-use super::carry;
 use super::collision::Collision;
 use super::combat::{Combat, CutKind};
 use super::events::{SimEvent, SimEvents};
@@ -130,6 +129,10 @@ const WIND_SPIN_RATE: i16 = 3000;
 const RADIUS: f32 = 20.0;
 const RADIUS_POKE_HIGH: f32 = 60.0;
 const RADIUS_TUBO: f32 = 100.0;
+const RADIUS_SRC: f32 = 15.0;
+const TG_TYPE_MORTH: u32 = !(AT_TYPE_WATER | AT_TYPE_UNK20000 | AT_TYPE_UNK400000 | AT_TYPE_LIGHT);
+const PLAYER_TG_RADIUS: f32 = 30.0;
+const PLAYER_TG_HEIGHT: f32 = 125.0;
 const LIFT: f32 = 25.0;
 const LIFT_DEAD: f32 = 20.0;
 const LIFT_DEAD_ALT: f32 = 45.0;
@@ -139,12 +142,17 @@ const BTK_FRAME_MAX: i16 = 7;
 
 const AT_TYPE_SWORD: u32 = 1 << 1;
 const AT_TYPE_UNK8: u32 = 1 << 3;
+const AT_TYPE_WATER: u32 = 1 << 8;
 const AT_TYPE_FIRE: u32 = 1 << 9;
 const AT_TYPE_SKULL_HAMMER: u32 = 1 << 16;
+const AT_TYPE_UNK20000: u32 = 1 << 17;
 const AT_TYPE_FIRE_ARROW: u32 = 1 << 18;
 const AT_TYPE_ICE_ARROW: u32 = 1 << 19;
 const AT_TYPE_LIGHT_ARROW: u32 = 1 << 20;
 const AT_TYPE_WIND: u32 = 1 << 21;
+const AT_TYPE_UNK400000: u32 = 1 << 22;
+const AT_TYPE_LIGHT: u32 = 1 << 23;
+const AT_TYPE_STALFOS_MACE: u32 = 1 << 24;
 
 const STTS_UNK4000: u32 = 0x0000_4000;
 const STTS_UNK8000000: u32 = 0x8000_0000;
@@ -360,7 +368,6 @@ impl Blow {
 pub struct Morth {
     pub form: u8,
     pub count: u8,
-    pub reach_byte: u8,
     pub action: u8,
     pub mode: u8,
     pub cling: u8,
@@ -399,10 +406,8 @@ pub struct Morth {
     pub freeze_delay: i16,
     pub freeze_spin: i16,
     pub fire: i16,
-    pub co: bool,
-    pub at: bool,
-    pub tg: bool,
     pub shield_hit: bool,
+    pub sph: Sph,
     pub in_water: bool,
     pub water_surface: f32,
     pub gm_link: bool,
@@ -414,11 +419,43 @@ pub struct Morth {
     pub steal_bit: u8,
     pub seed: [i32; 3],
     pub health: i32,
-    pub max_health: i32,
     pub status: u32,
     pub entered: bool,
     pub doomed: bool,
     pub counted: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sph {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub at_type: u32,
+    pub at_atp: u8,
+    pub at_set: bool,
+    pub at_vs_player: bool,
+    pub at_vs_other: bool,
+    pub at_hit: bool,
+    pub tg_type: u32,
+    pub tg_set: bool,
+    pub tg_hit: bool,
+    pub co_set: bool,
+}
+
+impl Sph {
+    const SRC: Sph = Sph {
+        centre: Vec3::ZERO,
+        radius: RADIUS_SRC,
+        at_type: AT_TYPE_STALFOS_MACE,
+        at_atp: 0,
+        at_set: true,
+        at_vs_player: true,
+        at_vs_other: false,
+        at_hit: false,
+        tg_type: TG_TYPE_MORTH,
+        tg_set: true,
+        tg_hit: false,
+        co_set: true,
+    };
 }
 
 impl Morth {
@@ -438,7 +475,6 @@ impl Morth {
         Self {
             form,
             count,
-            reach_byte,
             action: ACTION_DOU,
             mode: MODE_DOU_INIT,
             cling: 0,
@@ -477,10 +513,8 @@ impl Morth {
             freeze_delay: 0,
             freeze_spin: 0,
             fire: 0,
-            co: false,
-            at: false,
-            tg: false,
             shield_hit: false,
+            sph: Sph::SRC,
             in_water: false,
             water_surface: 0.0,
             gm_link: false,
@@ -492,7 +526,6 @@ impl Morth {
             steal_bit: 0,
             seed: [RND_SEED; 3],
             health: MAX_HEALTH,
-            max_health: MAX_HEALTH,
             status: 0,
             entered: false,
             doomed: false,
@@ -526,10 +559,6 @@ impl Morth {
         range * (self.rnd() - 0.5) * 2.0
     }
 
-    fn rnd_ang(&mut self, range: f32, base: f32) -> i16 {
-        (self.rnd() * range + base) as i32 as i16
-    }
-
     fn timer(&mut self, index: usize) -> bool {
         let slot = match self.timers.get_mut(index) {
             Some(slot) => slot,
@@ -549,8 +578,13 @@ impl Morth {
     }
 
     fn joint_slot(&self) -> i16 {
-        let index = usize::from(self.joint.unsigned_abs() as u16).min(JOINT_COUNT - 1);
-        JOINT_TABLE[index]
+        match usize::try_from(self.joint)
+            .ok()
+            .and_then(|index| JOINT_TABLE.get(index))
+        {
+            Some(&slot) => slot,
+            None => JOINT_TABLE[0],
+        }
     }
 
     fn wind_speed(&mut self, heading: i16) {
@@ -587,6 +621,15 @@ fn span(value: Vec3) -> f32 {
     value.length()
 }
 
+fn cyl_touches(centre: Vec3, radius: f32, height: f32, at: Vec3, sphere: f32) -> bool {
+    let dx = at.x - centre.x;
+    let dz = at.z - centre.z;
+    if radius + sphere > (dx * dx + dz * dz).sqrt() {
+        return false;
+    }
+    at.y + sphere >= centre.y && at.y - sphere <= centre.y + height
+}
+
 fn flat(from: Vec3, to: Vec3) -> f32 {
     let dx = to.x - from.x;
     let dz = to.z - from.z;
@@ -614,7 +657,7 @@ struct Env<'a> {
     rolling_crash: bool,
     spinning: bool,
     swimming: bool,
-    carrying: bool,
+    hooked: bool,
     quake: bool,
     sword_top: Vec3,
     head_top: Vec3,
@@ -670,7 +713,6 @@ pub struct Watch<'w, 's> {
     blasts: Res<'w, bombflower::Blasts>,
     roll: Res<'w, roll::Roll>,
     swim: Res<'w, swim::Swim>,
-    carry: Res<'w, carry::Carry>,
     hearts: Res<'w, Health>,
     stage: Res<'w, StageName>,
     players: Query<'w, 's, (Entity, &'static mut Player)>,
@@ -701,7 +743,7 @@ pub fn control(
     let rolling = watch.roll.active;
     let spinning = matches!(watch.combat.kind, CutKind::EA | CutKind::EB);
     let swimming = watch.swim.active;
-    let carrying = watch.carry.held.is_some();
+    let hooked = blow.hookshot_shot;
     let quake = hammer_kind == hammer::CUT_HAMMER_FRONTSWING;
     let stage = watch.stage.0.clone();
     let life = i32::from(watch.hearts.units);
@@ -742,7 +784,7 @@ pub fn control(
             rolling_crash: false,
             spinning,
             swimming,
-            carrying,
+            hooked,
             quake,
             sword_top,
             head_top,
@@ -891,7 +933,7 @@ impl Morth {
         self.lift = LIFT;
         self.radius = RADIUS;
         self.status = 0;
-        self.timers[0] = self.rnd_ang(25.0, 50.0);
+        self.timers[0] = (self.rnd_fx(25.0) + 50.0) as i16;
         self.sweep = (self.actor_id as i32 & 7) as i16 * 0x52 + 1000;
         let (in_water, surface) = water::probe(sea, self.pos.x, self.pos.z);
         self.in_water = in_water;
@@ -936,8 +978,9 @@ impl Morth {
         self.counted = true;
         match self.form {
             FORM_TUBO => {
-                self.co = false;
-                self.tg = false;
+                self.sph.tg_set = false;
+                self.sph.co_set = false;
+                self.sph.tg_hit = false;
                 self.action = ACTION_TUBO;
                 self.mode = MODE_TUBO_SEARCH;
                 self.tsuko = pots
@@ -967,7 +1010,9 @@ impl Morth {
             FORM_GRAB | FORM_GRAB_GORON => {
                 self.gm_link = true;
                 if self.form == FORM_GRAB_GORON {
-                    self.angle[1] = self.angle[1].wrapping_add(self.rnd_ang(GORON_ANGLE, 0.0));
+                    self.angle[1] = self
+                        .angle[1]
+                        .wrapping_add((self.rnd_fx(GORON_ANGLE)) as i32 as i16);
                     self.speed_f = GORON_FAST + self.rnd_f(GORON_SPEED);
                     self.speed.y = GORON_RISE + self.rnd_f(GORON_UP);
                 }
@@ -1066,18 +1111,34 @@ impl Morth {
         false
     }
 
-    fn ks_kuttuki_check(&mut self, statics: &Statics, env: &Env<'_>) -> bool {
-        if !self.at || self.shield_hit {
+    fn cc_calc(&mut self, env: &Env<'_>, blow: &Blow) {
+        let player = env.pos();
+        self.sph.at_hit = self.sph.at_set
+            && self.sph.at_vs_player
+            && cyl_touches(
+                player,
+                PLAYER_TG_RADIUS,
+                PLAYER_TG_HEIGHT,
+                self.sph.centre,
+                self.sph.radius,
+            );
+        self.sph.tg_hit = self.sph.tg_set && blow.hits(self.sph.centre, self.sph.radius, player);
+    }
+
+    fn cc_set(&mut self) {
+        self.sph.centre = self.pos;
+        self.sph.radius = self.radius;
+    }
+
+    fn ks_kuttuki_check(&mut self, statics: &Statics) -> bool {
+        if !self.sph.at_hit || self.shield_hit {
             return false;
         }
         if statics.kattuku < 0 || statics.kattuku >= KUTTUKU_MAX || statics.goron != 0 {
             return false;
         }
-        if (env.pos() - self.pos).length() > self.radius {
-            return false;
-        }
-        self.tg = false;
-        self.co = false;
+        self.sph.tg_set = false;
+        self.sph.co_set = false;
         if self.water_in != 0 {
             self.water_in = 0;
         }
@@ -1087,7 +1148,7 @@ impl Morth {
     }
 
     fn body_atari_check(&mut self, env: &Env<'_>, blow: &Blow) -> bool {
-        if blow.hits(self.pos, self.radius, env.pos()) {
+        if self.sph.tg_hit {
             self.angle[1] = env.facing(self.pos).wrapping_add(-32768);
             self.action = ACTION_DEAD;
             let at_type = blow.at.at_type();
@@ -1122,7 +1183,7 @@ impl Morth {
                         return true;
                     }
                 }
-                AT_TYPE_FIRE => self.fire = FIRE_BURN,
+                AT_TYPE_FIRE | AT_TYPE_FIRE_ARROW => self.fire = FIRE_BURN,
                 AT_TYPE_ICE_ARROW => {
                     self.freeze_want = ICE_FREEZE;
                     self.ice_flag = 1;
@@ -1232,39 +1293,41 @@ impl Morth {
         if env.head_top.y > self.pos.y {
             self.radius = RADIUS_POKE_HIGH;
         }
-        match self.mode {
-            MODE_POKE_START => {
-                self.co = false;
-                self.speed_f = 26.0;
-                self.gravity = GRAVITY_POKE;
-                self.speed.y = 28.0;
-                self.clear_swings();
-                self.sway = 0.0;
-                self.angle[1] = env.facing(self.pos);
-                sink.se(SE_CM_KS_ATTACK);
-                sink.se(SE_CV_KS_ATTACK);
-                self.mode += 1;
-            }
-            MODE_POKE_RISE => {
-                if self.speed_f > 0.0 && self.swings[1] == 0 && self.shield_hit {
+        'poke: {
+            match self.mode {
+                MODE_POKE_START => {
+                    self.sph.co_set = false;
+                    self.speed_f = 26.0;
                     self.gravity = GRAVITY_POKE;
-                    self.speed.y = 25.0;
-                    self.speed_f *= -0.5;
-                    self.swings[1] = 1;
+                    self.speed.y = 28.0;
+                    self.clear_swings();
+                    self.sway = 0.0;
+                    self.angle[1] = env.facing(self.pos);
+                    sink.se(SE_CM_KS_ATTACK);
+                    sink.se(SE_CV_KS_ATTACK);
+                    self.mode += 1;
                 }
-                if self.swings[1] == 0 && self.ks_kuttuki_check(statics, env) {
-                    return;
+                MODE_POKE_RISE => {
+                    if self.speed_f > 0.0 && self.swings[1] == 0 && self.shield_hit {
+                        self.gravity = GRAVITY_POKE;
+                        self.speed.y = 25.0;
+                        self.speed_f *= -0.5;
+                        self.swings[1] = 1;
+                    }
+                    if self.swings[1] == 0 && self.ks_kuttuki_check(statics) {
+                        return;
+                    }
+                    if !self.contact(env.solid) {
+                        break 'poke;
+                    }
+                    self.sph.co_set = true;
+                    self.timers[2] = (self.rnd_f(20.0) + 20.0) as i16;
+                    self.mode += 1;
+                    self.poke_fall(statics, env);
                 }
-                if !self.contact(env.solid) {
-                    return;
-                }
-                self.co = true;
-                self.timers[2] = (self.rnd_f(20.0) + 20.0) as i16;
-                self.mode += 1;
-                self.poke_fall(statics, env);
+                MODE_POKE_FALL => self.poke_fall(statics, env),
+                _ => {}
             }
-            MODE_POKE_FALL => self.poke_fall(statics, env),
-            _ => {}
         }
         add_calc_angle_s2(&mut self.shape_angle[1], self.angle[1], 1, SHAPE_SPIN_MAX);
         if self.body_atari_check(env, blow) {
@@ -1273,7 +1336,7 @@ impl Morth {
     }
 
     fn poke_fall(&mut self, statics: &Statics, env: &Env<'_>) {
-        self.ks_kuttuki_check(statics, env);
+        self.ks_kuttuki_check(statics);
         if self.tyaku_check(env.solid) {
             self.gravity = GRAVITY_POKE;
             self.speed.y = 1.0;
@@ -1369,15 +1432,16 @@ impl Morth {
         match self.mode {
             MODE_DEAD_SPIN => {
                 self.clear_swings();
-                self.tg = false;
-                self.co = false;
+                self.sph.tg_set = false;
+                self.sph.co_set = false;
+                self.sph.tg_hit = false;
                 sink.se(SE_CV_KS_DAMAGE);
                 self.speed_f = DEAD_SPEED_F + self.rnd_f(5.0);
                 self.gravity = GRAVITY;
                 self.speed.y = DEAD_RISE + self.rnd_f(5.0);
                 self.mode += 1;
-                self.swings[1] = self.rnd_ang(4096.0, 0.0);
-                self.at = false;
+                self.swings[1] = (self.rnd_fx(4096.0)) as i32 as i16;
+                self.sph.at_set = false;
                 self.dead_bounce(sink);
             }
             MODE_DEAD_BOUNCE => self.dead_bounce(sink),
@@ -1417,10 +1481,7 @@ impl Morth {
         }
     }
 
-    fn action_omoi(&mut self, statics: &mut Statics, env: &mut Env<'_>, blow: &Blow, sink: &mut Sink<'_>) {
-        if self.cling == 1 && statics.heavy {
-            env.carrying = false;
-        }
+    fn action_omoi(&mut self, statics: &mut Statics, env: &Env<'_>, blow: &Blow, sink: &mut Sink<'_>) {
         match self.mode {
             MODE_CLING_ENTER => self.cling_enter(statics, env),
             MODE_CLING_HOLD => self.cling_hold(statics, env),
@@ -1449,7 +1510,7 @@ impl Morth {
         }
     }
 
-    fn cling_enter(&mut self, statics: &mut Statics, env: &mut Env<'_>) {
+    fn cling_enter(&mut self, statics: &mut Statics, env: &Env<'_>) {
         self.speed_f = 0.0;
         self.gravity = 0.0;
         self.speed = Vec3::ZERO;
@@ -1457,13 +1518,6 @@ impl Morth {
             self.joint_live = false;
             self.status &= !STTS_UNK4000;
             self.mode = MODE_CLING_LEAP;
-            let facing = env.facing(self.pos);
-            self.angle[1] = facing.wrapping_add(-32768);
-            self.angle[1] = self.angle[1].wrapping_add((self.rnd_fx(16384.0)) as i32 as i16);
-            self.speed_f = CLING_LEAP;
-            self.gravity = GRAVITY;
-            self.speed.y = CLING_CLAW;
-            self.mode += 1;
             return;
         }
         self.clear_swings();
@@ -1493,7 +1547,7 @@ impl Morth {
         self.cling_hold(statics, env);
     }
 
-    fn cling_hold(&mut self, statics: &mut Statics, env: &mut Env<'_>) {
+    fn cling_hold(&mut self, statics: &mut Statics, env: &Env<'_>) {
         let target = env.pos();
         let turn = (self.sweep as f32 * 0.25) as i32 as i16;
         if (self.actor_id & 1) == 0 {
@@ -1547,15 +1601,15 @@ impl Morth {
                 self.joint_live = true;
             }
         }
-        if env.carrying {
+        if env.hooked {
             limit = Vec3::splat(CLING_OVERRIDE);
         }
         add_calc(&mut self.pos.x, target.x, 1.0, limit.x);
         add_calc(&mut self.pos.y, target.y, 1.0, limit.y);
         add_calc(&mut self.pos.z, target.z, 1.0, limit.z);
         if env.rolling_crash || env.spinning || env.swimming {
-            self.co = true;
-            self.tg = true;
+            self.sph.co_set = true;
+            self.sph.tg_set = true;
             if self.cling != 0 {
                 statics.heavy = false;
                 statics.kattuku = 0;
@@ -1587,8 +1641,12 @@ impl Morth {
             if self.swings[1] != 0 {
                 return;
             }
-            let slot = usize::from(self.swings[0].max(0) as u16).min(GORON_RATE.len() - 1);
-            statics.goron = ((statics.kattuku as f32) * GORON_RATE[slot]) as i32;
+            if let Some(rate) = usize::try_from(self.swings[0])
+                .ok()
+                .and_then(|slot| GORON_RATE.get(slot))
+            {
+                statics.goron = ((statics.kattuku as f32) * rate) as i32;
+            }
             if statics.goron == 0 {
                 statics.goron = 1;
             }
@@ -1623,8 +1681,8 @@ impl Morth {
             return;
         }
         self.timers[2] = (self.rnd_f(CLING_POKE_MIN) + CLING_POKE_MIN) as i16;
-        self.co = true;
-        self.tg = true;
+        self.sph.co_set = true;
+        self.sph.tg_set = true;
         self.action = ACTION_POKE;
         self.mode = MODE_POKE_FALL;
     }
@@ -1639,20 +1697,23 @@ impl Morth {
                 }
             }
             MODE_TUBO_FOLLOW => {
-                if self.tsuko.is_none() {
-                    self.doomed = true;
-                    return;
-                }
-                if self.goal_reach != 0.0 && env.distance(self.pos) > self.goal_reach {
-                    return;
+                if self.tsuko.is_some() {
+                    if self.goal_reach == 0.0 {
+                        return;
+                    }
+                    if env.distance(self.pos) > self.goal_reach {
+                        return;
+                    }
                 }
                 self.radius = RADIUS_TUBO;
-                self.at = true;
-                self.co = true;
-                self.tg = true;
+                self.sph.at_vs_other = true;
+                self.sph.at_vs_player = false;
+                self.sph.at_set = true;
+                self.cc_set();
                 self.mode += 1;
             }
             MODE_TUBO_SPAWN => {
+                self.cc_set();
                 if self.count > TUBO_COUNT_MAX || self.count == 0 {
                     self.count = 1;
                 }
@@ -1774,6 +1835,7 @@ impl Morth {
         sink: &mut Sink<'_>,
     ) {
         self.pos = actor.pos;
+        self.cc_calc(env, blow);
         if self.pause_timer != 0 {
             self.pause_timer -= 1;
         }
@@ -1809,7 +1871,7 @@ impl Morth {
         match self.action {
             ACTION_DOU => {
                 self.action_dousa_move(statics, env, blow, sink);
-                self.ks_kuttuki_check(statics, env);
+                self.ks_kuttuki_check(statics);
             }
             ACTION_POKE => self.action_kougeki_move(statics, env, blow, sink),
             ACTION_WIND => self.action_kaze_move(env, blow, sink),
@@ -1829,7 +1891,7 @@ impl Morth {
             }
         }
         if self.timers[0] == 0 {
-            self.timers[0] = self.rnd_ang(25.0, 50.0);
+            self.timers[0] = (self.rnd_fx(25.0) + 50.0) as i16;
             self.frame = 1;
         }
         let (sin, cos) = from_s16(self.angle[1]).sin_cos();
@@ -1841,6 +1903,7 @@ impl Morth {
                 self.speed.y = FALL_MAX;
             }
         }
+        self.cc_set();
         self.pos += self.speed;
         if self.mode != MODE_CLING_HOLD {
             self.bg_check(solid);

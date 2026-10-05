@@ -33,14 +33,8 @@ const ANGLE_X: usize = 0;
 const ANGLE_Y: usize = 1;
 const ANGLE_Z: usize = 2;
 
-const PRM_BYTE_MASK: u32 = 0xFF;
-const PRM_NONE: u32 = 0xFF;
-
-const HIO_NO: i8 = -1;
-const HIO_M05: u8 = 0;
 const HIO_M08: f32 = 0.8;
 const HIO_M0C: f32 = 1.0;
-const HIO_M10: f32 = 0.5;
 const HIO_M14: i16 = 100;
 
 const MODE_WAIT: i16 = 0;
@@ -176,8 +170,17 @@ const SHAKE_FRAME: i16 = 5;
 const CORE_HEALTH: i32 = 0x0F;
 const BODY_RADIUS: f32 = 300.0;
 const BODY_LIFT: f32 = 200.0;
-const COCYL_HEIGHT: f32 = 400.0;
+const COCYL_SRC_RADIUS: f32 = 100.0;
+const COCYL_SRC_HEIGHT: f32 = 400.0;
+const COCYL_HEIGHT: f32 = 3000.0;
 const COCYL_RANGE: f32 = 800.0;
+const OFFSCREEN_X: f32 = -20000.0;
+const OFFSCREEN_Y: f32 = 10000.0;
+const OFFSCREEN_Z: f32 = -10000.0;
+const AT_POWER_CO_CYL: u8 = 1;
+const PLAYER_TG_RADIUS: f32 = 30.0;
+const PLAYER_TG_HEIGHT: f32 = 125.0;
+const CORE_SRC_RADIUS: f32 = 40.0;
 const CORE_RADIUS: f32 = 50.0;
 const CORE_LIFT: f32 = 300.0;
 const HEAD_OFFSET: [f32; 3] = [0.0, -20.0, 30.0];
@@ -187,7 +190,7 @@ const THROW_SPEED: f32 = 50.0;
 const THROW_RISE: f32 = 120.0;
 const THROW_DAMAGE: u8 = 4;
 const THROW_ANGLE: i16 = 0x5000;
-const MAKAR_OFFSET: [f32; 3] = [0.0, 20.0, 90.0];
+const MAKAR_OFFSET: [f32; 3] = [0.0, REG0_F1 + 20.0, REG0_F2 + 90.0];
 const MAKAR_OFFSET_TALL: [f32; 3] = [0.0, 70.0, 1000.0];
 const MAKAR_OFFSET_CATCH: [f32; 3] = [0.0, 0.0, 850.0];
 const MAKAR_YAW_OFFSET: i16 = 3000;
@@ -297,6 +300,15 @@ const REACH_BOOMERANG: f32 = 90.0;
 const REACH_HAMMER: f32 = 50.0;
 const REACH_HOOKSHOT: f32 = 5.0;
 const REACH_BOMB: f32 = 150.0;
+
+const AT_TYPE_ALL: u32 = u32::MAX;
+const AT_TYPE_BOOMERANG: u32 = 1 << 6;
+const AT_TYPE_WATER: u32 = 1 << 8;
+const AT_TYPE_UNK800: u32 = 1 << 11;
+const AT_TYPE_UNK20000: u32 = 1 << 17;
+const AT_TYPE_WIND: u32 = 1 << 21;
+const AT_TYPE_UNK400000: u32 = 1 << 22;
+const AT_TYPE_LIGHT: u32 = 1 << 23;
 
 const CULL_MIN: [f32; 3] = [-300.0, 0.0, -300.0];
 const CULL_MAX: [f32; 3] = [300.0, 900.0, 300.0];
@@ -438,6 +450,16 @@ fn reach_flat(from: Vec3, to: Vec3) -> f32 {
 
 fn touches(centre: Vec3, radius: f32, at: Vec3, reach: f32) -> bool {
     (at - centre).length() <= radius + reach
+}
+
+fn cyls_touch(a: Vec3, a_radius: f32, a_height: f32, b: Vec3, b_radius: f32, b_height: f32) -> bool {
+    let sum = a_radius + b_radius;
+    let dx = a.x - b.x;
+    let dz = a.z - b.z;
+    if dx * dx + dz * dz > sum * sum {
+        return false;
+    }
+    a.y + a_height >= b.y && a.y <= b.y + b_height
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -735,6 +757,81 @@ impl Sink<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sph {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub at_set: bool,
+    pub at_vs_player: bool,
+    pub at_hit: bool,
+    pub tg_set: bool,
+    pub tg_type: u32,
+    pub tg_hit: bool,
+    pub co_set: bool,
+}
+
+impl Sph {
+    const BODY_SRC: Sph = Sph {
+        centre: Vec3::ZERO,
+        radius: BODY_RADIUS,
+        at_set: false,
+        at_vs_player: false,
+        at_hit: false,
+        tg_set: true,
+        tg_type: AT_TYPE_ALL & !AT_TYPE_BOOMERANG & !AT_TYPE_WATER & !AT_TYPE_UNK20000 & !AT_TYPE_WIND
+            & !AT_TYPE_UNK400000
+            & !AT_TYPE_LIGHT,
+        tg_hit: false,
+        co_set: false,
+    };
+
+    const CORE_SRC: Sph = Sph {
+        centre: Vec3::ZERO,
+        radius: CORE_SRC_RADIUS,
+        at_set: false,
+        at_vs_player: false,
+        at_hit: false,
+        tg_set: true,
+        tg_type: AT_TYPE_ALL
+            & !AT_TYPE_WATER
+            & !AT_TYPE_UNK20000
+            & !AT_TYPE_WIND
+            & !AT_TYPE_UNK400000
+            & !AT_TYPE_LIGHT,
+        tg_hit: false,
+        co_set: true,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Cyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub at_type: u32,
+    pub at_atp: u8,
+    pub at_set: bool,
+    pub at_vs_player: bool,
+    pub at_hit: bool,
+    pub tg_set: bool,
+    pub co_set: bool,
+}
+
+impl Cyl {
+    const SRC: Cyl = Cyl {
+        centre: Vec3::new(OFFSCREEN_X, OFFSCREEN_Y, OFFSCREEN_Z),
+        radius: COCYL_SRC_RADIUS,
+        height: COCYL_SRC_HEIGHT,
+        at_type: AT_TYPE_UNK800,
+        at_atp: AT_POWER_CO_CYL,
+        at_set: true,
+        at_vs_player: true,
+        at_hit: false,
+        tg_set: false,
+        co_set: true,
+    };
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct KalleDemos {
     pub pos: Vec3,
@@ -753,11 +850,8 @@ pub struct KalleDemos {
     pub attention_flags: u32,
     pub attention: Vec3,
     pub attention_distance: i32,
-    pub hio_no: i8,
-    pub hio_05: u8,
     pub hio_08: f32,
     pub hio_0c: f32,
-    pub hio_10: f32,
     pub hio_14: i16,
     pub env_frame: f32,
     pub makar_mode: i8,
@@ -786,13 +880,9 @@ pub struct KalleDemos {
     pub shake_speed: f32,
     pub body_tg: i16,
     pub body_tg_radius: f32,
-    pub body_sphere: Vec3,
-    pub body_sphere_radius: f32,
-    pub co_cyl: Vec3,
-    pub co_cyl_radius: f32,
-    pub co_cyl_height: f32,
-    pub core_sphere: Vec3,
-    pub core_sphere_radius: f32,
+    pub body_sph: Sph,
+    pub co_cyl: Cyl,
+    pub core_sph: Sph,
     pub core_sway: [Vec3; 2],
     pub sway_clock: i16,
     pub sway_a: f32,
@@ -847,16 +937,13 @@ pub struct KalleDemos {
     pub entered: bool,
     pub created: bool,
     pub blocked: bool,
-    pub prm_kind: u8,
     pub camera_kind: u8,
     pub demo_ordered: bool,
     pub seed: [i32; 3],
 }
 
 impl KalleDemos {
-    pub fn spawn(parameters: u32) -> Self {
-        let prm_kind = (parameters & PRM_BYTE_MASK) as u8;
-        let _ = prm_kind as u32 == PRM_NONE;
+    pub fn spawn(_parameters: u32) -> Self {
         let mut body = Frame::idle();
         body.init(frame_max(BCK_HANA_WAIT));
         let mut head = Frame::idle();
@@ -882,11 +969,8 @@ impl KalleDemos {
             attention_flags: 0,
             attention: Vec3::ZERO,
             attention_distance: ATTN_BATTLE_DISTANCE,
-            hio_no: HIO_NO,
-            hio_05: HIO_M05,
             hio_08: HIO_M08,
             hio_0c: HIO_M0C,
-            hio_10: HIO_M10,
             hio_14: HIO_M14,
             env_frame: 0.0,
             makar_mode: MAKAR_OFF,
@@ -915,13 +999,9 @@ impl KalleDemos {
             shake_speed: 0.0,
             body_tg: 0,
             body_tg_radius: 0.0,
-            body_sphere: Vec3::ZERO,
-            body_sphere_radius: BODY_RADIUS,
-            co_cyl: Vec3::new(-20000.0, 10000.0, -10000.0),
-            co_cyl_radius: 0.0,
-            co_cyl_height: COCYL_HEIGHT,
-            core_sphere: Vec3::ZERO,
-            core_sphere_radius: CORE_RADIUS,
+            body_sph: Sph::BODY_SRC,
+            co_cyl: Cyl::SRC,
+            core_sph: Sph::CORE_SRC,
             core_sway: [Vec3::ZERO; 2],
             sway_clock: 0,
             sway_a: 0.0,
@@ -976,7 +1056,6 @@ impl KalleDemos {
             entered: false,
             created: false,
             blocked: false,
-            prm_kind,
             camera_kind: CAMERA_BOSS,
             demo_ordered: false,
             seed: [RND_SEED; 3],
@@ -1035,10 +1114,6 @@ impl KalleDemos {
         self.body_morph.frame as i32 as i16
     }
 
-    fn body_frame_int(&self) -> i32 {
-        self.body_morph.frame as i32
-    }
-
     fn dead_frame(&self) -> i32 {
         self.dead_morph.frame as i32
     }
@@ -1073,7 +1148,7 @@ impl KalleDemos {
                 }
                 if self.pos.y <= self.ground + 5.0 {
                     self.anm_init(BCK_HANA_OTIRU, 2.0, EMODE_NONE, 1.0);
-                    self.vine = 1;
+                    self.vine = VINE_OUT;
                     self.state = 2;
                     self.core_yaw = env.angle_y(self.pos);
                     self.wind_gap = WIND_MAX;
@@ -1112,7 +1187,7 @@ impl KalleDemos {
                 if self.timers[0] == 0 {
                     self.state = 4;
                     self.anm_init(BCK_HANA_TOJIRU, 5.0, EMODE_NONE, 1.0);
-                    self.vine = 2;
+                    self.vine = VINE_UP;
                     sink.se(SE_CM_BKM_FLW_WAVING);
                 }
                 add_calc2(&mut self.env_amount, 1.0, 1.0, 0.1);
@@ -1136,7 +1211,7 @@ impl KalleDemos {
                     step = REG0_S3 + 200;
                     self.play_count = 0;
                 } else {
-                    self.vine = 3;
+                    self.vine = VINE_FULL;
                     step = REG0_S4 + 0x290;
                     if self.play_count != 0 && REG0_S9 == 0 {
                         self.play_count -= 1;
@@ -1200,7 +1275,7 @@ impl KalleDemos {
             0 => {
                 self.state = 1;
                 self.demo = 1;
-                self.vine = 2;
+                self.vine = VINE_UP;
                 self.blure = 0x96;
                 self.eat(env, sink);
             }
@@ -1304,7 +1379,7 @@ impl KalleDemos {
                 self.anm_init(BCK_HIRAKU_WAIT, 1.0, EMODE_LOOP, 1.0);
                 self.head_anm_init(BCK_COA_START1, 1.0, EMODE_LOOP, 1.0);
                 self.state = 1;
-                self.vine = 2;
+                self.vine = VINE_UP;
                 self.makar_mode = 1;
                 self.start(env, sink);
             }
@@ -1372,7 +1447,7 @@ impl KalleDemos {
 
     fn end(&mut self, env: &mut Env<'_>, sink: &mut Sink<'_>) {
         self.plant_lean = 0;
-        self.vine = 1;
+        self.vine = VINE_OUT;
         match self.state {
             0 => {
                 if env.stage_x {
@@ -1421,13 +1496,31 @@ impl KalleDemos {
         }
     }
 
+    fn cc_calc(&mut self, env: &mut Env<'_>, sink: &mut Sink<'_>) {
+        let reach = env.blow.at.reach();
+        self.core_sph.tg_hit = self.core_sph.tg_set
+            && touches(self.core_sph.centre, self.core_sph.radius, env.pos(), reach);
+        self.co_cyl.at_hit = self.co_cyl.at_set
+            && self.co_cyl.at_vs_player
+            && cyls_touch(
+                env.pos(),
+                PLAYER_TG_RADIUS,
+                PLAYER_TG_HEIGHT,
+                self.co_cyl.centre,
+                self.co_cyl.radius,
+                self.co_cyl.height,
+            );
+        if self.co_cyl.at_hit {
+            sink.hurt_player(self.co_cyl.at_atp);
+        }
+    }
+
     fn core_damage_check(&mut self, env: &mut Env<'_>, sink: &mut Sink<'_>) {
         if self.core_guard != 0 {
             return;
         }
         let mut dead = false;
-        let reach = env.blow.at.reach();
-        if touches(self.core_sphere, self.core_sphere_radius, env.pos(), reach) {
+        if self.core_sph.tg_hit {
             self.core_guard = 8;
             sink.se(SE_CV_BKM_DAMAGE);
             self.core_state = CORE_HIT;
@@ -1642,8 +1735,8 @@ impl KalleDemos {
                 self.eye_pos.y += 20000.0;
             }
         }
-        self.core_sphere = self.eye_pos;
-        self.core_sphere_radius = CORE_RADIUS;
+        self.core_sph.centre = self.eye_pos;
+        self.core_sph.radius = CORE_RADIUS;
         if leap {
             self.core_fx[2] = true;
             self.core_fx_life[2] = 3;
@@ -1734,7 +1827,7 @@ impl KalleDemos {
                 self.timers[2] = 0x28;
                 if self.timers[0] == 0 {
                     self.state = 0;
-                    self.vine = 0;
+                    self.vine = VINE_NONE;
                     self.anm_init(BCK_HANA_WAIT, 20.0, EMODE_LOOP, 1.0);
                     sink.se(SE_CM_BKM_VINE_OUT);
                     self.timers[3] = 0x5a;
@@ -2407,6 +2500,7 @@ impl KalleDemos {
         }
         self.clock = self.clock.wrapping_add(1);
         self.smoke_on = 0;
+        self.cc_calc(env, sink);
         for index in 0..TIMER_COUNT {
             if self.timers[index] != 0 {
                 self.timers[index] -= 1;
@@ -2439,8 +2533,8 @@ impl KalleDemos {
         if self.vine != 0 {
             centre.y += 10000.0;
         }
-        self.body_sphere = centre;
-        self.body_sphere_radius = REG0_F8 + BODY_RADIUS;
+        self.body_sph.centre = centre;
+        self.body_sph.radius = REG0_F8 + BODY_RADIUS;
         if self.body_tg != 0 {
             self.body_tg -= 1;
             centre = self.pos;
@@ -2453,11 +2547,11 @@ impl KalleDemos {
             );
         } else {
             self.body_tg_radius = 0.0;
-            centre = Vec3::new(-20000.0, 10000.0, -10000.0);
+            centre = Vec3::new(OFFSCREEN_X, OFFSCREEN_Y, OFFSCREEN_Z);
         }
-        self.co_cyl = centre;
-        self.co_cyl_radius = self.body_tg_radius;
-        self.co_cyl_height = REG0_F3 + COCYL_HEIGHT;
+        self.co_cyl.centre = centre;
+        self.co_cyl.radius = self.body_tg_radius;
+        self.co_cyl.height = REG0_F3 + COCYL_HEIGHT;
         self.demo_camera(env, sink);
         self.bmd_kankyo();
         self.eff_cont();
@@ -2490,7 +2584,6 @@ impl KalleDemos {
             self.blocked = true;
             return;
         }
-        self.hio_no = 0;
         self.health = CORE_HEALTH;
         self.max_health = CORE_HEALTH;
         for index in 0..HAND_COUNT {
@@ -2569,7 +2662,6 @@ pub struct Watch<'w, 's> {
     players: Query<'w, 's, (Entity, &'static mut Player)>,
     shafts: Query<'w, 's, &'static arrow::Arrow>,
     bolts: Query<'w, 's, &'static boomerang::Boomerang>,
-    others: Query<'w, 's, (Entity, &'static Actor), Without<KalleDemos>>,
 }
 
 pub fn control(

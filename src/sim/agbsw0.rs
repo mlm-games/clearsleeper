@@ -4,6 +4,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
+use crate::text::msgproc::MsgGameInfo;
 use super::actor::Actor;
 use super::bomb;
 use super::chest::Chests;
@@ -94,8 +95,7 @@ const TYPE_FA: u8 = 0x0C;
 const TYPE_UNK_0D: u8 = 0x0D;
 const TYPE_UNK_0E: u8 = 0x0E;
 
-const EXE_SUB_TABLE_SLOTS: usize = 45;
-const EXE_SUB_TABLE_FILLED: usize = 15;
+const AT_TYPE_BOMB: u32 = 1 << 5;
 
 const BIT_MET_KORL: u16 = 0x0F80;
 const BIT_UNK_1708: u16 = 0x1708;
@@ -218,11 +218,8 @@ const MAGIC_LIMIT: i32 = 0;
 const LIFE_CONTAINER: i32 = 8;
 
 const OCEAN_SV_BIT: u16 = 0xF;
-const OCEAN_SV_GRID: usize = 0;
 const OCEAN_GRIDS: usize = 50;
 
-const ITEM_SPAWN_TIME_MIN: f32 = 40.0;
-const ITEM_SPAWN_TIME_SPAN: f32 = 10.0;
 const TRIFORCE_RND_SPAN: f32 = 3.0;
 const TRIFORCE_RND_LOW: f32 = 1.0;
 const TRIFORCE_RND_MID: f32 = 2.0;
@@ -360,7 +357,6 @@ pub struct Spawn {
     pub pos: Vec3,
     pub room: i8,
     pub item: u8,
-    pub speed_y: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -466,6 +462,39 @@ pub struct BombView {
     pub mode: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Cyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub at_set: bool,
+    pub at_atp: u8,
+    pub tg_type: u32,
+    pub tg_set: bool,
+    pub tg_hit: bool,
+    pub co_set: bool,
+}
+
+impl Cyl {
+    const SRC: Cyl = Cyl {
+        centre: Vec3::ZERO,
+        radius: CYL_RADIUS_SRC,
+        height: CYL_HEIGHT_SRC,
+        at_set: false,
+        at_atp: 0,
+        tg_type: AT_TYPE_BOMB,
+        tg_set: true,
+        tg_hit: false,
+        co_set: false,
+    };
+
+    fn touches(&self, at: Vec3) -> bool {
+        let d = at - self.centre;
+        let r = (d.x * d.x + d.z * d.z).sqrt();
+        r < self.radius && d.y >= 0.0 && d.y <= self.height
+    }
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Agbsw0 {
     pub kind: u8,
@@ -487,8 +516,7 @@ pub struct Agbsw0 {
     pub stage_no: u8,
     pub shape_angle_y: i16,
     pub eye_pos: Vec3,
-    pub radius: f32,
-    pub height: f32,
+    pub cyl: Cyl,
     pub seed: [i32; 3],
 }
 
@@ -514,16 +542,15 @@ impl Agbsw0 {
             stage_no: 0,
             shape_angle_y: 0,
             eye_pos: Vec3::ZERO,
-            radius: CYL_RADIUS_SRC,
-            height: CYL_HEIGHT_SRC,
+            cyl: Cyl::SRC,
             seed: [RND_SEED; 3],
         }
     }
 
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
         (
-            [-self.radius, CULL_FLOOR, -self.radius],
-            [self.radius, self.scale.y, self.radius],
+            [-self.cyl.radius, CULL_FLOOR, -self.cyl.radius],
+            [self.cyl.radius, self.scale.y, self.cyl.radius],
         )
     }
 
@@ -705,8 +732,9 @@ impl Agbsw0 {
         self.field_0x299 = 0;
         self.timer = 0;
 
-        self.radius = scale.x;
-        self.height = scale.y;
+        self.cyl.centre = actor.pos;
+        self.cyl.radius = scale.x;
+        self.cyl.height = scale.y;
 
         if kind == TYPE_S {
             if param_no > 0 {
@@ -721,6 +749,7 @@ impl Agbsw0 {
     }
 
     fn execute(&mut self, ctx: &mut Ctx<'_>) -> bool {
+        self.cc_calc(ctx);
         match self.kind {
             TYPE_A => self.exe_sub_a(ctx),
             TYPE_AT => self.exe_sub_at(ctx),
@@ -737,11 +766,15 @@ impl Agbsw0 {
             TYPE_FA => self.exe_sub_fa(ctx),
             TYPE_UNK_0D => self.exe_sub_m2(ctx),
             TYPE_UNK_0E => self.exe_sub_m3(ctx),
-            _ => {
-                let _ = (EXE_SUB_TABLE_SLOTS, EXE_SUB_TABLE_FILLED);
-                true
-            }
+            _ => true,
         }
+    }
+
+    fn cc_calc(&mut self, ctx: &Ctx<'_>) {
+        self.cyl.tg_hit = self.cyl.tg_set
+            && ctx.f.bombs.iter().any(|shell| {
+                shell.mode == bomb::MODE_EXPLODE && self.cyl.touches(shell.pos)
+            });
     }
 
     fn release(&mut self, ctx: &mut Ctx<'_>) -> bool {
@@ -888,7 +921,10 @@ impl Agbsw0 {
             if self.move_check(ctx.f) {
                 return true;
             }
-        } else if ctx.f.ocean_sv(OCEAN_SV_GRID, OCEAN_SV_BIT) {
+        } else if ctx
+            .f
+            .ocean_sv(usize::from(self.room_no() as u8), OCEAN_SV_BIT)
+        {
             if self.field_0x298 == 1 {
                 if self.gba_link() {
                     if !self.gba_status_check(STATUS_CHANNEL_MAIL) {
@@ -1283,22 +1319,15 @@ impl Agbsw0 {
             return true;
         }
 
-        if self.gba_link() && self.gba_status_check(STATUS_CHANNEL_BOMB) {
-            let touching = ctx
-                .f
-                .bombs
-                .iter()
-                .any(|b| b.mode == bomb::MODE_EXPLODE && self.bomb_touch(b.pos));
-            if touching {
-                let se = big_little_change(MAIL_SE_BOMB);
-                MAIL_SE.store(se, Ordering::Relaxed);
-                ctx.switches.set(sw0);
-                if self.msg_no == NO_MSG {
-                    self.kill(ctx);
-                    return true;
-                }
-                self.timer = TIMER_TRIGGER;
+        if self.gba_link() && self.gba_status_check(STATUS_CHANNEL_BOMB) && self.cyl.tg_hit {
+            let se = big_little_change(MAIL_SE_BOMB);
+            MAIL_SE.store(se, Ordering::Relaxed);
+            ctx.switches.set(sw0);
+            if self.msg_no == NO_MSG {
+                self.kill(ctx);
+                return true;
             }
+            self.timer = TIMER_TRIGGER;
         }
         true
     }
@@ -1381,12 +1410,10 @@ impl Agbsw0 {
                 if item_no != i32::from(ITEM_RECOVER_FAIRY) {
                     self.pos.y += self.scale.y / 2.0;
                 }
-                let speed_y = self.rnd_span(ITEM_SPAWN_TIME_SPAN) + ITEM_SPAWN_TIME_MIN;
                 ctx.spawns.push(Spawn {
                     pos: self.pos,
                     room: self.room_no(),
                     item: item_no as u8,
-                    speed_y,
                 });
                 ctx.events.list.push(SimEvent::Se(SE_CHI_MEGAHORN));
                 self.mail_cancel();
@@ -1650,13 +1677,10 @@ impl Agbsw0 {
                             && item_no != i32::from(ITEM_HEART_CONTAINER)
                             && item_no != i32::from(ITEM_SMALL_KEY)
                         {
-                            let speed_y =
-                                self.rnd_span(ITEM_SPAWN_TIME_SPAN) + ITEM_SPAWN_TIME_MIN;
                             ctx.spawns.push(Spawn {
                                 pos: self.pos,
                                 room: self.room_no(),
                                 item: item_no as u8,
-                                speed_y,
                             });
                             self.mail_send(NO_MSG, MAIL_REACT_NONE, NO_SWITCH, NO_SWITCH, 0x11);
                         }
@@ -1751,12 +1775,6 @@ impl Agbsw0 {
             }
         }
         true
-    }
-
-    fn bomb_touch(&self, at: Vec3) -> bool {
-        let d = at - self.pos;
-        let r = (d.x * d.x + d.z * d.z).sqrt();
-        r < self.radius && d.y >= 0.0 && d.y <= self.height
     }
 
     fn room_no(&self) -> i8 {
@@ -2760,6 +2778,7 @@ pub fn control(
     mut stories: ResMut<StoryBits>,
     mut active: ResMut<ActiveEvent>,
     mut events: ResMut<SimEvents>,
+    info: Res<MsgGameInfo>,
     mut actors: Query<(Entity, &mut Actor, &mut Agbsw0), (With<Agbsw0>, Without<Player>)>,
     mut commands: Commands,
 ) {
@@ -2848,7 +2867,7 @@ pub fn control(
         stage_m_new_d2: watch.stage.0 == STAGE_M_NEW_D2,
         agb_room: 0,
         demo_accept: false,
-        event_running: false,
+        event_running: info.event_run_check(),
         look_attention: watch.list.event_index(EVENT_ATTENTION),
         agb_staff: watch.list.staff_of(EVENT_STAFF),
         bombs,
