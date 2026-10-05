@@ -943,15 +943,15 @@ impl Aryll {
         }
     }
 
-    pub fn partner_search_sub(&mut self, others: &Query<&Actor, Without<Aryll>>) -> bool {
+    pub fn partner_search_sub(&mut self, others: &Query<(Entity, &Actor), Without<Aryll>>) -> bool {
         self.partner = others
             .iter()
-            .find(|(_, actor)| actor.name == PARTNER_ACTOR)
-            .map(|(entity, _)| *entity);
+            .find(|entry| entry.1.name == PARTNER_ACTOR)
+            .map(|entry| entry.0);
         self.partner.is_some()
     }
 
-    pub fn partner_search(&mut self, others: &Query<&Actor, Without<Aryll>>) {
+    pub fn partner_search(&mut self, others: &Query<(Entity, &Actor), Without<Aryll>>) {
         if self.stage != STAGE_PENDING {
             return;
         }
@@ -2164,7 +2164,7 @@ fn cam_set_flag_focus(&mut self) {
         &mut self,
         actor: &mut Actor,
         ctx: &mut Ctx,
-        others: &Query<&Actor, Without<Aryll>>,
+        others: &Query<(Entity, &Actor), Without<Aryll>>,
     ) {
         self.jnt.param = Self::default_jnt_param();
         if !self.primed {
@@ -2407,7 +2407,7 @@ pub struct Msg<'w, 's> {
 pub fn control(
     mut world: World,
     mut msg: Msg,
-    mut others: Query<&Actor, Without<Aryll>>,
+    mut others: Query<(Entity, &Actor), Without<Aryll>>,
     mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
 ) {
     let player = msg.players.iter().next().copied();

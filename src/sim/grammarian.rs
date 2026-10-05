@@ -1837,12 +1837,12 @@ impl Grammarian {
         }
     }
 
-    pub fn partner_search_sub(&mut self, others: &Query<&Actor, Without<Grammarian>>) -> bool {
+    pub fn partner_search_sub(&mut self, others: &Query<(Entity, &Actor), Without<Grammarian>>) -> bool {
         self.partner = None;
         let found = others
             .iter()
-            .find(|(_, actor)| actor.name == PARTNER_ACTOR)
-            .map(|(entity, _)| *entity);
+            .find(|entry| entry.1.name == PARTNER_ACTOR)
+            .map(|entry| entry.0);
         self.partner = found;
         found.is_some()
     }
@@ -2039,7 +2039,7 @@ impl Grammarian {
         ret
     }
 
-    pub fn ev_move_chk_fairy(&mut self, others: &Query<&Actor, Without<Grammarian>>) -> bool {
+    pub fn ev_move_chk_fairy(&mut self, others: &Query<(Entity, &Actor), Without<Grammarian>>) -> bool {
         if calc_timer(&mut self.ev_timer) == 0 {
             return !self.partner_search_sub(others);
         }
@@ -2063,7 +2063,7 @@ impl Grammarian {
 
     pub fn ev_move_chk_fairy_mov(
         &mut self,
-        others: &Query<&Actor, Without<Grammarian>>,
+        others: &Query<(Entity, &Actor), Without<Grammarian>>,
         ctx: &mut Ctx,
     ) -> bool {
         let mut ret = false;
@@ -2082,7 +2082,7 @@ impl Grammarian {
     pub fn event_action(
         &mut self,
         actor: &mut Actor,
-        others: &Query<&Actor, Without<Grammarian>>,
+        others: &Query<(Entity, &Actor), Without<Grammarian>>,
         ctx: &mut Ctx,
     ) -> bool {
         match self.act_no {
@@ -2129,7 +2129,7 @@ impl Grammarian {
         &mut self,
         staff: i32,
         actor: &mut Actor,
-        others: &Query<&Actor, Without<Grammarian>>,
+        others: &Query<(Entity, &Actor), Without<Grammarian>>,
         ctx: &mut Ctx,
     ) {
         if staff < 0 {
@@ -2162,7 +2162,7 @@ impl Grammarian {
         &mut self,
         staff: i32,
         actor: &mut Actor,
-        others: &Query<&Actor, Without<Grammarian>>,
+        others: &Query<(Entity, &Actor), Without<Grammarian>>,
         ctx: &mut Ctx,
     ) {
         let ended = self
@@ -2205,7 +2205,7 @@ impl Grammarian {
     pub fn execute(
         &mut self,
         actor: &mut Actor,
-        others: &Query<&Actor, Without<Grammarian>>,
+        others: &Query<(Entity, &Actor), Without<Grammarian>>,
         ctx: &mut Ctx,
     ) {
         if !self.primed {
@@ -2423,7 +2423,7 @@ pub struct Msg<'w, 's> {
 pub fn control(
     world: World,
     msg: Msg,
-    others: Query<&Actor, Without<Grammarian>>,
+    others: Query<(Entity, &Actor), Without<Grammarian>>,
     mut actors: Query<(Entity, &mut Actor, &mut Grammarian)>,
 ) {
     let mut player = msg.players.iter_mut().next();
