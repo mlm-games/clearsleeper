@@ -54,6 +54,8 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
         story: Vec::new(),
         held_item: 0,
         held_count: 0,
+        time: 0.0,
+        date: 0,
     }
 }
 
