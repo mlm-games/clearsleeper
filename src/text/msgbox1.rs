@@ -420,7 +420,7 @@ fn pane_scale_xy(pane: &mut PaneState, scale: f32) {
 }
 
 fn pane_data(slot: &mut PaneState, setup: Option<PaneSetup>, type_id: u16) {
-    slot.set_pane_data(setup.copied().unwrap_or_default().pane(type_id));
+    slot.set_pane_data(setup.unwrap_or_default().pane(type_id));
 }
 
 #[derive(Resource, Debug, Clone, PartialEq)]
@@ -657,13 +657,13 @@ impl Default for Msg1Box {
 impl Msg1Box {
     fn text_pane_data(&mut self, i: usize, setup: Option<PaneSetup>, type_id: u16) {
         if let Some(p) = self.m0544.get_mut(i) {
-            p.set_pane_data(setup.copied().unwrap_or_default().pane(type_id));
+            p.set_pane_data(setup.unwrap_or_default().pane(type_id));
         }
     }
 
     fn select_pane_data(&mut self, i: usize, setup: Option<PaneSetup>, type_id: u16) {
         if let Some(p) = self.m011c.get_mut(i) {
-            p.set_pane_data(setup.copied().unwrap_or_default().pane(type_id));
+            p.set_pane_data(setup.unwrap_or_default().pane(type_id));
         }
     }
 

@@ -30,6 +30,7 @@ const ANGLE_Y: usize = 1;
 const ANGLE_Z: usize = 2;
 
 const PRM_BYTE_MASK: u32 = 0xF;
+const PRM_MASK_SET: u32 = 0xF;
 const SWITCH_TOGE: u8 = 0x80;
 const EVENT_BIT_LAST_DAMAGE: u16 = 0x3C01;
 const TMP_BIT_SHUTTER: u32 = 0x0401;
@@ -287,7 +288,6 @@ const AT_BOMB: u8 = 2;
 const AT_TSUBO: u8 = 3;
 const AT_JUG: u8 = 4;
 const AT_HOOKSHOT: u8 = 5;
-const AT_MAGBALL: u8 = 6;
 const AT_LANCE: u8 = 7;
 const AT_WIND: u8 = 8;
 const AT_HAMMER: u8 = 9;
@@ -349,13 +349,8 @@ const SE_OBJ_TOGE_IN: u32 = 0x6977;
 const BGM_DK_BATTLE: u32 = 0x8000_0014;
 const BGM_MJ_TOWER_BATTLE: u32 = 0x8000_0015;
 const BGM_UNK_110: u32 = 0x8000_0110;
-
-const VIBE_Y: f32 = 1.0;
-const VIBE_ATTACK: i16 = -0x21;
-const VIBE_LAND: i16 = 5;
-const VIBE_JAB: i16 = 4;
-const VIBE_KUTI: i16 = 6;
-const VIBE_PECK: i16 = 3;
+const STRM_DK_START: u32 = 0xC000_0008;
+const STRM_DK_CLEAR: u32 = 0xC000_001A;
 
 const KAMEN_BREAK_OFF_X: [f32; 4] = [50.0, 30.0, -50.0, -30.0];
 const KAMEN_BREAK_OFF_Y: [f32; 4] = [0.0, -120.0, 20.0, 0.0];
@@ -363,7 +358,6 @@ const KAMEN_BREAK_OFF_Z: [f32; 4] = [50.0, 20.0, 50.0, 0.0];
 const KAMEN_BREAK_SD_X: [f32; 4] = [-5.0, 0.0, 5.0, 0.0];
 const KAMEN_BREAK_SD_Z: [f32; 4] = [0.0, 5.0, 0.0, 0.0];
 const KAMEN_BREAK_TIME: [i8; 4] = [0x1E, 0x2D, 0x28, 0x23];
-const KAMEN_BREAK_G: [f32; 4] = [9820.0, 9820.0, 9820.0, 9820.0];
 const KAMEN_BREAK_Z1: [i16; 4] = [0x2000, 0x2000, -0x2000, -0x2000];
 const KAMEN_BREAK_Z2: [i16; 4] = [-0x1000, -0x1000, 0x1000, 0x1000];
 
@@ -395,15 +389,9 @@ const EFF_AREA: f32 = 3000.0;
 const EFF_GROUND_LIFT: f32 = 20.0;
 const EFF_RISE_STEP: f32 = 0.1;
 const EFF_FLOOR_CLAMP: f32 = -5.0;
-const TAIL_COUNT: usize = 4;
 const TIMER_COUNT: usize = 5;
 const SMOKE_COUNT: usize = 4;
 const FOOT_COUNT: usize = 2;
-const WALL_INNER: f32 = 50.0;
-const WALL_OUTER: f32 = 300.0;
-const WALL_TOGE_INNER: f32 = 500.0;
-const WALL_TOGE_OUTER: f32 = 500.0;
-const GROUND_UP_Y: f32 = 0.0;
 const EFFECT_LIFE: i16 = 2000;
 const EFFECT_LIFE_LIMIT: i16 = 0x26;
 const LANDING_AREA: f32 = 1400.0;
@@ -414,7 +402,6 @@ const VIEW_LIMIT: u16 = 0x6000;
 const WALK_LIMIT: i16 = 0x3000;
 const SENKAI_LIMIT: i16 = 0x800;
 const TRACK_LIMIT: i16 = 7000;
-const TURN_DIV: i16 = 10;
 const TURN_DIV_WALK: i16 = 2;
 const TURN_DIV_AIM: i16 = 8;
 const TURN_DIV_FACE: i16 = 4;
@@ -422,7 +409,6 @@ const TURN_DIV_CAM: i16 = 0x10;
 const TURN_DIV_HEAD: i16 = 4;
 const TURN_DIV_NECK: i16 = 0x10;
 const TURN_CAP: f32 = 0x800;
-const TURN_CAP_TILT: f32 = 0.5;
 const TURN_BANK: f32 = 5500.0;
 const TURN_STEP: f32 = 0.05;
 const TURN_STEP_GROUND: f32 = 0.1;
@@ -3108,3 +3094,468 @@ impl Helmaroc {
             }
         }
     }
+
+    fn demo_order(&mut self, out: &mut Sink<'_>) {
+        if !self.demo_ordered {
+            self.demo_ordered = true;
+            let _ = out;
+            return;
+        }
+    }
+
+    fn demo_gate(&mut self) -> bool {
+        if !self.demo_ordered {
+            self.demo_ordered = true;
+            return false;
+        }
+        true
+    }
+
+    fn demo_camera(&mut self, actor: &Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        let mut run = true;
+        let mut rumble = false;
+        match self.demo_state {
+            0 => {}
+            1 => {
+                if !self.demo_gate() {
+                    run = false;
+                } else {
+                    self.demo_state += 1;
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 45.0;
+                    self.mask_damage = 4;
+                }
+            }
+            2 => {
+                self.cam_eye =
+                    turned(actor.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X, REG0_F1 - 30.0, REG0_F2 + 50.0])
+                        + self.head.pos;
+                self.cam_look =
+                    turned(actor.shape_angle[ANGLE_Y], [REG0_F5 + 400.0, REG0_F6 - 100.0, REG0_F7 + 400.0])
+                        + self.head.pos;
+                if self.demo_sub > REG6_S7 + 0x3C {
+                    add_calc2(&mut self.fov, 20.0, 0.5, 1.0);
+                } else if self.demo_sub > 0 {
+                    add_calc2(&mut self.fov, 35.0, 0.35, 1.0);
+                } else {
+                    add_calc2(&mut self.fov, 45.0, 0.05, 1.0);
+                }
+            }
+            0xA => {
+                if !self.demo_gate() {
+                    run = false;
+                } else {
+                    self.demo_state += 1;
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 55.0;
+                    self.cam_eye = Vec3::new(2598.0, 9902.0, -3498.0);
+                    self.cam_look = Vec3::new(2228.0, 9961.0, -3403.0);
+                }
+            }
+            0xB => {
+                add_calc2(&mut self.cam_eye.x, 164.0, 0.05, self.demo_param * 24.34);
+                add_calc2(&mut self.cam_eye.y, 11617.0, 0.05, self.demo_param * 17.15);
+                add_calc2(&mut self.cam_eye.z, -2802.0, 0.05, self.demo_param * 6.96);
+                add_calc2(&mut self.cam_look.x, -167.0, 0.05, self.demo_param * 23.949999);
+                add_calc2(&mut self.cam_look.y, 11791.0, 0.05, self.demo_param * 18.3);
+                add_calc2(&mut self.cam_look.z, -2706.0, 0.05, self.demo_param * 6.97);
+                if self.demo_sub > REG13_S1 + 0x1E {
+                    add_calc2(&mut self.demo_param, REG13_F1 + 1.0, 1.0, REG13_F2 + 0.015);
+                }
+                if self.demo_sub >= REG13_S6 + 0xBE {
+                    if self.demo_sub == REG13_S6 + 0xD2 {
+                        out.bgm(STRM_DK_START);
+                    }
+                    self.shake = REG13_F18 + 1.5;
+                    out.se(SE_ATM_MJT_JINARI);
+                    add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
+                    self.shutter_roll += 0.003 + REG0_F8;
+                    rumble = true;
+                }
+                if self.demo_sub > REG13_S2 + 0xFA {
+                    self.demo_state = 0xC;
+                    self.cam_eye = Vec3::new(2195.0, 10007.0, -4079.0);
+                    self.cam_look = Vec3::new(1816.0, 10051.0, -4137.0);
+                    self.demo_param = 0.0;
+                    self.demo_sub = 0;
+                }
+            }
+            0xC => {
+                add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
+                rumble = true;
+                self.shutter_roll += REG0_F8 + 0.003;
+                if self.demo_sub < REG13_S6 + 0x9B {
+                    self.shake = REG13_F5 + 5.0;
+                    out.se(SE_ATM_MJT_JINARI);
+                }
+                if self.demo_sub == REG13_S6 + 0x96 {
+                    self.demo_flag = 1;
+                }
+                if self.demo_sub == REG13_S7 + 0xA0 {
+                    self.demo_sub = 0;
+                    self.demo_state = 0xD;
+                }
+                add_calc2(&mut self.cam_eye.x, 2682.0, 0.05, self.demo_param * 4.87);
+                add_calc2(&mut self.cam_eye.y, 9904.0, 0.05, self.demo_param * 1.03);
+                add_calc2(&mut self.cam_eye.z, -3600.0, 0.05, self.demo_param * 4.79);
+                add_calc2(&mut self.cam_look.x, 2308.0, 0.05, self.demo_param * 4.92);
+                add_calc2(&mut self.cam_look.y, 9961.0, 0.05, self.demo_param * 0.9);
+                add_calc2(&mut self.cam_look.z, -3524.0, 0.05, self.demo_param * 6.1299998);
+                add_calc2(&mut self.demo_param, REG13_F3 + 1.5, 1.0, REG13_F4 + 0.02);
+            }
+            0xD => {
+                if self.demo_sub < REG0_S3 + 0x64 {
+                    add_calc2(&mut self.fov, 25.0, 0.1, 0.5);
+                } else {
+                    add_calc2(&mut self.fov, 55.0, 0.2, 3.0);
+                }
+                if self.demo_sub == REG13_S8 + 0x37 {
+                    self.demo_flag = 1;
+                }
+                add_calc2(&mut self.cam_eye.x, self.head.pos.x, 0.1, 50.0);
+                add_calc2(
+                    &mut self.cam_eye.y,
+                    (self.head.pos.y - 200.0) + REG13_F11,
+                    0.1,
+                    50.0,
+                );
+                add_calc2(&mut self.cam_eye.z, self.head.pos.z, 0.1, 50.0);
+                if self.morph.is_stop() {
+                    self.anm_init(BCK_FLY3, 1.0, EMODE_LOOP, 1.0, 0xD, 0);
+                }
+                if self.demo_sub == REG13_S8 + 0xF0 {
+                    self.demo_sub = 0;
+                    self.demo_state = 0xE;
+                }
+                rumble = true;
+            }
+            0xE => {
+                self.cam_eye = Vec3::new(3304.0, 10983.0, -3644.0);
+                self.cam_look = Vec3::new(2841.0, 13058.0, -3272.0);
+                self.demo_state = 0xF;
+                self.demo_sub = 0;
+                self.demo_param = 0.0;
+                self.shutter_ring = REG13_F17 - 100.0;
+                self.shutter_roll = 0.0;
+                rumble = true;
+            }
+            0xF | 0x10 => {
+                add_calc0(&mut self.shutter_ring, 1.0, REG6_F11 + 1.5);
+                if self.shutter_ring.abs() < 1.0 {
+                    add_calc0(&mut self.shutter_shift, 1.0, REG6_F12 + 1.0);
+                    if self.demo_state == 0xF {
+                        self.flags_on(out);
+                        self.stage_boss_demo = true;
+                        self.demo_state = 0x10;
+                    }
+                }
+                add_calc2(&mut self.cam_look.x, 3152.0, 0.05, self.demo_param * 3.11);
+                add_calc2(&mut self.cam_look.z, -3070.0, 0.05, self.demo_param * 2.02);
+                add_calc2(&mut self.demo_param, REG13_F3 + 1.2, 1.0, REG13_F4 + 0.015);
+                if self.demo_sub == 0xA0 {
+                    self.demo_state = 0x96;
+                    self.action = Action::Fly;
+                    self.fly_ca = -1;
+                    self.state = 0;
+                    self.gravity = REG0_F4 + GRAVITY;
+                    self.battle_mode = 0;
+                    out.bgm(BGM_DK_BATTLE);
+                }
+            }
+            0x32 => {
+                if !self.demo_gate() {
+                    run = false;
+                } else {
+                    self.demo_state += 1;
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 60.0;
+                    self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
+                    self.cam_eye = actor.eye;
+                    self.cam_eye.y -= REG0_F7 + 100.0;
+                }
+            }
+            0x33 => {
+                add_calc2(&mut self.cam_eye.x, actor.eye.x, 0.1, self.demo_param * 100.0);
+                add_calc2(
+                    &mut self.cam_eye.y,
+                    actor.eye.y - (REG0_F7 + 100.0),
+                    0.3,
+                    self.demo_param * 200.0,
+                );
+                add_calc2(&mut self.cam_eye.z, actor.eye.z, 0.1, self.demo_param * 100.0);
+                if self.action == Action::Start {
+                    self.demo_state += 1;
+                    self.demo_sub = 0;
+                }
+                add_calc2(&mut self.demo_param, 1.0, 1.0, REG0_F4 + 0.02);
+            }
+            0x34 => {
+                if self.demo_sub >= 0x64 {
+                    self.demo_state = 0x96;
+                }
+            }
+            0x64 => {
+                if !self.demo_gate() {
+                    run = false;
+                } else {
+                    self.demo_state += 1;
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 45.0;
+                    self.cam_look = Vec3::new(
+                        env.player_pos.x,
+                        env.player_pos.y,
+                        env.player_pos.z,
+                    );
+                    self.cam_yaw = actor.angle[ANGLE_Y].wrapping_add(self.rnd_fx(4000.0) as i16);
+                    self.demo_radius = 1500.0;
+                }
+            }
+            0x65 => {
+                if self.demo_sub == 0x3C {
+                    out.bgm(STRM_DK_CLEAR);
+                }
+                self.cam_eye = self.head.pos;
+                self.cam_eye.y += REG6_F16 - 100.0;
+                let look = turned(self.cam_yaw, [0.0, 0.0, self.demo_radius + REG6_F17]);
+                let look = look + self.cam_eye;
+                add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
+                if self.flown_high == 0 {
+                    self.cam_look.y = REG6_F18 + 9950.0;
+                } else {
+                    add_calc2(&mut self.cam_look.y, look.y + REG6_F13, 0.1, 100.0);
+                }
+                add_calc2(&mut self.cam_look.z, look.z, 0.1, 100.0);
+            }
+            0x6E => {
+                self.fov = 40.0;
+                self.cam_look = Vec3::new(-25267.0, -948.0, 22916.0);
+                self.demo_state = 0x6F;
+            }
+            0x6F => {
+                self.cam_eye.x = AREA_X;
+                if actor.pos.y < 30000.0 {
+                    self.cam_eye.y = (actor.pos.y - 6000.0) + REG6_F19;
+                }
+                self.cam_eye.z = AREA_Z;
+                add_calc2(&mut self.cam_look.z, 30449.0, 0.02, self.demo_param * 75.33);
+                if self.demo_sub > REG6_S2 {
+                    add_calc2(&mut self.demo_param, REG6_S1 + 1.5, 1.0, REG6_F2 + 0.02);
+                }
+            }
+            0x70 => {
+                self.cam_eye = self.target;
+                self.demo_state += 1;
+                self.demo_sub = 0;
+                self.fov = 45.0;
+            }
+            0x71 => {
+                if self.demo_sub == 0x78 {
+                    let mut at = Vec3::new(AREA_X, 10300.0, AREA_Z);
+                    at.y = 10300.0;
+                    self.eff_hane_set(at, 0x27, -1);
+                }
+                if self.demo_sub > REG12_S7 + 0x43 {
+                    add_calc2(&mut self.cam_eye.y, REG12_F4 + 9900.0, 0.5, REG12_F6 + 200.0);
+                }
+                self.cam_look = self.target;
+                self.cam_look.y = REG12_F5 + 10000.0;
+                self.cam_look.x += REG12_F7 + 500.0;
+            }
+            0x72 => {
+                self.cam_eye = Vec3::new(4386.0, 10020.0, -4368.0);
+                self.cam_look = Vec3::new(4144.0, 10061.0, -4131.0);
+                if self.demo_sub == 10 {
+                    self.stage_boss_enemy = true;
+                    out.se(SE_OBJ_TOGE_IN);
+                }
+                if self.demo_sub == 0x28 {
+                    self.demo_state = 0x96;
+                }
+            }
+            0x96 => {
+                self.demo_state = 0;
+            }
+            _ => {}
+        }
+        if self.demo_state != 0 && run {
+            let fx = self.shake * sin_s(self.demo_count.wrapping_mul(0x3300));
+            let fy = self.shake * cos_s(self.demo_count.wrapping_mul(0x3000));
+            let fz = self.shake * sin_s(self.demo_count.wrapping_mul(0x3700));
+            self.cam_look += Vec3::new(fx, fy, fz);
+            self.cam_eye += Vec3::new(fx, fy, fz);
+            add_calc0(&mut self.shake, 1.0, REG0_F16 + 1.0);
+            self.demo_sub += 1;
+            self.demo_count += 1;
+        }
+        if rumble {
+            out.se(SE_ATM_MJT_SHUTTER);
+        }
+    }
+
+    fn flags_on(&mut self, out: &mut Sink<'_>) {
+        out.flags.set(TMP_BIT_SHUTTER);
+        out.se(SE_ATM_MJT_SHUTTER_END);
+    }
+
+    fn beak_step(&mut self, actor: &Actor, env: &Env<'_>) {
+        let yaw = -actor.shape_angle[ANGLE_Y];
+        let swing = self.head.pos - self.head_prev;
+        let rot = turned(yaw, swing);
+        let mut angle = (rot.z * (REG8_F15 + BEAK_SWING)) as i16;
+        if angle > 8000 {
+            angle = 8000;
+        } else if angle < -8000 {
+            angle = -8000;
+        }
+        let wobble = ((REG14_F5 + BEAK_WOBBLE) * self.beak_sway_calc
+            * sin_s(self.beak_tick.wrapping_mul(REG8_S4 + 2500)))
+            as i16;
+        let rate = (self.beak_calc * 4000.0) as i16;
+        add_calc2(&mut self.beak_calc, 1.0, 1.0, REG14_F4 + 0.01);
+        if self.demo_sub > REG14_S9 + 0x41 {
+            add_calc2(&mut self.beak_sway_calc, 1.0, 1.0, REG14_F2 + 0.4);
+        }
+        add_calc_angle_s2(
+            &mut self.tosaka_y1,
+            angle.wrapping_add(wobble).wrapping_add(4500),
+            TURN_DIV_HEAD,
+            rate,
+        );
+        add_calc_angle_s2(&mut self.tosaka_z1, 4, 10, rate);
+        self.beak_tick += 1;
+        if self.beak_timer != 0 {
+            self.beak_amp = 0;
+            self.beak_sway = 0;
+            let reach = turned(self.beak_aim, [0.0, 0.0, self.beak_timer as f32 * (REG0_F7 + 500.0)]);
+            let wave = sin_s(self.frame_count.wrapping_mul(REG0_S4 + 7000));
+            self.tosaka_y4 = (reach.z * wave) as i16;
+            self.tosaka_z4 = (reach.x * wave) as i16;
+        }
+        if 3000 < self.beak_amp {
+            self.beak_tick += 1;
+        }
+        let sway = self.beak_sway;
+        self.tosaka_y2 = (sway as f32 * sin_s(self.beak_tick.wrapping_mul(1500))) as i16;
+        self.tosaka_z2 = (sway as f32 * cos_s(self.beak_tick.wrapping_mul(1200))) as i16;
+        self.tosaka_y3 =
+            (sway as f32 * sin_s(self.beak_tick.wrapping_mul(1500).wrapping_add(0x4000))) as i16;
+        self.tosaka_z3 =
+            (sway as f32 * cos_s(self.beak_tick.wrapping_mul(1200).wrapping_add(0x4000))) as i16;
+        add_calc_angle_s2(&mut self.beak_sway, self.beak_amp, 2, 500);
+        self.beak_amp = 1500;
+        let _ = env;
+    }
+
+    fn attention_step(&mut self, actor: &mut Actor, env: &Env<'_>) {
+        self.eye = Self::at_pos(actor.shape_angle[ANGLE_Y], JOINT_ATAMA1)
+            + turned(
+                actor.shape_angle[ANGLE_Y],
+                [REG0_F10 + 120.0, 0.0, REG0_F12 + EYE_OFFSET[2]],
+            );
+        let angle = if self.track_player {
+            let delta = env.player_pos - actor.pos;
+            let mut turn = bearing(Vec3::ZERO, delta).wrapping_sub(actor.shape_angle[ANGLE_Y]);
+            if turn > TRACK_LIMIT {
+                turn = TRACK_LIMIT;
+            } else if turn < -TRACK_LIMIT {
+                turn = -TRACK_LIMIT;
+            }
+            turn
+        } else {
+            0
+        };
+        self.track_player = false;
+        add_calc_angle_s2(&mut self.head_pitch, angle, TURN_DIV_HEAD, 0x800);
+        add_calc_angle_s2(&mut self.head_yaw, 0, TURN_DIV_NECK, 0x200);
+    }
+
+    fn hurt_player(&self, env: &Env<'_>, out: &mut Sink<'_>) {
+        if self.at_mode == 1
+            && touches(self.beak, self.beak_radius, env.player_pos, PLAYER_BODY_RADIUS)
+        {
+            out.health.damage(AT_POWER_HEAD);
+        }
+        for index in 0..FOOT_COUNT {
+            if self.foot_at[index]
+                && touches(self.foot[index], self.foot_radius[index], env.player_pos, PLAYER_BODY_RADIUS)
+            {
+                out.health.damage(AT_POWER_FOOT);
+            }
+        }
+    }
+
+    pub fn execute(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        self.smoke_pos = actor.pos;
+        self.smoke_pos.y = AREA_Y;
+        self.frame_count = self.frame_count.wrapping_add(1);
+        for slot in 0..TIMER_COUNT {
+            timer(&mut self.timers[slot]);
+        }
+        if self.hit_stop != 0 {
+            self.hit_stop -= 1;
+        }
+        if self.mask_timer != 0 {
+            self.mask_timer -= 1;
+        }
+        if self.beak_timer != 0 {
+            self.beak_timer -= 1;
+        }
+        if !HIO_M005 {
+            self.morph.play();
+            self.move_actor(actor, env, out);
+            if self.action != Action::Start && self.action.code() < ACTION_LIMIT {
+                let from = actor.pos;
+                let (next, wall) = env.corrected(from, actor.pos);
+                actor.pos = next;
+                let _ = wall;
+                if env.landed(actor.pos) {
+                    self.speed.y = -10.0;
+                    self.ground_hit = 3;
+                }
+                if self.ground_hit != 0 {
+                    self.ground_hit -= 1;
+                }
+            }
+            self.damage_check(actor, env, out);
+        }
+        self.shape_angle[ANGLE_X] = 0;
+        self.col_set(actor);
+        if self.beak_free != 0 {
+            self.beak_step(actor, env);
+        } else {
+            self.beak_timer = 0;
+            self.beak_amp = 0;
+            self.beak_sway = 0;
+        }
+        self.shape_angle[ANGLE_Y] = actor.angle[ANGLE_Y];
+        self.shape_angle[ANGLE_Z] = actor.angle[ANGLE_Z];
+        self.attention_step(actor, env);
+        self.hurt_player(env, out);
+        self.kamen_break_move(env, out);
+        self.my_effect_move(env);
+        self.obj_move();
+        self.demo_camera(actor, env, out);
+        self.kankyo_cont(actor);
+        for slot in 0..SMOKE_COUNT {
+            timer(&mut self.smoke_timer[slot]);
+        }
+        if self.rise_smoke != 0 {
+            self.rise_smoke -= 1;
+        }
+        if self.nail_live != 0 {
+            out.se(SE_CM_DK_NAIL);
+            if self.foot[0].y <= 9810.0 || self.at_mode == 0 {
+                self.nail_live = 0;
+            }
+        }
+        self.at_mode = 0;
+    }
+}

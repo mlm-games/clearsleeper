@@ -64,19 +64,19 @@ pub struct Names {
 
 impl Names {
     fn player(&self) -> &str {
-        self.slice(&self.player, self.player_len)
+        Self::slice(&self.player, self.player_len)
     }
 
     fn npc(&self) -> &str {
-        self.slice(&self.npc, self.npc_len)
+        Self::slice(&self.npc, self.npc_len)
     }
 
     fn item(&self) -> &str {
-        self.slice(&self.item, self.item_len)
+        Self::slice(&self.item, self.item_len)
     }
 
     fn password(&self) -> &str {
-        self.slice(&self.password, self.password_len)
+        Self::slice(&self.password, self.password_len)
     }
 
     fn slice(bytes: &[u8; NAME_MAX], len: usize) -> &str {
