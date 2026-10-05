@@ -7,7 +7,7 @@ use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Collect, StoryBits};
 use super::frame::CurrentFrame;
-use super::inventory::Equipped;
+use super::inventory::{Equipped, check_get_item};
 use super::player::Player;
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 use crate::assets::MsgArchives;
@@ -34,6 +34,7 @@ pub const EVENT_ZELDA_FLY: usize = 0;
 pub const EVENT_OMEDETO: usize = 1;
 pub const EVENT_GET_TELESCOPE: usize = 2;
 pub const EVENT_ETALK: usize = 3;
+pub const EVENT_ETALK_NAME: &str = "eTalk";
 pub const EVENT_ID_COUNT: usize = 4;
 
 const _: () = assert!(EVENT_NAMES.len() == EVENT_ETALK + 1);
@@ -219,6 +220,11 @@ pub const TURN_SCALE: i16 = 4;
 pub const TURN_MAX_STEP: i16 = 0x800;
 pub const TURN_MIN_STEP: i16 = 0x80;
 
+pub const JNT_SCALE: i32 = 4;
+pub const JNT_MIN_STEP: i32 = 4;
+pub const JNT_SCALE_I16: i16 = 4;
+pub const JNT_TURN_MIN_STEP: i16 = 0x100;
+
 pub const SCOPE_TYPE_TELESCOPE: u8 = 1;
 pub const CAMERA_FLAG_FOCUS: u32 = 0x0008_0000;
 pub const PLAYER_RESET_FLAG: u32 = 0xCC70;
@@ -251,6 +257,26 @@ pub const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
 pub const RND_SEED: i32 = 100;
 
 pub const ANM_NUM_ROWS: usize = 14;
+
+pub const BCK_FRAME_MAX: [f32; ANM_NUM_ROWS] = [
+    49.0,
+    58.0,
+    39.0,
+    36.0,
+    39.0,
+    35.0,
+    59.0,
+    29.0,
+    35.0,
+    35.0,
+    44.0,
+    49.0,
+    43.0,
+    129.0,
+];
+
+pub const ATR_SEVEN_FRAME: f32 = 23.0;
+pub const EVT_CND_CANTALK: u16 = 0x0001;
 pub const ANM_STT_ROWS: usize = 6;
 pub const ANM_ATR_ROWS: usize = 17;
 pub const BTK_OF_BTP_ROWS: usize = 11;
@@ -566,6 +592,53 @@ pub enum Proc {
     Demo,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Cyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub at_set: bool,
+    pub at_power: u8,
+    pub tg_set: bool,
+    pub tg_enemy: bool,
+    pub co_set: bool,
+    pub co_player: bool,
+    pub co_all: bool,
+}
+
+impl Cyl {
+    const SRC: Cyl = Cyl {
+        centre: Vec3::ZERO,
+        radius: 0.0,
+        height: 0.0,
+        at_set: false,
+        at_power: 0,
+        tg_set: true,
+        tg_enemy: true,
+        co_set: true,
+        co_player: true,
+        co_all: true,
+    };
+
+    pub fn touches(&self, at: Vec3, reach: f32) -> bool {
+        let dx = self.centre.x - at.x;
+        let dz = self.centre.z - at.z;
+        let flat = (dx * dx + dz * dz).sqrt();
+        if flat >= self.radius + reach {
+            return false;
+        }
+        let bottom = self.centre.y;
+        let top = self.centre.y + self.height;
+        let lo = at.y - reach;
+        let hi = at.y + reach;
+        hi >= bottom && lo <= top
+    }
+
+    pub fn blocks(&self, at: Vec3) -> bool {
+        self.co_set && self.co_player && self.co_all && self.touches(at, 0.0)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct JntParam {
     pub max_backbone_x: i16,
@@ -590,6 +663,10 @@ pub struct Jnt {
     pub backbone_lock: bool,
     pub head_lock: bool,
     pub trn: bool,
+    pub f2c: i16,
+    pub f2e: i16,
+    pub f30: i16,
+    pub f32: i16,
 }
 
 impl Aryll {
@@ -629,6 +706,216 @@ impl Jnt {
     pub fn set_trn(&mut self) {
         self.trn = true;
     }
+
+    pub fn head_angle(&self, axis: usize) -> i16 {
+        if axis == 0 { self.head_x } else { self.head_y }
+    }
+
+    pub fn backbone_angle(&self, axis: usize) -> i16 {
+        if axis == 0 { self.backbone_x } else { self.backbone_y }
+    }
+
+    pub fn set_head_angle(&mut self, axis: usize, value: i16) {
+        if axis == 0 {
+            self.head_x = value;
+        } else {
+            self.head_y = value;
+        }
+    }
+
+    pub fn set_backbone_angle(&mut self, axis: usize, value: i16) {
+        if axis == 0 {
+            self.backbone_x = value;
+        } else {
+            self.backbone_y = value;
+        }
+    }
+
+    fn max_angle(&self, row: usize, axis: usize) -> i16 {
+        if row == 0 {
+            if axis == 0 {
+                self.param.max_head_x
+            } else {
+                self.param.max_head_y
+            }
+        } else if axis == 0 {
+            self.param.max_backbone_x
+        } else {
+            self.param.max_backbone_y
+        }
+    }
+
+    fn min_angle(&self, row: usize, axis: usize) -> i16 {
+        if row == 0 {
+            if axis == 0 {
+                self.param.min_head_x
+            } else {
+                self.param.min_head_y
+            }
+        } else if axis == 0 {
+            self.param.min_backbone_x
+        } else {
+            self.param.min_backbone_y
+        }
+    }
+
+    pub fn chk_lim(&self, angle: i16, row: usize, axis: usize) -> i16 {
+        let mut angle = angle;
+        let max = self.max_angle(row, axis);
+        if angle > max {
+            angle = max;
+        }
+        let min = self.min_angle(row, axis);
+        if angle < min {
+            angle = min;
+        }
+        angle
+    }
+
+    pub fn turn_from_backbone2head(
+        &self,
+        delta: i16,
+        head: &mut i16,
+        backbone: &mut i16,
+        forward: bool,
+    ) {
+        *backbone = 0;
+        if !self.backbone_lock {
+            *backbone = self.chk_lim(delta, 1, 1);
+            if forward && self.f32 != 0 && *backbone < 0 {
+                *backbone = 0;
+            }
+        }
+        *head = 0;
+        if !self.head_lock {
+            *head = delta.wrapping_sub(*backbone);
+            *head = self.chk_lim(*head, 0, 1);
+        }
+    }
+
+    pub fn turn_from_head2backbone(&self, delta: i16, head: &mut i16, backbone: &mut i16) {
+        *head = 0;
+        if !self.head_lock {
+            *head = delta.wrapping_sub(self.f32);
+            *head = self.chk_lim(*head, 0, 1);
+        }
+        *backbone = 0;
+        if !self.backbone_lock {
+            *backbone = delta.wrapping_sub(*head);
+            *backbone = self.chk_lim(*backbone, 1, 1);
+        }
+    }
+
+    pub fn follow_current(angle: &mut i16, diff: i16) -> i16 {
+        let before = *angle;
+        *angle = angle.wrapping_sub(diff);
+        let mut carry = 0;
+        if (before > 0 && *angle < 0) || (before < 0 && *angle > 0) {
+            carry = angle.wrapping_neg();
+            *angle = 0;
+        }
+        carry
+    }
+
+    pub fn look_at_target_2(
+        &mut self,
+        actor_yaw: &mut i16,
+        target: Option<Vec3>,
+        src: Vec3,
+        default_y: i16,
+        max_vel: i16,
+        no_follow: bool,
+    ) {
+        let (target_y, target_x) = match target {
+            Some(point) => (target_angle_y(src, point), target_angle_x(src, point)),
+            None => (default_y, 0),
+        };
+        let delta_y = target_y.wrapping_sub(*actor_yaw);
+        let mut head = 0_i16;
+        let mut backbone = 0_i16;
+        if self.f32 >= 0 {
+            if delta_y >= self.f32 || self.f32 == 0 {
+                self.turn_from_head2backbone(delta_y, &mut head, &mut backbone);
+            } else {
+                let forward = self.f32 >= 0;
+                self.turn_from_backbone2head(delta_y, &mut head, &mut backbone, forward);
+            }
+        } else if delta_y <= self.f32 || self.f32 == 0 {
+            self.turn_from_head2backbone(delta_y, &mut head, &mut backbone);
+        } else {
+            let forward = self.f32 >= 0;
+            self.turn_from_backbone2head(delta_y, &mut head, &mut backbone, forward);
+        }
+        self.f2e = head;
+        self.f32 = backbone;
+        let max_step = i32::from(self.param.max_turn_step);
+        let head_target = i32::from(self.f2e);
+        let backbone_target = i32::from(self.f32);
+        let head_now = add_calc_angle_l(
+            i32::from(self.head_y),
+            head_target,
+            JNT_SCALE,
+            max_step,
+            JNT_MIN_STEP,
+        );
+        let backbone_now = add_calc_angle_l(
+            i32::from(self.backbone_y),
+            backbone_target,
+            JNT_SCALE,
+            max_step,
+            JNT_MIN_STEP,
+        );
+        self.head_y = head_now as i16;
+        self.backbone_y = backbone_now as i16;
+        if self.trn && !no_follow {
+            let before = *actor_yaw;
+            *actor_yaw = add_calc_angle_s(
+                *actor_yaw,
+                target_y,
+                JNT_SCALE_I16,
+                max_vel,
+                JNT_TURN_MIN_STEP,
+            );
+            let mut diff = actor_yaw.wrapping_sub(before);
+            self.trn = diff != 0;
+            if !self.backbone_lock {
+                diff = Self::follow_current(&mut self.backbone_y, diff);
+            }
+            if !self.head_lock {
+                Self::follow_current(&mut self.head_y, diff);
+            }
+        } else {
+            let reach = self.f2e.wrapping_add(self.f32);
+            if delta_y >= 0 {
+                self.trn = delta_y > reach;
+            } else {
+                self.trn = delta_y < reach;
+            }
+        }
+        let temp5 = self.chk_lim(target_x, 0, 0);
+        let residual = target_x.wrapping_sub(temp5);
+        let temp9 = self.chk_lim(residual, 1, 0);
+        self.f2c = temp5;
+        self.f30 = temp9;
+        let head_x_target = i32::from(self.f2c);
+        let backbone_x_target = i32::from(self.f30);
+        let head_x_now = add_calc_angle_l(
+            i32::from(self.head_x),
+            head_x_target,
+            JNT_SCALE,
+            max_step,
+            JNT_MIN_STEP,
+        );
+        let backbone_x_now = add_calc_angle_l(
+            i32::from(self.backbone_x),
+            backbone_x_target,
+            JNT_SCALE,
+            max_step,
+            JNT_MIN_STEP,
+        );
+        self.head_x = head_x_now as i16;
+        self.backbone_x = backbone_x_now as i16;
+    }
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -641,6 +928,7 @@ pub struct Aryll {
     pub entered: bool,
     pub event_ids: [i16; EVENT_ID_COUNT],
     pub event_index: i16,
+    pub event_id: i16,
     pub staff_idx: usize,
     pub order: i8,
     pub stt: i8,
@@ -687,9 +975,16 @@ pub struct Aryll {
     pub joint_head_y: i16,
     pub joint_backbone_y: i16,
     pub actor_angle_y: i16,
+    pub live_angle_y: i16,
     pub set_eye_pos: bool,
     pub morf_stopped: bool,
     pub prev_morf_frame: f32,
+    pub morf_cur: f32,
+    pub morf_max: f32,
+    pub morf_speed: f32,
+    pub morf_loop: bool,
+    pub event_conditions: u16,
+    pub collider: Cyl,
     pub item_no: u8,
     pub msg_no: u32,
     pub msg_bs_id: u32,
@@ -734,8 +1029,9 @@ impl Aryll {
             proc_state: Proc::None,
             stage: STAGE_INIT,
             entered: false,
-            event_ids: [NO_INDEX; EVENT_ID_COUNT],
-            event_index: NO_INDEX,
+            event_ids: [0; EVENT_ID_COUNT],
+            event_index: 0,
+            event_id: 0,
             staff_idx: NO_STAFF,
             order: ORDER_NONE,
             stt: 0,
@@ -757,10 +1053,10 @@ impl Aryll {
             attention: false,
             anm_flag: 0,
             atr_ready: 0,
-            atr: ATR_NONE,
-            mesg_anime_tag: MESG_TAG_NONE,
-            btp: -1,
-            btk: -1,
+            atr: 0,
+            mesg_anime_tag: 0,
+            btp: 0,
+            btk: 0,
             bck: BCKNUM_NULL,
             btp_frame: 0,
             btk_frame: 0,
@@ -782,9 +1078,16 @@ impl Aryll {
             joint_head_y: 0,
             joint_backbone_y: 0,
             actor_angle_y: 0,
+            live_angle_y: 0,
             set_eye_pos: false,
             morf_stopped: false,
             prev_morf_frame: 0.0,
+            morf_cur: 0.0,
+            morf_max: 0.0,
+            morf_speed: 0.0,
+            morf_loop: false,
+            event_conditions: 0,
+            collider: Cyl::SRC,
             item_no: ITEM_NONE,
             msg_no: 0,
             msg_bs_id: FPC_M_ERROR_PROCESS_ID,
@@ -822,7 +1125,14 @@ impl Aryll {
     }
 
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
-        (CULL_MIN, CULL_MAX)
+        (
+            CULL_MIN,
+            [
+                CULL_MAX[0].max(self.collider.radius),
+                CULL_MAX[1].max(self.collider.height),
+                CULL_MAX[2].max(self.collider.radius),
+            ],
+        )
     }
 
     pub fn drawn(&self) -> bool {
@@ -895,7 +1205,7 @@ impl Aryll {
         }
         self.angle = actor.angle;
         self.shape_angle = actor.angle;
-        self.play_animation(ctx.ground_hit, ctx.reverb);
+        self.play_animation(ctx.frame, ctx.ground_hit, ctx.reverb);
         self.set_attention(ctx.pos, true);
         true
     }
@@ -1295,6 +1605,17 @@ impl Aryll {
         self.morf_stopped = false;
         self.anm_flag = 0;
         self.prev_morf_frame = 0.0;
+        self.morf_cur = 0.0;
+        self.morf_speed = prm.speed;
+        self.morf_loop = prm.loop_mode == LOOP_LOOP;
+        self.morf_max = if self.morf_loop {
+            0.0
+        } else {
+            BCK_FRAME_MAX
+                .get(usize::try_from(prm.bck).unwrap_or(usize::MAX))
+                .copied()
+                .unwrap_or(0.0)
+        };
     }
 
     pub fn set_anm_num(&mut self, index: i32, modify: bool) {
@@ -1392,6 +1713,11 @@ impl Aryll {
                     self.ctrl_anm_atr_post();
                 }
             }
+            7 => {
+                if self.check_frame(ATR_SEVEN_FRAME) {
+                    self.telescope_scale = 1.0;
+                }
+            }
             _ => {}
         }
     }
@@ -1460,7 +1786,7 @@ impl Aryll {
         self.ctrl_anm_tag();
     }
 
-    pub fn play_animation(&mut self, ground_sound: bool, reverb: u8) {
+    pub fn play_animation(&mut self, frame: u32, ground_sound: bool, reverb: u8) {
         if self.btk == BTKNUM_DEFAULT && self.eye_live {
             self.set_eye_ctrl();
         } else {
@@ -1469,7 +1795,35 @@ impl Aryll {
         self.play_btp_anm();
         self.play_btk_anm();
         let _ = (ground_sound, reverb);
-        let _ = self.prev_morf_frame;
+        let _ = frame;
+        self.morf_play();
+    }
+
+    fn morf_play(&mut self) {
+        if self.bck == BCKNUM_NULL || self.morf_max == 0.0 {
+            self.morf_stopped = true;
+            return;
+        }
+        self.morf_cur += self.morf_speed;
+        if self.morf_cur >= self.morf_max {
+            if self.morf_loop {
+                self.morf_cur %= self.morf_max;
+                self.morf_stopped = false;
+            } else {
+                self.morf_cur = self.morf_max;
+                self.morf_stopped = true;
+            }
+        } else {
+            self.morf_stopped = false;
+        }
+        if self.morf_cur < self.prev_morf_frame {
+            self.morf_stopped = true;
+        }
+        self.prev_morf_frame = self.morf_cur;
+    }
+
+    pub fn check_frame(&self, frame: f32) -> bool {
+        self.morf_max > 0.0 && self.morf_cur >= frame
     }
 
     pub fn next_msg_status(&self, msg_no: &mut u32, clear_count: u8) -> u8 {
@@ -1534,6 +1888,12 @@ impl Aryll {
 
     pub fn event_order(&mut self, ctx: &mut Ctx) {
         if self.order == ORDER_SPEAK || self.order == ORDER_CANTALK {
+            self.event_conditions |= EVT_CND_CANTALK;
+            if self.order == ORDER_SPEAK {
+                if let Some(index) = ctx.list.event_index(EVENT_ETALK_NAME) {
+                    ctx.active.order(ctx.list, index, ctx.entity);
+                }
+            }
             return;
         }
         if self.order >= ORDER_EVENT {
@@ -1591,6 +1951,15 @@ impl Aryll {
                 self.m841 = false;
             }
         } else {
+            if !self.m841 {
+                self.clr_eye_ctrl();
+                self.m841 = true;
+                self.post_shaped = false;
+                self.jnt.head_y = 0;
+                self.jnt.head_x = 0;
+                self.jnt.backbone_y = 0;
+                self.jnt.backbone_x = 0;
+            }
             self.btp_frame = self.btp_frame.wrapping_add(1);
             if self.btp_frame >= self.btp_frame_max {
                 self.btp_frame = self.btp_frame_max;
@@ -1599,12 +1968,6 @@ impl Aryll {
             if self.btk_frame >= self.btk_frame_max {
                 self.btk_frame = self.btk_frame_max;
             }
-            self.m841 = true;
-            self.post_shaped = false;
-            self.jnt.head_x = 0;
-            self.jnt.head_y = 0;
-            self.jnt.backbone_x = 0;
-            self.jnt.backbone_y = 0;
         }
         self.m841
     }
@@ -1624,7 +1987,7 @@ impl Aryll {
     pub fn chk_parts_not_mov(&self) -> bool {
         self.joint_head_y != self.jnt.head_y
             || self.joint_backbone_y != self.jnt.backbone_y
-            || self.actor_angle_y != self.angle[1]
+            || self.actor_angle_y != self.live_angle_y
     }
 
     pub fn chk_attention(&self, ctx: &Ctx) -> bool {
@@ -1831,14 +2194,18 @@ fn cam_set_flag_focus(&mut self) {
                     Vec3::new(point.x, point.y + SCOPE_FOCUS_LIFT, point.z)
                 });
                 let hit = self.chk_telescope(target, ctx.fov_y, TELESCOPE_X_TOL, TELESCOPE_Z_MIN);
+                let mut broken = false;
                 if hit {
                     if scope_mesg_status == STATUS_CLOSE_WAIT {
                         ctx.text.force_send_on();
+                        broken = true;
                     } else if ctx.text.info.release_scope_mode() {
                         self.order = ORDER_EVENT;
                     }
                 }
-                self.scope_msg_no = MSG_BC3;
+                if !broken {
+                    self.scope_msg_no = MSG_BC3;
+                }
             }
             _ => {}
         }
@@ -2028,7 +2395,7 @@ fn cam_set_flag_focus(&mut self) {
         }
         match self.msg_no {
             MSG_BC2 | MSG_BC3 | MSG_BC5 => {}
-            MSG_BC4 | MSG_BC6 => self.event_index = NO_INDEX,
+            MSG_BC4 | MSG_BC6 => self.event_id = NO_INDEX,
             _ => {}
         }
         self.search_actor_kamome_clr_nostop_demo();
@@ -2072,36 +2439,54 @@ fn cam_set_flag_focus(&mut self) {
         status
     }
 
-    pub fn look_back(&mut self, actor: &Actor, ctx: &Ctx) {
+    pub fn look_back(&mut self, actor: &mut Actor, ctx: &Ctx) {
         self.joint_head_y = self.jnt.head_y;
         self.joint_backbone_y = self.jnt.backbone_y;
         self.actor_angle_y = actor.angle[1];
         self.look_origin = Vec3::new(ctx.pos.x, self.eye_pos.y, ctx.pos.z);
-        let mut player_eye_pos = Vec3::ZERO;
-        let mut player_eye_pos_p: Option<Vec3> = None;
-        self.look_yaw = actor.angle[1];
+        let player_eye_pos_p: Option<Vec3>;
+        let mut target_y = actor.angle[1];
+        let no_follow = self.m840;
         match self.look_mode {
             LOOK_PLAYER => {
                 self.player_eye = player_eye_pos_of(ctx, HIO_PLAYER_EYE_OFFSET_Y);
-                player_eye_pos = self.player_eye;
-                player_eye_pos_p = Some(player_eye_pos);
+                player_eye_pos_p = Some(self.player_eye);
                 self.eye_live = true;
             }
             LOOK_STORED => {
-                player_eye_pos = self.player_eye;
-                player_eye_pos_p = Some(player_eye_pos);
+                player_eye_pos_p = Some(self.player_eye);
             }
             LOOK_ANGLE => {
-                self.look_yaw = self.look_angle;
+                target_y = self.look_angle;
+                player_eye_pos_p = None;
                 self.eye_live = false;
             }
-            LOOK_ACTOR => {}
+            LOOK_ACTOR => {
+                match ctx.proc_eye {
+                    Some((pos, eye)) => {
+                        self.player_eye = Vec3::new(pos.x, eye.y, pos.z);
+                        player_eye_pos_p = Some(self.player_eye);
+                        self.eye_live = true;
+                    }
+                    None => player_eye_pos_p = None,
+                }
+            }
             _ => {
+                player_eye_pos_p = None;
                 self.eye_live = false;
             }
         }
         self.look_target = player_eye_pos_p;
-        let _turn_vel = self.jnt.param.turn_vel;
+        let turn_vel = self.jnt.param.turn_vel;
+        self.look_yaw = actor.angle[1];
+        self.jnt.look_at_target_2(
+            &mut actor.angle[1],
+            player_eye_pos_p,
+            self.look_origin,
+            target_y,
+            turn_vel,
+            no_follow,
+        );
         self.half_head_x = self.jnt.head_x / 2;
         self.half_head_y = self.jnt.head_y / 2;
         self.eye_yaw = self.half_head_x;
@@ -2119,7 +2504,7 @@ fn cam_set_flag_focus(&mut self) {
                 if ctx.stories.test(EVENT_BIT_2A80) {
                     if ctx.stories.test(EVENT_BIT_0001) {
                         self.set_stt(STT_POST);
-                    } else if ctx.equipped.item(TELESCOPE_SLOT) == ITEM_TELESCOPE {
+                    } else if check_get_item(ctx.equipped, ctx.collect, ITEM_TELESCOPE) {
                         self.home_angle[1] = actor.angle[1];
                         self.set_stt(STT_SCOPE);
                     } else {
@@ -2172,6 +2557,7 @@ fn cam_set_flag_focus(&mut self) {
             self.home_angle = actor.angle;
             self.primed = true;
         }
+        self.live_angle_y = actor.angle[1];
         if self.draw_skip && ctx.demo_actor.unwrap_or(0) == 0 {
             return;
         }
@@ -2188,7 +2574,7 @@ fn cam_set_flag_focus(&mut self) {
                 self.run_proc(actor, ctx);
             }
             self.look_back(actor, ctx);
-            self.play_animation(ctx.ground_hit, ctx.reverb);
+            self.play_animation(ctx.frame, ctx.ground_hit, ctx.reverb);
         } else {
             self.draw_skip = false;
         }
@@ -2198,10 +2584,26 @@ fn cam_set_flag_focus(&mut self) {
             self.shape_angle = actor.angle;
         }
         self.set_attention(ctx.pos, false);
+        self.collider.centre = ctx.pos;
         if !self.m841 {
             self.collision_radius = COLLISION_RADIUS;
             self.collision_height = COLLISION_HEIGHT;
+            self.collider.radius = COLLISION_RADIUS;
+            self.collider.height = COLLISION_HEIGHT;
+        } else {
+            self.collider.radius = 0.0;
+            self.collider.height = 0.0;
         }
+        self.collision_radius = self.collider.radius;
+        self.collision_height = self.collider.height;
+    }
+
+    pub fn collider(&self) -> Cyl {
+        self.collider
+    }
+
+    pub fn event_conditions(&self) -> u16 {
+        self.event_conditions
     }
 }
 
@@ -2307,6 +2709,7 @@ pub struct Ctx<'a> {
     pub project: Option<Vec3>,
     pub project_high: Option<Vec3>,
     pub fov_y: Option<f32>,
+    pub proc_eye: Option<(Vec3, Vec3)>,
     pub cut_action: Option<i8>,
     pub cut_advance: bool,
     pub cut_proc: bool,
@@ -2315,6 +2718,7 @@ pub struct Ctx<'a> {
     pub active: &'a mut ActiveEvent,
     pub events: &'a mut SimEvents,
     pub equipped: &'a Equipped,
+    pub collect: &'a Collect,
     pub text: &'a mut Text<'a>,
 }
 
@@ -2339,6 +2743,39 @@ fn rotated_y(offset: Vec3, pos: Vec3, yaw: i16) -> Vec3 {
 
 fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
     to_s16((to.x - from.x).atan2(to.z - from.z))
+}
+
+fn target_angle_x(from: Vec3, to: Vec3) -> i16 {
+    let delta = to - from;
+    to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
+}
+
+fn add_calc_angle_l(value: i32, target: i32, scale: i32, max_step: i32, min_step: i32) -> i32 {
+    let diff = target - value;
+    let mut value = value;
+    if value != target {
+        let mut step = diff / scale;
+        if step > min_step || step < -min_step {
+            if step > max_step {
+                step = max_step;
+            }
+            if step < -max_step {
+                step = -max_step;
+            }
+            value += step;
+        } else if diff >= 0 {
+            value += min_step;
+            if target - value <= 0 {
+                value = target;
+            }
+        } else {
+            value -= min_step;
+            if target - value >= 0 {
+                value = target;
+            }
+        }
+    }
+    value
 }
 
 fn table_of<T, const N: usize>(table: &[T; N], index: i32) -> Option<&T> {
@@ -2407,7 +2844,7 @@ pub struct Msg<'w, 's> {
 pub fn control(
     mut world: World,
     mut msg: Msg,
-    mut others: Query<(Entity, &Actor), Without<Aryll>>,
+    others: Query<(Entity, &Actor), Without<Aryll>>,
     mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
 ) {
     let player = msg.players.iter().next().copied();
@@ -2453,6 +2890,7 @@ pub fn control(
             project: None,
             project_high: None,
             fov_y: None,
+            proc_eye: None,
             cut_action: None,
             cut_advance: false,
             cut_proc: false,
@@ -2461,6 +2899,7 @@ pub fn control(
             active: &mut world.active,
             events: &mut world.events,
             equipped: &world.equipped,
+            collect: &world.collect,
             text: &mut text,
         };
         if !aryll.entered {
