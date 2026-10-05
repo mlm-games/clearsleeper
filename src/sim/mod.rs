@@ -1,6 +1,7 @@
 pub mod actor;
 pub mod ajav;
 pub mod area;
+pub mod amos_knight;
 pub mod armos;
 pub mod aryll;
 pub mod arrow;
@@ -74,6 +75,7 @@ pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
+pub mod morth;
 pub mod molgera;
 pub mod msg;
 pub mod nh;
@@ -107,13 +109,16 @@ pub mod stone;
 pub mod stream;
 pub mod swim;
 pub mod swhammer;
+pub mod swatk;
 pub mod swlight;
+pub mod switem;
 pub mod swtdoor;
 pub mod swpush;
 pub mod tag;
 pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
+pub mod tama;
 pub mod tbox;
 pub mod tingle;
 pub mod torch;
@@ -548,6 +553,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, magma::Magma::spawn())).id()
     } else if woodbox::is_wood_box(&source.name) {
         world.spawn((actor, woodbox::WoodBox::spawn())).id()
+    } else if tama::is_tama(&source.name) {
+        world.spawn((actor, tama::Tama::spawn())).id()
+    } else if swatk::is_swatk(&source.name) {
+        world.spawn((actor, swatk::Swatk::spawn(source.parameters))).id()
+    } else if switem::is_switem(&source.name) {
+        world.spawn((actor, switem::Switem::spawn(source.parameters))).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -688,7 +699,11 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
-                (ajav::control.in_set(WwSimSet::Execute),).chain(),
+                (
+                    bombflower::clear_blasts.in_set(WwSimSet::Execute),
+                    ajav::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
                 (
                     death::freeze.in_set(WwSimSet::Execute),
                     carry::control.in_set(WwSimSet::Execute),
@@ -807,6 +822,9 @@ pub fn build(
                     boko::control.in_set(WwSimSet::Execute),
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
+                    tama::control.in_set(WwSimSet::Execute),
+                    swatk::control.in_set(WwSimSet::Execute),
+                    switem::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
                     molgera::control.in_set(WwSimSet::Execute),
@@ -843,3 +861,5 @@ pub fn build(
             .chain(),
     );
 }
+
+pub mod auction;

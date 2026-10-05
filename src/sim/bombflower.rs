@@ -283,6 +283,10 @@ impl Blasts {
     }
 }
 
+pub fn clear_blasts(mut blasts: ResMut<Blasts>) {
+    blasts.list.clear();
+}
+
 pub fn blast(
     origin: Vec3,
     published: &mut ResMut<Blasts>,

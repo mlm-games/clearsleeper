@@ -271,7 +271,6 @@ pub fn control(
         }
     }
     let owner = players.iter().next().map(|player| player.pos);
-    blasts.list.clear();
     for &entity in &burst {
         let Ok((_, bomb)) = shots.bombs.get(entity) else {
             continue;
