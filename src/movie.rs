@@ -19,6 +19,7 @@ pub const RIGHT_PREVIOUS: usize = 0x4C;
 
 const DEFAULT_RATE: f32 = 29.97;
 const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
+const EOI: [u8; 2] = [0xFF, 0xD9];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MovieError;
@@ -104,6 +105,7 @@ impl Movie {
     pub fn frame(&mut self, index: usize) -> Result<(u32, u32, Vec<u8>), MovieError> {
         let at = self.frames.get(index).ok_or(MovieError)?.at;
         let span = self.read(at, self.frames[index].image.max(1))?;
+        let span = restuff(&span);
         let mut decoder = jpeg_decoder::Decoder::new(Cursor::new(&span));
         let pixels = decoder.decode().map_err(|_| MovieError)?;
         let info = decoder.info().ok_or(MovieError)?;
@@ -244,6 +246,48 @@ impl AudioBlock {
     }
 }
 
+fn restuff(frame: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(frame.len() + frame.len() / 16);
+    let mut at = 0;
+    while at < frame.len() {
+        if frame[at] != 0xFF {
+            break;
+        }
+        while at < frame.len() && frame[at] == 0xFF {
+            at += 1;
+        }
+        let Some(&marker) = frame.get(at) else {
+            break;
+        };
+        out.extend_from_slice(&[0xFF, marker]);
+        at += 1;
+        if marker == 0xD8 || marker == 0xD9 || (0xD0..=0xD7).contains(&marker) {
+            continue;
+        }
+        let Some(length) = frame.get(at..at + 2).map(|head| {
+            usize::from(u16::from_be_bytes([head[0], head[1]]))
+        }) else {
+            break;
+        };
+        let Some(segment) = frame.get(at..at + length) else {
+            break;
+        };
+        out.extend_from_slice(segment);
+        at += length;
+        if marker == 0xDA {
+            for byte in &frame[at..] {
+                out.push(*byte);
+                if *byte == 0xFF {
+                    out.push(0x00);
+                }
+            }
+            out.extend_from_slice(&EOI);
+            return out;
+        }
+    }
+    out
+}
+
 fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) -> Channel {
     Channel {
         filter: std::array::from_fn(|pair| {
@@ -306,13 +350,6 @@ fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<
     Ok(frames)
 }
 
-fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) -> Channel {
-    Channel {
-        filter: std::array::from_fn(|pair| [i16_at(span, filter + 4 * pair), i16_at(span, filter + 4 * pair + 2)]),
-        previous: [i16_at(span, previous), i16_at(span, previous + 2)],
-        encoded: span.get(from..to).unwrap_or_default().to_vec(),
-    }
-}
 
 pub fn title_path() -> PathBuf {
     crate::assets::asset_root().join("files/thpdemo/title_loop.thp")
