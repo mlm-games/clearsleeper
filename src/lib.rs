@@ -888,7 +888,7 @@ impl App {
                     (max.x - min.x) * 0.5,
                 )
             } else if entity.contains::<sim::dummy::Dummy>() {
-                let (min, max) = dummy::Dummy::spawn().cull();
+                let (min, max) = sim::dummy::Dummy::spawn().cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if let Some(door) = entity.get::<sim::swtdoor::Swtdoor>() {
