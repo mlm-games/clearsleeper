@@ -239,7 +239,7 @@ pub fn control(
 ) {
     let solid = collision.as_deref();
     let player = players.iter().next().copied();
-    for (actor, mut tbox) in &mut boxes {
+    for (mut actor, mut tbox) in &mut boxes {
         let actor = &mut *actor;
         let tbox = &mut *tbox;
         match tbox.action {

@@ -1044,8 +1044,8 @@ impl Msg1Box {
         }
         if let Some(size) = item_icon_size(self.msg_no) {
             let p = &mut self.m0624[8];
-            p.state.size = size;
-            p.state.pane_trans(0.0f32, 0.0f32);
+            p.size = size;
+            p.pane_trans(0.0, 0.0);
         }
         if self.mesg_entry.textbox_type == 1 {
             self.frame_white = pack_color(MSG1_TCOLOR_WHITE);
@@ -1355,14 +1355,14 @@ impl Msg1Box {
         let text = format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.m1164);
         let rub = "\u{1b}CC[FFFFFFFF]\u{1b}GM[0]";
         let sdw = "\u{1b}CC[000000FF]\u{1b}GM[0]";
-        self.output_text.clone_from(text);
-        self.output_rub.clone_from(rub);
-        self.output_text_sdw.clone_from(sdw);
-        self.output_rub_sdw.clone_from(sdw);
-        self.select_text.clone_from(text);
-        self.select_rub.clone_from(rub);
-        self.select_text_sdw.clone_from(sdw);
-        self.select_rub_sdw.clone_from(sdw);
+        self.output_text = text.into();
+        self.output_rub = rub.into();
+        self.output_text_sdw = sdw.into();
+        self.output_rub_sdw = sdw.into();
+        self.select_text = text.into();
+        self.select_rub = rub.into();
+        self.select_text_sdw = sdw.into();
+        self.select_rub_sdw = sdw.into();
         self.msg_data.string_color = self.m1164;
         self.out_font_hide();
         self.m1108 = 0;

@@ -2189,7 +2189,7 @@ impl Helmaroc {
                     out.stop_bgm();
                 } else {
                     out.stories.set(EVENT_BIT_LAST_DAMAGE);
-                    self.mask_damage += 1;
+                    self.mask_damage = self.mask_damage.wrapping_add(1);
                     if self.mask_damage == 4 {
                         self.mask_damage = 3;
                         self.action = Action::KamenDemo;
@@ -2214,7 +2214,7 @@ impl Helmaroc {
             if self.action == Action::KutiAttack && self.body.y < 10000.0 {
                 self.anm_init(BCK_DAMAGE1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                 self.state = 10;
-                self.beat_count += 1;
+                self.beat_count = self.beat_count.wrapping_add(1);
                 if i32::from(self.beat_count) >= 6 {
                     self.timers[2] = 10;
                     self.hit_stop = 0x14;
@@ -3083,7 +3083,7 @@ impl Helmaroc {
                     self.shake = REG13_F18 + 1.5;
                     out.se(SE_ATM_MJT_JINARI);
                     add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
-                    self.shutter_roll += 0.003 + REG0_F8;
+                    self.shutter_roll = self.shutter_roll + 0.003 + REG0_F8;
                     rumble = true;
                 }
                 if self.demo_sub > REG13_S2 + 0xFA {
@@ -3097,7 +3097,7 @@ impl Helmaroc {
             0xC => {
                 add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
                 rumble = true;
-                self.shutter_roll += REG0_F8 + 0.003;
+                self.shutter_roll = self.shutter_roll + REG0_F8 + 0.003;
                 if self.demo_sub < REG13_S6 + 0x9B {
                     self.shake = REG13_F5 + 5.0;
                     out.se(SE_ATM_MJT_JINARI);
@@ -3306,8 +3306,8 @@ impl Helmaroc {
             self.cam_look += Vec3::new(fx, fy, fz);
             self.cam_eye += Vec3::new(fx, fy, fz);
             add_calc0(&mut self.shake, 1.0, REG0_F16 + 1.0);
-            self.demo_sub += 1;
-            self.demo_count += 1;
+            self.demo_sub = self.demo_sub.wrapping_add(1);
+            self.demo_count = self.demo_count.wrapping_add(1);
         }
         if rumble {
             out.se(SE_ATM_MJT_SHUTTER);
@@ -3344,7 +3344,7 @@ impl Helmaroc {
             rate,
         );
         add_calc_angle_s2(&mut self.tosaka_z1, 4, 10, rate);
-        self.beak_tick += 1;
+        self.beak_tick = self.beak_tick.wrapping_add(1);
         if self.beak_timer != 0 {
             self.beak_amp = 0;
             self.beak_sway = 0;
@@ -3354,7 +3354,7 @@ impl Helmaroc {
             self.tosaka_z4 = (reach.x * wave) as i16;
         }
         if 3000 < self.beak_amp {
-            self.beak_tick += 1;
+            self.beak_tick = self.beak_tick.wrapping_add(1);
         }
         let sway = self.beak_sway;
         self.tosaka_y2 = (sway as f32 * sin_s(self.beak_tick.wrapping_mul(1500))) as i16;
@@ -3427,9 +3427,8 @@ impl Helmaroc {
             self.move_actor(actor, env, out);
             if self.action != Action::Start && self.action.code() < ACTION_LIMIT {
                 let from = actor.pos;
-                let (next, wall) = env.corrected(from, actor.pos);
+                let (next, _wall) = env.corrected(from, actor.pos);
                 actor.pos = next;
-                let _ = wall;
                 if env.landed(actor.pos) {
                     self.speed.y = -10.0;
                     self.ground_hit = 3;
@@ -3463,9 +3462,6 @@ impl Helmaroc {
         }
         if self.rise_smoke != 0 {
             self.rise_smoke -= 1;
-            if self.rise_smoke == 0 {
-                self.rise_smoke_used = true;
-            }
         }
         if self.nail_live != 0 {
             out.se(SE_CM_DK_NAIL);
@@ -3589,8 +3585,7 @@ pub fn control(
             .others
             .iter()
             .find(|(id, other)| {
-                *id != Entity::PLACEHOLDER
-                    && other.name == BDK_OBJ_ACTOR
+                other.name == BDK_OBJ_ACTOR
                     && (other.parameters & PRM_BYTE_MASK) != PRM_MASK_SET
                     && Some(*id) != boss.peck_done
             })

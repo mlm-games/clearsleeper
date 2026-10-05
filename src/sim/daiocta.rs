@@ -353,7 +353,7 @@ pub fn control(
     let sea = sea.as_deref();
     let player = players.iter().next().copied();
     let riding = ships.iter().any(|ship| ship.riding);
-    for (actor, octo) in &mut octos {
+    for (mut actor, mut octo) in &mut octos {
         let actor = &mut *actor;
         let octo = &mut *octo;
         if !octo.placed {
