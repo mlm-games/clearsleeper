@@ -17,6 +17,7 @@ pub mod msghio;
 pub mod msglayout;
 pub mod msgproc;
 pub mod msgtags;
+pub mod overlay;
 pub mod raster;
 
 pub const INF1: u32 = u32::from_be_bytes(*b"INF1");

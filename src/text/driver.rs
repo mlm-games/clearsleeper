@@ -253,8 +253,16 @@ impl TextDriver {
 }
 
 pub fn load_fonts(fonts: &mut FontBank) {
+    if fonts.len() >= FONT_SLOTS {
+        return;
+    }
+    let disc = crate::assets::load_font();
     while fonts.len() < FONT_SLOTS {
-        fonts.insert(ResFont::from_bytes(fontdata::ASCENT_FIX12));
+        let font = match &disc {
+            Some(bytes) => ResFont::from_bytes(bytes),
+            None => ResFont::from_bytes(fontdata::ASCENT_FIX12),
+        };
+        fonts.insert(font);
     }
 }
 
@@ -268,10 +276,13 @@ pub fn control(
     mut fonts: ResMut<FontBank>,
 ) {
     load_fonts(&mut fonts);
-    let pending = procs
-        .procs()
-        .last()
-        .map(|proc| (proc.pid, proc.name, proc.msg_no));
+    let pending = procs.procs().last().and_then(|proc| {
+        let msg_no = match &proc.append {
+            super::msgproc::MsgAppend::Class(params) => params.m_msg_no,
+            _ => proc.msg_no,
+        };
+        (msg_no != 0).then_some((proc.pid, proc.name, msg_no))
+    });
     let Some((pid, name, msg_no)) = pending else {
         driver.live = false;
         driver.phase1 = 0;

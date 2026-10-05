@@ -455,6 +455,11 @@ pub fn asset_root() -> PathBuf {
     AssetRoot::from_env().map_or_else(|_| PathBuf::new(), |root| root.root.clone())
 }
 
+pub fn load_font() -> Option<Vec<u8>> {
+    let root = asset_root();
+    std::fs::read(root.join(FONT_FILE)).ok()
+}
+
 pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
     match stage_from_assets(stage) {
         Ok(stage) => Some(stage),
@@ -575,6 +580,7 @@ impl crate::text::msgget::MsgArchive for MsgArchives {
     }
 }
 
+const FONT_FILE: &str = "files/res/Menu/kanfont_fix16.bfn";
 const MSG_ARCHIVE: &str = "files/res/Msg/bmgres.arc";
 const MSG_ARCHIVE_HYRULE: &str = "files/res/Msg/bmgresh.arc";
 const MSG_LINE_MAX: u16 = 4;
