@@ -493,6 +493,9 @@ impl Intro {
                 }
                 self.panes[D6].alpha = self.alpha;
             }
+            44 => {
+                self.done = true;
+            }
             _ => {}
         }
     }

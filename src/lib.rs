@@ -59,6 +59,7 @@ pub struct App {
     movie_sound: bool,
     movie_done: bool,
     pub intro: Option<IntroStage>,
+    pending_slot: Option<usize>,
 }
 
 pub struct IntroStage {
@@ -113,6 +114,7 @@ impl App {
             movie_sound: false,
             movie_done: false,
             intro: None,
+            pending_slot: None,
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -218,9 +220,7 @@ impl App {
 
     fn start_new(&mut self, slot: usize) {
         self.reset_world();
-        if let Err(e) = self.write_slot(slot) {
-            log::warn!("clearsleeper: slot {slot} write failed ({e})");
-        }
+        self.pending_slot = Some(slot);
         self.begin_intro();
         self.menu.screen = menus::Screen::Title;
     }
@@ -1482,6 +1482,9 @@ pub fn root_view(
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
     };
+    if app.intro.is_some() {
+        return intro_view(app, ctx);
+    }
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
 }
 
