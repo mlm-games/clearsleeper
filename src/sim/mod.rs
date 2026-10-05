@@ -775,15 +775,12 @@ pub fn build(
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
-                    swc00::control.in_set(WwSimSet::Execute),
-                    swtdoor::control.in_set(WwSimSet::Execute),
-
-                    tagkb::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                     kytag07::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
-
-
                 )
                     .chain(),
                 (
@@ -871,7 +868,10 @@ pub fn build(
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
                     tama::control.in_set(WwSimSet::Execute),
-                    swatk::control.in_set(WwSimSet::Execute),
+                    swatk::control.in_set(WwSimSet::Execute),                    swc00::control.in_set(WwSimSet::Execute),
+                    swtdoor::control.in_set(WwSimSet::Execute),
+                    tagkb::control.in_set(WwSimSet::Execute),
+
                     switem::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
