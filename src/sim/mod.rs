@@ -31,6 +31,7 @@ pub mod collision;
 pub mod combat;
 pub mod daiocta;
 pub mod damage;
+pub mod daynight;
 pub mod death;
 pub mod doguud;
 pub mod door;
@@ -825,6 +826,7 @@ pub fn build(
     sim.world.insert_resource(npc_p1::StageStart::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
+    daynight::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -897,6 +899,7 @@ pub fn build(
         (
             (
                 (
+                    daynight::control.in_set(WwSimSet::Execute),
                     player_status::control.in_set(WwSimSet::Execute),
                     bombflower::clear_blasts.in_set(WwSimSet::Execute),
                     ajav::control.in_set(WwSimSet::Execute),

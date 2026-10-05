@@ -79,6 +79,10 @@ pub struct SaveGame {
     pub held_item: u8,
     #[serde(default)]
     pub held_count: u8,
+    #[serde(default)]
+    pub time: f32,
+    #[serde(default)]
+    pub date: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -189,6 +193,7 @@ impl App {
         let story = world.resource::<StoryBits>().bytes.to_vec();
         let arrivals = world.resource::<Arrivals>().bytes();
         let held = *world.resource::<Held>();
+        let clock = world.get_resource::<crate::sim::daynight::DayNight>().copied().unwrap_or_default();
         let stage = self
             .stage
             .as_ref()
@@ -211,6 +216,8 @@ impl App {
             arrivals: arrivals.to_vec(),
             held_item: held.item,
             held_count: held.count,
+            time: clock.time,
+            date: clock.date,
         }
     }
 
@@ -240,6 +247,9 @@ impl App {
             held.item = save.held_item;
             held.count = save.held_count;
             held.pressed = false;
+            let mut clock = world.resource_mut::<crate::sim::daynight::DayNight>();
+            clock.time = save.time;
+            clock.date = save.date;
             *world.resource_mut::<Dialogue>() = Dialogue::default();
         }
         crate::sim::clear_shots(&mut self.sim.world);
