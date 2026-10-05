@@ -718,14 +718,14 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
 fn rnd_value(seed: &mut [i32; 3], min: i16, range: i16) -> i16 {
-    min.wrapping_add((rnd(seed) * f32::from(range)) as i16)
+    min.wrapping_add((rnd(seed) * (range) as f32) as i16)
 }
 
 fn bottle_flag(item: u8) -> Option<(usize, u8)> {

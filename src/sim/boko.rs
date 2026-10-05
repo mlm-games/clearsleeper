@@ -141,9 +141,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -320,7 +320,7 @@ impl Boko {
             let span = Vec3::new(self.top.x - self.root.x, f1 - f30, self.top.z - self.root.z);
             let tilt = self.shape[0]
                 .wrapping_sub(walk::to_s16(-span.y.atan2(span.x.hypot(span.z))));
-            self.turn_x = (f32::from(tilt) * FLAT_RATE) as i16;
+            self.turn_x = ((tilt) as f32 * FLAT_RATE) as i16;
             if self.turn_x == 0 && tilt != 0 {
                 self.turn_x = tilt.wrapping_neg();
             }
@@ -334,7 +334,7 @@ impl Boko {
             }
             events.list.push(SimEvent::Se(BOUND_SE[slot]));
             self.speed_f *= MOVE_DAMP;
-            self.spin = (f32::from(self.spin) * MOVE_DAMP) as i16;
+            self.spin = ((self.spin) as f32 * MOVE_DAMP) as i16;
             struck = true;
         }
 

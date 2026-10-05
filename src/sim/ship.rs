@@ -150,7 +150,7 @@ fn ride(
     } else if turn_rate < TURN_RATE_MIN {
         turn_rate = TURN_RATE_MIN;
     }
-    let step = (-turn_rate * f32::from(ship.tiller >> 6)) as i16;
+    let step = (-turn_rate * (ship.tiller >> 6) as f32) as i16;
     actor.angle[1] = actor.angle[1].wrapping_add(step);
     if pressed && ship.speed >= STOP_SPEED {
         add_calc(

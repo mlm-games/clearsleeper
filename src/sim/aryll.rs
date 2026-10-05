@@ -1248,8 +1248,8 @@ impl Aryll {
         let mut fvar2;
         let mut fvar1;
         if self.eye_ctrl_set {
-            fvar1 = f32::from(self.eye_yaw) / f32::from(HIO_EYE_SCALE_DENOM);
-            fvar2 = f32::from(self.eye_pitch) / f32::from(HIO_EYE_SCALE_DENOM);
+            fvar1 = (self.eye_yaw) as f32 / (HIO_EYE_SCALE_DENOM) as f32;
+            fvar2 = (self.eye_pitch) as f32 / (HIO_EYE_SCALE_DENOM) as f32;
             fvar1 = EYE_MULT * fvar1;
             fvar2 = EYE_MULT * fvar2;
             fvar1 = fvar1.clamp(EYE_MIN, EYE_MAX);
@@ -2360,14 +2360,14 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
 fn rnd_value(seed: &mut [i32; 3], min: i16, range: i16) -> i16 {
-    min.wrapping_add((rnd(seed) * f32::from(range)) as i16)
+    min.wrapping_add((rnd(seed) * (range) as f32) as i16)
 }
 
 pub fn is_aryll(name: &str) -> bool {

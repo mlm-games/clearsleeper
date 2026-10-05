@@ -740,7 +740,7 @@ impl Stalfos {
 
     fn step_anm(&mut self) {
         self.frame += self.rate;
-        let end = f32::from(self.clip.frames());
+        let end = (self.clip.frames()) as f32;
         if self.looping {
             if end > 0.0 && self.frame >= end {
                 self.frame -= end;
@@ -812,7 +812,7 @@ impl Stalfos {
         let range = if self.sight == NO_SWITCH {
             AMBUSH_RANGE
         } else {
-            f32::from(self.sight) * AMBUSH_SCALE
+            (self.sight) as f32 * AMBUSH_SCALE
         };
         (player.pos - actor.pos).length() < range
     }

@@ -1092,7 +1092,7 @@ impl Servant {
 
     pub fn rnd(&mut self) -> f32 {
         self.seed = (self.seed * RND_MUL) % RND_MOD;
-        (f32::from(self.seed) / RND_SCALE) % 1.0
+        ((self.seed) as f32 / RND_SCALE) % 1.0
     }
 
     pub fn chase_carry(&mut self) {

@@ -705,15 +705,15 @@ impl Lenzo {
         for lane in 0..3 {
             self.seed[lane] = (self.seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
         }
-        let sum = f32::from(self.seed[0]) / RND_SCALE[0]
-            + f32::from(self.seed[1]) / RND_SCALE[1]
-            + f32::from(self.seed[2]) / RND_SCALE[2];
+        let sum = (self.seed[0]) as f32 / RND_SCALE[0]
+            + (self.seed[1]) as f32 / RND_SCALE[1]
+            + (self.seed[2]) as f32 / RND_SCALE[2];
         (sum % 1.0).abs()
     }
 
     fn jitter(&mut self, min: i16, span: i16) -> i16 {
-        let base = f32::from(min);
-        let range = f32::from(span);
+        let base = (min) as f32;
+        let range = (span) as f32;
         (base + self.rnd() * range) as i16
     }
 
@@ -1259,7 +1259,7 @@ impl Lenzo {
 
     fn event_set_eye(&mut self, ctx: &Ctx<'_>) {
         let swing = walk::from_s16(self.eye_timer).sin() * EYE_ORBIT_SWING;
-        let yaw = (f32::from(ctx.player_face) + swing) as i16;
+        let yaw = ((ctx.player_face) as f32 + swing) as i16;
         self.eye_timer = self.eye_timer.wrapping_add(EYE_ORBIT_RATE);
         let turn = Quat::from_rotation_y(walk::from_s16(yaw))
             * Quat::from_rotation_x(walk::from_s16(EYE_ORBIT_TILT));

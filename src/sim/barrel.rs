@@ -250,7 +250,7 @@ impl Barrel {
     pub fn wobble(&mut self, grounded: bool) {
         let factor = if grounded { GROUND_FACTOR } else { 1.0 };
         let gain =
-            (f32::from(self.roll) * VIB_SLOPE + VIB_BIAS) * VIB_RATE * VIB_RATE_GAIN * factor;
+            ((self.roll) as f32 * VIB_SLOPE + VIB_BIAS) * VIB_RATE * VIB_RATE_GAIN * factor;
         self.yaw = self.yaw.wrapping_add(stream::units_s(gain));
         let spin = stream::units_s(VIB_RATE * VIB_SPIN * factor);
         self.spin = self.spin.wrapping_add(spin);
@@ -312,7 +312,7 @@ impl Barrel {
         let circumference =
             (stream::cos_s(self.tilt) * ROLL_RADIUS_GAIN + SHORT_RADIUS) * ROLL_TURN;
         let arc = stream::units_s(travel / circumference * 65535.0);
-        let spin = stream::units_s(f32::from(arc) * ROLL_SPIN);
+        let spin = stream::units_s((arc) as f32 * ROLL_SPIN);
         if facing.is_some_and(|facing| facing < 0) {
             self.spin = self.spin.wrapping_add(spin);
             self.drift = self.drift.wrapping_add(arc);
@@ -320,7 +320,7 @@ impl Barrel {
             self.spin = self.spin.wrapping_sub(spin);
             self.drift = self.drift.wrapping_sub(arc);
         }
-        self.roll = stream::units_s((travel / MAX_MOVE).min(1.0) * f32::from(VIB_PEAK));
+        self.roll = stream::units_s((travel / MAX_MOVE).min(1.0) * (VIB_PEAK) as f32);
         facing.unwrap_or(self.yaw)
     }
 

@@ -34,7 +34,7 @@ impl MsgData {
         MsgTagLen {
             len,
             width,
-            line_width: (width + 0.5f) as i32,
+            line_width: (width + 0.5) as i32,
         }
     }
 
@@ -60,7 +60,7 @@ impl MsgData {
         } else {
             self.field_0x108.get(idx).copied().unwrap_or(0)
         };
-        self.now_cursor_pos = base as f32 + self.field_0x14 + 0.5f;
+        self.now_cursor_pos = base as f32 + self.field_0x14 + 0.5;
     }
 
     fn msg_tag_advance(&mut self) {

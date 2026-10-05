@@ -185,7 +185,7 @@ impl Canon {
     }
 
     fn shot(&self, pos: Vec3, angle: [i16; 3], reach: f32) -> Vec3 {
-        let twist = angle_s(f32::from(self.kick) * TWIST_GAIN * from_s16(self.phase).sin());
+        let twist = angle_s((self.kick) as f32 * TWIST_GAIN * from_s16(self.phase).sin());
         let mut v = Vec3::new(0.0, reach * self.scale, 0.0);
         v = zrot(v, self.yaw.wrapping_neg());
         v = xrot(v, self.pitch.wrapping_neg());

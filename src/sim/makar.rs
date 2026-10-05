@@ -1048,9 +1048,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -1059,7 +1059,7 @@ fn rnd_f(seed: &mut [i32; 3], range: f32) -> f32 {
 }
 
 fn get_rnd_value(seed: &mut [i32; 3], min: i16, range: i16) -> i16 {
-    (f32::from(min) + rnd_f(seed, f32::from(range))) as i32 as i16
+    ((min) as f32 + rnd_f(seed, (range) as f32)) as i32 as i16
 }
 
 fn chk_lim(angle: i16, max: i16, min: i16) -> i16 {
@@ -1249,7 +1249,7 @@ impl Makar {
         self.anm_frame = 0.0;
         self.anm_last = 0.0;
         self.anm_end = MORPH_END_FRAME;
-        self.anm_speed = f32::from(data[3]).max(1.0);
+        self.anm_speed = (data[3]) as f32.max(1.0);
         self.anm_loop = data[1] == ANM_LOOP;
         let _ = (data[0].unsigned_abs(), if secondary { data[2] } else { 0 }, data[5]);
         self.anm_done = false;
@@ -1703,7 +1703,7 @@ impl Makar {
             self.speed.y = HIO_NPC_FLY_LAUNCH_SPEED_Y;
             self.set_anm(ANM_04, ctx);
             self.fly_timer = HIO_NPC_FLY_TIMER;
-            self.fall_sum = f32::from(HIO_FLY_FALL_STEP) + 1.0;
+            self.fall_sum = (HIO_FLY_FALL_STEP) as f32 + 1.0;
             ctx.events.list.push(SimEvent::Se(SE_CV_CB_THROW));
         } else if step != ACT_EXIT {
             self.fly_action(self.steer == 0, 0.0, 0, false, ctx);
@@ -1717,7 +1717,7 @@ impl Makar {
     fn hit_npc_action(&mut self, ctx: &mut Ctx) {
         if self.act_step == ACT_INIT {
             self.attn_flags &= !ATTN_ACTION_CARRY;
-            self.speed_f = max_limit(self.speed_f, HIO_MAX_WALK_SPEED * 0.5f);
+            self.speed_f = max_limit(self.speed_f, HIO_MAX_WALK_SPEED * 0.5);
             self.speed.y = HIO_HIT_SPEED_SCALE_Y * self.speed_f.abs();
             self.speed_f *= HIO_HIT_SPEED_SCALE_F;
             ctx.events.list.push(SimEvent::Se(SE_CM_CB_BOUND));
@@ -2006,7 +2006,7 @@ impl Makar {
 
     fn hit_player_action(&mut self, ctx: &mut Ctx) {
         if self.act_step == ACT_INIT {
-            self.speed_f = max_limit(self.speed_f, 0.5f * HIO_MAX_WALK_SPEED);
+            self.speed_f = max_limit(self.speed_f, 0.5 * HIO_MAX_WALK_SPEED);
             self.speed.y = HIO_HIT_SPEED_SCALE_Y * self.speed_f.abs();
             self.speed_f *= HIO_HIT_SPEED_SCALE_F;
             ctx.events.list.push(SimEvent::Se(SE_CM_CB_BOUND));
@@ -2125,7 +2125,7 @@ impl Makar {
     ) -> bool {
         let as_player = self.as_player;
         let mut y_limit = HIO_FLY_Y_SPEED;
-        let lift = f32::from(self.fly_speed) * HIO_FLY_GRAVITY_SCALE;
+        let lift = (self.fly_speed) as f32 * HIO_FLY_GRAVITY_SCALE;
         let mut caught = false;
         if self.grounded {
             self.breaking();

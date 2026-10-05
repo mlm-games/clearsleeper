@@ -419,7 +419,7 @@ impl Frame {
 
     fn set_start(&mut self, start: i16) {
         self.start = start;
-        self.frame = f32::from(start);
+        self.frame = (start) as f32;
     }
 
     fn set_loop(&mut self, frame: f32) {
@@ -439,8 +439,8 @@ impl Frame {
     fn update(&mut self) {
         self.state = 0;
         self.frame += self.rate;
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         match self.attribute {
             EMODE_NONE => {
                 if self.frame < start {
@@ -462,14 +462,14 @@ impl Frame {
                     if low <= 0 {
                         break;
                     }
-                    self.frame += f32::from(low);
+                    self.frame += (low) as f32;
                 }
                 while self.frame >= end {
                     self.state |= STATE_LOOP;
                     if high <= 0 {
                         break;
                     }
-                    self.frame -= f32::from(high);
+                    self.frame -= (high) as f32;
                 }
             }
             _ => {}
@@ -489,8 +489,8 @@ impl Frame {
     }
 
     fn check_pass(&self, pass: f32) -> bool {
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         let cur = self.frame;
         let mut next = cur + self.rate;
         if next < start {
@@ -627,7 +627,7 @@ impl Armos {
         let area_radius = if prm_radius == NO_SWITCH || prm_radius == 0 {
             AREA_RADIUS_FIXED
         } else {
-            f32::from(prm_radius) * AREA_RADIUS_STEP
+            (prm_radius) as f32 * AREA_RADIUS_STEP
         };
         Self {
             kind,

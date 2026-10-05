@@ -1110,9 +1110,9 @@ pub fn rnd(seed: &mut [i32; 3]) -> f32 {
             *slot = (*slot * mul) % modu;
         }
     }
-    let a = f32::from(seed.first().copied().unwrap_or(0)) / RND_SCALE[0];
-    let b = f32::from(seed.get(1).copied().unwrap_or(0)) / RND_SCALE[1];
-    let c = f32::from(seed.get(2).copied().unwrap_or(0)) / RND_SCALE[2];
+    let a = (seed.first().copied().unwrap_or(0)) as f32 / RND_SCALE[0];
+    let b = (seed.get(1).copied().unwrap_or(0)) as f32 / RND_SCALE[1];
+    let c = (seed.get(2).copied().unwrap_or(0)) as f32 / RND_SCALE[2];
     (a + b + c) % 1.0
 }
 

@@ -234,7 +234,7 @@ pub fn control(
     }
     if caught
         && let Some(mut held) = held
-        && held.item == BOOMERANG
+        && held.item == super::inventory::ITEM_BOOMERANG
     {
         held.count = 1;
     }

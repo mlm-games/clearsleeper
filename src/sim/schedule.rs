@@ -44,7 +44,7 @@ impl Schedule {
     }
 
     pub fn window(&self, divisor: f32) -> u16 {
-        ((f32::from(self.sec) / divisor) as u32 * SIM_HZ as u32) as u16
+        (((self.sec) as f32 / divisor) as u32 * SIM_HZ as u32) as u16
     }
 
     pub fn step(&mut self) {

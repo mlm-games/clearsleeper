@@ -181,7 +181,7 @@ pub fn control(
             {
                 continue;
             }
-            start(&mut combat, player, &intent, &camera, &lock);
+            start(&mut out.combat, player, &intent, &camera, &gates.lock);
             out.events.list.push(SimEvent::Slash);
             continue;
         }
@@ -198,7 +198,7 @@ pub fn control(
             && grounded(gates.collision.as_deref(), player.pos)
         {
             player.speed = 0.0;
-            start(&mut combat, player, &intent, &camera, &lock);
+            start(&mut out.combat, player, &intent, &camera, &gates.lock);
             continue;
         }
         if pressed && !is_finisher(out.combat.kind) {

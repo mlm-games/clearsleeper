@@ -114,7 +114,7 @@ impl Hammer {
             return;
         }
         self.frame += self.rate;
-        if self.frame > f32::from(self.end) {
+        if self.frame > (self.end) as f32 {
             self.rate = 0.0;
         }
     }

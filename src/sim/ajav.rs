@@ -178,7 +178,7 @@ impl Part {
             self.proc = Proc::Fall1;
             self.timer = 0;
             for axis in 0..3 {
-                self.rot[axis] = (f32::from(self.rot[axis]) * SPIN_SLOW) as i16;
+                self.rot[axis] = ((self.rot[axis]) as f32 * SPIN_SLOW) as i16;
             }
             let swing = (rnd(seed) * -2.0) as i32;
             let turn = (rnd(seed) * SPIN_SPAN) as i16;
@@ -188,7 +188,7 @@ impl Part {
 
     fn fall_1(&mut self) -> Option<u32> {
         self.shift += self.rate;
-        self.shift.y -= f32::from(self.timer) * FALL_ACCEL;
+        self.shift.y -= (self.timer) as f32 * FALL_ACCEL;
         for axis in 0..3 {
             self.spin[axis] = self.spin[axis].wrapping_add(self.rot[axis]);
         }
@@ -433,9 +433,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 

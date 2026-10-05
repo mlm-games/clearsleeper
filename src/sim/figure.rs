@@ -544,7 +544,7 @@ impl Figure {
                         self.auto_spin = CHECK_AUTO_FRAMES;
                         self.cam_spin =
                             self.cam_spin.wrapping_add((stick_x * CHECK_TURN_STEP) as i16);
-                        self.cam_height += f32::from((stick_y * CHECK_HEIGHT_STEP) as i16);
+                        self.cam_height += ((stick_y * CHECK_HEIGHT_STEP) as i16) as f32;
                         if self.cam_height < CHECK_HEIGHT_MIN {
                             self.cam_height = CHECK_HEIGHT_MIN;
                         } else if self.cam_height > CHECK_HEIGHT_MAX {

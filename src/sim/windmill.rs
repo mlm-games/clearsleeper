@@ -103,7 +103,7 @@ impl Windmill {
 
     pub fn vane_step(&mut self, strength: f32) {
         self.previous = self.vane;
-        let target = (strength * f32::from(VANE_TOP)) as i16;
+        let target = (strength * (VANE_TOP) as f32) as i16;
         self.vane = walk::add_calc_angle_s(
             self.vane,
             target,
@@ -200,9 +200,6 @@ impl Windmill {
         self.spin_tip(SPOKE_HUB)
     }
 
-    pub fn blast(&self) -> f32 {
-        f32::from(self.vane) / f32::from(VANE_TOP) * HULL_RADIUS
-    }
 }
 
 pub fn is_windmill(name: &str) -> bool {

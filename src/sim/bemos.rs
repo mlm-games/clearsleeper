@@ -252,7 +252,7 @@ impl Bemos {
         let reach = match kind {
             KIND_YELLOW => RANGE_FIXED,
             _ => {
-                let scale = if low == NO_SWITCH { 0.0 } else { f32::from(low) };
+                let scale = if low == NO_SWITCH { 0.0 } else { (low) as f32 };
                 scale * RANGE_STEP + RANGE_BASE
             }
         };

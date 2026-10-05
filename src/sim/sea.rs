@@ -133,7 +133,7 @@ impl Sea {
         if self.culled {
             return;
         }
-        let scale = self.flat * self.next_scale(f32::from(wave_at(&self.tables, cell)));
+        let scale = self.flat * self.next_scale((wave_at(&self.tables, cell)) as f32);
         self.fill(scale);
         self.advance_counters();
     }

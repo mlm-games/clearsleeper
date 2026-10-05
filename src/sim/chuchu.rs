@@ -393,9 +393,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -508,7 +508,7 @@ impl Frame {
 
     fn set_start(&mut self, start: i16) {
         self.start = start;
-        self.frame = f32::from(start);
+        self.frame = (start) as f32;
     }
 
     fn set_loop(&mut self, frame: f32) {
@@ -528,8 +528,8 @@ impl Frame {
     fn update(&mut self) {
         self.state = 0;
         self.frame += self.rate;
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         match self.attribute {
             EMODE_NONE => {
                 if self.frame < start {
@@ -551,14 +551,14 @@ impl Frame {
                     if low <= 0 {
                         break;
                     }
-                    self.frame += f32::from(low);
+                    self.frame += (low) as f32;
                 }
                 while self.frame >= end {
                     self.state |= STATE_LOOP;
                     if high <= 0 {
                         break;
                     }
-                    self.frame -= f32::from(high);
+                    self.frame -= (high) as f32;
                 }
             }
             _ => {}
@@ -578,8 +578,8 @@ impl Frame {
     }
 
     fn check_pass(&self, pass: f32) -> bool {
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         let cur = self.frame;
         let mut next = cur + self.rate;
         if next < start {
@@ -780,7 +780,7 @@ impl Chuchu {
                     RANGE_DEFAULT
                 }
             } else {
-                f32::from(range_byte) * RANGE_SCALE
+                (range_byte) as f32 * RANGE_SCALE
             };
             if colour >= COLOUR_BAND {
                 colour -= COLOUR_BAND;
@@ -792,7 +792,7 @@ impl Chuchu {
             }
             reach
         } else {
-            f32::from(range_byte) * RANGE_SCALE
+            (range_byte) as f32 * RANGE_SCALE
         };
         let mut seed = [RND_SEED; 3];
         let wander = (rnd_fx(&mut seed, WANDER_BAND) as i32) as i16;
@@ -904,7 +904,7 @@ impl Chuchu {
         self.entered = true;
         self.home = actor.pos;
         self.shape = actor.angle;
-        self.leash = f32::from(actor.angle[2]) * LEASH_SCALE;
+        self.leash = (actor.angle[2]) as f32 * LEASH_SCALE;
         if self.leash < LEASH_MIN {
             self.leash = LEASH_MIN;
         }
@@ -1035,7 +1035,7 @@ impl Chuchu {
             && rnd(&mut self.seed) < LEASH_GATE
             && distance_angle_s(self.shape[1], actor.angle[1]) < LEASH_TURN_GATE
         {
-            let turn = f32::from(actor.angle[1]) + rnd_fx(&mut self.seed, LEASH_JITTER);
+            let turn = (actor.angle[1]) as f32 + rnd_fx(&mut self.seed, LEASH_JITTER);
             actor.angle[1] = (turn as i32) as i16;
         }
         false
@@ -1667,7 +1667,7 @@ impl Chuchu {
                 ATTACK_STEP_LAND => {
                     if self.morph.is_stop() {
                         self.timers[TIMER_REST] = LIE_SPAN;
-                        let span = f32::from(self.timers[TIMER_REST]);
+                        let span = (self.timers[TIMER_REST]) as f32;
                         self.timers[TIMER_REST] = self.timers[TIMER_REST]
                             .wrapping_add((rnd_f(&mut self.seed, span) as i32) as i16);
                         self.state = Step::Normal;

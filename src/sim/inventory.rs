@@ -126,6 +126,7 @@ impl Got {
     }
 }
 
+pub const ITEM_BOOMERANG: u8 = 0x2D;
 pub const ITEM_TELESCOPE: u8 = 0x20;
 pub const ITEM_PIRATES_CHARM: u8 = 0x42;
 pub const ITEM_HEROS_CHARM: u8 = 0x43;

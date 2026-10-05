@@ -387,9 +387,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -690,8 +690,8 @@ impl Frame {
     fn update(&mut self) {
         self.state = 0;
         self.frame += self.rate;
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         match self.attribute {
             EMODE_NONE => {
                 if self.frame < start {
@@ -713,14 +713,14 @@ impl Frame {
                     if low <= 0 {
                         break;
                     }
-                    self.frame += f32::from(low);
+                    self.frame += (low) as f32;
                 }
                 while self.frame >= end {
                     self.state |= STATE_LOOP;
                     if high <= 0 {
                         break;
                     }
-                    self.frame -= f32::from(high);
+                    self.frame -= (high) as f32;
                 }
             }
             _ => {}
@@ -972,7 +972,7 @@ impl Floormaster {
     }
 
     fn set_rnd(&mut self, low: i32, high: i32) -> i32 {
-        low + (self.rnd_f(f32::from(high - low).abs()) as i32)
+        low + (self.rnd_f((high - low) as f32.abs()) as i32)
     }
 
     fn set_anm(&mut self, prm: u8, force: bool) {
@@ -1341,13 +1341,13 @@ impl Floormaster {
 
     fn wander_yaw_step(&mut self, actor: &Actor, open: bool) {
         if open {
-            let add = (f32::from(WANDER_BASE)
-                + f32::from(self.wander_yaw)
+            let add = ((WANDER_BASE) as f32
+                + (self.wander_yaw) as f32
                 + self.rnd_f(WANDER_SPAN_A) * WANDER_SCALE_A) as i32 as i16;
             self.wander_yaw = self.wander_yaw.wrapping_add(add);
         } else {
-            let value = f32::from(actor.angle[1])
-                + f32::from(WANDER_TURN)
+            let value = (actor.angle[1]) as f32
+                + (WANDER_TURN) as f32
                 + self.rnd_f(WANDER_SPAN_B) * WANDER_SCALE_A;
             self.wander_yaw = value as i32 as i16;
         }

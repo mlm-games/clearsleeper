@@ -16,7 +16,7 @@ use super::health::Health;
 use super::item::Held;
 use super::player::Player;
 use super::stream::{add_calc_angle_s2, cos_s, sin_s};
-use super::walk::{from_s16, to_s16};
+use super::walk::{chase_f, from_s16, to_s16};
 
 pub const HELMAROC_ACTOR: &str = "Bdk";
 pub const BDK_OBJ_ACTOR: &str = "Bdkobj";
@@ -325,6 +325,12 @@ const SE_CV_DK_LAST_DAMAGE: u32 = 0x486A;
 const SE_CV_DK_MODAE: u32 = 0x486B;
 const SE_CV_DK_DIE: u32 = 0x486C;
 const SE_LK_HAMMER_HIT: u32 = 0x2855;
+const SE_LK_SW_CRT_HIT: u32 = 0x2806;
+const SE_LK_LAST_HIT: u32 = 0x2828;
+const SE_LK_W_WEP_CRT_HIT: u32 = 0x2835;
+const SE_LK_MS_WEP_CRT_HIT: u32 = 0x2836;
+const SE_LK_HS_SPIKE: u32 = 0x286F;
+const SE_LK_ARROW_HIT: u32 = 0x2879;
 const SE_ATM_MJT_JINARI: u32 = 0x7020;
 const SE_ATM_MJT_SHUTTER: u32 = 0x7021;
 const SE_ATM_MJT_SHUTTER_END: u32 = 0x7822;
@@ -571,8 +577,8 @@ impl Frame {
     fn update(&mut self) {
         self.state = 0;
         self.frame += self.rate;
-        let start = f32::from(self.start);
-        let end = f32::from(self.end);
+        let start = (self.start) as f32;
+        let end = (self.end) as f32;
         match self.attribute {
             EMODE_NONE => {
                 if self.frame < start {
@@ -594,14 +600,14 @@ impl Frame {
                     if low <= 0 {
                         break;
                     }
-                    self.frame += f32::from(low);
+                    self.frame += (low) as f32;
                 }
                 while self.frame >= end {
                     self.state |= STATE_LOOP;
                     if high <= 0 {
                         break;
                     }
-                    self.frame -= f32::from(high);
+                    self.frame -= (high) as f32;
                 }
             }
             _ => {}
@@ -609,6 +615,10 @@ impl Frame {
     }
 
     fn play(&mut self) {
+        if self.cur_morf < 1.0 {
+            self.prev_morf = self.cur_morf;
+            chase_f(&mut self.cur_morf, 1.0, self.morf_step);
+        }
         self.update();
     }
 
@@ -682,10 +692,14 @@ impl At {
         }
     }
 
-    fn spl(self) -> u8 {
+    fn at_se(self) -> u32 {
         match self {
-            Self::Arrow | Self::FireArrow | Self::IceArrow | Self::LightArrow => 0xB,
-            _ => 0,
+            Self::Hammer => SE_LK_HAMMER_HIT,
+            Self::Arrow | Self::FireArrow | Self::IceArrow | Self::LightArrow => SE_LK_ARROW_HIT,
+            Self::Hookshot => SE_LK_HS_SPIKE,
+            Self::Bomb => SE_LK_MS_WEP_CRT_HIT,
+            Self::Boomerang => SE_LK_W_WEP_CRT_HIT,
+            _ => SE_LK_SW_CRT_HIT,
         }
     }
 }
@@ -741,9 +755,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = (seed[0]) as f32 / RND_SCALE[0]
+        + (seed[1]) as f32 / RND_SCALE[1]
+        + (seed[2]) as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -811,3 +825,463 @@ fn timer8(value: &mut u8) -> bool {
     }
     *value == 0
 }
+pub struct Env<'a> {
+    pub player_pos: Vec3,
+    pub player_angle: i16,
+    pub solid: Option<&'a Collision>,
+    pub blow: Blow,
+    pub peck: Option<Vec3>,
+}
+
+impl Env<'_> {
+    fn ground_h(&self, pos: Vec3) -> f32 {
+        match self.solid {
+            Some(solid) => solid.ground_at(pos.x, pos.z).unwrap_or(0.0),
+            None => 0.0,
+        }
+    }
+
+    fn player_bearing(&self, pos: Vec3) -> i16 {
+        bearing(pos, self.player_pos)
+    }
+
+    fn player_distance(&self, pos: Vec3) -> f32 {
+        (self.player_pos - pos).length()
+    }
+}
+
+pub struct Sink<'a> {
+    pub events: &'a mut SimEvents,
+    pub switches: &'a mut Switches,
+    pub stories: &'a mut StoryBits,
+    pub flags: &'a mut EventFlags,
+    pub zones: &'a mut ZoneActors,
+    pub health: &'a mut Health,
+    pub drop: &'a mut Vec<Entity>,
+}
+
+impl Sink<'_> {
+    fn se(&mut self, id: u32) {
+        self.events.list.push(SimEvent::Se(id));
+    }
+
+    fn bgm(&mut self, id: u32) {
+        self.events.list.push(SimEvent::Bgm(id));
+    }
+
+    fn stop_bgm(&mut self) {
+        self.events.list.push(SimEvent::Bgm(0));
+    }
+
+    fn kill(&mut self, entity: Entity, room: i8, set_id: u16) {
+        self.zones.mark_done(room, set_id);
+        self.drop.push(entity);
+    }
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct Helmaroc {
+    pub battle_mode: u8,
+    pub morph: Frame,
+    pub frame_count: i32,
+    pub action: Action,
+    pub state: i16,
+    pub fly_ca: i16,
+    pub loop_kind: u8,
+    pub target: Vec3,
+    pub target_yaw: i16,
+    pub turn_scale: f32,
+    pub turn_step: f32,
+    pub speed_f: f32,
+    pub speed_step: f32,
+    pub timers: [i16; TIMER_COUNT],
+    pub tail_hold: i16,
+    pub hit_stop: u8,
+    pub mask_timer: u8,
+    pub mask_damage: u8,
+    pub beak_open: u8,
+    pub foot_at_live: u8,
+    pub ground_hit: i8,
+    pub resume_bck: i32,
+    pub resume_bas: i32,
+    pub resume_loop: u8,
+    pub resume_pending: u8,
+    pub sit_count: i8,
+    pub swoop_count: i8,
+    pub beat_count: i8,
+    pub peck_obj: Option<Entity>,
+    pub blure_rate: i16,
+    pub demo_state: i16,
+    pub flown_high: i8,
+    pub demo_count: i16,
+    pub demo_sub: i16,
+    pub cam_look: Vec3,
+    pub cam_eye: Vec3,
+    pub cam_yaw: i16,
+    pub cam_pitch: i16,
+    pub fov: f32,
+    pub demo_param: f32,
+    pub demo_radius: f32,
+    pub shake: f32,
+    pub demo_flag: i8,
+    pub demo_ordered: bool,
+    pub wind_power: f32,
+    pub wind_scale: Vec3,
+    pub wind_dir: Vec3,
+    pub rise_smoke: u8,
+    pub nail_live: u8,
+    pub smoke_pos: Vec3,
+    pub effects: [Eff; EFF_COUNT],
+    pub effect_cursor: u8,
+    pub smoke_timer: [i16; SMOKE_COUNT],
+    pub shutter_y: f32,
+    pub shutter_roll: f32,
+    pub shutter_ring: f32,
+    pub shutter_shift: f32,
+    pub track_player: bool,
+    pub head_pitch: i16,
+    pub head_yaw: i16,
+    pub swoop_offset: f32,
+    pub tosaka_y1: i16,
+    pub tosaka_z1: i16,
+    pub tosaka_y2: i16,
+    pub tosaka_z2: i16,
+    pub tosaka_y3: i16,
+    pub tosaka_z3: i16,
+    pub tosaka_y4: i16,
+    pub tosaka_z4: i16,
+    pub beak_tick: i16,
+    pub beak_sway: i16,
+    pub beak_amp: i16,
+    pub beak_aim: i16,
+    pub beak_timer: i16,
+    pub beak_free: i8,
+    pub beak_calc: f32,
+    pub beak_sway_calc: f32,
+    pub head_prev: Vec3,
+    pub head: Vec3,
+    pub beak: Vec3,
+    pub body: Vec3,
+    pub foot: [Vec3; FOOT_COUNT],
+    pub wind_active: [u8; WIND_COUNT],
+    pub wind_pos: [Vec3; WIND_COUNT],
+    pub wind_move: [Vec3; WIND_COUNT],
+    pub piece_live: [i8; PIECE_COUNT],
+    pub piece_pos: [Vec3; PIECE_COUNT],
+    pub piece_prev: [Vec3; PIECE_COUNT],
+    pub piece_move: [Vec3; PIECE_COUNT],
+    pub piece_rot: [[i16; 3]; PIECE_COUNT],
+    pub piece_sway: [[i16; 3]; PIECE_COUNT],
+    pub piece_push: [[i16; 3]; PIECE_COUNT],
+    pub piece_hold: [i8; PIECE_COUNT],
+    pub piece_roll: [f32; PIECE_COUNT],
+    pub piece_speed: [f32; PIECE_COUNT],
+    pub piece_angle: [i16; PIECE_COUNT],
+    pub piece_sway_speed: [f32; PIECE_COUNT],
+    pub health: i32,
+    pub max_health: i32,
+    pub stage_boss_enemy: bool,
+    pub stage_boss_demo: bool,
+    pub speed: Vec3,
+    pub speed_f_walk: f32,
+    pub gravity: f32,
+    pub eye: Vec3,
+    pub shape_angle: [i16; 3],
+    pub seed: [i32; 3],
+}
+
+impl Helmaroc {
+    pub fn spawn(parameters: u32) -> Self {
+        let _param_byte = parameters & 0xFF;
+        let mut morph = Frame::idle();
+        morph.init(frame_max(BCK_FLY1));
+        morph.attribute = EMODE_LOOP;
+        morph.set_loop(0.0);
+        morph.set_morf(0.0);
+        let centre = Vec3::new(AREA_X, 5000.0, AREA_Z);
+        Self {
+            battle_mode: 1,
+            morph,
+            frame_count: 0,
+            action: Action::TFly,
+            state: 0,
+            fly_ca: -1,
+            loop_kind: 0,
+            target: Vec3::ZERO,
+            target_yaw: 0,
+            turn_scale: 0.0,
+            turn_step: 0.0,
+            speed_f: 0.0,
+            speed_step: 0.0,
+            timers: [0x168, 0, 0, 0, 0],
+            tail_hold: 0,
+            hit_stop: 0,
+            mask_timer: 0,
+            mask_damage: 0,
+            beak_open: 0,
+            foot_at_live: 0,
+            ground_hit: 0,
+            resume_bck: 0,
+            resume_bas: 0,
+            resume_loop: 0,
+            resume_pending: 0,
+            sit_count: 0,
+            swoop_count: 0,
+            beat_count: 0,
+            peck_obj: None,
+            blure_rate: 0,
+            demo_state: 0,
+            flown_high: 0,
+            demo_count: 0,
+            demo_sub: 0,
+            cam_look: Vec3::ZERO,
+            cam_eye: Vec3::ZERO,
+            cam_yaw: 0,
+            cam_pitch: 0,
+            fov: 45.0,
+            demo_param: 0.0,
+            demo_radius: 0.0,
+            shake: 0.0,
+            demo_flag: 0,
+            demo_ordered: false,
+            wind_power: 0.0,
+            wind_scale: Vec3::ZERO,
+            wind_dir: Vec3::ZERO,
+            rise_smoke: 0,
+            nail_live: 0,
+            smoke_pos: Vec3::ZERO,
+            effects: [Eff::idle(); EFF_COUNT],
+            effect_cursor: 0,
+            smoke_timer: [0; SMOKE_COUNT],
+            shutter_y: 0.0,
+            shutter_roll: 0.0,
+            shutter_ring: -630.0,
+            shutter_shift: -70.0,
+            track_player: false,
+            head_pitch: 0,
+            head_yaw: 0,
+            swoop_offset: 0.0,
+            tosaka_y1: -2000,
+            tosaka_z1: 0,
+            tosaka_y2: 0,
+            tosaka_z2: 0,
+            tosaka_y3: 0,
+            tosaka_z3: 0,
+            tosaka_y4: 0,
+            tosaka_z4: 0,
+            beak_tick: 0,
+            beak_sway: 0,
+            beak_amp: 0,
+            beak_aim: 0,
+            beak_timer: 0,
+            beak_free: 0,
+            beak_calc: 0.0,
+            beak_sway_calc: 0.0,
+            head_prev: Vec3::ZERO,
+            head: Vec3::ZERO,
+            beak: Vec3::ZERO,
+            body: Vec3::ZERO,
+            foot: [Vec3::ZERO; FOOT_COUNT],
+            wind_active: [0; WIND_COUNT],
+            wind_pos: [Vec3::ZERO; WIND_COUNT],
+            wind_move: [Vec3::ZERO; WIND_COUNT],
+            piece_live: [0; PIECE_COUNT],
+            piece_pos: [Vec3::ZERO; PIECE_COUNT],
+            piece_prev: [Vec3::ZERO; PIECE_COUNT],
+            piece_move: [Vec3::ZERO; PIECE_COUNT],
+            piece_rot: [[0; 3]; PIECE_COUNT],
+            piece_sway: [[0; 3]; PIECE_COUNT],
+            piece_push: [[0; 3]; PIECE_COUNT],
+            piece_hold: [0; PIECE_COUNT],
+            piece_roll: [0.0; PIECE_COUNT],
+            piece_speed: [0.0; PIECE_COUNT],
+            piece_angle: [0; PIECE_COUNT],
+            piece_sway_speed: [0.0; PIECE_COUNT],
+            health: MAX_HEALTH,
+            max_health: MAX_HEALTH,
+            stage_boss_enemy: false,
+            stage_boss_demo: false,
+            speed: Vec3::ZERO,
+            speed_f_walk: 0.0,
+            gravity: 0.0,
+            eye: Vec3::ZERO,
+            shape_angle: [0; 3],
+            seed: [RND_SEED; 3],
+        }
+        .placed(centre)
+    }
+
+    fn placed(mut self, pos: Vec3) -> Self {
+        self.target = pos;
+        self
+    }
+
+    pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
+        (CULL_MIN, CULL_MAX)
+    }
+
+    pub fn drawn(&self) -> bool {
+        self.action != Action::AfterFight
+    }
+
+    pub fn reset_health(&mut self) {
+        self.health = MAX_HEALTH;
+        self.max_health = MAX_HEALTH;
+    }
+
+    fn rnd_f(&mut self, range: f32) -> f32 {
+        rnd(&mut self.seed) * range
+    }
+
+    fn rnd_fx(&mut self, range: f32) -> f32 {
+        range * (rnd(&mut self.seed) - 0.5) * 2.0
+    }
+
+    fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32, bas: i32, param7: u8) {
+        if param7 == 0 {
+            self.resume_bck = bck;
+            self.resume_bas = bas;
+            self.resume_loop = loop_mode;
+            self.resume_pending = 0;
+        } else {
+            self.resume_pending = 1;
+        }
+        self.morph.init(frame_max(bck));
+        self.morph.attribute = loop_mode;
+        self.morph.rate = speed;
+        self.morph.set_loop(0.0);
+        self.morph.set_morf(morf);
+    }
+
+    fn frame(&self) -> f32 {
+        self.morph.frame
+    }
+
+    fn frame_i(&self) -> i32 {
+        self.morph.frame as i32
+    }
+
+    fn scale_now(&self) -> f32 {
+        if self.battle_mode == 1 {
+            MODEL_SCALE_BATTLE * HIO_M008
+        } else {
+            MODEL_SCALE * HIO_M008
+        }
+    }
+
+    fn pos_move(&mut self, actor: &mut Actor) {
+        let diff = self.target - actor.pos;
+        let target_xz = bearing(actor.pos, self.target);
+        let target_pitch = -to_s16(diff.y.atan2(flat(actor.pos, self.target)));
+        let before = actor.angle[ANGLE_Y];
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_Y],
+            target_xz,
+            REG0_S3 + 10,
+            (self.turn_scale * self.turn_step) as i16,
+        );
+        let mut bank = (before.wrapping_sub(actor.angle[ANGLE_Y])) as f32 * 0x20;
+        let cap = REG0_S1 + TURN_BANK;
+        if bank > cap {
+            bank = cap;
+        } else if bank < -cap {
+            bank = -cap;
+        }
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_Z],
+            bank as i16,
+            REG0_S3 + 10,
+            (self.turn_scale * self.turn_step * 0.5) as i16,
+        );
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_X],
+            target_pitch,
+            REG0_S3 + 10,
+            (self.turn_scale * self.turn_step) as i16,
+        );
+        add_calc2(&mut self.turn_step, SPEED_STEP, SPEED_STEP, TURN_STEP);
+        add_calc2(&mut self.speed_f, self.speed_step, SPEED_STEP, self.speed_step);
+        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_f]);
+        if self.resume_pending == 0 {
+            self.speed = forward;
+        } else {
+            let out = turned(actor.angle[ANGLE_X], forward);
+            self.speed.x = out.x;
+            self.speed.z = out.z;
+            if self.morph.frame < RISE_FRAMES {
+                self.speed.y -= REG0_F9 + RISE_SPEED_UP;
+            } else {
+                self.speed.y += REG0_F10 + RISE_SPEED_DOWN;
+            }
+        }
+        actor.pos += self.speed;
+    }
+
+    fn ground_move(&mut self, actor: &mut Actor, env: &Env<'_>) {
+        add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
+        add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
+        add_calc2(&mut self.speed_f, self.speed_step, SPEED_STEP, self.speed_step);
+        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_f]);
+        let out = turned(actor.angle[ANGLE_X], forward);
+        self.speed.x = out.x;
+        self.speed.z = out.z;
+        actor.pos += self.speed;
+        self.speed.y += self.gravity;
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_Y],
+            bearing(actor.pos, self.target),
+            TURN_DIV_WALK,
+            (self.turn_scale * self.turn_step) as i16,
+        );
+        add_calc2(&mut self.turn_step, SPEED_STEP, SPEED_STEP, TURN_STEP_GROUND);
+        let _ = env;
+    }
+
+    fn pl_view_check(&self, actor: &Actor, env: &Env<'_>) -> bool {
+        let mut angle = env.player_bearing(actor.pos);
+        angle = actor.angle[ANGLE_Y].wrapping_sub(angle);
+        if angle < 0 {
+            angle = -angle;
+        }
+        angle.unsigned_abs() < VIEW_LIMIT
+    }
+
+    fn eff_hane_set(&mut self, offset: Vec3, count: i32, mode: i8) {
+        let mut made = 0;
+        let mut index = 0;
+        while index < EFF_COUNT - 1 && made < count {
+            let slot = usize::from(self.effect_cursor);
+            self.effect_cursor += 1;
+            if self.effect_cursor > EFFECT_LIFE_LIMIT {
+                self.effect_cursor = 0;
+            }
+            let eff = &mut self.effects[slot];
+            eff.kind = 1;
+            eff.life = EFFECT_LIFE;
+            eff.done = 0;
+            eff.chase = 0;
+            eff.scale = 1.0;
+            eff.pos = offset;
+            eff.fall = 0.0;
+            eff.count = to_s16(from_s16(self.rnd_f(1.0) * 0.0).atan2(1.0)) as i16;
+            self.effect_cursor = self.effect_cursor;
+            eff.tumble[2] = self.rnd_fx(1200.0 + REG8_F10);
+            eff.tumble[0] = self.rnd_fx(800.0 + REG8_F16);
+            made += 1;
+            if mode > 0 {
+                eff.spin[1] = self.shape_angle[ANGLE_Y].wrapping_add(self.rnd_fx(5000.0) as i16);
+                eff.speed = REG8_F8 + (self.rnd_f(10.0) + 20.0);
+                eff.sway = REG8_F9 + (self.rnd_fx(5.0) - 10.0);
+                eff.chase = self.rnd_f(20.0) as u8 + 20;
+            } else {
+                if mode < 0 {
+                    eff.speed = self.rnd_f(10.0);
+                } else {
+                    eff.speed = REG8_F8 + (self.rnd_f(5.0) + 5.0);
+                }
+                eff.sway = REG8_F9 + (self.rnd_f(5.0) + 5.0);
+                eff.spin[1] = to_s16(from_s16(self.rnd_f(1.0) * 0x10000 as f32));
+            }
+            index += 1;
+        }
+    }
