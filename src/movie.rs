@@ -119,11 +119,11 @@ impl Movie {
             return Err(MovieError);
         }
         let span = self.read(at, len)?;
-        let channel_bytes = be32(&span, 0) as usize;
-        if AUDIO_HEADER + 2 * channel_bytes != len {
+        let channel_bytes = u64::from(be32(&span, 0));
+        if u64::try_from(AUDIO_HEADER).unwrap_or(0) + 2 * channel_bytes != len as u64 {
             return Err(MovieError);
         }
-        let split = AUDIO_HEADER + channel_bytes;
+        let split = AUDIO_HEADER + channel_bytes as usize;
         Ok(AudioBlock {
             samples: be32(&span, 4) as usize,
             coefficient: table(&span, COEFFICIENT),
@@ -183,21 +183,21 @@ fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<
             .copied()
             .unwrap_or(last as u64)
             .min(last as u64);
-        if *at < first as u64 + FRAME_HEADER as u64 || *at + FRAME_HEADER as u64 > bound {
+        if *at < FRAME_HEADER as u64 || *at + FRAME_HEADER as u64 > bound {
             continue;
         }
         file.seek(SeekFrom::Start(at - FRAME_HEADER as u64))
             .map_err(|_| MovieError)?;
         file.read_exact(&mut header).map_err(|_| MovieError)?;
-        let image = be32(&header, 8) as usize;
-        let audio = be32(&header, 12) as usize;
-        if image == 0 || *at + (image + audio) as u64 > bound {
+        let image = u64::from(be32(&header, 8));
+        let audio = u64::from(be32(&header, 12));
+        if image == 0 || *at + image + audio > bound {
             continue;
         }
         frames.push(Frame {
             at: *at,
-            image,
-            audio,
+            image: image as usize,
+            audio: audio as usize,
         });
     }
     Ok(frames)
