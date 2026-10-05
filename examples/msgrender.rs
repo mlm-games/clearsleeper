@@ -12,6 +12,20 @@ fn main() {
     let root = assets::AssetRoot::at(root);
     let archives = assets::MsgArchives::load(&root);
 
+    {
+        use clearsleeper::text::msgget::MsgGet;
+        let mut get = MsgGet::default();
+        let head = get.get_mesg_header(&archives, 0, 0x58E).unwrap();
+        let bmg = get.get_message(head).unwrap();
+        println!("bmg len={}", bmg.len());
+        println!("first 96 bytes: {}", bmg[..96.min(bmg.len())]
+            .iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(" "));
+        let printable: String = bmg.iter().take(200).map(|b| {
+            if *b == 0x1b { "\e".to_string() } else { (*b as char).to_string() }
+        }).collect();
+        println!("as chars: {printable}");
+    }
+
     let mut world = World::new();
     world.insert_resource(archives);
     world.insert_resource(msgproc::MsgProcs::default());
