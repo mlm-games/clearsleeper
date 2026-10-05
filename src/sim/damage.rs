@@ -40,9 +40,10 @@ pub fn sword_power(item: u8, soup: bool) -> i32 {
     }
 }
 
-pub const MASTER_SWORD_FIRST: u8 = 0x39;
-pub const MASTER_SWORD_LAST: u8 = 0x3E;
+pub const MASTER_SWORD_1: u8 = 0x39;
+pub const MASTER_SWORD_2: u8 = 0x3A;
+pub const MASTER_SWORD_3: u8 = 0x3E;
 
 pub fn is_master_sword(item: u8) -> bool {
-    (MASTER_SWORD_FIRST..=MASTER_SWORD_LAST).contains(&item)
+    item == MASTER_SWORD_1 || item == MASTER_SWORD_2 || item == MASTER_SWORD_3
 }
