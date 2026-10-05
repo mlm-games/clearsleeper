@@ -1,4 +1,5 @@
 pub mod actor;
+pub mod agbsw0;
 pub mod ajav;
 pub mod area;
 pub mod amos_knight;
@@ -40,6 +41,7 @@ pub mod figure;
 pub mod flags;
 pub mod frame;
 pub mod floormaster;
+pub mod ganon_form3;
 pub mod ghostship;
 pub mod gohdan;
 pub mod gohma;
@@ -60,7 +62,10 @@ pub mod ice;
 pub mod intent;
 pub mod inventory;
 pub mod item;
+pub mod ivan;
 pub mod jump;
+pub mod kalle_demos;
+pub mod kamome;
 pub mod kita;
 pub mod kn;
 pub mod kytag01;
@@ -80,8 +85,13 @@ pub mod mbdoor;
 pub mod mflft;
 pub mod morth;
 pub mod molgera;
+pub mod movebox;
 pub mod msg;
 pub mod nh;
+pub mod npc_bmsw;
+pub mod npc_mt;
+pub mod npc_p1;
+pub mod npc_tc;
 pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
@@ -111,6 +121,7 @@ pub mod statue;
 pub mod stone;
 pub mod stream;
 pub mod swim;
+pub mod swc00;
 pub mod swhammer;
 pub mod swatk;
 pub mod swlight;
@@ -575,6 +586,17 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, atttag::Atttag::spawn())).id()
     } else if kytag01::is_kytag01(&source.name) {
         world.spawn((actor, kytag01::Kytag01::spawn())).id()
+    } else if swtdoor::is_swtdoor(&source.name) {
+        let door = swtdoor::Swtdoor::spawn(source.parameters);
+        world.spawn((actor, door)).id()
+    } else if swc00::is_swc00(&source.name) {
+        let trig = swc00::Swc00::spawn(source.parameters, &mut world.resource_mut::<flags::Switches>());
+        match trig {
+            Some(trig) => world.spawn((actor, trig)).id(),
+            None => world.spawn(actor).id(),
+        }
+    } else if dummy::is_dummy(&source.name) {
+        world.spawn((actor, dummy::Dummy::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -753,6 +775,9 @@ pub fn build(
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
+                    swc00::control.in_set(WwSimSet::Execute),
+                    swtdoor::control.in_set(WwSimSet::Execute),
+
                     tagkb::control.in_set(WwSimSet::Execute),
                     kytag07::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
