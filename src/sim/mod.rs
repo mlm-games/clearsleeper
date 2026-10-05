@@ -762,6 +762,8 @@ pub fn build(
     sim.world.insert_resource(flags::EventFlags::default());
     sim.world.insert_resource(flags::Collect::default());
     sim.world.insert_resource(flags::MemBits::default());
+    sim.world.insert_resource(morth::Statics::default());
+    sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
