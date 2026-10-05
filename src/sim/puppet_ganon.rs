@@ -159,7 +159,6 @@ const HIO_KEESE_NUM_3HP: i8 = 3;
 const HIO_KEESE_NUM_2HP: i8 = 4;
 const HIO_KEESE_NUM_1HP: i8 = 5;
 const HIO_KEESE_NUM_MAX: i32 = 5;
-const STAGE_GANONK_PARAM: u8 = 9;
 
 const REG0_F0: f32 = 0.0;
 const REG0_F1: f32 = 0.0;
@@ -241,8 +240,8 @@ const BGM_BGN_TARABA_IN: u32 = 0x8000_005C;
 
 const EVENT_BIT_3F10: u16 = 0x3F10;
 const STAGE_GANONK: &str = "GanonK";
-const STAGE_GANONK_ROOM: u8 = 4;
-const STAGE_GANONK_START: u8 = 0;
+const STAGE_GANONK_ROOM: u8 = 0;
+const STAGE_GANONK_POINT: u8 = 4;
 
 const ACTION_NONE: i16 = 0;
 const ACTION_PUNCH: i16 = 1;
@@ -3068,7 +3067,7 @@ impl PuppetGanon {
             out.next.target = Some(Target {
                 stage: STAGE_GANONK.to_owned(),
                 room: STAGE_GANONK_ROOM,
-                start: STAGE_GANONK_START,
+                start: STAGE_GANONK_POINT,
             });
             out.stories.set(EVENT_BIT_3F10);
         }
