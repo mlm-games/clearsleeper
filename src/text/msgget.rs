@@ -103,7 +103,7 @@ impl MsgGet {
         entry_at(head, self.m_msg_idx)
     }
 
-    pub fn get_message(&mut self, head: &[u8]) -> Option<&[u8]> {
+    pub fn get_message<'a>(&mut self, head: &'a [u8]) -> Option<&'a [u8]> {
         let text = text_blob(head)?;
         let count = num_entry(head)?;
         for i in 0..count {
@@ -157,7 +157,7 @@ impl ItemMsgGet {
         entry_at(head, self.m_msg_idx)
     }
 
-    pub fn get_message(&mut self, head: &[u8]) -> Option<&[u8]> {
+    pub fn get_message<'a>(&mut self, head: &'a [u8]) -> Option<&'a [u8]> {
         let text = text_blob(head)?;
         let count = num_entry(head)?;
         for i in 0..count {
