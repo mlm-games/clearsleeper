@@ -1349,14 +1349,14 @@ pub fn fop_msgm_out_font_stick_anime(
 
     if *i_timer < temp {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 0);
-    } else if *i_timer < temp as i32 * 2 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 2 {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 1);
         *param_3 += param_5;
-    } else if *i_timer < temp as i32 * 3 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 3 {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 2);
         *param_3 += param_5;
         *param_4 += param_5;
-    } else if *i_timer < temp as i32 * 4 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 4 {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 3);
         *param_4 += param_5;
     }
@@ -1367,7 +1367,7 @@ pub fn fop_msgm_out_font_stick_anime(
     }
 
     *i_timer += 1;
-    if *i_timer >= temp as i32 * 4 {
+    if i32::from(*i_timer) >= i32::from(temp) * 4 {
         *i_timer = 0;
     }
 }
@@ -1385,15 +1385,15 @@ pub fn fop_msgm_out_font_stick_anime_offsets(
 
     if *i_timer < temp {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 0);
-    } else if *i_timer < temp as i32 * 2 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 2 {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 1);
         swap_i32(param_4, param_5);
         *param_2 += *param_5;
-    } else if *i_timer < temp as i32 * 3 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 3 {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 2);
         *param_2 += *param_4;
         *param_3 += *param_5;
-    } else if *i_timer < temp as i32 * 4 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 4 {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 3);
         swap_i32(param_4, param_5);
         *param_3 += *param_4;
@@ -1404,7 +1404,7 @@ pub fn fop_msgm_out_font_stick_anime_offsets(
     }
 
     *i_timer += 1;
-    if *i_timer >= temp as i32 * 4 {
+    if i32::from(*i_timer) >= i32::from(temp) * 4 {
         *i_timer = 0;
     }
 }
@@ -1504,7 +1504,7 @@ pub fn fop_msgm_out_font_stick_anime2(
             fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 0);
             *param_3 += param_5;
             rot = 1;
-        } else if *i_timer < temp as i32 * 2 {
+        } else if i32::from(*i_timer) < i32::from(temp) * 2 {
             fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 1);
             *param_4 += param_5;
             rot = 3;
@@ -1514,7 +1514,7 @@ pub fn fop_msgm_out_font_stick_anime2(
     } else if *i_timer < temp {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 0);
         rot = 0;
-    } else if *i_timer < temp as i32 * 2 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 2 {
         fop_msgm_out_font_stick_anime_piece(hio, i_icon_pic, i_sdw_pic, *i_timer, 1);
         *param_3 += param_5;
         *param_4 += param_5;
@@ -1553,7 +1553,7 @@ pub fn fop_msgm_out_font_stick_anime2_offsets(
             swap_i32(param_4, param_5);
             *param_2 += *param_5;
             rot = 1;
-        } else if *i_timer < temp as i32 * 2 {
+        } else if i32::from(*i_timer) < i32::from(temp) * 2 {
             fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 1);
             swap_i32(param_4, param_5);
             *param_3 += *param_4;
@@ -1564,7 +1564,7 @@ pub fn fop_msgm_out_font_stick_anime2_offsets(
     } else if *i_timer < temp {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 0);
         rot = 0;
-    } else if *i_timer < temp as i32 * 2 {
+    } else if i32::from(*i_timer) < i32::from(temp) * 2 {
         fop_msgm_out_font_stick_anime_piece_offsets(hio, i_icon_pic, *i_timer, 1);
         *param_2 += *param_4;
         *param_3 += *param_5;

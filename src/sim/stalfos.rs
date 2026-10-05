@@ -132,7 +132,7 @@ const PART_WAIT_BASE: f32 = 2.0;
 const PART_JUMP_SPREAD: f32 = 20000.0;
 const PART_DIE_WAIT: i16 = 30;
 const PART_HURT_WAIT: i16 = 0x7F;
-const PART_SPAN: f32 = 0x10000.0;
+const PART_SPAN: f32 = 65536.0;
 
 const HIO_WALK_A: i32 = 9;
 const HIO_WALK_A_END: i32 = 0x15;
@@ -444,6 +444,7 @@ pub struct Stalfos {
     pub target: Vec3,
     pub speed: Vec3,
     pub speed_f: f32,
+    pub speed_target: f32,
     pub speed_step: f32,
     pub turn: i16,
     pub tick: u32,
@@ -504,9 +505,7 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = f32::from(seed[0]) / RND_SCALE[0]
-        + f32::from(seed[1]) / RND_SCALE[1]
-        + f32::from(seed[2]) / RND_SCALE[2];
+    let sum = seed[0] as f32 / RND_SCALE[0] + seed[1] as f32 / RND_SCALE[1] + seed[2] as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -661,6 +660,7 @@ impl Stalfos {
             target: Vec3::ZERO,
             speed: Vec3::ZERO,
             speed_f: 0.0,
+            speed_target: 0.0,
             speed_step: 0.0,
             turn: 0,
             tick: 0,
@@ -824,7 +824,7 @@ impl Stalfos {
         }
         let (sin, cos) = from_s16(self.aim.wrapping_add(self.sway)).sin_cos();
         let travel = self.speed_f;
-        add_calc2(&mut self.speed_f, self.speed, ONE, self.speed_step);
+        add_calc2(&mut self.speed_f, self.speed_target, ONE, self.speed_step);
         self.speed_step = SPEED_STEP_MAX;
         self.speed.x = travel * sin;
         self.speed.z = travel * cos;
@@ -845,7 +845,7 @@ impl Stalfos {
     }
 
     fn jyunkai(&mut self, actor: &Actor, player: &Player, events: &mut SimEvents) {
-        self.speed = 0.0;
+        self.speed_f = 0.0;
         self.speed_step = SPEED_RAMP;
         match self.sub {
             JYUN_WAIT => {
@@ -860,7 +860,7 @@ impl Stalfos {
                 if (frame >= HIO_WALK_A && frame <= HIO_WALK_A_END)
                     || (frame >= HIO_WALK_B && frame <= HIO_WALK_B_END)
                 {
-                    self.speed = WALK_SPEED;
+                    self.speed_f = WALK_SPEED;
                     self.turn = WALK_TURN;
                     if frame == HIO_WALK_A || frame == HIO_WALK_B {
                         self.se(events, SE_WALK);
@@ -901,7 +901,7 @@ impl Stalfos {
         self.target = player.pos;
         self.turn = FIGHT_TURN;
         if self.sub == JYUN_WALK {
-            self.speed = 0.0;
+            self.speed_f = 0.0;
         }
         self.at_weapon = AT_OFF;
         let mut spin = 0.0f32;
@@ -933,7 +933,7 @@ impl Stalfos {
                 }
             }
             3 => {
-                self.speed = RETREAT_SPEED;
+                self.speed_f = RETREAT_SPEED;
                 self.lean();
                 if self.timers[0] == 0 {
                     if self.rnd_f(ONE) < 0.5 || gap < CLOSE_RANGE {
@@ -977,7 +977,7 @@ impl Stalfos {
                 }
             }
             8 => {
-                self.speed = RETREAT_SPEED;
+                self.speed_f = RETREAT_SPEED;
                 self.lean();
                 if self.timers[0] == 0 {
                     if self.rnd_f(ONE) < 0.5 || gap < CLOSE_RANGE {
@@ -1015,7 +1015,7 @@ impl Stalfos {
                 }
             }
             13 => {
-                self.speed = CHARGE_SPEED;
+                self.speed_f = CHARGE_SPEED;
                 spin = 1.0;
                 spin_step = SWING_STEP_FAST;
                 self.lean();
@@ -1051,7 +1051,7 @@ impl Stalfos {
                 }
             }
             18 => {
-                self.speed = CHARGE_SPEED;
+                self.speed_f = CHARGE_SPEED;
                 spin = -1.0;
                 spin_step = SWING_STEP_FAST;
                 self.lean();
@@ -1080,7 +1080,7 @@ impl Stalfos {
                 }
             }
             22 => {
-                self.speed = CHARGE_SPEED;
+                self.speed_f = CHARGE_SPEED;
                 spin = 1.0;
                 spin_step = SWING_STEP_FAST;
                 self.lean();
@@ -1110,7 +1110,7 @@ impl Stalfos {
                 }
             }
             27 => {
-                self.speed = CHARGE_SPEED;
+                self.speed_f = CHARGE_SPEED;
                 spin = -1.0;
                 spin_step = SWING_STEP_FAST;
                 self.lean();
@@ -1159,7 +1159,7 @@ impl Stalfos {
     }
 
     fn fight2(&mut self, events: &mut SimEvents) {
-        self.speed = 0.0;
+        self.speed_f = 0.0;
         let mut done = false;
         match self.sub {
             F2_PULL => {
@@ -1321,7 +1321,7 @@ impl Stalfos {
     }
 
     fn st_break_wait(&mut self, events: &mut SimEvents) {
-        self.speed = 0.0;
+        self.speed_f = 0.0;
         if self.grab_lock == 0 {
             self.hurt_window = 10;
         }
@@ -1385,7 +1385,7 @@ impl Stalfos {
     }
 
     fn head_damage(&mut self, events: &mut SimEvents) {
-        self.speed = 0.0;
+        self.speed_f = 0.0;
         self.at_body = TG_BODY;
         match self.sub {
             HD_TURN => {
@@ -1457,7 +1457,7 @@ impl Stalfos {
                 self.timers[0] = RISE_WAIT;
             }
             UE_DASH => {
-                self.speed = RISE_STALK_SPEED;
+                self.speed_f = RISE_STALK_SPEED;
                 self.turn = RISE_STALK_TURN;
                 if self.timers[0] == 0 {
                     self.sub = UE_WALK;
@@ -1469,7 +1469,7 @@ impl Stalfos {
                 }
             }
             _ => {
-                self.speed = 0.0;
+                self.speed_f = 0.0;
                 self.turn = CHARGE_TURN_FAST;
                 self.target = player.pos;
                 if self.timers[0] == 0 && (player.pos - actor.pos).length() < DASH_ENTER {
@@ -1497,7 +1497,7 @@ impl Stalfos {
                 self.sub = SI_APPROACH;
             }
             SI_APPROACH => {
-                self.speed = CHARGE_SPEED;
+                self.speed_f = CHARGE_SPEED;
                 self.turn = CHARGE_TURN;
                 self.target = player.pos;
                 if self.timers[0] == 0 && (player.pos - actor.pos).length() < KICK_RANGE {
@@ -1511,7 +1511,7 @@ impl Stalfos {
                 self.sub = SI_KICK;
             }
             SI_KICK => {
-                self.speed = KICK_SPEED;
+                self.speed_f = KICK_SPEED;
                 if self.stopped() {
                     self.set_anm(Clip::Kick2, false, ONE);
                     self.sub = SI_KICK_END;
@@ -1521,7 +1521,7 @@ impl Stalfos {
                 if self.at_frame() < FRAME_KICK {
                     self.at_weapon = AT_KICK;
                 }
-                self.speed = KICK_HOLD;
+                self.speed_f = KICK_HOLD;
                 if self.stopped() {
                     self.sub = SI_WALK;
                     self.timers[0] = RISE_WAIT;

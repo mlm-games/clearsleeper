@@ -1,10 +1,10 @@
-use glam::Vec3;
-
 //! Shared contract for the message/text stack.
 //!
 //! Every sibling module is ported independently against this file. Types,
 //! constant values and cross-module signatures are fixed here; implementations
 //! live in the per-module files and must not redeclare anything from here.
+
+use glam::Vec3;
 
 pub mod driver;
 pub mod font;
