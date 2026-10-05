@@ -17,6 +17,7 @@ pub const RIGHT_FILTER: usize = 0x28;
 pub const LEFT_PREVIOUS: usize = 0x48;
 pub const RIGHT_PREVIOUS: usize = 0x4C;
 pub const SAMPLE_RATE: u32 = 32000;
+const MAX_BLOCK_SAMPLES: usize = 0x10000;
 
 const DEFAULT_RATE: f32 = 29.97;
 const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
@@ -127,9 +128,13 @@ impl Movie {
         if u64::try_from(AUDIO_HEADER).unwrap_or(0) + 2 * channel_bytes != len as u64 {
             return Err(MovieError);
         }
+        let samples = be32(&span, 4) as usize;
+        if samples == 0 || samples > MAX_BLOCK_SAMPLES {
+            return Err(MovieError);
+        }
         let split = AUDIO_HEADER + channel_bytes as usize;
         Ok(AudioBlock {
-            samples: be32(&span, 4) as usize,
+            samples,
             left: channel(&span, AUDIO_HEADER, LEFT_FILTER, LEFT_PREVIOUS, split),
             right: (channel_bytes > 0)
                 .then(|| channel(&span, split, RIGHT_FILTER, RIGHT_PREVIOUS, len)),
