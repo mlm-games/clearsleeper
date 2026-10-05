@@ -1992,6 +1992,11 @@ pub struct Watch<'w, 's> {
     flags: Res<'w, TextFlags>,
     do_intent: Res<'w, DoIntent>,
     target: Res<'w, TargetIntent>,
+    archives: Option<Res<'w, MsgArchives>>,
+    counters: ResMut<'w, Counters>,
+    layout: ResMut<'w, Layout>,
+    procs: ResMut<'w, MsgProcs>,
+    info: ResMut<'w, MsgGameInfo>,
     npcs: Query<'w, 's, &'static Actor>,
     players: Query<'w, 's, &'static Player>,
 }
@@ -2098,8 +2103,7 @@ impl Ctx<'_, '_, '_> {
 }
 
 pub fn control(
-    watch: Watch<'_, '_>,
-    archive: Option<Res<MsgArchives>>,
+    mut watch: Watch<'_, '_>,
     mut active: ResMut<ActiveEvent>,
     mut ev_flags: ResMut<EventFlags>,
     mut stories: ResMut<StoryBits>,
@@ -2108,16 +2112,19 @@ pub fn control(
     mut rupees: ResMut<Rupees>,
     mut order_flags: ResMut<OrderFlags>,
     mut item_partner: ResMut<ItemPartner>,
-    mut counters: ResMut<Counters>,
-    mut layout: ResMut<Layout>,
-    mut procs: ResMut<MsgProcs>,
-    mut info: ResMut<MsgGameInfo>,
     mut one: ResMut<Msg1Box>,
     mut two: ResMut<Msg2Box>,
     mut actors: Query<(Entity, &Actor, &mut Auction), (With<Auction>, Without<Player>)>,
     mut commands: Commands,
 ) {
-    let archive = archive.as_deref();
+    let archive = watch.archives.as_deref();
+    let Watch {
+        mut counters,
+        mut layout,
+        mut procs,
+        mut info,
+        ..
+    } = watch;
     let clear_count = watch.flags.clear_count;
     let player = watch.players.iter().next().copied();
     let views: Vec<NpcView> = watch

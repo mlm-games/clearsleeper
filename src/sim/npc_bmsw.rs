@@ -1940,7 +1940,7 @@ impl Ctx<'_> {
 }
 
 #[derive(SystemParam)]
-pub struct World<'w> {
+pub struct Env<'w> {
     pub flags: Res<'w, TextFlags>,
     pub mem: Res<'w, MemBits>,
     pub list: Res<'w, EventList>,
@@ -1961,7 +1961,7 @@ pub struct Msg<'w, 's> {
     pub players: Query<'w, 's, &'static Player>,
 }
 
-pub fn control(mut world: World, mut msg: Msg, mut actors: Query<(Entity, &mut Actor, &mut NpcBmsw)>) {
+pub fn control(mut world: Env, mut msg: Msg, mut actors: Query<(Entity, &mut Actor, &mut NpcBmsw)>) {
     let player = msg.players.iter().next().copied();
     let clear_count = world.flags.clear_count;
     let select = msg.one.select_num;

@@ -307,6 +307,45 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if puppet_ganon::is_puppet_ganon(&source.name) {
         let boss = puppet_ganon::PuppetGanon::spawn(source.parameters);
         world.spawn((actor, boss)).id()
+    } else if ivan::is_ivan(&source.name) {
+        let ivan = ivan::Ivan::spawn(source.parameters);
+        world.spawn((actor, ivan)).id()
+    } else if morth::is_morth(&source.name) {
+        let morth = morth::Morth::spawn(source.parameters);
+        world.spawn((actor, morth)).id()
+    } else if kalle_demos::is_kalle_demos(&source.name) {
+        let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
+        world.spawn((actor, kalleDemos)).id()
+    } else if agbsw0::is_agbsw0(&source.name) {
+        let agbsw0 = agbsw0::Agbsw0::spawn(source.parameters);
+        world.spawn((actor, agbsw0)).id()
+    } else if npc_tc::is_npc_tc(&source.name) {
+        let npcTc = npc_tc::NpcTc::spawn(source.parameters);
+        world.spawn((actor, npcTc)).id()
+    } else if movebox::is_movebox(&source.name) {
+        let movebox = movebox::Movebox::spawn(source.parameters);
+        world.spawn((actor, movebox)).id()
+    } else if npc_bmsw::is_npc_bmsw(&source.name) {
+        let npcBmsw = npc_bmsw::NpcBmsw::spawn(source.parameters);
+        world.spawn((actor, npcBmsw)).id()
+    } else if auction::is_auction(&source.name) {
+        let auction = auction::Auction::spawn(source.parameters);
+        world.spawn((actor, auction)).id()
+    } else if kamome::is_kamome(&source.name) {
+        let kamome = kamome::Kamome::spawn(source.parameters);
+        world.spawn((actor, kamome)).id()
+    } else if npc_mt::is_npc_mt(&source.name) {
+        let npcMt = npc_mt::NpcMt::spawn(source.parameters);
+        world.spawn((actor, npcMt)).id()
+    } else if npc_p1::is_npc_p1(&source.name) {
+        let npcP1 = npc_p1::NpcP1::spawn(source.parameters);
+        world.spawn((actor, npcP1)).id()
+    } else if amos_knight::is_amos_knight(&source.name) {
+        let amosKnight = amos_knight::AmosKnight::spawn(source.parameters);
+        world.spawn((actor, amosKnight)).id()
+    } else if ganon_form3::is_ganon_form3(&source.name) {
+        let ganonForm3 = ganon_form3::GanonForm3::spawn(source.parameters);
+        world.spawn((actor, ganonForm3)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -791,6 +830,22 @@ pub fn build(
                     select::control.in_set(WwSimSet::Execute),
                     canon::control.in_set(WwSimSet::Execute),
                     mbdoor::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
+                    ivan::control.in_set(WwSimSet::Execute),
+                    morth::control.in_set(WwSimSet::Execute),
+                    kalle_demos::control.in_set(WwSimSet::Execute),
+                    agbsw0::control.in_set(WwSimSet::Execute),
+                    npc_tc::control.in_set(WwSimSet::Execute),
+                    movebox::control.in_set(WwSimSet::Execute),
+                    npc_bmsw::control.in_set(WwSimSet::Execute),
+                    auction::control.in_set(WwSimSet::Execute),
+                    kamome::control.in_set(WwSimSet::Execute),
+                    npc_mt::control.in_set(WwSimSet::Execute),
+                    npc_p1::control.in_set(WwSimSet::Execute),
+                    amos_knight::control.in_set(WwSimSet::Execute),
+                    ganon_form3::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (

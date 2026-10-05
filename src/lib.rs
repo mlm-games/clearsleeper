@@ -23,6 +23,7 @@ pub mod btk;
 pub mod dzs;
 pub mod hud;
 pub mod input;
+pub mod j2d;
 pub mod menus;
 pub mod movie;
 pub mod save;
@@ -716,6 +717,97 @@ impl App {
                     continue;
                 }
                 let (min, max) = boss.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ivan::Ivan>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::morth::Morth>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kalle_demos::KalleDemos>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::agbsw0::Agbsw0>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_tc::NpcTc>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::movebox::Movebox>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_bmsw::NpcBmsw>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::auction::Auction>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kamome::Kamome>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_mt::NpcMt>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_p1::NpcP1>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::amos_knight::AmosKnight>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ganon_form3::GanonForm3>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
