@@ -256,13 +256,8 @@ pub fn control(
             Swing::FrontReady => {
                 hammer.advance();
                 if hammer.done() {
-                    hammer.begin(
-                        Swing::Front,
-                        FRONT_END,
-                        FRONT_RATE,
-                        FRONT_START,
-                        hammer.heading,
-                    );
+                    let heading = hammer.heading;
+                    hammer.begin(Swing::Front, FRONT_END, FRONT_RATE, FRONT_START, heading);
                 }
             }
             Swing::Side => {
@@ -274,13 +269,8 @@ pub fn control(
             Swing::Front => {
                 hammer.advance();
                 if hammer.done() {
-                    hammer.begin(
-                        Swing::FrontEnd,
-                        END_FRAME,
-                        END_RATE,
-                        END_START,
-                        hammer.heading,
-                    );
+                    let heading = hammer.heading;
+                    hammer.begin(Swing::FrontEnd, END_FRAME, END_RATE, END_START, heading);
                 }
             }
             Swing::FrontEnd => {

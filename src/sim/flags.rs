@@ -547,7 +547,7 @@ pub fn control(
     }
 }
 
-const NO_SWITCH: u8 = 0xFF;
+pub const NO_SWITCH: u8 = 0xFF;
 const NO_EVENT_FLAG: u16 = 0xFFFF;
 const RADIUS_SCALE: f32 = 100.0;
 const ISLAND_SCALE: f32 = 10000.0;

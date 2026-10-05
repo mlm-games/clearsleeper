@@ -809,7 +809,6 @@ fn timer8(value: &mut u8) -> bool {
 }
 pub struct Env<'a> {
     pub player_pos: Vec3,
-    pub player_angle: i16,
     pub player_hover: bool,
     pub solid: Option<&'a Collision>,
     pub blow: Blow,
@@ -2046,7 +2045,7 @@ impl Helmaroc {
             let (next, wall) = env.corrected(from, actor.pos);
             actor.pos = next;
             if env.landed(actor.pos) && self.nail_live == 0 {
-                self.nail_live += 1;
+                self.nail_live = self.nail_live.saturating_add(1);
             }
             if wall {
                 self.state = 10;
@@ -2210,7 +2209,6 @@ impl Helmaroc {
             out.se(SE_CV_DK_DAMAGE);
             self.beak_timer = REG0_S5 + 0x1E;
             self.beak_aim = bearing(env.player_pos, actor.eye);
-            let mut flinched = false;
             if self.action == Action::KutiAttack && self.body.y < 10000.0 {
                 self.anm_init(BCK_DAMAGE1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                 self.state = 10;
@@ -2219,7 +2217,6 @@ impl Helmaroc {
                     self.timers[2] = 10;
                     self.hit_stop = 0x14;
                 }
-                flinched = true;
             } else if self.ground_hit != 0 {
                 if self.action == Action::KutiAttack {
                     self.action = Action::Wait;
@@ -2230,10 +2227,8 @@ impl Helmaroc {
                     self.fly_ca = 0;
                 }
                 self.anm_init(BCK_DAMAGE3, 2.0, EMODE_NONE, 1.0, BAS_NONE, 1);
-                flinched = true;
             } else {
                 self.anm_init(BCK_DAMAGE2, 2.0, EMODE_NONE, 1.0, 0x9, 1);
-                flinched = true;
             }
             let power = env.blow.at.power(env.blow.blade, env.blow.soup);
             self.health -= power;
@@ -2243,7 +2238,6 @@ impl Helmaroc {
                 self.end_set(actor, out);
             } else {
                 out.se(env.blow.at.at_se());
-                let _ = flinched;
             }
         }
     }
@@ -2440,7 +2434,7 @@ impl Helmaroc {
                     actor.pos.x = 100000.0;
                     actor.pos.y = 100000.0;
                     if self.timers[0] == 0 {
-                        self.demo_count += 1;
+                        self.demo_count = self.demo_count.wrapping_add(1);
                         self.state = 8;
                     }
                     break;
@@ -2505,8 +2499,8 @@ impl Helmaroc {
                     dz = REG8_F8 + 150.0;
                     step = 300.0;
                     if self.peck_obj.is_some() && self.frame_i() == 0x30 {
+                        self.peck_done = self.peck_obj;
                         self.peck_obj = None;
-                        out.break_peck();
                         out.se(SE_CM_DK_PECK);
                     }
                 }
@@ -2550,7 +2544,7 @@ impl Helmaroc {
         );
         if self.speed.y > 0.0 {
             actor.pos.y += self.speed.y;
-            self.speed.y -= 5.0;
+            self.speed.y -= GRAVITY_FALL;
         } else {
             add_calc2(
                 &mut actor.pos.y,
@@ -2590,7 +2584,7 @@ impl Helmaroc {
         add_calc2(&mut actor.pos.x, self.target.x, 0.5, 30.0);
         add_calc2(&mut actor.pos.z, self.target.z, 0.5, 30.0);
         actor.pos.y += self.speed.y;
-        self.speed.y -= 5.0;
+        self.speed.y -= GRAVITY_FALL;
         let mut falling = false;
         if actor.pos.y <= self.target.y {
             actor.pos.y = self.target.y;
@@ -3368,11 +3362,15 @@ impl Helmaroc {
         let _ = env;
     }
 
-    fn attention_step(&mut self, actor: &mut Actor, env: &Env<'_>) {
+    fn attention_step(&mut self, actor: &Actor, env: &Env<'_>) {
         self.eye = Self::at_pos(actor.shape_angle[ANGLE_Y], JOINT_ATAMA1)
             + turned(
                 actor.shape_angle[ANGLE_Y],
-                [REG0_F10 + 120.0, 0.0, REG0_F12 + EYE_OFFSET[2]],
+                [
+                    REG0_F10 + EYE_OFFSET[0],
+                    EYE_OFFSET[1],
+                    REG0_F12 + EYE_OFFSET[2],
+                ],
             );
         let angle = if self.track_player {
             let delta = env.player_pos - actor.pos;
@@ -3575,7 +3573,7 @@ pub fn control(
     let Some(entry) = players.iter_mut().next() else {
         return;
     };
-    let mut player = entry.1;
+    let player = entry.1;
     let mut orders = Orders::default();
     let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
     for (_, actor, boss) in &mut bosses {
@@ -3592,7 +3590,6 @@ pub fn control(
             .map(|(id, other)| (id, other.pos));
         let env = Env {
             player_pos: player.pos,
-            player_angle: to_s16(player.face),
             player_hover: false,
             solid,
             blow,

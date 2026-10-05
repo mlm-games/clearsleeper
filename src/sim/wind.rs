@@ -241,7 +241,8 @@ pub fn control(
     let mut strongest = 0.0f32;
     let mut audible = false;
     for (_, mut tag) in &mut tags {
-        let set = tag.switch_no != NO_SWITCH && switches.test(tag.switch_no);
+        let swbit = tag.switch_no;
+        let set = swbit != NO_SWITCH && switches.test(swbit);
         tag.step(tag.primed(set) && tag.scheduled(&schedule));
         if tag.visible() {
             audible = true;

@@ -109,7 +109,7 @@ pub fn control(
     mut got: ResMut<super::inventory::Got>,
     mut chest_flags: ResMut<super::chest::Chests>,
     mut switches: ResMut<super::flags::Switches>,
-    events: ResMut<SimEvents>,
+    mut events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut items: Query<(Entity, &mut Pickup, &Actor)>,
     mut chests: Query<(
@@ -150,7 +150,7 @@ pub fn control(
     for (entity, actor, mut chest, marker) in &mut chests {
         let tapped = do_intent.0 && !chest.pressed;
         chest.pressed = do_intent.0;
-        if chest.opened || !super::chest::present(chest, &switches) {
+        if chest.opened || !super::chest::present(&chest, &switches) {
             continue;
         }
         let forced = marker.is_some();
@@ -169,11 +169,11 @@ pub fn control(
             commands.entity(entity).remove::<super::chest::ChestOpen>();
         }
         chest.opened = true;
-        chest_flags.open(super::chest::stage_of(chest), chest.index);
-        if chest.open_switch != super::chest::NO_SWITCH {
+        chest_flags.open(super::chest::stage_of(&chest), chest.index);
+        if chest.open_switch != super::flags::NO_SWITCH {
             switches.set(chest.open_switch);
         }
-        super::chest::loot(chest, &mut rupees, &mut equipped, &mut got);
+        super::chest::loot(&chest, &mut rupees, &mut equipped, &mut got);
         events.list.push(SimEvent::Collect);
     }
 }
