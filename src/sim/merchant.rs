@@ -119,8 +119,8 @@ const HEAD_MOVE_MIN: i32 = 1;
 const HEAD_TURN_MIN_STEP: i16 = 0x60;
 const HEAD_LIMIT_X: i16 = 0x09C4;
 const HEAD_LIMIT_Y: i16 = 0x1388;
-const HEAD_MIN_X: i16 = 0xF63C;
-const HEAD_MIN_Y: i16 = 0xEC78;
+const HEAD_MIN_X: i16 = -0x9C4;
+const HEAD_MIN_Y: i16 = -0x1388;
 const HEAD_LOCK_VALUE: i16 = 0;
 const HEAD_TURN_STEP: i16 = 0x03E8;
 

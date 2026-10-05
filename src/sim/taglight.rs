@@ -81,7 +81,8 @@ impl TagLight {
             self.level = if self.lit { ON_LEVEL } else { OFF_LEVEL };
         }
         let target = if self.lit { ON_LEVEL } else { OFF_LEVEL };
-        walk::chase_f(&mut self.level, target, self.fade_speed());
+        let rate = self.fade_speed();
+        walk::chase_f(&mut self.level, target, rate);
     }
 
     pub fn drawn(&self) -> bool {

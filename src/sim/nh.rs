@@ -36,7 +36,7 @@ const IDLE_MAX: f32 = 10.0;
 const IDLE_MIN: f32 = 1.0;
 
 const TURN_STEP: i16 = 0x400;
-const OPPOSITE: i16 = 0x8000;
+const OPPOSITE: i16 = -0x8000;
 const WOBBLE_BIAS: i16 = 0x2000;
 const WOBBLE_MIN: f32 = 15.0;
 const WOBBLE_RANGE: f32 = 20.0;

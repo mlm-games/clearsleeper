@@ -2324,7 +2324,7 @@ impl Medli {
         if let Some(wall) = wall_angle {
             let angle = self
                 .yaw
-                .wrapping_add(0x8000)
+                .wrapping_add(-0x8000)
                 .wrapping_sub(wall);
             if angle.unsigned_abs() < ANGLE_HALF as u16 {
                 want *= 1.0 - HIO2_M1C * walk::from_s16(angle).cos();
@@ -2386,7 +2386,7 @@ impl Medli {
         if (self.normal.y >= 1.0 && angle_distance(next, *angle) > ANGLE_HALF as u16)
             || player_dy * temp.y < 0.0
         {
-            next = next.wrapping_add(0x8000);
+            next = next.wrapping_add(-0x8000);
         }
         *angle = next;
     }
@@ -3789,7 +3789,7 @@ impl Medli {
         if absolute {
             self.stick_angle
         } else {
-            self.stick_angle.wrapping_add(0x8000).wrapping_add(self.player_yaw)
+            self.stick_angle.wrapping_add(-0x8000).wrapping_add(self.player_yaw)
         }
     }
 
@@ -4722,7 +4722,7 @@ impl Medli {
         if target == "@PLAYER" {
             self.look_back(flag != 0, false, false);
         } else {
-            self.look_back_at(Some(self.turn_pos), 1, flag != 0);
+            self.look_back_at(Some(self.turn_pos), true, flag != 0);
         }
         !Medli::calc_timer(&mut self.wait_timer)
     }

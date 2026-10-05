@@ -137,7 +137,8 @@ pub fn control(
         }
         let before = actor.pos;
         rock.frames += 1;
-        actor.pos += rock.integrate(actor.angle[1]);
+        let step = rock.integrate(actor.angle[1]);
+        actor.pos += step;
         let spent = rock.accumulate();
         let landed = ground::grounded(solid, actor.pos);
         let splash = wet && rock.drowned(actor.pos.y);

@@ -794,7 +794,8 @@ impl Stalfos {
     }
 
     fn lean(&mut self) {
-        self.sway = (LEAN * sin_s(self.tick.wrapping_mul(LEAN_RATE) as i16)) as i16;
+        let phase = self.tick.wrapping_mul(LEAN_RATE as u32) as i16;
+        self.sway = (LEAN * sin_s(phase)) as i16;
     }
 
     fn centred(&self) -> bool {
@@ -835,7 +836,7 @@ impl Stalfos {
         self.speed.y -= GRAVITY;
         if let Some(solid) = solid {
             actor.pos = solid.slide(before, actor.pos);
-            if let Some(floor) = ground::surface(solid, actor.pos)
+            if let Some(floor) = ground::surface(Some(solid), actor.pos)
                 && actor.pos.y < floor
             {
                 actor.pos.y = floor;

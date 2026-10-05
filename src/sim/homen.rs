@@ -62,7 +62,7 @@ pub const SPIN_RANGE: f32 = 3072.0;
 pub const SPIN_SCALE: i16 = 20;
 pub const SPIN_FACE_SCALE: i16 = 10;
 pub const SPIN_MAX_STEP: i16 = 0x1000;
-pub const SPIN_FACE: i16 = 0x8000;
+pub const SPIN_FACE: i16 = -0x8000;
 
 pub const ENEMY_ROWS: usize = 11;
 pub const ENEMY_CHUCHU: u8 = 6;

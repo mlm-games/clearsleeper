@@ -1416,7 +1416,7 @@ fn bm1_cut(
     }
     if cut.name == "360_TRN" {
         if let Ok((_, mut body)) = actors.get_mut(owner) {
-            body.angle[1] = body.angle[1].wrapping_add(0x8000);
+            body.angle[1] = body.angle[1].wrapping_add(-0x8000);
         }
     }
     cut_end(run, list, flags);

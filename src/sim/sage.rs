@@ -693,7 +693,7 @@ impl Sage {
     }
 
     pub fn talk01(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_>) -> bool {
-        let status = self.talk(actor.pos, ctx.switches, ctx.text);
+        let status = self.talk(actor.pos, ctx.switches, &mut ctx.text);
         if status == STATUS_BOX_CLOSED {
             self.end_talk();
         }
@@ -873,13 +873,13 @@ pub fn control(
     let tornado = actors
         .iter()
         .find(|(_, actor, _)| actor.name == TORNADO_ACTOR)
-        .map(|(found, _, _)| *found);
+        .map(|(found, _, _)| found);
     let shown_item = if equipped.item(WAKER_SLOT) == ITEM_WIND_WAKER {
         ITEM_WIND_WAKER
     } else {
         ITEM_NONE
     };
-    for (entity, actor, sage) in &mut actors {
+    for (entity, mut actor, mut sage) in &mut actors {
         let actor = &mut *actor;
         let sage = &mut *sage;
         let ordered = do_intent.0 && !sage.do_held;

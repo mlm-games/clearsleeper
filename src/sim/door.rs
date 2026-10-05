@@ -363,7 +363,7 @@ pub fn control(
         door.front_check = door.facing(room);
         door.barrier = door.barrier_value(room >= 0, &switches);
         if let Ok(mut cut) = cuts.get_mut(entity) {
-            drive_cut(door, &mut cut, &mut switches, &mut flags);
+            drive_cut(&mut *door, &mut cut, &mut switches, &mut flags);
         }
         if !door.makes_stop() {
             advance(&mut door);

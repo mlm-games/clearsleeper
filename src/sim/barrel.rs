@@ -296,7 +296,7 @@ impl Barrel {
         };
         if let Some(facing) = facing {
             let wrapped = if facing < 0 {
-                facing.wrapping_add(0x8000)
+                facing.wrapping_add(-0x8000)
             } else {
                 facing
             };

@@ -26,7 +26,7 @@ pub const PROBE: f32 = 1000.0;
 pub const CUT_BIT: [u8; ROPES] = [1, 2, 4];
 pub const CUT_ALL: u8 = 7;
 pub const ROLL_HOLD: [i16; 8] = [
-    0x0001, 0x0000, 0x5555, 0x2AAA, 0xAAAA, 0xD555, 0x8000, 0x0001,
+    0x0001, 0x0000, 0x5555, 0x2AAA, -0x5556, -0x2AAB, -0x8000, 0x0001,
 ];
 pub const LEVEL_ROLL: i16 = 0x0001;
 pub const HANG_NOD: i16 = -0x3000;

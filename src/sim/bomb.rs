@@ -116,19 +116,30 @@ pub fn control(
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
         (
-            Without<Bomb>,
             Without<super::bombflower::Bombflower>,
             Without<super::bombflower::Crawler>,
+            Without<Bomb>,
         ),
     >,
     players: Query<&Player>,
     mut zones: ResMut<ZoneActors>,
     mut events: ResMut<SimEvents>,
     mut published: ResMut<super::bombflower::Blasts>,
-    mut fences: Query<(&Actor, &mut super::barricade::Barricade)>,
+    mut fences: Query<
+        (&Actor, &mut super::barricade::Barricade),
+        (
+            Without<super::bombflower::Bombflower>,
+            Without<super::bombflower::Crawler>,
+            Without<Bomb>,
+        ),
+    >,
     mut floats: Query<
         (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
-        Without<Bomb>,
+        (
+            Without<super::bombflower::Bombflower>,
+            Without<super::bombflower::Crawler>,
+            Without<Bomb>,
+        ),
     >,
     mut switches: ResMut<Switches>,
     mut commands: Commands,

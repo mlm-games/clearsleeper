@@ -305,7 +305,7 @@ pub fn control(
     mut commands: Commands,
 ) {
     if let Some(player) = players.iter().next().copied() {
-        for (_, actor, ray, _) in &rays {
+        for (_, actor, ray) in &rays {
             if !ray.lit {
                 continue;
             }

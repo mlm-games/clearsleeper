@@ -194,17 +194,17 @@ pub fn crawler_control(
     players: Query<&Player>,
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
-        (Without<Bombflower>, Without<Crawler>),
+        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
     >,
     mut events: ResMut<super::events::SimEvents>,
     mut published: ResMut<Blasts>,
     mut fences: Query<
         (&Actor, &mut super::barricade::Barricade),
-        (Without<Crawler>, Without<Bomb>),
+        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
     >,
     mut floats: Query<
         (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
-        (Without<Crawler>, Without<Bomb>),
+        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
     >,
     mut switches: ResMut<super::flags::Switches>,
     mut commands: Commands,
@@ -254,7 +254,7 @@ pub fn crawler_control(
         events.list.push(super::events::SimEvent::Explode);
         blast(
             origin,
-            published,
+            &mut published,
             &mut foes,
             owner,
             &mut zones,
@@ -285,16 +285,13 @@ impl Blasts {
 
 pub fn blast(
     origin: Vec3,
-    published: &mut Blasts,
-    foes: &mut Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
-        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
-    >,
+    published: &mut ResMut<Blasts>,
+    foes: &mut Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
     events: &mut super::events::SimEvents,
-    fences: &mut Query<(&Actor, &mut super::barricade::Barricade)>,
-    floats: &mut Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel)>,
+    fences: &mut Query<(&Actor, &mut super::barricade::Barricade), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
+    floats: &mut Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
     switches: &mut ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {

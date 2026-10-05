@@ -1355,7 +1355,7 @@ impl Msg1Box {
         let text = format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.m1164);
         let rub = "\u{1b}CC[FFFFFFFF]\u{1b}GM[0]";
         let sdw = "\u{1b}CC[000000FF]\u{1b}GM[0]";
-        self.output_text = text.into();
+        self.output_text = text.clone().into();
         self.output_rub = rub.into();
         self.output_text_sdw = sdw.into();
         self.output_rub_sdw = sdw.into();

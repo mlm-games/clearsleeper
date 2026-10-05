@@ -330,7 +330,7 @@ pub const SQUARE_600: f32 = 600.0 * 600.0;
 pub const TURN_WALK: i16 = 0x400;
 pub const TURN_EVENT: i16 = 0x800;
 pub const TURN_SHAPE: i16 = 0x2000;
-pub const TURN_FLIP: i16 = 0x8000;
+pub const TURN_FLIP: i16 = -0x8000;
 pub const ROUTE_ANGLE: i32 = 0x4000;
 pub const BLOCK_PUSH: i16 = 0x4000;
 pub const ROUTE_TURN_WALL: i32 = 0x6000;
@@ -369,7 +369,7 @@ pub const GROUND_CODE_INVALID: i32 = 4;
 pub const GROUND_CODE_NONE: i32 = 0;
 pub const SPECIAL_CODE_NONE: i32 = 1;
 pub const ROOM_STATUS_LOADED: u8 = 0x10;
-pub const ROOM_NO_RESET: i8 = 0xFF;
+pub const ROOM_NO_RESET: i8 = -0x1;
 pub const ROOM_NO_GONE: i8 = -1;
 pub const ROOM_OFF_COUNT_MAX: i8 = 30;
 pub const LANDING_LIMIT: f32 = 200.0;
@@ -2236,7 +2236,10 @@ impl Makar {
                 || (!self.grounded && self.fly_speed == 0)
                 || (self.grounded
                     && self.fly_speed <= HIO_FLY_SPEED_STOP
-                    && (ctx.stick >= HIO_STICK_FACE || (self.land_timer += 1) > HIO_LANDING_LIMIT));
+                    && (ctx.stick >= HIO_STICK_FACE || {
+                        self.land_timer += 1;
+                        self.land_timer > HIO_LANDING_LIMIT
+                    }));
             if landed {
                 self.set_anm(ANM_06, ctx);
                 self.anm_frame = PROPELLER_LAND_FRAME;

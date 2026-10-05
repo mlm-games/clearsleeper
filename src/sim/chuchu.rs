@@ -2450,7 +2450,7 @@ pub fn control(
 ) {
     let solid = watch.collision.as_deref();
     let sea = watch.sea.as_deref();
-    let switches = watch.switches;
+    let switches: &Switches = &watch.switches;
     let Some(player) = watch.players.iter().next().copied() else {
         return;
     };
@@ -2525,7 +2525,7 @@ pub fn control(
             &bombs,
             lit,
             watch.roll.active,
-            &switches,
+            switches,
             &watch.pots,
             &mut events,
         );

@@ -590,7 +590,7 @@ impl Molgera {
                         self.set_anm(Clip::Jattack1, false, ONE);
                         self.se(events, SE_GO_UNDER);
                     } else {
-                        let index = usize::from(self.hop.max(0));
+                        let index = self.hop.max(0) as usize;
                         let next = SFLY_TARGET_X
                             .get(index)
                             .zip(SFLY_TARGET_Y.get(index))

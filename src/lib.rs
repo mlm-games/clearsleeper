@@ -870,7 +870,7 @@ impl App {
                 continue;
             };
             out.push(view::ActorView {
-                pos: actor.pos + Vec3::new(0.0, lift, 0.0),
+                pos: actor.pos + glam::Vec3::new(0.0, lift, 0.0),
                 kind,
                 item,
                 height,
@@ -1036,7 +1036,10 @@ impl App {
             .filter_map(|(entity, actor)| {
                 let index = indices.get((actor.parameters >> 24) as usize).copied().flatten()?;
                 let source = sources.iter().find(|source| {
-                    source.name == actor.name && source.pos.to_bits() == actor.pos.to_bits()
+                    source.name == actor.name
+                        && source.pos[0].to_bits() == actor.pos.x.to_bits()
+                        && source.pos[1].to_bits() == actor.pos.y.to_bits()
+                        && source.pos[2].to_bits() == actor.pos.z.to_bits()
                 });
                 let scale = source.map_or([1.0, 1.0, 1.0], |source| source.scale);
                 Some((

@@ -38,7 +38,7 @@ pub fn is_carryable(name: &str) -> bool {
         || name == PIG_ACTOR
 }
 
-fn chain_from(carryables: &Query<(Entity, &Actor, &Carryable)>, base: Entity) -> Vec<Entity> {
+fn chain_from<D: bevy_ecs::query::QueryFilter>(carryables: &Query<(Entity, &Actor, &Carryable), D>, base: Entity) -> Vec<Entity> {
     let mut out = vec![base];
     for (entity, _, _) in carryables.iter() {
         if out.len() >= MAX_STACK {

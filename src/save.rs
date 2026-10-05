@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
+use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
@@ -128,6 +129,7 @@ impl From<SavedPlayer> for Player {
             face: saved.yaw,
             speed: saved.speed,
             speed_y: saved.speed_y,
+            drift: Vec3::ZERO,
         }
     }
 }

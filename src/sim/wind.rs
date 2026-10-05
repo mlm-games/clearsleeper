@@ -243,7 +243,8 @@ pub fn control(
     for (_, mut tag) in &mut tags {
         let swbit = tag.switch_no;
         let set = swbit != NO_SWITCH && switches.test(swbit);
-        tag.step(tag.primed(set) && tag.scheduled(&schedule));
+        let go = tag.primed(set) && tag.scheduled(&schedule);
+        tag.step(go);
         if tag.visible() {
             audible = true;
             strongest = strongest.max(tag.ratio());

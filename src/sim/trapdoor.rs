@@ -17,7 +17,7 @@ pub const STILL_SPEED: f32 = 0.0;
 pub const HOLD_FRAMES: u8 = 0;
 pub const STEPS: usize = 7;
 pub const SWING: [i16; STEPS] = [
-    0xC568, 0xD508, 0xC950, 0xD120, 0xCD38, 0xCF2C, 0xCE32,
+    -0x3A98, -0x2AF8, -0x36B0, -0x2EE0, -0x32C8, -0x30D4, -0x31CE,
 ];
 pub const TURN_SCALE: i16 = 4;
 pub const TURN_MAX_STEP: i16 = 0x2000;

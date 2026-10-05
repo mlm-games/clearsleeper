@@ -248,7 +248,7 @@ pub fn control(
             let _ = commands.entity(entity).despawn();
             continue;
         }
-        if latched(statue, &switches) {
+        if latched(&*statue, &switches) {
             statue.enter(Step::Cut);
             statue.shatter();
             events.list.push(SimEvent::Se(SE_RIDDLE));

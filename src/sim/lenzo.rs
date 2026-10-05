@@ -688,7 +688,7 @@ impl Lenzo {
     fn camera_at(&self) -> i8 {
         self.cam_tbl
             .and_then(|table| table.get(self.cam_at).copied())
-            .map_or(MSG_CAM_NONE, i8::from)
+            .map_or(MSG_CAM_NONE, |value| value as i8)
     }
 
     fn bump_message(&mut self) {
@@ -1119,10 +1119,10 @@ impl Lenzo {
         let Some(cut) = ctx.active.cut_of(usize::from(idx as u16), staff) else {
             return;
         };
-        let Some(row) = ctx.list.cuts.get(cut.max(0) as usize) else {
+        let Some(name) = ctx.list.cut_name(cut.max(0) as usize) else {
             return;
         };
-        let Some(act) = CUT_NAMES.iter().position(|name| *name == row.name) else {
+        let Some(act) = CUT_NAMES.iter().position(|cut_name| *cut_name == name) else {
             return;
         };
         let act = act as i8;
@@ -1249,7 +1249,7 @@ impl Lenzo {
         if slot == 3 {
             slot = 0;
         }
-        self.rng_msg_no = MSG_2F.get(slot).copied().map_or(0, i32::from);
+        self.rng_msg_no = MSG_2F.get(slot).copied().map_or(0, |msg| msg as i32);
     }
 
     fn event_set_angle_init(&mut self, ctx: &Ctx<'_>) {

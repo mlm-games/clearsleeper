@@ -286,7 +286,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let princess = zelda::Zelda::spawn(source.parameters);
         world.spawn((actor, princess)).id()
     } else if source.name == tingle::TINGLE_ACTOR {
-        world.spawn((actor, tingle::Tingle::spawn(actor.pos))).id()
+        let home = actor.pos;
+        world.spawn((actor, tingle::Tingle::spawn(home))).id()
     } else if chest::is_chest(&source.name) {
         let box_ = chest::Chest::spawn(source.parameters, source.angle[2], source.room);
         world.spawn((actor, box_)).id()

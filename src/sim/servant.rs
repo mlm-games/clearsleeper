@@ -67,7 +67,7 @@ const FINISH_ORDER_HELD: [i8; 3] = [0xB, 0xD, 0xF];
 const MESSAGE_ORDER: [i8; 3] = [7, 8, 9];
 const ORDER_TALK_LOW: i8 = 0x11;
 const ORDER_TALK_HIGH: i8 = 0x12;
-const ORDER_SPOKEN: i8 = 0xFF;
+const ORDER_SPOKEN: i8 = -0x1;
 const ORDER_LIMIT: i8 = 0x10;
 
 const FINISH_HOME_POS: [Vec3; 3] = [
@@ -135,7 +135,7 @@ const ROUTE_CROSS_MIN: f32 = 1.0;
 const ROUTE_ANGLE: u16 = 0x4000;
 const ROUTE_TURN: u16 = 0x800;
 const ROUTE_FACE: u16 = 0x2000;
-const ROUTE_FLIP: i16 = 0x8000;
+const ROUTE_FLIP: i16 = -0x8000;
 const STOP_SPEED: f32 = 0.001;
 const NO_GROUND_Y: f32 = -1.0e7;
 
@@ -173,6 +173,7 @@ const BRK_PAIR: [(i8, i8); BRK_ROWS] = [
     (0, 5),
     (0, 6),
     (4, 7),
+    (0, 8),
 ];
 
 const BRK_INIT: i8 = 9;
@@ -187,7 +188,7 @@ const SE_BLINK: u32 = 0x50FF;
 const SE_LIGHT_SUSTAIN: u32 = 0x7046;
 
 const STICK_REACH: f32 = 100.0;
-const STICK_HALF: i16 = 0x8000;
+const STICK_HALF: i16 = -0x8000;
 const ATTN_DIST_BONUS: f32 = 40.0;
 const ATTN_ANGLE_BONUS: i32 = 0x71C;
 
@@ -234,7 +235,7 @@ pub enum Step {
     WalkPlayer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Param {
     Null,
     Marked,
@@ -390,7 +391,7 @@ impl Servant {
             base: Vec3::ZERO,
             offset: Vec3::ZERO,
             normal: Vec3::ZERO,
-            event_id: [NO_STEP; EVENT_SLOTS],
+            event_id: [NO_STEP as i16; EVENT_SLOTS],
             angles: [[0, 0], [0, 0]],
             max_angles: [
                 [HIO_MAX_HEAD_X, HIO_MAX_HEAD_Y],
@@ -713,7 +714,7 @@ impl Servant {
         if self.brk == brk {
             return true;
         }
-        let index = brk.clamp(0, BRK_ROWS as i32 - 1) as usize;
+        let index = brk.clamp(0, BRK_ROWS as i8 - 1) as usize;
         let (speed, at_end) = BRK_TABLE.get(index).copied().unwrap_or(BRK_TABLE[0]);
         self.brk = brk;
         self.brk_speed = speed;
@@ -1210,7 +1211,7 @@ impl Servant {
             self.event_id[slot] = list
                 .event_index(name)
                 .and_then(|index| i16::try_from(index).ok())
-                .unwrap_or(NO_STEP);
+                .unwrap_or(NO_STEP as i16);
         }
     }
 

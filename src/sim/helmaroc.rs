@@ -2022,7 +2022,7 @@ impl Helmaroc {
                             actor.angle[ANGLE_Z].wrapping_add(REG0_S7 + 0x50);
                         if self.timers[1] == 0 {
                             self.state = 0xC;
-                            self.target_yaw = actor.angle[ANGLE_Y].wrapping_add(0x8000);
+                            self.target_yaw = actor.angle[ANGLE_Y].wrapping_add(-0x8000);
                             self.timers[0] = REG0_S8 + 0x28;
                             self.anm_init(BCK_FLY2, 5.0, EMODE_LOOP, 2.0, 0xC, 0);
                         }
@@ -2602,7 +2602,7 @@ impl Helmaroc {
             self.speed.y = -1.0;
             falling = true;
         }
-        let mut angle = env.player_bearing(actor.pos).wrapping_sub(0x8000);
+        let mut angle = env.player_bearing(actor.pos).wrapping_sub(-0x8000);
         if angle < -0xEB8 {
             angle = -0xEB8;
         } else if 0xE8 < angle {
@@ -2610,7 +2610,7 @@ impl Helmaroc {
         }
         add_calc_angle_s2(
             &mut actor.angle[ANGLE_Y],
-            angle.wrapping_add(0x8000),
+            angle.wrapping_add(-0x8000),
             TURN_DIV_WALK,
             TURN_CAP as i16,
         );

@@ -257,7 +257,7 @@ pub const SHOP_BUYER_POS: [Vec3; 4] = [
     Vec3::new(1985.0, 672.0, -203786.0),
 ];
 
-pub const STALL_Y: [i16; ROTEN_ROWS] = [0xE800, 0xE400, 0xE000, 0xDC00];
+pub const STALL_Y: [i16; ROTEN_ROWS] = [-0x1800, -0x1C00, -0x2000, -0x2400];
 
 pub const CUT_NAMES: [&str; 4] = ["TALKMSG", "CONTINUE_TALK", "SETANM", "TURN"];
 
@@ -1110,13 +1110,13 @@ impl Zunari {
         } else {
             self.path_index - 1
         };
-        let at = usize::try_from(temp).unwrap_or(usize::MAX);
+        let at = temp as usize;
         let point = self.path_point_pos.get(at).copied().unwrap_or(Vec3::ZERO);
-        let mark_at = self.path_point_mark.get(at).copied().unwrap_or(NO_POINT);
+        let mark_at: i8 = self.path_point_mark.get(at).copied().unwrap_or(NO_POINT as i8);
         let chase_result = chase_pos_xz(&mut actor.pos, point, HIO_CHASE_STEP);
         if chase_result {
             self.path_index = temp;
-            if mark_at != NO_POINT {
+            if mark_at as u8 != NO_POINT {
                 let temp2 = i32::from(mark_at) - 1;
                 let temp3 = temp2 + 9;
                 self.shop_idx = temp2;

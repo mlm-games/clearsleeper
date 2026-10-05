@@ -163,7 +163,7 @@ impl Ice {
 }
 
 fn profile(radius: f32) -> f32 {
-    1.0 - stream::cos_s((radius * PROFILE) as i16)
+    1.0 - stream::cos_s((radius * f32::from(PROFILE)) as i16)
 }
 
 pub fn is_ice(name: &str) -> bool {
