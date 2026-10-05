@@ -1422,7 +1422,7 @@ impl Grammarian {
 
     pub fn wait_0(&mut self, actor: &mut Actor, ctx: &mut Ctx) -> bool {
         self.turn_home(actor);
-        if self.order == ORDER_SPEAK || self.order >= ORDER_OFFSET {
+        if self.order == ORDER_SPEAK || i16::from(self.order) >= i16::from(ORDER_OFFSET) {
             return true;
         }
         self.order = ORDER_NONE;
@@ -1439,7 +1439,7 @@ impl Grammarian {
 
     pub fn wait_1(&mut self, actor: &mut Actor, ctx: &mut Ctx) -> bool {
         self.turn_home(actor);
-        if self.order == ORDER_SPEAK || self.order >= ORDER_OFFSET {
+        if self.order == ORDER_SPEAK || i16::from(self.order) >= i16::from(ORDER_OFFSET) {
             return true;
         }
         if self.order_talk {
@@ -1462,7 +1462,7 @@ impl Grammarian {
 
     pub fn wait_2(&mut self, actor: &mut Actor, ctx: &mut Ctx) -> bool {
         self.turn_home(actor);
-        if self.order == ORDER_SPEAK || self.order >= ORDER_OFFSET {
+        if self.order == ORDER_SPEAK || i16::from(self.order) >= i16::from(ORDER_OFFSET) {
             return true;
         }
         if self.order_talk {
@@ -1503,7 +1503,7 @@ impl Grammarian {
     }
 
     pub fn zzzwai(&mut self, actor: &mut Actor, ctx: &mut Ctx) -> bool {
-        if self.order == ORDER_SPEAK || self.order >= ORDER_OFFSET {
+        if self.order == ORDER_SPEAK || i16::from(self.order) >= i16::from(ORDER_OFFSET) {
             return true;
         }
         if self.fairy_used {
@@ -1815,7 +1815,7 @@ impl Grammarian {
                 ctx.active.order(ctx.list, EVENT_IDX_SPEAK, ctx.entity);
             }
         } else if condition >= ORDER_OFFSET {
-            self.event_index = condition.wrapping_sub(ORDER_OFFSET);
+            self.event_index = i16::from(condition).wrapping_sub(i16::from(ORDER_OFFSET));
             if let Some(index) = self.event_slot_of(self.event_index) {
                 ctx.active.order(ctx.list, index, ctx.entity);
             }
@@ -1930,7 +1930,7 @@ impl Grammarian {
     pub fn ev_draw_control(
         &mut self,
         actor: &mut Actor,
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         prm_0: Option<i32>,
         prm_1: Option<i32>,
     ) {
@@ -2342,7 +2342,7 @@ impl Text<'_> {
             archive,
             self.clear_count,
             msg_no,
-            MSG_ACTOR_SLOT,
+            Some(MSG_ACTOR_SLOT),
             eye,
         )
     }
@@ -2421,8 +2421,8 @@ pub struct Msg<'w, 's> {
 }
 
 pub fn control(
-    world: World,
-    msg: Msg,
+    mut world: World,
+    mut msg: Msg,
     others: Query<(Entity, &Actor), Without<Grammarian>>,
     mut actors: Query<(Entity, &mut Actor, &mut Grammarian)>,
 ) {
@@ -2432,7 +2432,7 @@ pub fn control(
         .archive
         .as_deref()
         .map(|archive| archive as &dyn MsgArchive);
-    for (entity, actor, gram) in &mut actors {
+    for (entity, mut actor, mut gram) in &mut actors {
         let actor = &mut *actor;
         let gram = &mut *gram;
         let mut text = Text {

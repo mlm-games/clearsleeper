@@ -1537,7 +1537,7 @@ impl Aryll {
             return;
         }
         if self.order >= ORDER_EVENT {
-            self.event_index = self.order.wrapping_sub(ORDER_EVENT);
+            self.event_index = i16::from(self.order).wrapping_sub(i16::from(ORDER_EVENT));
             let slot = self.event_slot_of(self.event_index);
             let name = slot
                 .and_then(|slot| EVENT_NAMES.get(slot).copied())

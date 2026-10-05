@@ -789,7 +789,7 @@ pub fn fop_msgm_message_set_actor<F: MsgArchive + ?Sized>(
     archive: &F,
     clear_count: u8,
     i_msg_no: u32,
-    i_actor: u32,
+    i_actor: Option<u32>,
     i_eye_pos: Vec3,
 ) -> u32 {
     message_set_dispatch(
@@ -798,7 +798,7 @@ pub fn fop_msgm_message_set_actor<F: MsgArchive + ?Sized>(
         archive,
         clear_count,
         i_msg_no,
-        Some(i_actor),
+        i_actor,
         i_eye_pos,
     )
 }

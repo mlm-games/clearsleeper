@@ -12,9 +12,10 @@ pub const LAST_OFFSET: usize = 0x2C;
 
 pub const FRAME_HEADER: usize = 0x10;
 pub const AUDIO_HEADER: usize = 0x50;
-pub const COEFFICIENT: usize = 0x08;
-pub const SCALE: usize = 0x28;
-pub const PREVIOUS: usize = 0x48;
+pub const LEFT_FILTER: usize = 0x08;
+pub const RIGHT_FILTER: usize = 0x28;
+pub const LEFT_PREVIOUS: usize = 0x48;
+pub const RIGHT_PREVIOUS: usize = 0x4C;
 
 const DEFAULT_RATE: f32 = 29.97;
 const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
@@ -126,13 +127,9 @@ impl Movie {
         let split = AUDIO_HEADER + channel_bytes as usize;
         Ok(AudioBlock {
             samples: be32(&span, 4) as usize,
-            coefficient: table(&span, COEFFICIENT),
-            scale: table(&span, SCALE),
-            previous: [
-                [i16_at(&span, PREVIOUS), i16_at(&span, PREVIOUS + 2)],
-                [i16_at(&span, PREVIOUS + 4), i16_at(&span, PREVIOUS + 6)],
-            ],
-            channels: [span[AUDIO_HEADER..split].to_vec(), span[split..].to_vec()],
+            left: channel(&span, AUDIO_HEADER, LEFT_FILTER, LEFT_PREVIOUS, split),
+            right: (channel_bytes > 0)
+                .then(|| channel(&span, split, RIGHT_FILTER, RIGHT_PREVIOUS, len)),
         })
     }
 
@@ -148,10 +145,116 @@ impl Movie {
 
 pub struct AudioBlock {
     pub samples: usize,
-    pub coefficient: [i16; 16],
-    pub scale: [i16; 16],
-    pub previous: [[i16; 2]; 2],
-    pub channels: [Vec<u8>; 2],
+    pub left: Channel,
+    pub right: Option<Channel>,
+}
+
+pub struct Channel {
+    filter: [[i16; 2]; 8],
+    previous: [i16; 2],
+    encoded: Vec<u8>,
+}
+
+struct Nibbles<'a> {
+    data: &'a [u8],
+    at: usize,
+    offset: u32,
+    predictor: usize,
+    scale: u32,
+}
+
+struct Voice<'a> {
+    filter: [[i16; 2]; 8],
+    previous: [i16; 2],
+    nibbles: Nibbles<'a>,
+}
+
+fn sign_extend(value: u8) -> i32 {
+    let value = i32::from(value & 0x0F);
+    value - if value & 0x08 != 0 { 0x10 } else { 0 }
+}
+
+impl<'a> Voice<'a> {
+    fn new(channel: &'a Channel) -> Self {
+        let first = channel.encoded.first().copied().unwrap_or(0);
+        Self {
+            filter: channel.filter,
+            previous: channel.previous,
+            nibbles: Nibbles {
+                data: &channel.encoded,
+                at: 1,
+                offset: 2,
+                predictor: usize::from((first & 0x70) >> 4),
+                scale: u32::from(first & 0x0F),
+            },
+        }
+    }
+
+    fn next(&mut self) -> i32 {
+        if self.nibbles.offset & 0x0F == 0 {
+            let byte = self.nibbles.data.get(self.nibbles.at).copied().unwrap_or(0);
+            self.nibbles.predictor = usize::from((byte & 0x70) >> 4);
+            self.nibbles.scale = u32::from(byte & 0x0F);
+            self.nibbles.at += 1;
+            self.nibbles.offset += 2;
+        }
+        let byte = self.nibbles.data.get(self.nibbles.at).copied().unwrap_or(0);
+        let delta = if self.nibbles.offset & 1 == 1 {
+            self.nibbles.at += 1;
+            sign_extend(byte)
+        } else {
+            sign_extend(byte >> 4)
+        };
+        self.nibbles.offset += 1;
+
+        let pair = self.filter[self.nibbles.predictor & 7];
+        let mut yn = i64::from(pair[1]) * i64::from(self.previous[1]);
+        yn += i64::from(pair[0]) * i64::from(self.previous[0]);
+        yn += (i64::from(delta) << self.nibbles.scale) << 11;
+        yn <<= 5;
+        let half = yn & 0xFFFF;
+        if half > 0x8000 || (half == 0x8000 && yn & 0x10000 != 0) {
+            yn += 0x10000;
+        }
+        let value = yn.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) >> 16;
+        let value = value as i16;
+        self.previous = [value, self.previous[0]];
+        i32::from(value)
+    }
+}
+
+impl AudioBlock {
+    pub fn decode(&self, out: &mut Vec<i16>) {
+        let mut left = Voice::new(&self.left);
+        let mut right = self.right.as_ref().map(Voice::new);
+        out.reserve(self.samples * 2);
+        for _ in 0..self.samples {
+            let first = left.next();
+            match right.as_mut() {
+                Some(voice) => {
+                    out.push(first);
+                    out.push(voice.next());
+                }
+                None => {
+                    out.push(first);
+                    out.push(first);
+                }
+            }
+        }
+    }
+}
+
+fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) -> Channel {
+    Channel {
+        filter: std::array::from_fn(|pair| {
+            [
+                i16_at(span, filter + 4 * pair),
+                i16_at(span, filter + 4 * pair + 2),
+            ]
+        }),
+        previous: [i16_at(span, previous), i16_at(span, previous + 2)],
+        encoded: span.get(from..to).unwrap_or_default().to_vec(),
+    }
 }
 
 fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<Vec<Frame>, MovieError> {
@@ -203,8 +306,12 @@ fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<
     Ok(frames)
 }
 
-fn table(span: &[u8], at: usize) -> [i16; 16] {
-    std::array::from_fn(|index| i16_at(span, at + 2 * index))
+fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) -> Channel {
+    Channel {
+        filter: std::array::from_fn(|pair| [i16_at(span, filter + 4 * pair), i16_at(span, filter + 4 * pair + 2)]),
+        previous: [i16_at(span, previous), i16_at(span, previous + 2)],
+        encoded: span.get(from..to).unwrap_or_default().to_vec(),
+    }
 }
 
 pub fn title_path() -> PathBuf {
