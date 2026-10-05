@@ -1528,7 +1528,7 @@ pub fn fop_msgm_out_font_stick_anime2(
     i_sdw_pic.rotate(angle);
 
     *i_timer += 1;
-    if *i_timer >= temp as i32 * 2 {
+    if i32::from(*i_timer) >= i32::from(temp) * 2 {
         *i_timer = 0;
     }
 }
@@ -1576,7 +1576,7 @@ pub fn fop_msgm_out_font_stick_anime2_offsets(
     i_icon_pic.rotate(rot as f32 * ROTATE_STEP);
 
     *i_timer += 1;
-    if *i_timer >= temp as i32 * 2 {
+    if i32::from(*i_timer) >= i32::from(temp) * 2 {
         *i_timer = 0;
     }
 }

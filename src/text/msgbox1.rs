@@ -1359,7 +1359,7 @@ impl Msg1Box {
         self.output_rub = rub.into();
         self.output_text_sdw = sdw.into();
         self.output_rub_sdw = sdw.into();
-        self.select_text = text.into();
+        self.select_text = text.clone().into();
         self.select_rub = rub.into();
         self.select_text_sdw = sdw.into();
         self.select_rub_sdw = sdw.into();

@@ -208,7 +208,7 @@ impl<'a> Voice<'a> {
         }
     }
 
-    fn next(&mut self) -> i32 {
+    fn next(&mut self) -> i16 {
         if self.nibbles.offset & 0x0F == 0 {
             let byte = self.nibbles.data.get(self.nibbles.at).copied().unwrap_or(0);
             self.nibbles.predictor = usize::from((byte & 0x70) >> 4);
@@ -237,7 +237,7 @@ impl<'a> Voice<'a> {
         let value = yn.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) >> 16;
         let value = value as i16;
         self.previous = [value, self.previous[0]];
-        i32::from(value)
+        value
     }
 }
 

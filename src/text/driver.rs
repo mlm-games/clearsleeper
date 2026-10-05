@@ -8,7 +8,10 @@ use super::msgdata::MsgStickFlags;
 use super::msgbox1::{Msg1Box, Msg1Ctx, Msg1Env, Msg1Hio, Msg1Screen, Msg1Stick};
 use super::msgdata::MsgLenState;
 use super::msgproc::{MeterMsgHio, MsgGameInfo, MsgProcs, FPC_NM_MSG2};
+use super::msgget::MsgArchive;
 use super::msglayout::MsgLayoutState;
+
+pub const COLOR_TABLE: &str = "color.bmc";
 
 pub const FONT_SLOTS: usize = 2;
 pub const MAIN_FONT: usize = 0;
@@ -197,6 +200,7 @@ impl TextDriver {
         npc: &'a [u8],
         item: &'a [u8],
         password: &'a [u8],
+        clt1: &'a [u8],
     ) -> MsgLayoutState<'a> {
         MsgLayoutState {
             player_name: self.names.player(),
@@ -210,7 +214,7 @@ impl TextDriver {
             clear_count: self.flags.clear_count,
             next_msg_flag: self.flags.next_msg,
             msg_hio_0x6c: 0,
-            color_clt1: self.layout.color(),
+            color_clt1: clt1,
             event_reg_beff: self.counters.event_reg_beff,
             event_reg_ba0f: self.counters.event_reg_ba0f,
             event_reg_8aff: self.counters.event_reg_8aff,
@@ -250,9 +254,7 @@ impl TextDriver {
 
 pub fn load_fonts(fonts: &mut FontBank) {
     while fonts.len() < FONT_SLOTS {
-        if !fonts.insert(ResFont::from_bytes(fontdata::ASCENT_FIX12)) {
-            break;
-        }
+        fonts.insert(ResFont::from_bytes(fontdata::ASCENT_FIX12));
     }
 }
 
@@ -304,6 +306,7 @@ pub fn control(
                     driver.names.npc().as_bytes(),
                     driver.names.item().as_bytes(),
                     driver.names.password().as_bytes(),
+                    archive.resource(COLOR_TABLE).unwrap_or_default(),
                 );
                 let mut ctx = Msg2Ctx {
                     hio: &driver.msg2_hio,
@@ -334,6 +337,7 @@ pub fn control(
                 driver.names.npc().as_bytes(),
                 driver.names.item().as_bytes(),
                 driver.names.password().as_bytes(),
+                archive.resource(COLOR_TABLE).unwrap_or_default(),
             );
             let mut ctx = Msg2Ctx {
                 hio: &driver.msg2_hio,
@@ -371,6 +375,7 @@ pub fn control(
                 driver.names.npc().as_bytes(),
                 driver.names.item().as_bytes(),
                 driver.names.password().as_bytes(),
+                archive.resource(COLOR_TABLE).unwrap_or_default(),
             );
             let mut ctx = Msg1Ctx {
                 hio: &driver.msg1_hio,
@@ -400,6 +405,7 @@ pub fn control(
         driver.names.npc().as_bytes(),
         driver.names.item().as_bytes(),
         driver.names.password().as_bytes(),
+        archive.resource(COLOR_TABLE).unwrap_or_default(),
     );
     let mut env = Msg1Env::default();
     let mut ctx = Msg1Ctx {

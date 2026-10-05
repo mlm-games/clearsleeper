@@ -143,8 +143,8 @@ pub fn title_view() -> View {
     Column(
         Modifier::new()
             .fill_max_size()
-            .justify_content(JustifyContent::SpaceBetween)
-            .align_items(AlignItems::Center)
+            .justify_content(JustifyContent::SPACE_BETWEEN)
+            .align_items(AlignItems::CENTER)
             .padding(56.dp())
             .hit_passthrough(),
     )

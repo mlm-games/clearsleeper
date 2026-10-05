@@ -381,7 +381,7 @@ impl ResFont {
             dst.b = entry.b;
         }
         let font_code = self.font_code(code as i32);
-        self.load_image(font_code);
+        self.load_image(font_code as u16);
     }
 
     pub fn load_image(&mut self, code_in: u16) {
@@ -934,7 +934,7 @@ impl CacheFont {
             dst.b = entry.b;
         }
         let font_code = self.font_code(code as i32);
-        self.load_image(font_code);
+        self.load_image(font_code as u16);
     }
 
     pub fn tex_page(&self) -> &[u8] {
