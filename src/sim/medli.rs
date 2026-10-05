@@ -3,6 +3,8 @@ use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::arrow;
+use super::wind::WindTag;
 use super::area::StageName;
 use super::carry::Carry;
 use super::collision::Collision;
@@ -13,6 +15,7 @@ use super::ground;
 use super::water::Water;
 use super::intent::{DoIntent, MoveIntent, TargetIntent};
 use super::player::Player;
+use super::taglight::TagLight;
 use super::ship::Ship;
 use super::transition::{NextStage, Target};
 use super::stream;
@@ -188,11 +191,228 @@ pub const HEIGHT: f32 = 120.0;
 pub const HEIGHT_SQUAT: f32 = 75.0;
 pub const MAX_FALL: f32 = -100.0;
 pub const CYL_RADIUS: f32 = 30.0;
+pub const CYL_HEIGHT: f32 = 120.0;
+pub const CYL_SRC_RADIUS: f32 = 30.0;
+pub const CYL_SRC_HEIGHT: f32 = 80.0;
+pub const CPS_SRC_RADIUS: f32 = 70.0;
 pub const CPS_RADIUS: f32 = 20.0;
 pub const ACCH_ROOF_HEIGHT: f32 = 120.0;
+pub const WALL_CIR_NONE: i8 = -1;
+pub const WALL_CIR_NONE_ANGLE: i16 = -1;
+pub const WALL_PROBE_DIRS: usize = 8;
+pub const ANGLE_TURN_F: f32 = 6.2831855;
+pub const ROOF_PROBE_OFFSETS: [(f32, f32); 4] = [(0.0, 0.0), (20.0, 0.0), (-20.0, 0.0), (0.0, 20.0)];
 pub const ACCH_CIR0_WALL: [f32; 2] = [20.0, 20.0];
 pub const ACCH_CIR1_WALL: [f32; 2] = [60.0, 20.0];
 pub const ACCH_CIR1_WALL_FLY: [f32; 2] = [60.0, 60.0];
+
+pub const AT_TYPE_BOOMERANG: u32 = 1 << 6;
+pub const AT_TYPE_WIND: u32 = 1 << 21;
+pub const AT_TYPE_LIGHT: u32 = 1 << 23;
+pub const AT_TYPE_ALL: u32 = !0u32;
+
+pub const CYL1_TG_TYPE: u32 = AT_TYPE_ALL & !(AT_TYPE_BOOMERANG | AT_TYPE_WIND | AT_TYPE_LIGHT);
+pub const CYL1_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_PLAYER;
+pub const CYL1_CO_SPRM: u32 = CCC_CO_SET | CCC_CO_IS_PLAYER | CCC_CO_VS_GRP_ALL;
+
+pub const CYL2_TG_TYPE: u32 = AT_TYPE_WIND;
+pub const CYL2_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_ENEMY;
+
+pub const CYL3_TG_TYPE: u32 = AT_TYPE_LIGHT;
+pub const CYL3_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_ENEMY;
+
+pub const CPS_AT_TYPE: u32 = AT_TYPE_LIGHT;
+pub const CPS_ATP: u8 = 0;
+pub const CPS_TG_SPRM: u32 = CCT_TG_SET | CCT_TG_IS_GRP_ALL;
+
+pub const CYL_AT_TYPE: u32 = 0;
+pub const CYL_ATP: u8 = 0;
+pub const CYL_CO_SPRM: u32 = 0;
+
+pub const CCT_TG_SET: u32 = 0x01;
+pub const CCT_TG_IS_ENEMY: u32 = 0x02;
+pub const CCT_TG_IS_PLAYER: u32 = 0x04;
+pub const CCT_TG_IS_OTHER: u32 = 0x08;
+pub const CCT_TG_IS_GRP_ALL: u32 = CCT_TG_IS_ENEMY | CCT_TG_IS_PLAYER | CCT_TG_IS_OTHER;
+
+pub const CCC_CO_SET: u32 = 0x01;
+pub const CCC_CO_IS_PLAYER: u32 = 0x04;
+pub const CCC_CO_VS_GRP_ALL: u32 = 0x10 | 0x20 | 0x40;
+
+pub const STTS_MIN_FIELD: u8 = 0xFE;
+pub const STTS_MAX: u8 = 0xFF;
+pub const STTS_MIN_OTHER: u8 = 0xFF;
+
+pub const MS_LIGHT_LOCAL_VEC: Vec3 = Vec3::new(0.0, 0.0, -10000.0);
+pub const MS_LIGHT_LOCAL_START: Vec3 = Vec3::new(5.0, 7.0, 0.0);
+pub const HARP_HIO_TRANS: Vec3 = Vec3::new(-5.0, -5.0, 0.0);
+pub const PLAYER_TG_REACH: f32 = 30.0;
+pub const LIGHT_ARROW_REACH: f32 = 10.0;
+pub const LAMP_REACH: f32 = 200.0;
+pub const WIND_SWITCH_NONE: u8 = 0xFF;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MdCyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub at_type: u32,
+    pub at_atp: u8,
+    pub at_sprm: u32,
+    pub tg_type: u32,
+    pub tg_sprm: u32,
+    pub co_sprm: u32,
+    pub stts_min: u8,
+    pub stts_max: u8,
+    pub registered: bool,
+    pub co_hit: bool,
+    pub tg_hit: bool,
+    pub tg_pos: Vec3,
+    pub tg_rvec: Vec3,
+    pub tg_at_type: u32,
+    pub tg_ac: bool,
+}
+
+impl MdCyl {
+    pub const CYL1: MdCyl = MdCyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: CYL_SRC_HEIGHT,
+        at_type: CYL_AT_TYPE,
+        at_atp: CYL_ATP,
+        at_sprm: 0,
+        tg_type: CYL1_TG_TYPE,
+        tg_sprm: CYL1_TG_SPRM,
+        co_sprm: CYL1_CO_SPRM,
+        stts_min: STTS_MIN_FIELD,
+        stts_max: STTS_MAX,
+        registered: false,
+        co_hit: false,
+        tg_hit: false,
+        tg_pos: Vec3::ZERO,
+        tg_rvec: Vec3::ZERO,
+        tg_at_type: 0,
+        tg_ac: false,
+    };
+
+    pub const CYL2: MdCyl = MdCyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: CYL_SRC_HEIGHT,
+        at_type: CYL_AT_TYPE,
+        at_atp: CYL_ATP,
+        at_sprm: 0,
+        tg_type: CYL2_TG_TYPE,
+        tg_sprm: CYL2_TG_SPRM,
+        co_sprm: CYL_CO_SPRM,
+        stts_min: STTS_MIN_FIELD,
+        stts_max: STTS_MAX,
+        registered: false,
+        co_hit: false,
+        tg_hit: false,
+        tg_pos: Vec3::ZERO,
+        tg_rvec: Vec3::ZERO,
+        tg_at_type: 0,
+        tg_ac: false,
+    };
+
+    pub const CYL3: MdCyl = MdCyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: CYL_SRC_HEIGHT,
+        at_type: CYL_AT_TYPE,
+        at_atp: CYL_ATP,
+        at_sprm: 0,
+        tg_type: CYL3_TG_TYPE,
+        tg_sprm: CYL3_TG_SPRM,
+        co_sprm: CYL_CO_SPRM,
+        stts_min: STTS_MIN_FIELD,
+        stts_max: STTS_MAX,
+        registered: false,
+        co_hit: false,
+        tg_hit: false,
+        tg_pos: Vec3::ZERO,
+        tg_rvec: Vec3::ZERO,
+        tg_at_type: 0,
+        tg_ac: false,
+    };
+
+    pub fn touches(&self, at: Vec3, reach: f32) -> bool {
+        let dx = self.centre.x - at.x;
+        let dz = self.centre.z - at.z;
+        let flat = (dx * dx + dz * dz).sqrt();
+        if flat >= self.radius + reach {
+            return false;
+        }
+        let hi = at.y + reach;
+        let lo = at.y - reach;
+        hi >= self.centre.y && lo <= self.centre.y + self.height
+    }
+
+    pub fn co_set(&self) -> bool {
+        self.registered && self.co_sprm & CCC_CO_SET != 0
+    }
+
+    pub fn blocks(&self, at: Vec3) -> bool {
+        self.co_set() && self.touches(at, 0.0)
+    }
+
+    pub fn tg_set(&self) -> bool {
+        self.registered && self.tg_sprm & CCT_TG_SET != 0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MdCps {
+    pub start: Vec3,
+    pub end: Vec3,
+    pub radius: f32,
+    pub at_type: u32,
+    pub at_atp: u8,
+    pub at_sprm: u32,
+    pub tg_sprm: u32,
+    pub co_sprm: u32,
+    pub at_set: bool,
+    pub registered: bool,
+    pub mass: u32,
+    pub at_hit: bool,
+    pub at_pos: Vec3,
+}
+
+impl MdCps {
+    pub const SRC: MdCps = MdCps {
+        start: Vec3::ZERO,
+        end: Vec3::ZERO,
+        radius: CPS_SRC_RADIUS,
+        at_type: CPS_AT_TYPE,
+        at_atp: CPS_ATP,
+        at_sprm: 0,
+        tg_sprm: CPS_TG_SPRM,
+        co_sprm: 0,
+        at_set: false,
+        registered: false,
+        mass: 0,
+        at_hit: false,
+        at_pos: Vec3::ZERO,
+    };
+
+    pub fn hits(&self, at: Vec3) -> bool {
+        if !self.at_set || self.radius <= 0.0 {
+            return false;
+        }
+        let axis = self.end - self.start;
+        let len_sq = axis.length_squared();
+        if len_sq < CM3D_F_ABS_MIN {
+            return (at - self.start).length() < self.radius;
+        }
+        let t = (at - self.start).dot(axis) / len_sq;
+        if !(0.0..=1.0).contains(&t) {
+            return false;
+        }
+        let closest = self.start + axis * t;
+        (at - closest).length() < self.radius
+    }
+}
 
 pub const ANM_WAIT: i32 = 0x00;
 pub const ANM_WALK: i32 = 0x01;
@@ -234,6 +454,13 @@ pub const ANM_SHIPTALK01: i32 = 0x24;
 pub const ANM_TALK05: i32 = 0x25;
 pub const ANM_UNAZUKI: i32 = 0x26;
 pub const ANM_COUNT: usize = 50;
+pub const ANM_TBL_COUNT: usize = 39;
+pub const ANM_FRAME_MAX: [f32; ANM_TBL_COUNT] = [
+    39.0, 32.0, 29.0, 39.0, 60.0, 28.0, 14.0, 14.0, 29.0, 2.0,
+    2.0, 13.0, 53.0, 36.0, 39.0, 18.0, 39.0, 44.0, 48.0, 48.0,
+    11.0, 42.0, 37.0, 39.0, 39.0, 39.0, 39.0, 28.0, 38.0, 37.0,
+    39.0, 27.0, 20.0, 40.0, 60.0, 39.0, 39.0, 39.0, 39.0,
+];
 
 pub const ANM_TBL_IDX: [u8; ANM_COUNT] = [
     0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x06, 0x07,
@@ -463,7 +690,12 @@ pub const DEMO_FLY_SPEED: f32 = 17.0;
 
 pub const GLIDE_STEPS: i16 = 2;
 pub const GLIDE_WING_FRAME: f32 = 23.0;
-pub const WIND_ABS_MIN: f32 = 1e-6;
+pub const WIND_ABS_MIN: f32 = CM3D_F_ABS_MIN;
+pub const WIND_PUSH_MAX_STEP: f32 = 3.0;
+pub const WIND_PUSH_STEP: f32 = 0.5;
+pub const WIND_PUSH_SCALE: f32 = 0.5;
+pub const WIND_PUSH_SPEED: f32 = 30.0;
+pub const WIND_PUSH_FLOOR: f32 = 1.0;
 pub const WIND_DOT_MIN: f32 = 0.7071;
 pub const ROUTE_PROBE_UP: f32 = 80.0;
 pub const ROUTE_DROP_LIMIT: f32 = -100.0;
@@ -485,7 +717,8 @@ pub const HARP_SE_RND_SPAN: i32 = 10;
 
 pub const VELOCITY_EPS: f32 = 0.001;
 pub const SPEED_EPS: f32 = 0.05;
-pub const IS_ZERO: f32 = 8e-11;
+pub const CM3D_F_ABS_MIN: f32 = 3.8146973e-06;
+pub const NORMAL_EPS: f32 = 0.001;
 pub const NORMALIZE_EPS: f32 = 1e-4;
 pub const HEAD_SCALE: i16 = 4;
 pub const HEAD_MAX_STEP: i16 = 0x800;
@@ -529,7 +762,6 @@ pub const PIYO_TALK_ATTR: u8 = 0x14;
 pub const SHADOW_LIFT: f32 = 150.0;
 pub const SHADOW_RADIUS: f32 = 800.0;
 pub const SHADOW_DEPTH: f32 = 20.0;
-pub const NORMAL_EPS: f32 = 0.001;
 pub const ANGLE_HALF: i16 = 0x4000;
 pub const DUST_SCALE_X: f32 = 1.25;
 pub const DUST_SCALE_Y: f32 = 1.5;
@@ -738,6 +970,7 @@ pub struct Medli {
     pub piyo_count: u8,
     pub harp_delay: u8,
     pub harp_se: u32,
+    pub harp_se_pending: u32,
     pub old_light_body_hit: bool,
     pub timer_a: i16,
     pub timer_b: i16,
@@ -747,6 +980,12 @@ pub struct Medli {
     pub wind_timer: i16,
     pub start_y: f32,
     pub wind_ramp: f32,
+    pub wind_push: Vec3,
+    pub acch_cir: [[f32; 2]; 2],
+    pub acch_roof: f32,
+    pub wall_cir: i8,
+    pub wall_angle: i16,
+    pub roof_hit: bool,
     pub jnt_angles: [[i16; 2]; 2],
     pub jnt_min: [[i16; 2]; 2],
     pub jnt_max: [[i16; 2]; 2],
@@ -783,6 +1022,13 @@ pub struct Medli {
     pub player_shape: i16,
     pub frame_ended: bool,
     pub ripple: bool,
+    pub cyl1: MdCyl,
+    pub cyl2: MdCyl,
+    pub cyl3: MdCyl,
+    pub cps: MdCps,
+    pub harp_start: Vec3,
+    pub harp_vec: Vec3,
+    pub culled: bool,
 }
 
 impl Medli {
@@ -856,6 +1102,7 @@ impl Medli {
             piyo_count: 0,
             harp_delay: 0,
             harp_se: HARP_SE[0],
+            harp_se_pending: 0,
             old_light_body_hit: false,
             timer_a: 0,
             timer_b: 0,
@@ -865,6 +1112,12 @@ impl Medli {
             wind_timer: 0,
             start_y: 0.0,
             wind_ramp: 0.0,
+            wind_push: Vec3::ZERO,
+            acch_cir: [ACCH_CIR0_WALL, ACCH_CIR1_WALL],
+            acch_roof: ACCH_ROOF_HEIGHT,
+            wall_cir: WALL_CIR_NONE,
+            wall_angle: 0,
+            roof_hit: false,
             jnt_angles: [[0; 2]; 2],
             jnt_min: [
                 [HIO_NPC_MIN_HEAD_X, HIO_NPC_MIN_HEAD_Y],
@@ -907,6 +1160,13 @@ impl Medli {
             player_shape: 0,
             frame_ended: false,
             ripple: false,
+            cyl1: MdCyl::CYL1,
+            cyl2: MdCyl::CYL2,
+            cyl3: MdCyl::CYL3,
+            cps: MdCps::SRC,
+            harp_start: MS_LIGHT_LOCAL_START,
+            harp_vec: MS_LIGHT_LOCAL_VEC,
+            culled: false,
         }
     }
 
@@ -1007,6 +1267,9 @@ impl Medli {
     }
 
     pub fn drawn(&self) -> bool {
+        if self.culled {
+            return false;
+        }
         if self.is_ship_ride() {
             return !self.ship_head_hidden;
         }
@@ -1100,6 +1363,10 @@ pub fn normalize_zp(v: Vec3) -> Vec3 {
     } else {
         Vec3::ZERO
     }
+}
+
+pub fn cm3d_is_zero(f: f32) -> bool {
+    f.abs() < CM3D_F_ABS_MIN
 }
 
 pub fn rnd(seed: &mut [i32; 3]) -> f32 {
@@ -1433,6 +1700,20 @@ pub struct Ctx<'a> {
     pub xy_end: bool,
     pub reset_event: bool,
     pub delete_me: bool,
+    pub cyl1_tg: bool,
+    pub cyl1_pos: Vec3,
+    pub cyl1_co: bool,
+    pub cyl2_tg: bool,
+    pub cyl2_pos: Vec3,
+    pub cyl2_rvec: Vec3,
+    pub cyl3_tg: bool,
+    pub cyl3_pos: Vec3,
+    pub cyl3_rvec: Vec3,
+    pub cyl3_at_type: u32,
+    pub cyl2_at_type: u32,
+    pub cps_at: bool,
+    pub cps_at_pos: Vec3,
+    pub light_body: bool,
 }
 
 impl Ctx<'_> {
@@ -1473,6 +1754,20 @@ impl Medli {
         } else {
             self.npc_not_change = true;
         }
+        if self.is_type_m_dai() || self.is_type_edaichi() {
+            self.cyl1.stts_min = STTS_MIN_FIELD;
+            self.cyl2.stts_min = STTS_MIN_FIELD;
+            self.cyl3.stts_min = STTS_MIN_FIELD;
+        } else {
+            self.cyl1.stts_min = STTS_MIN_OTHER;
+            self.cyl2.stts_min = STTS_MIN_OTHER;
+            self.cyl3.stts_min = STTS_MIN_OTHER;
+        }
+        self.cyl1.stts_max = STTS_MAX;
+        self.cyl2.stts_max = STTS_MAX;
+        self.cyl3.stts_max = STTS_MAX;
+        self.cps.at_type = CPS_AT_TYPE;
+        self.cps.radius = CPS_RADIUS;
         if self.is_type_edaichi() {
             self.call_command = true;
         }
@@ -1570,9 +1865,9 @@ impl Medli {
             let wing = arm_idx >= 0x80;
             ret = wing;
             if index == 0x12 || index == 0x1F {
-                self.harp_delay = 0;
+                self.harp_se_pending = SE_CM_MD_HARP_SET_UP;
             } else if index == 0x13 || index == 0x21 {
-                self.harp_delay = 0;
+                self.harp_se_pending = SE_CM_MD_HARP_TAKE_OFF;
             }
         }
         if btp_idx != self.btp_tbl {
@@ -1611,9 +1906,6 @@ impl Medli {
         }
         if self.btp_repeat > 0.0 {
             self.btp_repeat -= 1.0;
-            if self.btp_repeat < 0.0 {
-                self.btp_repeat = 0.0;
-            }
             return;
         }
         self.btp_repeat = ((BTP_REPEAT_MIN + rnd_f(&mut self.seed, BTP_REPEAT_SPAN)) as u8) as f32;
@@ -2042,28 +2334,237 @@ impl Medli {
         false
     }
 
-    pub fn wall_hit_check(&self, wall: bool, wall_angle: i16) -> i16 {
-        if wall {
-            return wall_angle;
-        }
-        -1
+    pub fn set_wall_cir0(&mut self) {
+        self.acch_cir[0] = ACCH_CIR0_WALL;
+        self.wall_cir = WALL_CIR_NONE;
     }
 
-    pub fn light_hit_check(&mut self) -> bool {
-        let light_hit = self.light_seen;
+    pub fn set_wall_cir1(&mut self) {
+        self.acch_cir[1] = ACCH_CIR1_WALL;
+        self.wall_cir = WALL_CIR_NONE;
+    }
+
+    pub fn set_wall_cir1_fly(&mut self) {
+        self.acch_cir[1] = ACCH_CIR1_WALL_FLY;
+        self.wall_cir = WALL_CIR_NONE;
+    }
+
+    pub fn wall_probe(&mut self, solid: Option<&Collision>) {
+        let mut circle = WALL_CIR_NONE;
+        let mut angle = 0_i16;
+        for index in 0..self.acch_cir.len() {
+            let radius = self.acch_cir[index][0];
+            let rise = self.acch_cir[index][1];
+            let mut best: Option<f32> = None;
+            for step in 0..WALL_PROBE_DIRS {
+                let bearing = step as f32 * ANGLE_TURN_F / WALL_PROBE_DIRS as f32;
+                let (sin, cos) = bearing.sin_cos();
+                let dx = cos * radius;
+                let dz = sin * radius;
+                let rise_here = solid
+                    .and_then(|solid| solid.ground_at(self.pos.x + dx, self.pos.z + dz))
+                    .map_or(f32::NEG_INFINITY, |y| y - self.pos.y);
+                if rise_here > rise && best.is_none_or(|value| rise_here > value) {
+                    best = Some(rise_here);
+                    angle = walk::to_s16((-dx).atan2(-dz));
+                }
+            }
+            if best.is_some() {
+                circle = index as i8;
+                break;
+            }
+        }
+        self.wall_cir = circle;
+        self.wall_angle = angle;
+        let mut roof = false;
+        for (dx, dz) in ROOF_PROBE_OFFSETS {
+            let rise = solid
+                .and_then(|solid| solid.ground_at(self.pos.x + dx, self.pos.z + dz))
+                .map_or(f32::NEG_INFINITY, |y| y - self.pos.y);
+            if rise > self.acch_roof {
+                roof = true;
+                break;
+            }
+        }
+        self.roof_hit = roof;
+    }
+
+    pub fn wall_hit_check(&self) -> i16 {
+        if self.wall_cir == WALL_CIR_NONE {
+            return WALL_CIR_NONE_ANGLE;
+        }
+        self.wall_angle
+    }
+
+    pub fn light_hit_check(&mut self, ctx: &mut Ctx<'_>) -> bool {
+        let light_vec = self.harp_vec;
         self.clr_stts(STTS_LIGHT_BODY_HIT);
-        if light_hit {
+        let mut light_hit = false;
+        if ctx.light_body {
             self.set_stts(STTS_LIGHT_BODY_HIT);
+            light_hit = true;
+        } else if self.cyl3.tg_hit && self.cyl3.tg_at_type & AT_TYPE_LIGHT != 0 {
+            self.set_stts(STTS_LIGHT_BODY_HIT);
+            if self.cyl3.tg_rvec.dot(light_vec) < 0.0 {
+                light_hit = true;
+            }
         }
         if light_hit {
             self.set_stts(STTS_LIGHT_HIT);
+            let se = if self.cps.at_set {
+                SE_MIRROR_LIGHT
+            } else {
+                SE_MIRROR_REFLECT
+            };
+            ctx.events.list.push(SimEvent::Se(se));
         } else {
             self.clr_stts(STTS_LIGHT_HIT);
         }
+        self.light_seen = light_hit;
         light_hit
     }
 
-    pub fn wait_ground_check(&mut self, special: bool, is_player: bool) {
+    pub fn collision_inputs(
+        &mut self,
+        ctx: &mut Ctx<'_>,
+        lamps: &Query<(&Actor, &TagLight), Without<Medli>>,
+        gusts: &Query<(&Actor, &WindTag), Without<Medli>>,
+        arrows: &Query<&arrow::Arrow>,
+    ) {
+        let mut lit = false;
+        for (lamp_actor, tag) in lamps.iter() {
+            if !tag.lit {
+                continue;
+            }
+            let dx = lamp_actor.pos.x - self.pos.x;
+            let dz = lamp_actor.pos.z - self.pos.z;
+            let dy = lamp_actor.pos.y - self.pos.y;
+            if dx * dx + dy * dy + dz * dz < LAMP_REACH * LAMP_REACH {
+                lit = true;
+                break;
+            }
+        }
+        ctx.light_body = lit;
+        let mut cyl3 = None;
+        let mut cps_at = false;
+        let mut cps_pos = Vec3::ZERO;
+        for shaft in arrows.iter() {
+            if shaft.kind != arrow::TYPE_LIGHT || shaft.phase != arrow::Phase::Flying {
+                continue;
+            }
+            if self.cyl3.touches(shaft.pos, LIGHT_ARROW_REACH) {
+                cyl3 = Some((shaft.pos, shaft.speed));
+            }
+            if self.cps.hits(shaft.pos) {
+                cps_at = true;
+                cps_pos = shaft.pos;
+            }
+        }
+        ctx.cyl3_tg = cyl3.is_some();
+        ctx.cyl3_pos = cyl3.map_or(Vec3::ZERO, |(pos, _)| pos);
+        ctx.cyl3_rvec = cyl3.map_or(Vec3::ZERO, |(_, rvec)| rvec);
+        ctx.cyl3_at_type = if cyl3.is_some() { AT_TYPE_LIGHT } else { 0 };
+        ctx.cps_at = cps_at;
+        ctx.cps_at_pos = cps_pos;
+        let mut cyl2 = None;
+        for (gust_actor, tag) in gusts.iter() {
+            let primed = tag.switch_no == WIND_SWITCH_NONE
+                || ctx.switches.test(tag.switch_no) == tag.switch_type;
+            if !primed {
+                continue;
+            }
+            if !tag.inside(gust_actor.pos, self.pos) {
+                continue;
+            }
+            let pos = gust_actor.pos;
+            cyl2 = Some(pos);
+            break;
+        }
+        ctx.cyl2_tg = cyl2.is_some();
+        ctx.cyl2_pos = cyl2.unwrap_or(Vec3::ZERO);
+        ctx.cyl2_rvec = Vec3::ZERO;
+        ctx.cyl2_at_type = if cyl2.is_some() { AT_TYPE_WIND } else { 0 };
+        ctx.wind_hit = ctx.cyl2_tg && ctx.cyl2_at_type & AT_TYPE_WIND != 0;
+        ctx.wind_vec = ctx.cyl2_rvec;
+        ctx.cyl1_co = ctx.link.is_some_and(|link| self.cyl1.blocks(link));
+        ctx.cyl1_tg = ctx
+            .link
+            .is_some_and(|link| self.cyl1.tg_set() && self.cyl1.touches(link, PLAYER_TG_REACH));
+        ctx.cyl1_pos = ctx.link.unwrap_or(Vec3::ZERO);
+    }
+
+    pub fn harp_update(&mut self) {
+        let yaw = walk::from_s16(self.shape[1]);
+        let (sy, cy) = (yaw.sin(), yaw.cos());
+        let rot = |v: Vec3| Vec3::new(v.x * cy + v.z * sy, v.y, -v.x * sy + v.z * cy);
+        self.harp_start = self.pos + rot(MS_LIGHT_LOCAL_START + HARP_HIO_TRANS);
+        self.harp_vec = rot(MS_LIGHT_LOCAL_VEC);
+    }
+
+    pub fn set_collision(&mut self, ctx: &Ctx<'_>) {
+        let centre = self.pos;
+        let radius = CYL_RADIUS;
+        let height = self.height;
+        self.cyl1.centre = centre;
+        self.cyl1.radius = radius;
+        self.cyl1.height = height;
+        self.cyl1.tg_hit = false;
+        self.cyl1.tg_pos = Vec3::ZERO;
+        self.cyl1.tg_rvec = Vec3::ZERO;
+        self.cyl1.tg_ac = false;
+        self.cyl1.co_hit = false;
+        if !self.is_ship_ride() && !ctx.carried {
+            self.cyl1.registered = true;
+            self.cyl1.tg_hit = ctx.cyl1_tg;
+            self.cyl1.tg_ac = ctx.cyl1_tg;
+            self.cyl1.tg_pos = ctx.cyl1_pos;
+            self.cyl1.co_hit = ctx.cyl1_co;
+        } else {
+            self.cyl1.registered = false;
+            self.cyl1.co_hit = false;
+            self.cyl1.tg_hit = false;
+            self.cyl1.tg_ac = false;
+        }
+        self.cyl2.centre = centre;
+        self.cyl2.radius = radius;
+        self.cyl2.height = height;
+        self.cyl2.registered = true;
+        self.cyl2.tg_hit = ctx.cyl2_tg;
+        self.cyl2.tg_pos = ctx.cyl2_pos;
+        self.cyl2.tg_rvec = ctx.cyl2_rvec;
+        self.cyl2.tg_at_type = ctx.cyl2_at_type;
+        self.cyl2.co_hit = false;
+        self.cyl3.centre = centre;
+        self.cyl3.radius = radius;
+        self.cyl3.height = height;
+        self.cyl3.registered = true;
+        self.cyl3.tg_hit = ctx.cyl3_tg;
+        self.cyl3.tg_pos = ctx.cyl3_pos;
+        self.cyl3.tg_rvec = ctx.cyl3_rvec;
+        self.cyl3.tg_at_type = ctx.cyl3_at_type;
+        self.cyl3.co_hit = false;
+        let start = self.harp_start;
+        let end = start + self.harp_vec;
+        self.cps.start = start;
+        self.cps.end = end;
+        self.cps.at_pos = Vec3::ZERO;
+        self.cps.at_hit = false;
+        if self.is_light_hit() {
+            self.cps.at_set = true;
+            self.cps.registered = true;
+            self.cps.mass = 1;
+            self.cps.at_hit = ctx.cps_at;
+            self.cps.at_pos = ctx.cps_at_pos;
+            self.culled = false;
+        } else {
+            self.cps.at_set = false;
+            self.cps.registered = false;
+            self.cps.mass = 0;
+            self.culled = true;
+        }
+    }
+
+pub fn wait_ground_check(&mut self, special: bool, is_player: bool) {
         if self.ground_hit {
             if !self.is_type_dra09() {
                 if special {
@@ -2129,25 +2630,26 @@ impl Medli {
         if !self.is_type_field() {
             return false;
         }
-        let Some(player) = self.link else {
+        if !self.cyl1.tg_hit {
             return false;
-        };
-        let mut delta = Vec3::new(self.pos.x - player.x, 0.0, self.pos.z - player.z);
-        if abs_xz(delta) < HIO_NPC_MAX_ATTN_DIST_XZ + ATTN_BONUS_DIST {
-            delta = normalize_zp(delta);
-            let angle = if delta.x.abs() < NORMAL_EPS && delta.z.abs() < NORMAL_EPS {
-                0
-            } else {
-                walk::to_s16(delta.x.atan2(delta.z))
-            };
-            if as_player {
-                self.set_player_action(PlayerStep::Hit, Arg::None);
-            } else {
-                self.set_npc_action(Step::Hit, Arg::Angle(angle));
-            }
-            return true;
         }
-        false
+        if !self.cyl1.tg_ac {
+            return false;
+        }
+        let mut sp = self.pos - self.cyl1.tg_pos;
+        sp.y = 0.0;
+        sp = normalize_zp(sp);
+        let angle = if sp.x.abs() < NORMAL_EPS && sp.z.abs() < NORMAL_EPS {
+            0
+        } else {
+            walk::to_s16(sp.x.atan2(sp.z))
+        };
+        if as_player {
+            self.set_player_action(PlayerStep::Hit, Arg::None);
+        } else {
+            self.set_npc_action(Step::Hit, Arg::Angle(angle));
+        }
+        true
     }
 
     pub fn carry_check(&mut self, carried: bool) {
@@ -2331,19 +2833,22 @@ impl Medli {
             }
         }
         let mut drive = f2;
-        let mut target;
-        let step;
+        let target;
+        let mut step;
         if want < self.walk_speed {
-            let gap = self.walk_speed - want;
-            step = if gap > max_step { max_step } else { gap };
-            let step = if step < min_step { min_step } else { step };
+
+            let temp = self.walk_speed - want;
+            step = if temp > max_step { max_step } else { temp };
+            if step < min_step {
+                step = min_step;
+            }
             drive = 0.0;
             target = want;
         } else {
             step = max_step;
             target = 0.0;
         }
-        if drive.abs() >= IS_ZERO {
+        if !cm3d_is_zero(drive) {
             self.walk_speed += drive;
             if self.walk_speed > want {
                 self.walk_speed = want;
@@ -2464,6 +2969,28 @@ impl Medli {
             self.route_wall_check(cross, angle, player_dy);
         }
         true
+    }
+
+    pub fn obj_wind_hit_check(&mut self) {
+        let mut target = Vec3::ZERO;
+        let mut max_step = WIND_PUSH_MAX_STEP;
+        if self.cyl2.tg_hit && self.cyl2.tg_at_type & AT_TYPE_WIND != 0 {
+            target = self.cyl2.tg_rvec;
+            let mut speed_xz = abs_xz(self.cyl2.tg_rvec);
+            let target_speed = WIND_PUSH_SPEED;
+            max_step = WIND_PUSH_STEP;
+            if speed_xz < WIND_PUSH_FLOOR {
+                target = (self.pos - self.cyl2.tg_pos) * target_speed;
+                speed_xz = abs_xz(target);
+            }
+            if speed_xz > target_speed {
+                target *= target_speed / speed_xz;
+            }
+        }
+        walk::add_calc(&mut self.wind_push.x, target.x, WIND_PUSH_SCALE, max_step, WIND_PUSH_STEP);
+        walk::add_calc(&mut self.wind_push.z, target.z, WIND_PUSH_SCALE, max_step, WIND_PUSH_STEP);
+        self.pos.x += self.wind_push.x;
+        self.pos.z += self.wind_push.z;
     }
 
     pub fn wind_proc(&mut self, hit: bool, hit_vec: Vec3) -> i16 {
@@ -2593,6 +3120,7 @@ impl Medli {
 
     pub fn wait_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_attn_bit(ATTN_ACTION_CARRY);
             if self.is_type_sea() {
                 let body = i32::from(self.anm_body);
@@ -2747,6 +3275,7 @@ impl Medli {
 
     pub fn harp_wait_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_harp_play_num();
             self.max_fall = MAX_FALL;
             self.gravity = HIO_M0F4;
@@ -2795,6 +3324,7 @@ impl Medli {
 impl Medli {
     pub fn talk_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.msg_id = FPC_M_ERROR_PROCESS_ID;
             self.msg_no = self.get_msg(ctx);
             self.clr_attn_bit(ATTN_ACTION_CARRY);
@@ -2848,6 +3378,7 @@ impl Medli {
 
     pub fn ship_talk_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.npc_not_change = true;
             self.set_stts(STTS_SHIP_RIDE);
             self.msg_id = FPC_M_ERROR_PROCESS_ID;
@@ -2881,6 +3412,7 @@ impl Medli {
 
     pub fn kyohi_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_FLY);
             self.set_stts(STTS_UNK4);
             self.set_anm(0x27);
@@ -2902,6 +3434,7 @@ impl Medli {
 
     pub fn ship_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.npc_not_change = true;
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_FLY);
             self.set_stts(STTS_UNK4);
@@ -2950,6 +3483,7 @@ impl Medli {
 
     pub fn mwait_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_attn_bit(ATTN_ACTION_CARRY);
             self.call_command = false;
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_UNK4 | STTS_FLY);
@@ -3007,6 +3541,7 @@ impl Medli {
 
     pub fn squatdown_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_FLY);
             self.set_stts(STTS_UNK4);
             self.set_anm(3);
@@ -3024,6 +3559,7 @@ impl Medli {
 
     pub fn sqwait01_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_attn_bit(ATTN_ACTION_CARRY);
             if ctx.stories.test(BIT_GAVE_LETTER) {
                 self.clr_attn_bit(ATTN_LOCKON_TALK | ATTN_ACTION_SPEAK);
@@ -3049,6 +3585,7 @@ impl Medli {
 
     pub fn piyo2_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_attn_bit(ATTN_LOCKON_TALK | ATTN_ACTION_SPEAK);
             self.max_fall = MAX_FALL;
             self.gravity = HIO_M0F4;
@@ -3109,6 +3646,7 @@ impl Medli {
 impl Medli {
     pub fn demo_fly_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.attn_flags = 0;
             self.step_stat += 1;
             self.yaw = DEMO_FLY_YAW;
@@ -3161,6 +3699,7 @@ impl Medli {
 
     pub fn carry_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.npc_not_change = true;
             self.clr_attn_bit(ATTN_ACTION_CARRY);
             self.call_command = false;
@@ -3256,6 +3795,7 @@ impl Medli {
 
     pub fn throw_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1_fly();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_THROW));
             self.wind_flag = 1;
             self.wind_timer = HIO_M1B4;
@@ -3296,6 +3836,7 @@ impl Medli {
 
     pub fn gliding_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1_fly();
             if self.wind_flag == 1 {
                 self.glide_flag = 0;
                 self.set_anm(0xb);
@@ -3353,6 +3894,7 @@ impl Medli {
 
     pub fn fall_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK4);
             self.set_stts(STTS_FLY);
             self.set_anm(0xc);
@@ -3371,6 +3913,7 @@ impl Medli {
 
     pub fn fall02_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK4);
             self.set_stts(STTS_FLY);
             self.max_fall = HIO_M110;
@@ -3401,6 +3944,7 @@ impl Medli {
 
     pub fn wall_hit_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_CRASH));
             self.max_fall = MAX_FALL;
             self.gravity = HIO_M0F4;
@@ -3435,6 +3979,7 @@ impl Medli {
 
     pub fn land01_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_LANDING));
             if self.has_stts(STTS_UNK1) {
                 self.effect |= 1;
@@ -3468,6 +4013,7 @@ impl Medli {
 
     pub fn land02_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.max_fall = MAX_FALL;
             self.gravity = HIO_M0F4;
             self.set_anm(0xf);
@@ -3488,6 +4034,7 @@ impl Medli {
 
     pub fn land03_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.max_fall = MAX_FALL;
             self.gravity = HIO_M0F4;
             self.set_anm(0xf);
@@ -3508,6 +4055,7 @@ impl Medli {
 
     pub fn jump_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_UNK4 | STTS_FLY);
             self.set_stts(STTS_UNK4);
             if let Arg::Speed(speed) = self.arg {
@@ -3541,6 +4089,7 @@ impl Medli {
 impl Medli {
     pub fn search_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_stts(STTS_UNK4);
             self.set_attn_bit(ATTN_ACTION_CARRY);
             if self.anm == 0x11 || self.anm == 0x16 || self.anm == 0x17 {
@@ -3623,10 +4172,10 @@ impl Medli {
                         ) as i16;
                     }
                 }
-                let wall = if ctx.wall_hit {
-                    Some(ctx.wall_angle)
-                } else {
+                let wall = if self.wall_cir == WALL_CIR_NONE {
                     None
+                } else {
+                    Some(self.wall_angle)
                 };
                 self.walk_proc(temp, adjusted, wall);
                 self.shape[1] = walk::add_calc_angle_s(
@@ -3662,6 +4211,7 @@ impl Medli {
 
     pub fn hit_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_CRASH));
             let angle = match self.arg {
                 Arg::Angle(value) => value,
@@ -3688,6 +4238,7 @@ impl Medli {
 
     pub fn escape_npc_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.step_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_stts(STTS_UNK4);
             self.set_attn_bit(ATTN_ACTION_CARRY);
             if self.anm == 0x11 || self.anm == 0x16 || self.anm == 0x17 {
@@ -3730,10 +4281,10 @@ impl Medli {
                     return true;
                 }
                 let mut local = self.timer_a;
-                let wall = if ctx.wall_hit {
-                    Some(ctx.wall_angle)
-                } else {
+                let wall = if self.wall_cir == WALL_CIR_NONE {
                     None
+                } else {
+                    Some(self.wall_angle)
                 };
                 let before = local;
                 let _ = self.route_check(
@@ -3821,6 +4372,7 @@ impl Medli {
 
     pub fn wait_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_FLY);
             self.set_stts(STTS_UNK4);
             self.set_anm(0);
@@ -3876,6 +4428,7 @@ impl Medli {
 
     pub fn walk_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.set_stts(STTS_UNK4);
             self.set_anm(2);
             self.max_speed = HIO2_M08;
@@ -3884,11 +4437,11 @@ impl Medli {
         } else if self.player_stat != STEP_ENDING && !self.fly_check() {
             let stick = ctx.stick;
             let stick_angle = self.get_stick_ang_y(false);
-            let wall = if ctx.wall_hit {
-                Some(ctx.wall_angle)
-            } else {
-                None
-            };
+            let wall = if self.wall_cir == WALL_CIR_NONE {
+                    None
+                } else {
+                    Some(self.wall_angle)
+                };
             self.walk_proc(stick, stick_angle, wall);
             let (focus, stick_pos) = self.calc_stick_pos(stick_angle, ctx.attention_lock);
             if focus == 0 {
@@ -3930,6 +4483,7 @@ impl Medli {
 
     pub fn hit_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_CRASH));
             let angle = match self.arg {
                 Arg::Angle(value) => value,
@@ -3964,6 +4518,7 @@ impl Medli {
 
     pub fn jump_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_UNK4 | STTS_FLY);
             self.set_stts(STTS_UNK4);
             if let Arg::Speed(speed) = self.arg {
@@ -3996,6 +4551,7 @@ impl Medli {
 
     pub fn land_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             ctx.events.list.push(SimEvent::Se(SE_CV_MD_LANDING));
             if self.has_stts(STTS_UNK1) {
                 self.effect |= 1;
@@ -4022,6 +4578,7 @@ impl Medli {
 
     pub fn mkamae_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK1 | STTS_UNK2 | STTS_UNK4 | STTS_FLY);
             self.set_anm(0x1F);
             self.shape[0] = 0;
@@ -4068,6 +4625,7 @@ impl Medli {
 
     pub fn carry_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1();
             self.clr_stts(STTS_UNK2 | STTS_UNK4 | STTS_FLY);
             self.set_anm(0x24);
             self.set_stts(STTS_UNK1);
@@ -4082,6 +4640,7 @@ impl Medli {
 impl Medli {
     pub fn fly_player_action(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.player_stat == STEP_STARTING {
+            self.set_wall_cir1_fly();
             self.set_anm(0x18);
             self.start_y = self.pos.y + FLY_CEILING_LIFT;
             self.timer_a = HIO_M1BE;
@@ -4783,6 +5342,7 @@ impl Medli {
     pub fn animation_play(&mut self, ctx: &mut Ctx<'_>) {
         self.old_light_body_hit = self.is_light_body_hit();
         self.anm_frame += self.anm_rate;
+        self.frame_ended = self.body_play_ended();
         self.anim_ended = self.frame_ended;
         self.frame_ended = false;
         let index = self.event_idx.get(5).copied().unwrap_or(NO_INDEX);
@@ -4833,6 +5393,18 @@ impl Medli {
             }
         }
         self.play_tex_pattern_anm();
+    }
+
+    pub fn body_play_ended(&self) -> bool {
+        let slot = usize::try_from(self.anm_body).unwrap_or(usize::MAX);
+        let Some(max) = ANM_FRAME_MAX.get(slot).copied() else {
+            return false;
+        };
+        if self.anm_rate < 0.0 {
+            self.anm_frame <= 0.0
+        } else {
+            self.anm_frame >= max
+        }
     }
 
     pub fn gravity_step(&mut self) {
@@ -4920,6 +5492,9 @@ impl Medli {
                     self.speed.z = self.speed_f * walk::from_s16(self.yaw).cos();
                     self.pos += self.speed;
                 }
+                if self.has_stts(STTS_UNK4) {
+                    self.obj_wind_hit_check();
+                }
                 self.set_stts(STTS_UNK20000);
                 self.ripple =
                     ctx.in_water && ctx.water_height > self.pos.y + 5.0;
@@ -4954,7 +5529,9 @@ impl Medli {
                 }
             }
         }
-        self.light_hit_check();
+        self.harp_update();
+        self.light_hit_check(ctx);
+        self.set_collision(ctx);
         if !ctx.pos_move {
             self.animation_play(ctx);
         }
@@ -4995,6 +5572,10 @@ impl Medli {
             }
         }
         self.event_order(ctx);
+        if self.harp_se_pending != 0 {
+            ctx.events.list.push(SimEvent::Se(self.harp_se_pending));
+            self.harp_se_pending = 0;
+        }
         self.effect = 0;
         actor.pos = self.pos;
         actor.angle = self.shape;
@@ -5050,10 +5631,13 @@ pub struct Dialogue<'w, 's> {
     pub two: ResMut<'w, Msg2Box>,
     pub players: Query<'w, 's, &'static Player>,
     pub ships: Query<'w, 's, &'static Ship>,
+    pub lamps: Query<'w, 's, (&'static Actor, &'static TagLight), Without<Medli>>,
+    pub gusts: Query<'w, 's, (&'static Actor, &'static WindTag), Without<Medli>>,
+    pub arrows: Query<'w, 's, &'static arrow::Arrow>,
 }
 
 pub fn control(
-    mut world: World,
+    world: World,
     mut dialogue: Dialogue,
     intent: Res<MoveIntent>,
     do_intent: Res<DoIntent>,
@@ -5077,6 +5661,9 @@ pub fn control(
     } = world;
     let player = dialogue.players.iter().next().copied();
     let ship = dialogue.ships.iter().next().copied();
+    let lights = &dialogue.lamps;
+    let gusts = &dialogue.gusts;
+    let arrows = &dialogue.arrows;
     let solid = collision.as_deref();
     let stick = intent.axis.length().min(1.0);
     let stick_angle = walk::to_s16(intent.axis.x.atan2(intent.axis.y));
@@ -5138,10 +5725,10 @@ pub fn control(
             ground_room: None,
             actor_room: room,
             link_room: room,
-            wall_hit: false,
-            wall_angle: 0,
+            wall_hit: medli.wall_cir != WALL_CIR_NONE,
+            wall_angle: medli.wall_angle,
             wall_normal: None,
-            roof_hit: false,
+            roof_hit: medli.roof_hit,
             probe_y: None,
             cross_normal: None,
             drop_normal: None,
@@ -5185,7 +5772,23 @@ pub fn control(
             pos_move: false,
             cut_end_mode: 0,
             move_block: None,
+            cyl1_tg: false,
+            cyl1_pos: Vec3::ZERO,
+            cyl1_co: false,
+            cyl2_tg: false,
+            cyl2_pos: Vec3::ZERO,
+            cyl2_rvec: Vec3::ZERO,
+            cyl3_tg: false,
+            cyl3_pos: Vec3::ZERO,
+            cyl3_rvec: Vec3::ZERO,
+            cyl3_at_type: 0,
+            cyl2_at_type: 0,
+            cps_at: false,
+            cps_at_pos: Vec3::ZERO,
+            light_body: false,
         };
+        medli.collision_inputs(&mut ctx, lights, gusts, arrows);
+        medli.wall_probe(solid);
         if !medli.entered {
             medli.entered = true;
             medli.home = actor.pos;
