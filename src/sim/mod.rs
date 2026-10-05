@@ -764,6 +764,7 @@ pub fn build(
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(door::StayRoom::default());
+    sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -791,6 +792,11 @@ pub fn build(
     sim.world.insert_resource(crate::assets::load_msg_table().unwrap_or_default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());
+    sim.world.insert_resource(morth::Statics {
+        next_id: 1,
+        ..Default::default()
+    });
+    sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
         area.spawn = stage.spawn;
