@@ -114,6 +114,7 @@ pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
 pub mod player;
+pub mod player_status;
 pub mod raft;
 pub mod rectangle;
 pub mod redead;
@@ -802,6 +803,7 @@ pub fn build(
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     kytag00::init(&mut sim.world);
+    player_status::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -874,6 +876,7 @@ pub fn build(
         (
             (
                 (
+                    player_status::control.in_set(WwSimSet::Execute),
                     bombflower::clear_blasts.in_set(WwSimSet::Execute),
                     ajav::control.in_set(WwSimSet::Execute),
                 )
