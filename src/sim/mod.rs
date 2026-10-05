@@ -13,6 +13,7 @@ pub mod barrier;
 pub mod barrel;
 pub mod bemos;
 pub mod barricade;
+pub mod bitem;
 pub mod bird;
 pub mod boko;
 pub mod cafelmp;
@@ -50,6 +51,7 @@ pub mod flags;
 pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
+pub mod gaship;
 pub mod gaship2;
 pub mod ghostship;
 pub mod gntakie;
@@ -66,6 +68,7 @@ pub mod hammer;
 pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
+pub mod hhyu;
 pub mod hotfloor;
 pub mod hmlif;
 pub mod homen;
@@ -86,7 +89,9 @@ pub mod komore;
 pub mod kytag02;
 pub mod kytag00;
 pub mod kytag01;
+pub mod kytag03;
 pub mod kytag04;
+pub mod kytag05;
 pub mod kytag06;
 pub mod kytag07;
 pub mod ladder;
@@ -171,6 +176,7 @@ pub mod tbox;
 pub mod tingle;
 pub mod turu;
 pub mod torch;
+pub mod tpota;
 pub mod transition;
 pub mod tsubo;
 pub mod usovmc;
@@ -182,6 +188,7 @@ pub mod walk;
 pub mod wall;
 pub mod wlvtag;
 pub mod wind;
+pub mod xtower;
 pub mod xfuta;
 pub mod windmill;
 pub mod warship;
@@ -762,6 +769,24 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, eayogn::Eayogn::spawn(world.resource::<flags::Collect>()))).id()
     } else if rforce::is_rforce(&source.name) {
         world.spawn((actor, rforce::Rforce::spawn())).id()
+    } else if bitem::is_bitem(&source.name) {
+        let boss_item = bitem::Bitem::spawn(world.resource::<flags::MemBits>());
+        world.spawn((actor, boss_item)).id()
+    } else if gaship::is_gaship(&source.name) {
+        world.spawn((actor, gaship::Gaship::spawn())).id()
+    } else if hhyu::is_hhyu(&source.name) {
+        let floor = hhyu::Hhyu::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, floor)).id()
+    } else if xtower::is_xtower(&source.name) {
+        let tower = xtower::Xtower::spawn(world.resource::<flags::EventFlags>());
+        world.spawn((actor, tower)).id()
+    } else if kytag05::is_kytag05(&source.name) {
+        let tag = kytag05::Kytag05::spawn(world.resource::<flags::Collect>());
+        world.spawn((actor, tag)).id()
+    } else if kytag03::is_kytag03(&source.name) {
+        world.spawn((actor, kytag03::Kytag03::spawn())).id()
+    } else if tpota::is_tpota(&source.name) {
+        world.spawn((actor, tpota::Tpota::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -803,6 +828,7 @@ pub fn build(
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(windmill::Wind::default());
+    sim.world.insert_resource(wlvtag::WaterLevel::default());
     sim.world.insert_resource(events::SimEvents::default());
     sim.world.insert_resource(events::Stride::default());
     sim.world.insert_resource(water::Water::default());
@@ -1112,7 +1138,14 @@ pub fn build(
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),                    gaship2::control.in_set(WwSimSet::Execute),                    eayogn::control.in_set(WwSimSet::Execute),
-                    doguud::control.in_set(WwSimSet::Execute),
+                    doguud::control.in_set(WwSimSet::Execute),                    gaship::control.in_set(WwSimSet::Execute),
+                    hhyu::control.in_set(WwSimSet::Execute),
+                    xtower::control.in_set(WwSimSet::Execute),
+                    tpota::control.in_set(WwSimSet::Execute),
+                    bitem::control.in_set(WwSimSet::Execute),
+                    kytag03::control.in_set(WwSimSet::Execute),
+                    kytag05::control.in_set(WwSimSet::Execute),
+
 
                     rforce::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
 

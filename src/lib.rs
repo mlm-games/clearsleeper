@@ -1089,6 +1089,18 @@ impl App {
                 let (min, max) = sim::eayogn::Eayogn::spawn(&sim::flags::Collect::default()).cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::gaship::Gaship>() {
+                let (min, max) = sim::gaship::Gaship::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::hhyu::Hhyu>() {
+                let (min, max) = sim::hhyu::Hhyu::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::xtower::Xtower>() {
+                let (min, max) = sim::xtower::Xtower::spawn(&sim::flags::EventFlags::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::dmgroom::Dmgroom>() {
                 let (min, max) = sim::dmgroom::Dmgroom::spawn().cull();
                 lift = min[1];
