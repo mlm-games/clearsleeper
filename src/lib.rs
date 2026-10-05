@@ -101,11 +101,12 @@ impl App {
             ..OrbitCamera::default()
         });
         let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
-        if let Some(tables) = self.stage.clone() {
-            let rooms = self.rooms.clone();
-            if let Some(set) = load_rooms(&tables, &rooms, stories) {
-                self.install_room_set(set, 0);
-            }
+        let set = self
+            .stage
+            .as_ref()
+            .and_then(|tables| load_rooms(tables, &self.rooms, stories));
+        if let Some(set) = set {
+            self.install_room_set(set, 0);
         }
     }
 
