@@ -12,6 +12,7 @@ use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
 use super::flags::MemBits;
 use super::hammer;
+use super::health::Health;
 use super::item::{self, Held};
 use super::msg::{MsgBox, MsgTable};
 use super::pickup;
@@ -184,8 +185,75 @@ const TIMER_COUNT: usize = 5;
 const PHASE_COUNT: usize = 3;
 const CHARGE_COUNT: usize = 2;
 const BOMB_EFF_COUNT: usize = 5;
-const JOINTS: usize = 20;
+const HEAD_JOINTS: usize = 15;
+const HAND_JOINTS: usize = 20;
 const ATT_SPL_UNK1: u8 = 1;
+
+const BIND_HEAD: [Vec3; HEAD_JOINTS] = [
+    Vec3::new(0.00, 0.00, 0.00),
+    Vec3::new(0.00, 10.00, 0.00),
+    Vec3::new(0.01, 110.00, 0.00),
+    Vec3::new(0.01, 110.01, 70.00),
+    Vec3::new(127.04, 383.35, 139.90),
+    Vec3::new(-126.96, 383.38, 139.90),
+    Vec3::new(70.03, 279.99, 200.00),
+    Vec3::new(-69.97, 280.01, 200.00),
+    Vec3::new(0.00, 7.36, 130.00),
+    Vec3::new(-126.96, 383.43, 140.00),
+    Vec3::new(127.04, 383.41, 140.00),
+    Vec3::new(127.04, 383.43, 140.00),
+    Vec3::new(-126.96, 383.45, 140.00),
+    Vec3::new(130.04, 379.99, 0.00),
+    Vec3::new(-129.96, 380.01, 0.00),
+];
+
+const BIND_LEFT: [Vec3; HAND_JOINTS] = [
+    Vec3::new(0.00, 0.00, 0.00),
+    Vec3::new(0.00, 10.00, 0.00),
+    Vec3::new(-129.99, 70.01, 35.00),
+    Vec3::new(-199.98, 150.03, 34.99),
+    Vec3::new(-199.97, 230.03, 34.98),
+    Vec3::new(-104.98, 260.01, 25.00),
+    Vec3::new(-104.97, 335.01, 25.00),
+    Vec3::new(-104.96, 420.01, 25.00),
+    Vec3::new(-34.98, 260.00, 25.00),
+    Vec3::new(-34.97, 355.00, 25.00),
+    Vec3::new(-34.96, 445.00, 25.00),
+    Vec3::new(40.02, 260.00, 25.00),
+    Vec3::new(40.03, 350.00, 25.00),
+    Vec3::new(40.04, 430.00, 25.00),
+    Vec3::new(115.02, 259.99, 25.00),
+    Vec3::new(115.03, 334.99, 25.00),
+    Vec3::new(115.04, 399.99, 25.00),
+    Vec3::new(0.01, 136.43, -50.00),
+    Vec3::new(0.01, 135.87, 25.25),
+    Vec3::new(0.01, 135.87, 25.25),
+];
+
+const BIND_RIGHT: [Vec3; HAND_JOINTS] = [
+    Vec3::new(0.00, 0.00, 0.00),
+    Vec3::new(0.00, 10.00, 0.00),
+    Vec3::new(129.99, 70.01, 35.01),
+    Vec3::new(199.98, 150.02, 35.02),
+    Vec3::new(199.97, 230.02, 35.04),
+    Vec3::new(104.98, 260.01, 25.02),
+    Vec3::new(104.97, 335.01, 25.03),
+    Vec3::new(104.96, 420.01, 25.04),
+    Vec3::new(34.98, 260.00, 25.02),
+    Vec3::new(34.97, 355.00, 25.03),
+    Vec3::new(34.96, 445.00, 25.04),
+    Vec3::new(-40.02, 259.99, 25.02),
+    Vec3::new(-40.03, 349.99, 25.03),
+    Vec3::new(-40.04, 429.99, 25.04),
+    Vec3::new(-115.02, 259.99, 25.02),
+    Vec3::new(-115.03, 334.99, 25.03),
+    Vec3::new(-115.04, 399.99, 25.04),
+    Vec3::new(-0.01, 136.43, -49.99),
+    Vec3::new(-0.01, 135.87, 25.26),
+    Vec3::new(-0.01, 135.87, 25.26),
+];
+
+const BIND_KNUCKLE_YAW: i16 = -16383;
 
 const TE_X: [f32; 4] = [70.0, 70.0, 70.0, 70.0];
 const TE_Y: [f32; 4] = [70.0, -70.0, 70.0, -70.0];
@@ -207,6 +275,12 @@ const HAND_RADIUS: f32 = 150.0;
 const HAND_SIDE: f32 = 100.0;
 const HAND_FAR: f32 = 40.0;
 const HAND_UP: f32 = 10.0;
+const BEAM_RADIUS: f32 = 60.0;
+
+const AT_POWER_HEAD: u8 = 1;
+const AT_POWER_FINGER: u8 = 1;
+const AT_POWER_BEAM: u8 = 2;
+const PLAYER_BODY_RADIUS: f32 = 20.0;
 
 const BEAM_SCALE_UP: f32 = 5.0;
 const BEAM_SCALE_STEP: f32 = 0.5;
@@ -434,8 +508,17 @@ fn tilted(pitch: i16, value: Vec3) -> Vec3 {
     )
 }
 
+fn rolled(roll: i16, value: Vec3) -> Vec3 {
+    let (sin, cos) = from_s16(roll).sin_cos();
+    Vec3::new(
+        value.x * cos - value.y * sin,
+        value.x * sin + value.y * cos,
+        value.z,
+    )
+}
+
 fn posed(yaw: i16, pitch: i16, offset: [f32; 3]) -> Vec3 {
-    tilted(pitch, turned(yaw, offset))
+    turned(yaw, tilted(pitch, Vec3::from_array(offset)).to_array())
 }
 
 fn bearing(from: Vec3, to: Vec3) -> i16 {
@@ -454,6 +537,19 @@ fn span(value: Vec3) -> f32 {
 
 fn touches(centre: Vec3, radius: f32, at: Vec3, reach: f32) -> bool {
     (at - centre).length() <= radius + reach
+}
+
+fn touches_cyl(centre: Vec3, radius: f32, height: f32, at: Vec3, reach: f32) -> bool {
+    let half = Vec3::new(0.0, height * 0.5, 0.0);
+    let base = centre - half;
+    let span = half * 2.0;
+    let len = span.length_squared();
+    let t = if len > 0.0 {
+        ((at - base).dot(span) / len).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (at - (base + span * t)).length() <= radius + reach
 }
 
 fn slide(solid: Option<&Collision>, from: Vec3, to: Vec3) -> (Vec3, bool) {
@@ -674,6 +770,7 @@ struct Sink<'a> {
     events: &'a mut SimEvents,
     msg: &'a mut MsgBox,
     table: &'a MsgTable,
+    health: &'a mut Health,
     spawns: &'a mut Vec<Spawn>,
     taken: &'a mut Vec<Entity>,
     eaten: &'a mut Vec<Entity>,
@@ -706,6 +803,10 @@ impl Sink<'_> {
 
     fn stop_bgm(&mut self) {
         self.events.list.push(SimEvent::Bgm(0));
+    }
+
+    fn hurt_player(&mut self, units: u8) {
+        self.health.damage(units);
     }
 
     fn spawn_item(&mut self, parameters: u32, pos: Vec3, angle: [i16; 3], room: i8, set_id: u16) {
@@ -777,14 +878,16 @@ pub struct Gohdan {
     pub srt_key: i32,
     pub za_brk: i32,
     pub za_btk: i32,
-    pub za_speed: f32,
-    pub za_loop: bool,
     pub stage_play: f32,
     pub stage_loop: bool,
     pub hidden: bool,
-    pub bind: [Vec3; JOINTS],
+    pub bind_head: [Vec3; HEAD_JOINTS],
+    pub bind_left: [Vec3; HAND_JOINTS],
+    pub bind_right: [Vec3; HAND_JOINTS],
     pub bob: Vec3,
     pub model_yaw: i16,
+    pub model_pitch: i16,
+    pub model_roll: i16,
     pub sway_clock: i16,
     pub action: i16,
     pub dormant: i16,
@@ -855,11 +958,13 @@ pub struct Gohdan {
     pub beam_dir: [Vec3; BEAM_COUNT],
     pub beam_angle: [[i16; 3]; BEAM_COUNT],
     pub beam_live: [i8; BEAM_COUNT],
+    pub beam_at: [bool; BEAM_COUNT],
     pub beam_scale: [f32; BEAM_COUNT],
     pub head_centre: Vec3,
     pub head_height: f32,
     pub head_radius: f32,
     pub head_at: bool,
+    pub at_hit: bool,
     pub hand_centre: Vec3,
     pub hand_height: f32,
     pub hand_radius: f32,
@@ -910,14 +1015,16 @@ impl Gohdan {
             srt_key: pick(&SET_BTK, part),
             za_brk: BRK_MUNE,
             za_btk: BTK_MUNE,
-            za_speed: 0.0,
-            za_loop: false,
             stage_play: 0.0,
             stage_loop: false,
             hidden: false,
-            bind: [Vec3::ZERO; JOINTS],
+            bind_head: BIND_HEAD,
+            bind_left: BIND_LEFT,
+            bind_right: BIND_RIGHT,
             bob: Vec3::ZERO,
             model_yaw: 0,
+            model_pitch: 0,
+            model_roll: 0,
             sway_clock,
             action: ACTION_STAY,
             dormant: 0,
@@ -992,11 +1099,13 @@ impl Gohdan {
             beam_dir: [Vec3::ZERO; BEAM_COUNT],
             beam_angle: [[0; 3]; BEAM_COUNT],
             beam_live: [0; BEAM_COUNT],
+            beam_at: [false; BEAM_COUNT],
             beam_scale: [0.0; BEAM_COUNT],
             head_centre: Vec3::ZERO,
             head_height: HEAD_HEIGHT,
             head_radius: HEAD_RADIUS,
             head_at: false,
+            at_hit: false,
             hand_centre: Vec3::ZERO,
             hand_height: HAND_HEIGHT_HEAD,
             hand_radius: HAND_RADIUS_HEAD,
@@ -1053,17 +1162,34 @@ impl Gohdan {
         3 - self.part
     }
 
-    fn joint(&self, no: u16) -> Vec3 {
-        let bind = self
-            .bind
-            .get(usize::from(no))
-            .copied()
-            .unwrap_or(Vec3::ZERO);
-        self.pos + self.bob + turned(self.model_yaw, bind.to_array())
+    fn bind_of(&self, no: u16) -> Vec3 {
+        let index = usize::from(no);
+        match self.part {
+            PART_LEFT => self.bind_left.get(index).copied(),
+            PART_RIGHT => self.bind_right.get(index).copied(),
+            _ => self.bind_head.get(index).copied(),
+        }
+        .unwrap_or(Vec3::ZERO)
     }
 
-    fn joint_off(&self, no: u16, offset: [f32; 3]) -> Vec3 {
-        self.joint(no) + turned(self.model_yaw, offset)
+    fn model_origin(&self) -> Vec3 {
+        self.pos + self.bob + Vec3::new(self.roll, self.lean, self.twist)
+    }
+
+    fn model_space(&self, value: Vec3) -> Vec3 {
+        turned(
+            self.model_yaw,
+            tilted(self.model_pitch, rolled(self.model_roll, value)).to_array(),
+        )
+    }
+
+    fn joint(&self, no: u16) -> Vec3 {
+        self.model_origin() + self.model_space(self.bind_of(no))
+    }
+
+    fn joint_off(&self, no: u16, bind_yaw: i16, offset: [f32; 3]) -> Vec3 {
+        let local = self.bind_of(no) + turned(bind_yaw, offset);
+        self.model_origin() + self.model_space(local)
     }
 
     fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32) {
@@ -1966,7 +2092,8 @@ impl Gohdan {
             if !shell.free || shell.rest_time <= 1 {
                 continue;
             }
-            if !touches(self.hand_centre, self.hand_radius, shell.pos, 0.0) {
+            if !touches_cyl(self.hand_centre, self.hand_radius, self.hand_height, shell.pos, 0.0)
+            {
                 continue;
             }
             self.bomb = Some(shell.entity);
@@ -2193,14 +2320,14 @@ impl Gohdan {
 
     fn col_set(&mut self) {
         if self.part == PART_HEAD {
-            self.head_centre = self.joint_off(JNT_KUTI, HEAD_OFF);
+            self.head_centre = self.joint_off(JNT_KUTI, 0, HEAD_OFF);
             self.head_height = REG0_F3 + HEAD_HEIGHT;
             self.head_radius = REG0_F4 + HEAD_RADIUS;
             self.hand_tg = false;
-            self.hand_centre = self.joint_off(JNT_KUTI, HAND_OFF);
+            self.hand_centre = self.joint_off(JNT_KUTI, 0, HAND_OFF);
             self.hand_height = REG0_F8 + HAND_HEIGHT_HEAD;
             self.hand_radius = REG0_F9 + HAND_RADIUS_HEAD;
-            self.eye = self.joint_off(JNT_KUTI, EYE_OFF);
+            self.eye = self.joint_off(JNT_KUTI, 0, EYE_OFF);
             for index in 0..EYE_COUNT {
                 let mut pos_vec = self.joint(JNT_EYEL + index as u16);
                 if self.eye_timer[index] != 0 || i32::from(self.eye_health[index]) <= 0 {
@@ -2216,6 +2343,7 @@ impl Gohdan {
                 self.eye_radius[index] = REG0_F14 + EYE_RADIUS;
             }
         } else {
+            self.hand_tg = true;
             let mut radius = 0.0;
             if self.action == ACTION_HARAI_ATTACK {
                 radius = REG0_F16 + FINGER_RADIUS_ATTACK;
@@ -2224,19 +2352,20 @@ impl Gohdan {
                 self.finger[index] = self.joint(JNT_FINGER_FIRST + index as u16);
                 self.finger_radius[index] = REG0_F14 + FINGER_RADIUS + radius;
             }
-            let knuckle = self.joint(JNT_FINGER_KNUCKLE);
             for index in 0..4 {
                 let mut vec = Vec3::new(TE_X[index], TE_Y[index], TE_Z[index]);
                 if self.part == PART_RIGHT {
                     vec.x *= -1.0;
                 }
-                if let Some(slot) = self.finger.get_mut(FINGER_ROWS + index) {
-                    *slot = knuckle + turned(self.model_yaw, vec.to_array());
+                let slot = self.joint_off(JNT_FINGER_KNUCKLE, BIND_KNUCKLE_YAW, vec.to_array());
+                if let Some(entry) = self.finger.get_mut(FINGER_ROWS + index) {
+                    *entry = slot;
                 }
                 self.finger_radius[FINGER_ROWS + index] = REG0_F15 + KNUCKLE_RADIUS + radius;
             }
             self.eye = self.joint_off(
                 JNT_FINGER_KNUCKLE,
+                BIND_KNUCKLE_YAW,
                 if self.part == PART_RIGHT {
                     [-(REG0_F15 + HAND_SIDE), REG0_F16, REG0_F18 + HAND_UP]
                 } else {
@@ -2245,6 +2374,7 @@ impl Gohdan {
             );
             self.hand_centre = self.joint_off(
                 JNT_FINGER_KNUCKLE,
+                BIND_KNUCKLE_YAW,
                 [REG0_F15 + HAND_SIDE, REG0_F16, REG0_F17 + HAND_FAR],
             );
             self.hand_height = REG0_F8 + HAND_HEIGHT;
@@ -2271,7 +2401,8 @@ impl Gohdan {
         if self.hurt_timer == 0 {
             let mut b_var1 = false;
             if self.part == PART_HEAD {
-                if touches(self.head_centre, self.head_radius, player, reach) {
+                if touches_cyl(self.head_centre, self.head_radius, self.head_height, player, reach)
+                {
                     b_var1 = true;
                 }
             } else {
@@ -2322,7 +2453,9 @@ impl Gohdan {
             self.speed_f = 0.0;
             return;
         }
-        if !touches(self.hand_centre, self.hand_radius, player, reach) {
+        if !self.hand_tg
+            || !touches_cyl(self.hand_centre, self.hand_radius, self.hand_height, player, reach)
+        {
             return;
         }
         self.state = 10;
@@ -2346,6 +2479,49 @@ impl Gohdan {
                 slot.action = ACTION_FLY;
                 slot.damage = 0;
                 slot.speed_f = 0.0;
+            }
+        }
+    }
+
+    fn hurt_player(&mut self, env: &Env<'_>, sink: &mut Sink<'_>) {
+        if self.at_hit {
+            return;
+        }
+        let player = env.pos();
+        if self.head_at
+            && touches_cyl(
+                self.head_centre,
+                self.head_radius,
+                self.head_height,
+                player,
+                PLAYER_BODY_RADIUS,
+            )
+        {
+            self.at_hit = true;
+            sink.hurt_player(AT_POWER_HEAD);
+            return;
+        }
+        for index in 0..FINGER_COUNT {
+            if self.finger_at[index]
+                && touches(
+                    self.finger[index],
+                    self.finger_radius[index],
+                    player,
+                    PLAYER_BODY_RADIUS,
+                )
+            {
+                self.at_hit = true;
+                sink.hurt_player(AT_POWER_FINGER);
+                return;
+            }
+        }
+        for index in 0..BEAM_COUNT {
+            if self.beam_at[index]
+                && touches(self.beam_pos[index], BEAM_RADIUS, player, PLAYER_BODY_RADIUS)
+            {
+                self.at_hit = true;
+                sink.hurt_player(AT_POWER_BEAM);
+                return;
             }
         }
     }
@@ -2393,8 +2569,7 @@ impl Gohdan {
                         }
                         if i32::from(item_no) != ITEM_NO_NONE {
                             sink.se(SE_OBJ_BOMB_EXPLODE);
-                            let pos_vec =
-                                self.joint_off(joint, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
+                            let pos_vec = self.joint_off(joint, 0, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
                             self.item_pos = pos_vec;
                             sink.spawn_item(
                                 u32::from(item_no),
@@ -2461,9 +2636,11 @@ impl Gohdan {
                 _ => break,
             }
         }
-        for index in 1..4 {
-            if self.bomb_eff[index] && self.timers[3] == 1 {
-                self.bomb_eff[index] = false;
+        if self.part == PART_HEAD {
+            for index in 1..BOMB_EFF_COUNT {
+                if self.bomb_eff[index] && self.timers[3] == 1 {
+                    self.bomb_eff[index] = false;
+                }
             }
         }
     }
@@ -2772,6 +2949,7 @@ impl Gohdan {
 
     fn beam_move(&mut self, env: &Env<'_>, sink: &mut Sink<'_>) {
         for index in 0..BEAM_COUNT {
+            self.beam_at[index] = false;
             if self.beam_live[index] == 0 {
                 continue;
             }
@@ -2808,6 +2986,7 @@ impl Gohdan {
             if self.beam_live[index] == 1 {
                 self.beam_live[index] += 1;
             }
+            self.beam_at[index] = self.beam_live[index] != 0;
         }
     }
 
@@ -2883,7 +3062,13 @@ impl Gohdan {
                         ],
                     );
                     self.cam_eye = self.eye + sp_a4;
-                    let sp_a4 = turned(REG0_S2 + CAM_PITCH, [0.0, REG0_F7, REG0_F8 + 850.0]);
+                    let sp_a4 = posed(
+                        self.shape_angle[1]
+                            .wrapping_add(DEMO_YAW_OFFSET)
+                            .wrapping_add(REG0_S1),
+                        REG0_S2 + CAM_PITCH,
+                        [0.0, REG0_F7, REG0_F8 + 850.0],
+                    );
                     self.cam_centre = self.pos + sp_a4;
                     if self.demo_count > 80 {
                         self.action = ACTION_FLY;
@@ -3279,7 +3464,8 @@ impl Gohdan {
                     }
                     if self.morph.frame as i32 == 26 {
                         sink.se(SE_OBJ_BOMB_EXPLODE);
-                        let sp_a4 = self.joint_off(JNT_HANAR, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
+                        let sp_a4 =
+                            self.joint_off(JNT_HANAR, 0, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
                         let mut item_angle = self.shape_angle;
                         item_angle[1] = (item_angle[1] as i32 + REG0_S7 as i32 + -300) as i16;
                         self.item_pos = sp_a4;
@@ -3399,6 +3585,7 @@ impl Gohdan {
         sink: &mut Sink<'_>,
     ) {
         self.sway_clock = self.sway_clock.wrapping_add(1);
+        self.at_hit = false;
         for index in 0..TIMER_COUNT {
             if self.timers[index] != 0 {
                 self.timers[index] -= 1;
@@ -3474,11 +3661,14 @@ impl Gohdan {
         r27 = r27
             .wrapping_add(ang(f1_3 * cos_s(((boss.sway_clock as i32) * SHAKE_YAW_E) as i16)));
         self.model_yaw = self.shape_angle[1].wrapping_add(r29);
+        self.model_pitch = self.shape_angle[0].wrapping_add(r27);
+        self.model_roll = self.shape_angle[2];
         add_calc0(&mut self.sway, 1.0, REG0_F3 + 30.0);
         add_calc0(&mut self.roll, 1.0, 5.0);
         add_calc0(&mut self.lean, 1.0, 10.0);
         add_calc0(&mut self.twist, 1.0, 5.0);
         self.col_set();
+        self.hurt_player(env, sink);
         if self.part == PART_HEAD {
             self.beam_move(env, sink);
             self.demo_camera(env, peers, writes, sink);
@@ -3491,7 +3681,6 @@ impl Gohdan {
         if self.blure == 1 {
             self.blure = 0;
         }
-        let _ = r27;
     }
 }
 
@@ -3560,6 +3749,7 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut msgbox: ResMut<MsgBox>,
     mut mem: ResMut<MemBits>,
+    mut health: ResMut<Health>,
     mut commands: Commands,
     mut bosses: Query<(Entity, &mut Actor, &mut Gohdan), (With<Gohdan>, Without<Player>)>,
 ) {
@@ -3632,6 +3822,7 @@ pub fn control(
                 events: &mut events,
                 msg: &mut msgbox,
                 table,
+                health: &mut health,
                 spawns: &mut spawns,
                 taken: &mut taken,
                 eaten: &mut eaten,
