@@ -67,6 +67,7 @@ const HIO_M40: i16 = 32;
 const HIO_M48: i16 = 150;
 
 const REG0_F0: f32 = 0.0;
+const REG0_F6: f32 = 0.0;
 const REG0_F1: f32 = 0.0;
 const REG0_F2: f32 = 0.0;
 const REG0_F3: f32 = 0.0;
@@ -281,9 +282,9 @@ const SWORD_SPIN_CAP: f32 = 700.0;
 const SWORD_SPIN_GAIN: f32 = 0.4;
 const SWORD_ACCEL_BASE: f32 = 3.0;
 const SWORD_ACCEL_CAP: f32 = 1000.0;
+const SPIN_SEAT_Y: f32 = 100.0;
 const SWORD_TURN_DIV: i16 = 1;
 const SWORD_YAW_OFFSET: i16 = 0x7058;
-const SWORD_SPEED_BASE: f32 = 20.0;
 const SWORD_SPEED_SPAN: u32 = 10_000;
 const SWORD_TURN_STEP: i16 = 0x80;
 const SWORD_CAP_BASE: i16 = 0x800;
@@ -324,10 +325,8 @@ const BALL_PREV_SCALE: f32 = 1.05;
 const BODY_RADIUS: f32 = 70.0;
 const BODY_HEIGHT: f32 = 250.0;
 const BODY_LIFT: f32 = -150.0;
-const KEN_REACH: f32 = 100.0;
 const PLAYER_BODY: f32 = 20.0;
 const REACH_SWORD: f32 = 20.0;
-const REACH_ARROW: f32 = 35.0;
 const SWAY_YAW: i16 = 700;
 const SWAY_PITCH: i16 = 750;
 const SWAY_ROLL: i16 = 720;
@@ -338,6 +337,20 @@ const PUSH_STEP: f32 = 7.0;
 const PUSH_RATE: f32 = 80.0;
 const PUSH_FRAMES: i16 = 7;
 const BALL_POWER: u8 = 1;
+
+const JNT_AGO1: [f32; 3] = [-0.00072, 258.75162, 2.51625];
+const JNT_MUNE2: [f32; 3] = [-0.0005, 179.77229, 4.77766];
+const JNT_ITEM1: [f32; 3] = [-192.50333, 205.01847, -9.97463];
+const JNT_ITEM1_TIP: [f32; 3] = [-192.49533, 205.0, 90.02537];
+const JNT_UDE_L3: [f32; 3] = [174.9995, 205.01682, -10.00957];
+const BALL_SPAWN_X: f32 = 30.0;
+const BALL_SPAWN_Y: f32 = 30.0;
+const MUNE2_DROP: f32 = 150.0;
+const PLAYER_EYE_Y: f32 = 60.0;
+const CYL_HEIGHT: f32 = 250.0;
+const CYL_RADIUS: f32 = 70.0;
+const KEN_RADIUS: f32 = 60.0;
+const KEN_ATP: i32 = 8;
 
 const DEMO_INTRO: i16 = 47;
 const DEMO_INTRO_HOLD: i16 = 60;
@@ -438,6 +451,10 @@ fn aimed(yaw: i16, pitch: i16, distance: f32) -> Vec3 {
 
 fn within(from: Vec3, to: Vec3, radius: f32) -> bool {
     (to - from).length_squared() <= radius * radius
+}
+
+fn bind(ofs: [f32; 3], shape_yaw: i16) -> Vec3 {
+    turned(shape_yaw, ofs)
 }
 
 fn timer(value: &mut i16) {
@@ -619,6 +636,7 @@ pub struct Blow {
 
 pub struct Env<'a> {
     pub player_pos: Vec3,
+    pub player_eye: Vec3,
     pub player_face: i16,
     pub player_ride: bool,
     pub player_swim: bool,
@@ -628,6 +646,7 @@ pub struct Env<'a> {
     pub has_light_arrow: bool,
     pub light_touch: bool,
     pub orb_touch: bool,
+    pub arrow_pos: Option<Vec3>,
     pub master_action: i16,
 }
 
@@ -643,6 +662,14 @@ impl Env<'_> {
                 }
             }
             None => (false, to),
+        }
+    }
+
+    fn strike_pos(&self) -> Option<Vec3> {
+        match self.blow.at {
+            At::Sword | At::LightArrow => Some(self.player_eye),
+            At::Arrow | At::FireArrow | At::IceArrow => self.arrow_pos,
+            _ => None,
         }
     }
 
@@ -709,7 +736,12 @@ pub struct PhantomGanon {
     pub model_offset: Vec3,
     pub body: Vec3,
     pub body_live: bool,
+    pub body_tg: bool,
+    pub cyl_radius: f32,
+    pub cyl_height: f32,
     pub ken: Vec3,
+    pub ken_radius: f32,
+    pub ken_atp: i32,
     pub ken_at_live: i8,
     pub ken_held: i8,
     pub slot_pos: Vec3,
@@ -732,6 +764,9 @@ pub struct PhantomGanon {
     pub ball_fire: i8,
     pub ball_pause: i8,
     pub ball_live: bool,
+    pub ball_tg_set: bool,
+    pub ball_at_radius: f32,
+    pub ball_tg_radius: f32,
     pub ball_hit_player: bool,
     pub orb_home: Vec3,
     pub orb_hits: i8,
@@ -808,7 +843,12 @@ impl PhantomGanon {
             model_offset: Vec3::ZERO,
             body: Vec3::ZERO,
             body_live: false,
-            ken: Vec3::ZERO,
+            body_tg: true,
+            cyl_radius: CYL_RADIUS,
+            cyl_height: CYL_HEIGHT,
+            ken: Vec3::new(FAR_OFF_LOW, FAR_OFF_LOW, FAR_OFF_LOW),
+            ken_radius: KEN_RADIUS,
+            ken_atp: 0,
             ken_at_live: 0,
             ken_held: 0,
             slot_pos: Vec3::ZERO,
@@ -831,6 +871,9 @@ impl PhantomGanon {
             ball_fire: 0,
             ball_pause: 0,
             ball_live: false,
+            ball_tg_set: false,
+            ball_at_radius: BALL_AT_RADIUS,
+            ball_tg_radius: BALL_TG_RADIUS,
             ball_hit_player: false,
             orb_home: Vec3::ZERO,
             orb_hits: 0,
@@ -961,8 +1004,8 @@ impl PhantomGanon {
         self.materialized = false;
     }
 
-    fn pos_move(&mut self, actor: &mut Actor, lead: bool) {
-        if lead {
+    fn pos_move(&mut self, actor: &mut Actor, param_2: u8) {
+        if param_2 == 0 {
             let delta = self.slot_pos - actor.pos;
             let y_target = to_s16(delta.x.atan2(delta.z));
             let span = (delta.x * delta.x + delta.z * delta.z).sqrt();
@@ -993,7 +1036,7 @@ impl PhantomGanon {
                 actor.pos = self.home_pos;
                 actor.pos.y = env.player_pos.y
                     + if big { HIO_M18 } else { HIO_M10 };
-                self.shape_angle[1] = bearing(actor.pos, env.player_pos);
+                self.shape_angle[1] = bearing(actor.pos, env.player_eye);
                 self.mode = 1;
                 self.anm_init(BCK_WAIT1, 20.0, EMODE_LOOP, 1.0);
                 self.set_t(1, if big { 40 } else { 60 });
@@ -1006,9 +1049,10 @@ impl PhantomGanon {
                 self.set_t(1, span);
                 self.fly_hold(actor, env, big);
             }
-            _ => self.fly_hold(actor, env, big),
+            1 => self.fly_hold(actor, env, big),
+            _ => {}
         }
-        self.pos_move(actor, false);
+        self.pos_move(actor, 0);
         self.fly_se_set(actor, out);
         if self.tv(1) == 0 {
             self.action = if big { ACTION_SHOT2 } else { ACTION_SHOT };
@@ -1042,7 +1086,7 @@ impl PhantomGanon {
         self.turn_scale = REG0_F5 + FLY_SCALE;
         add_calc_angle_s2(
             &mut self.shape_angle[1],
-            bearing(actor.pos, env.player_pos),
+            bearing(actor.pos, env.player_eye),
             FACE_DIV,
             FACE_CAP,
         );
@@ -1052,7 +1096,7 @@ impl PhantomGanon {
     fn shot(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         add_calc_angle_s2(
             &mut self.shape_angle[1],
-            bearing(actor.pos, env.player_pos),
+            bearing(actor.pos, env.player_eye),
             FACE_DIV,
             FACE_CAP,
         );
@@ -1156,10 +1200,10 @@ impl PhantomGanon {
 
     fn shot_tail(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
         add_calc0(&mut self.speed_f, 1.0, REG0_F14 + FLY_BRAKE);
-        self.pos_move(actor, false);
+        self.pos_move(actor, 0);
         self.fly_se_set(actor, out);
         if self.mode >= 2 && self.ball_mode == 0 {
-            self.action = ACTION_DOWN;
+            self.action = ACTION_FLY;
             self.mode = 0;
         }
         if self.mode == 3 || self.mode == 4 {
@@ -1175,7 +1219,7 @@ impl PhantomGanon {
         }
         if self.mode == 1 {
             let seat = env.player_pos
-                + turned(self.shape_angle[1], [0.0, HIO_M2C + SWORD_SPEED_BASE, HIO_M30]);
+                + turned(self.shape_angle[1], [0.0, HIO_M2C + SPIN_SEAT_Y, HIO_M30]);
             actor.pos = seat;
             if !env.blocked(env.player_pos, actor.pos) {
                 actor.pos.y -= 100.0;
@@ -1202,6 +1246,7 @@ impl PhantomGanon {
                 out.se(SE_CM_PG_SWING_L);
             }
             self.ken_active = 1;
+            self.ken_atp = KEN_ATP;
             if frame == i32::from(HIO_M3E) {
                 self.sword_live = (HIO_M40 - HIO_M3E) as i8;
             }
@@ -1213,7 +1258,7 @@ impl PhantomGanon {
             add_calc2(&mut self.speed_f, target, 1.0, step);
             actor.angle[1] = self.shape_angle[1];
             actor.angle[0] = 0;
-            self.pos_move(actor, true);
+            self.pos_move(actor, 1);
             if self.morph.is_stop() {
                 self.action = ACTION_KIERU;
                 self.mode = 0;
@@ -1246,7 +1291,7 @@ impl PhantomGanon {
             actor.angle[1] = self.shape_angle[1];
             self.speed_f = REG8_F4 + SPIN_SPEED_BASE;
             actor.angle[0] = 0;
-            self.pos_move(actor, true);
+            self.pos_move(actor, 1);
             if (self.slot_pos - actor.pos).length() < HIO_M38 {
                 self.anm_init(BCK_KAITEN1, 2.0, EMODE_NONE, 1.0);
                 self.mode = 3;
@@ -1260,6 +1305,7 @@ impl PhantomGanon {
                 out.se(SE_CM_PG_SWING_L);
             }
             self.ken_active = 1;
+            self.ken_atp = KEN_ATP;
             if frame == i32::from(HIO_M3E) {
                 self.sword_live = (HIO_M40 - HIO_M3E) as i8;
             }
@@ -1319,7 +1365,7 @@ impl PhantomGanon {
     fn shot2(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         add_calc_angle_s2(
             &mut self.shape_angle[1],
-            bearing(actor.pos, env.player_pos),
+            bearing(actor.pos, env.player_eye),
             FACE_DIV,
             FACE_CAP,
         );
@@ -1393,7 +1439,7 @@ impl PhantomGanon {
 
     fn shot2_tail(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
         add_calc0(&mut self.speed_f, 1.0, REG0_F14 + FLY_BRAKE);
-        self.pos_move(actor, false);
+        self.pos_move(actor, 0);
         self.fly_se_set(actor, out);
         self.tama_set(actor);
     }
@@ -1549,7 +1595,7 @@ impl PhantomGanon {
             let far = anchor + turned(self.home_angle, [0.0, 0.0, SWORD_SPEED_SPAN as f32]);
             let (hit, cross) = env.crossed(anchor, far);
             let base = if hit { cross } else { anchor };
-            let tip = anchor + turned(self.home_angle, [0.0, 0.0, 0.0]);
+            let tip = self.home_pos + bind(JNT_ITEM1, self.home_angle);
             self.sword_yaw = self.shape_angle[1].wrapping_sub(to_s16(
                 (tip.x - base.x).atan2(tip.z - base.z),
             ));
@@ -1596,12 +1642,13 @@ impl PhantomGanon {
                 self.kieru_brk(2, out);
                 self.set_t(0, DROP_HOLD);
                 self.mode = 4;
-                out.sword = Some(true);
+                out.sword = Some(false);
             }
             return;
         }
         if self.tv(0) == 0 {
             out.delete = true;
+            out.sword = Some(true);
         }
     }
 
@@ -1796,12 +1843,21 @@ impl PhantomGanon {
         add_calc_angle_s2(&mut actor.angle[0], 0, TURN_PITCH_DIV, TURN_PITCH_CAP);
     }
 
+    fn cyl_hits(&self, from: Vec3) -> bool {
+        let dx = from.x - self.body.x;
+        let dz = from.z - self.body.z;
+        let dy = from.y - self.body.y;
+        dx * dx + dz * dz <= self.cyl_radius * self.cyl_radius
+            && dy.abs() <= self.cyl_height * 0.5
+    }
+
     fn damage_check(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         if self.invuln != 0 {
             return;
         }
-        let touch = env.light_touch || env.orb_touch || self.sword_touch(env);
-        if touch {
+        let strike = env.strike_pos();
+        let tg_hit = self.body_tg && strike.is_some_and(|at| self.cyl_hits(at));
+        if tg_hit {
             if self.kind == 2 {
                 if env.light_touch {
                     self.light_arrow_hit(out);
@@ -1811,8 +1867,8 @@ impl PhantomGanon {
                     if self.ball_mode == 1 || self.ball_mode == 2 {
                         self.ball_mode = 35;
                     }
-                    self.orb_stage = 0;
                 }
+                self.orb_stage = 0;
                 return;
             }
             if env.orb_touch {
@@ -1821,29 +1877,33 @@ impl PhantomGanon {
             }
         }
         if self.clone != 0 {
-            if touch || env.master_action == ACTION_DOWN {
+            if tg_hit || env.master_action == ACTION_DOWN {
                 out.delete = true;
             }
             return;
         }
-        if touch {
+        if tg_hit || self.ball_landed != 0 {
             self.invuln = 6;
-            if self.sword_touch(env) {
-                self.sword_branch(env, out);
+            if tg_hit {
+                if self.action == ACTION_DOWN
+                    || self.action == ACTION_SPIN
+                    || self.action == ACTION_SPIN2
+                {
+                    if self.sword_touch(env) {
+                        self.sword_branch(env, out);
+                    }
+                }
+            } else {
+                out.se(SE_CV_PG_HIT_EBALL);
+                self.knock_back(actor, env);
             }
-            return;
-        }
-        if self.ball_landed != 0 {
-            self.invuln = 6;
-            out.se(SE_CV_PG_HIT_EBALL);
-            self.knock_back(actor, env);
         }
     }
 
     fn sword_touch(&self, env: &Env<'_>) -> bool {
         env.blow.at == At::Sword
             && damage::is_master_sword(env.blow.blade)
-            && within(self.body, env.player_pos, BODY_RADIUS + REACH_SWORD)
+            && within(self.body, env.player_eye, self.cyl_radius + REACH_SWORD)
     }
 
     fn light_arrow_hit(&mut self, out: &mut Sink<'_>) {
@@ -1891,6 +1951,10 @@ impl PhantomGanon {
         if !swung {
             return;
         }
+        let power = env.blow.at.power(env.blow.blade, env.blow.soup);
+        if power > 0 {
+            self.health -= power;
+        }
         if self.health <= 0 {
             out.se(SE_CV_PG_DAMAGE_L);
         } else {
@@ -1906,8 +1970,7 @@ impl PhantomGanon {
                 self.invuln = 1000;
                 out.stop_bgm();
             } else {
-                let power = env.blow.at.power(env.blow.blade, env.blow.soup) as i8;
-                self.combo_left = self.combo_left.wrapping_sub(power);
+                self.combo_left = self.combo_left.wrapping_sub(power as i8);
                 if self.combo_left <= 0 {
                     self.combo_left = COMBO_LEFT;
                     self.action = ACTION_KIERU;
@@ -1934,6 +1997,8 @@ impl PhantomGanon {
     }
 
     fn energy_ball_move(&mut self, actor: &Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        self.ball_tg_set = false;
+        self.ball_hit_player = false;
         if self.ball_mode == 0 {
             return;
         }
@@ -1948,11 +2013,13 @@ impl PhantomGanon {
             self.ball_mode = 2;
         }
         if self.ball_mode == 2 {
-            self.ball_pos = actor.pos + self.model_offset;
+            self.ball_pos =
+                actor.pos + self.model_offset + bind(JNT_UDE_L3, self.shape_angle[1])
+                    + turned(self.shape_angle[1], [BALL_SPAWN_X, BALL_SPAWN_Y, 0.0]);
             if self.ball_fire != 0 {
                 self.ball_fire = 0;
                 self.ball_mode = 3;
-                let mut delta = env.player_pos - self.ball_pos;
+                let mut delta = env.player_eye - self.ball_pos;
                 delta.y -= REG0_F18 + BALL_PROBE_AIM;
                 let (yaw, pitch) = aim_of(delta);
                 let reach = if self.kind == 0 {
@@ -1966,95 +2033,100 @@ impl PhantomGanon {
                 self.ball_live = false;
             }
         }
-        if self.ball_mode < 3 {
-            if (self.home_pos - self.ball_pos).length() > BALL_LIMIT {
-                self.ball_mode = 35;
-            }
-            return;
-        }
-        self.ball_prev = self.ball_pos;
-        self.ball_pos += self.ball_step;
-        let mut landed = false;
-        let mut delta = self.eye - self.ball_pos;
-        delta.y -= BALL_PROBE_AIM;
-        if delta.length() < self.ball_speed + BALL_GAP + REG0_F3 {
-            if self.swing_hit != 0 {
-                landed = true;
-                self.ball_landed = 1;
-            } else if self.ball_mode == 5 {
-                if self.kind != 2 {
+        if self.ball_mode >= 3 {
+            self.ball_prev = self.ball_pos;
+            self.ball_pos += self.ball_step;
+            let mut landed = false;
+            let mut delta = self.eye - self.ball_pos;
+            delta.y -= BALL_PROBE_AIM;
+            if delta.length() < self.ball_speed + BALL_GAP + REG0_F3 {
+                if self.swing_hit != 0 {
+                    landed = true;
                     self.ball_landed = 1;
-                } else {
-                    if self.ball_pause != 0 {
+                } else if self.ball_mode == 5 {
+                    if self.kind != 2 {
+                        self.ball_landed = 1;
+                    } else {
+                        if self.ball_pause != 0 {
+                            return;
+                        }
+                        self.action = ACTION_KIERU;
+                        self.mode = 0;
+                        self.ball_pause = BALL_PAUSE_BREAK;
                         return;
                     }
-                    self.action = ACTION_KIERU;
-                    self.mode = 0;
-                    self.ball_pause = BALL_PAUSE_BREAK;
-                    return;
                 }
             }
-        }
-        let mut bottle = false;
-        if self.ball_mode == 4 && env.player_bottle {
-            let mut probe = env.player_pos - self.ball_pos;
-            probe.y -= BALL_PROBE_SWING;
-            if probe.length() < REG0_F2 + BALL_RANGE_BASE {
-                bottle = true;
+            let mut bottle = false;
+            if self.ball_mode == 4 && env.player_bottle {
+                let mut probe = env.player_eye - self.ball_pos;
+                probe.y -= BALL_PROBE_SWING;
+                if probe.length() < REG0_F2 + BALL_RANGE_BASE {
+                    bottle = true;
+                }
             }
-        }
-        if (landed || bottle) && self.ball_pause == 0 {
-            let sword = env.blow.at == At::Sword
-                && damage::is_master_sword(env.blow.blade)
-                && within(self.ball_pos, env.player_pos, BALL_TG_RADIUS + REACH_SWORD);
-            let mut bounced = false;
-            if sword || bottle {
-                let mut aim = self.eye - self.ball_pos;
-                aim.y -= REG0_F17 + BALL_PROBE_SWING;
-                let (yaw, pitch) = aim_of(aim);
-                self.ball_step = aimed(yaw, pitch, self.ball_speed);
-                self.ball_mode = 5;
-                self.tension += 1;
-                out.se(SE_LK_PG_BOMB_STRIKE);
-                out.story(STORY_DEFEATED);
-                bounced = true;
-            } else if landed {
-                let mut aim = env.player_pos - self.ball_pos;
-                aim.y -= REG0_F18 + BALL_PROBE_AIM;
-                let (yaw, pitch) = aim_of(aim);
-                self.ball_step = aimed(yaw, pitch, self.ball_speed);
+            if (landed || bottle) && self.ball_pause == 0 {
+                let sword = env.blow.at == At::Sword
+                    && damage::is_master_sword(env.blow.blade)
+                    && within(
+                        self.ball_pos,
+                        env.player_eye,
+                        self.ball_tg_radius + REACH_SWORD,
+                    );
+                let mut bounced = false;
+                if sword || bottle {
+                    let mut aim = self.eye - self.ball_pos;
+                    aim.y -= REG0_F17 + BALL_PROBE_SWING;
+                    let (yaw, pitch) = aim_of(aim);
+                    self.ball_step = aimed(yaw, pitch, self.ball_speed);
+                    self.ball_mode = 5;
+                    self.tension += 1;
+                    out.se(SE_LK_PG_BOMB_STRIKE);
+                    out.story(STORY_DEFEATED);
+                    bounced = true;
+                } else if landed {
+                    let mut aim = env.player_eye - self.ball_pos;
+                    aim.y -= REG0_F18 + BALL_PROBE_AIM;
+                    let (yaw, pitch) = aim_of(aim);
+                    self.ball_step = aimed(yaw, pitch, self.ball_speed);
+                    self.ball_mode = 4;
+                    bounced = true;
+                }
+                if bounced {
+                    if self.kind == 0 {
+                        self.ball_speed += HIO_M24;
+                    } else {
+                        self.ball_speed += HIO_M28;
+                    }
+                    self.ball_pos += self.ball_step;
+                    self.ball_pause = BALL_PAUSE_FIRE;
+                }
+            }
+            let mut live = self.ball_pos;
+            if self.ball_pause != 0 {
+                self.ball_pause -= 1;
+                live = Vec3::new(FAR_OFF, FAR_OFF, FAR_OFF_UP);
+            }
+            if self.ball_mode == 3 {
+                self.ball_live = true;
                 self.ball_mode = 4;
-                bounced = true;
             }
-            if bounced {
-                if self.kind == 0 {
-                    self.ball_speed += HIO_M24;
-                } else {
-                    self.ball_speed += HIO_M28;
+            self.ball_at_radius = REG0_F6 + BALL_AT_RADIUS;
+            self.ball_tg_radius = REG0_F7 + BALL_TG_RADIUS;
+            self.ball_hit_player = within(live, env.player_eye, self.ball_at_radius + PLAYER_BODY);
+            if self.ball_landed != 0 || self.ball_bg_check(env) {
+                if self.tension != 0 {
+                    self.tension = 0;
                 }
-                self.ball_pos += self.ball_step;
-                self.ball_pause = BALL_PAUSE_FIRE;
+                self.ball_mode = 0;
+                out.se(SE_OBJ_PG_EBALL_EXP_S);
+                if self.ball_hit_player && self.action != ACTION_LAST_END {
+                    self.ball_struck_player(out);
+                }
+                self.ball_tg_set = false;
+                return;
             }
-        }
-        let mut live = self.ball_pos;
-        if self.ball_pause != 0 {
-            self.ball_pause -= 1;
-            live = Vec3::new(FAR_OFF, FAR_OFF, FAR_OFF_UP);
-        }
-        if self.ball_mode == 3 {
-            self.ball_live = true;
-            self.ball_mode = 4;
-        }
-        self.ball_hit_player = within(live, env.player_pos, BALL_AT_RADIUS + PLAYER_BODY);
-        if self.ball_landed != 0 || self.ball_bg_check(env) {
-            if self.tension != 0 {
-                self.tension = 0;
-            }
-            self.ball_mode = 0;
-            out.se(SE_OBJ_PG_EBALL_EXP_S);
-            if self.ball_hit_player && self.action != ACTION_LAST_END {
-                self.ball_struck_player(out);
-            }
+            self.ball_tg_set = true;
         }
         if (self.home_pos - self.ball_pos).length() > BALL_LIMIT {
             self.ball_mode = 35;
@@ -2144,6 +2216,8 @@ impl PhantomGanon {
                         self.shape_angle[1],
                         [REG6_F0 - 150.0, REG6_F1 + 20.0, REG6_F2 + 500.0],
                     );
+                self.cam_look = self.eye;
+                self.cam_look.y += REG6_F6 - 40.0;
                 if self.demo_count > DEMO_STAND_HOLD {
                     self.demo_state += 1;
                     self.demo_count = 0;
@@ -2169,6 +2243,8 @@ impl PhantomGanon {
                 break 'phase;
             }
             if self.demo_state == 53 {
+                self.cam_look = Vec3::new(-300098.0, 580.0, -301997.0);
+                self.cam_eye = Vec3::new(-300274.0, 929.0, -301770.0);
                 if self.demo_count != DEMO_CAPE_DROP {
                     break 'phase;
                 }
@@ -2176,6 +2252,8 @@ impl PhantomGanon {
                 self.demo_count = 0;
                 self.cam_eye = Vec3::new(-299703.0, 921.0, -300851.0);
                 self.speed.y = 0.0;
+                self.cam_look = self.eye;
+                self.cam_look.y -= REG0_F11 + 30.0;
                 self.mode += 1;
             }
             if self.demo_state == 54 {
@@ -2277,8 +2355,22 @@ impl PhantomGanon {
     }
 
     fn model_pose(&mut self, actor: &Actor) {
-        self.eye = actor.pos + self.model_offset;
-        self.body = self.eye + Vec3::new(0.0, BODY_LIFT, 0.0);
+        self.eye = actor.pos + self.model_offset + bind(JNT_AGO1, self.shape_angle[1]);
+        self.body = actor.pos + self.model_offset + bind(JNT_MUNE2, self.shape_angle[1])
+            - turned(self.shape_angle[1], [0.0, MUNE2_DROP, 0.0]);
+        self.cyl_radius = REG8_F4 + CYL_RADIUS;
+        self.cyl_height = REG8_F3 + CYL_HEIGHT;
+        self.ken_radius = REG0_F13 + KEN_RADIUS;
+        if self.ken_active != 0 {
+            self.ken = actor.pos + self.model_offset + bind(JNT_ITEM1_TIP, self.shape_angle[1]);
+            self.ken_active = 0;
+            if self.ken_at_live == 0 {
+                self.ken_at_live = 1;
+            }
+        } else {
+            self.ken_at_live = 0;
+            self.ken = Vec3::new(FAR_OFF_LOW, FAR_OFF_LOW, FAR_OFF_LOW);
+        }
     }
 
     fn execute(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
@@ -2317,16 +2409,7 @@ impl PhantomGanon {
         self.demo_camera(actor, env, out);
         self.energy_ball_move(actor, env, out);
         self.body_live = self.materialized && self.clone == 0;
-        if self.ken_active != 0 {
-            self.ken = self.eye + turned(self.shape_angle[1], [0.0, 0.0, KEN_REACH]);
-            self.ken_active = 0;
-            if self.ken_at_live == 0 {
-                self.ken_at_live = 1;
-            }
-        } else {
-            self.ken_at_live = 0;
-            self.ken = Vec3::new(FAR_OFF_LOW, FAR_OFF_LOW, FAR_OFF_LOW);
-        }
+        self.body_tg = self.materialized;
         self.swing_hit = 0;
         timer8(&mut self.sword_live);
     }
@@ -2541,12 +2624,24 @@ pub fn control(
     let mut clones: Vec<(Vec3, i16, i8, u32)> = Vec::new();
     let mut swords: Vec<(Vec3, bool, i8, u16)> = Vec::new();
     let mut gone: Vec<(Entity, i8, u16)> = Vec::new();
+    let mut sword_cut: Vec<(u8, Vec3, f32)> = Vec::new();
+    let player_eye = player.pos + Vec3::new(0.0, PLAYER_EYE_Y, 0.0);
     for (entity, mut actor, mut boss) in &mut bosses {
         let actor = &mut *actor;
         let boss = &mut *boss;
-        let body = boss.body;
+        let arrow_pos = shafts
+            .iter()
+            .find(|(_, phase, _)| *phase == arrow::Phase::Flying)
+            .map(|(_, _, pos)| *pos);
+        let light_touch = shafts.iter().any(|(kind, phase, pos)| {
+            *kind == arrow::TYPE_LIGHT
+                && *phase == arrow::Phase::Flying
+                && boss.cyl_hits(*pos)
+        });
+        let orb_touch = orbs.iter().any(|pos| boss.cyl_hits(*pos));
         let env = Env {
             player_pos: player.pos,
+            player_eye,
             player_face: to_s16(player.face),
             player_ride: riding,
             player_swim: swimming,
@@ -2554,12 +2649,9 @@ pub fn control(
             solid,
             blow,
             has_light_arrow,
-            light_touch: shafts.iter().any(|(kind, phase, pos)| {
-                *kind == arrow::TYPE_LIGHT
-                    && *phase == arrow::Phase::Flying
-                    && within(body, *pos, BODY_RADIUS + REACH_ARROW)
-            }),
-            orb_touch: orbs.iter().any(|pos| within(body, *pos, BALL_TG_RADIUS)),
+            light_touch,
+            orb_touch,
+            arrow_pos,
             master_action,
         };
         let room = actor.room;
@@ -2578,6 +2670,9 @@ pub fn control(
             boss.begin(actor, &env, &mut sink);
         }
         boss.execute(actor, &env, &mut sink);
+        if boss.ken_at_live != 0 && boss.ken_atp != 0 {
+            sword_cut.push((boss.ken_atp as u8, boss.ken, boss.ken_radius));
+        }
         if sink.orbs {
             orbs_made.push((boss.orb_home, room, set_id));
         }
@@ -2592,6 +2687,11 @@ pub fn control(
                 events.list.push(SimEvent::Bgm(0));
             }
             gone.push((entity, room, set_id));
+        }
+    }
+    for (power, centre, radius) in sword_cut {
+        if within(centre, player_eye, radius + PLAYER_BODY) {
+            health.damage(power);
         }
     }
     for (pos, room, set_id) in orbs_made {

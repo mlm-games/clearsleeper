@@ -27,9 +27,11 @@ const PRM_BYTE_MASK: u32 = 0xFF;
 const NO_BYTE: u8 = 0xFF;
 
 const HAND_MAX: i32 = 5;
+const HAND_MAX_INDEX: usize = 4;
 const TAIL_MAX: i32 = 10;
 const HEAD_PARTS: usize = 2;
 const PELVIS_PARTS: usize = 2;
+const PELVIS_INDEX: usize = 1;
 const ARM_PARTS: usize = 21;
 const LEG_PARTS: usize = 4;
 const TAIL_PARTS: usize = 21;
@@ -47,6 +49,7 @@ const CHAIN_TAIL: u8 = 7;
 
 const CHAIN_TAIL_ALIAS: usize = 9;
 const CHAIN_TIP: usize = 5;
+const HAND_TIP: usize = HAND_MAX_INDEX;
 
 const HIO_M004: i16 = 0;
 const HIO_M0240: u8 = 0;
@@ -284,6 +287,8 @@ const DANCE_B_STEP: i16 = 8;
 const DANCE_B_TARGET_A: i16 = 0x1555;
 const DANCE_B_TARGET_B: i16 = -0x1555;
 
+const AT_POWER: u8 = 4;
+const PLAYER_BODY_RADIUS: f32 = 20.0;
 const CUT_STATE_150: i8 = -106;
 const CAM_FOV: f32 = 55.0;
 const CAM_BANK_SCALE: f32 = 7.5;
@@ -751,6 +756,7 @@ pub struct Sink<'a> {
     pub next: &'a mut NextStage,
     pub drop: &'a mut Vec<(Entity, i8, u16)>,
     pub keese: &'a mut Vec<KeeseSpawn>,
+    pub kill_keese: bool,
 }
 
 impl Sink<'_> {
@@ -909,6 +915,7 @@ pub struct PuppetGanon {
     pub pos_target: f32,
     pub body: Vec3,
     pub body_prev: Vec3,
+    pub old_pos: Vec3,
     pub sway: i16,
     pub frame: i16,
     pub action: i16,
@@ -946,6 +953,7 @@ pub struct PuppetGanon {
     pub cut_ordered: bool,
     pub cam_eye: Vec3,
     pub cam_rise: Vec3,
+    pub cut_rise: Vec3,
     pub cam_center: Vec3,
     pub cam_anchor: Anchor,
     pub cam_follow: Vec3,
@@ -1010,7 +1018,7 @@ impl PuppetGanon {
             core_centre: Vec3::ZERO,
             core_radius: CORE_RADIUS,
             body_centre: Vec3::ZERO,
-            body_radius: 0.0,
+            body_radius: HIO_M0FC * HIO_M0F4 * (BODY_RADIUS_BASE + REG0_F1),
             body_at: false,
             moved_by: Vec3::ZERO,
             anchor_angle: [0; 3],
@@ -1022,6 +1030,7 @@ impl PuppetGanon {
             pos_target: 0.0,
             body: Vec3::ZERO,
             body_prev: Vec3::ZERO,
+            old_pos: Vec3::ZERO,
             sway: 0,
             frame: 0,
             action: ACTION_NONE,
@@ -1059,6 +1068,7 @@ impl PuppetGanon {
             cut_ordered: false,
             cam_eye: Vec3::ZERO,
             cam_rise: Vec3::ZERO,
+            cut_rise: Vec3::ZERO,
             cam_center: Vec3::ZERO,
             cam_anchor: Anchor::ZERO,
             cam_follow: Vec3::ZERO,
@@ -1142,15 +1152,15 @@ impl PuppetGanon {
     }
 
     fn pelvis_probe(&self) -> f32 {
-        self.part(CHAIN_PELVIS, 0).pos.y
+        self.part(CHAIN_LEFT_ARM, HAND_TIP).pos.y
     }
 
     fn grab_left(&self) -> Vec3 {
-        self.part(CHAIN_PELVIS, 0).pos
+        self.part(CHAIN_RIGHT_ARM, HAND_TIP).pos
     }
 
     fn grab_right(&self) -> Vec3 {
-        self.part(CHAIN_RIGHT_ARM, CHAIN_TIP).pos
+        self.part(CHAIN_LEFT_ARM, HAND_TIP).pos
     }
 
     fn player_yaw(env: &Env<'_>, from: Vec3) -> i16 {
@@ -1408,8 +1418,6 @@ impl PuppetGanon {
         let mut core_centre = self.core_centre;
         let mut core_pos = self.core_pos;
         let mut core_radius = self.core_radius;
-        let mut body_radius = self.body_radius;
-        let mut body_centre = self.body_centre;
         let mut morph = self.morph;
         let weak_model = self.weak_model();
         let head_loose = self.moves[0].rope || self.moves[1].rope;
@@ -1488,8 +1496,6 @@ impl PuppetGanon {
                 core_centre = local_98;
                 core_pos = local_98;
             }
-            body_radius = dvar10 * (BODY_RADIUS_BASE + REG0_F0);
-            body_centre = local_98;
             if i == param_5 {
                 if chain_id == 0 {
                     self.rope_anchor[0] = mtx.pos(Vec3::new(90.0, 180.0, -40.0));
@@ -1519,8 +1525,6 @@ impl PuppetGanon {
         self.core_centre = core_centre;
         self.core_pos = core_pos;
         self.core_radius = core_radius;
-        self.body_radius = body_radius;
-        self.body_centre = body_centre;
         self.morph = morph;
     }
 
@@ -1583,13 +1587,13 @@ impl PuppetGanon {
             }
         }
         let mut tag: u8 = 0;
-        if self.body_at && reaches(self.body_centre, self.body_radius, shot, 0.0) {
+        if reaches(self.body_centre, self.body_radius, shot, 0.0) {
             tag = 1;
         }
         if reaches(self.head[0].centre, self.head[0].radius, shot, 0.0) {
             tag = 2;
         }
-        for i in 0..PELVIS_PARTS {
+        for i in 0..PELVIS_INDEX {
             if reaches(
                 self.pelvis[i].centre,
                 self.pelvis[i].radius,
@@ -1635,7 +1639,7 @@ impl PuppetGanon {
                 tag = 7;
             }
         }
-        for i in 0..HAND_MAX as usize {
+        for i in 0..TAIL_MAX as usize {
             if reaches(
                 self.tail[i].centre,
                 self.tail[i].radius,
@@ -2040,8 +2044,8 @@ impl PuppetGanon {
                         self.moves[4].sway = REG0_F15 + 5000.0;
                         self.left_held = false;
                         self.right_held = false;
-                        self.moves[3].target = to_i16x3(self.grab_left());
-                        self.moves[4].target = to_i16x3(self.grab_right());
+                        self.moves[3].target = to_i16x3(self.grab_right());
+                        self.moves[4].target = to_i16x3(self.grab_left());
                         self.attack_eff_set(
                             self.right_arm[HAND_MAX as usize - 1].pos,
                             1,
@@ -2691,7 +2695,7 @@ impl PuppetGanon {
 
     fn move_step(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         self.body_prev = self.body;
-        self.moved_by = actor.pos - self.home;
+        self.moved_by = actor.pos - self.old_pos;
         if self.body_draw != 0 {
             self.action = ACTION_DONE;
             actor.pos = Vec3::new(0.0, 30000.0, 0.0);
@@ -2829,6 +2833,7 @@ impl PuppetGanon {
                 self.cam_center = self.body_centre;
                 self.cut_player = true;
                 self.keese_spawn = 0;
+                out.kill_keese = true;
                 self.cut_state = 2;
             }
             2 => {
@@ -2896,16 +2901,18 @@ impl PuppetGanon {
                 self.cam_center = anchor_vec(self.cam_anchor);
                 self.cut_player = true;
                 self.keese_spawn = 0;
+                out.kill_keese = true;
+                self.cut_rise = Vec3::new(200.0, 2100.0, 2500.0);
                 self.cut_state = 11;
             }
             11 | 12 => {
-                add_calc2(&mut self.cam_rise.x, -1800.0, 0.05, self.cut_param * 2000.0);
-                add_calc2(&mut self.cam_rise.y, 1100.0, 0.05, self.cut_param * 1000.0);
-                add_calc2(&mut self.cam_rise.z, 1000.0, 0.05, self.cut_param * 1500.0);
+                add_calc2(&mut self.cut_rise.x, -1800.0, 0.05, self.cut_param * 2000.0);
+                add_calc2(&mut self.cut_rise.y, 1100.0, 0.05, self.cut_param * 1000.0);
+                add_calc2(&mut self.cut_rise.z, 1000.0, 0.05, self.cut_param * 1500.0);
                 add_calc2(&mut self.cut_param, 0.01, 1.0, 0.0001);
                 let mut mtx = self.mtx;
                 mtx.yrot_s(self.cam_anchor.yaw);
-                self.cam_eye = mtx.pos(self.cam_rise);
+                self.cam_eye = mtx.pos(self.cut_rise);
                 self.mtx = mtx;
                 if self.cut_state == 11 {
                     add_calc2(&mut self.cam_center.x, self.cam_anchor.x, 0.1, 300.0);
@@ -2952,6 +2959,7 @@ impl PuppetGanon {
                 self.cut_player = true;
                 self.blure = 0xb4;
                 self.keese_spawn = 0;
+                out.kill_keese = true;
                 self.cut_state = 21;
             }
             21 => {
@@ -3011,10 +3019,34 @@ impl PuppetGanon {
         self.blure = 1;
     }
 
+    pub fn at_hits(&self, player_eye: Vec3) -> usize {
+        let mut hits = 0;
+        if self.body_at && reaches(self.body_centre, self.body_radius, player_eye, PLAYER_BODY_RADIUS)
+        {
+            hits += 1;
+        }
+        for part in self
+            .head
+            .iter()
+            .chain(self.pelvis.iter())
+            .chain(self.left_arm.iter())
+            .chain(self.right_arm.iter())
+            .chain(self.left_leg.iter())
+            .chain(self.right_leg.iter())
+            .chain(self.tail.iter())
+        {
+            if part.at && reaches(part.centre, part.radius, player_eye, PLAYER_BODY_RADIUS) {
+                hits += 1;
+            }
+        }
+        hits
+    }
+
     pub fn execute(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
         if self.prm == NO_BYTE {
             return;
         }
+        self.old_pos = actor.pos;
         if HIO_M027 != 0 {
             self.health = HIO_M027 as i32;
         }
@@ -3050,12 +3082,12 @@ impl PuppetGanon {
         if self.keese_spawn != 0 {
             self.keese_spawn -= 1;
             if env.keese < HIO_KEESE_NUM_MAX {
+                let first = self.rnd_fx(2500.0);
+                let y = self.rnd_f(500.0) + 3500.0;
+                let x = self.rnd_fx(2500.0);
+                let _ = first;
                 out.keese.push(KeeseSpawn {
-                    pos: Vec3::new(
-                        self.rnd_fx(2500.0),
-                        self.rnd_f(500.0) + 3500.0,
-                        self.rnd_fx(2500.0),
-                    ),
+                    pos: Vec3::new(x, y, 0.0),
                     room: actor.room,
                 });
             }
@@ -3081,6 +3113,8 @@ impl PuppetGanon {
         } else {
             for i in 0..MOVE_COUNT {
                 self.moves[i].join = 3;
+                self.moves[i].phase_x = self.rnd_f(32768.0) as i16;
+                self.moves[i].phase_z = self.rnd_f(32768.0) as i16;
             }
             out.bgm(BGM_BGN_KUGUTSU);
             self.health = MAX_HEALTH;
@@ -3156,6 +3190,7 @@ impl PuppetGanon {
             let target = Self::player_yaw(env, actor.pos);
             add_calc_angle_s2(&mut self.shape_angle[1], target, 10, 0x400);
         }
+        let mut stop = false;
         let mut early = false;
         match self.sub {
             0 => {
@@ -3176,7 +3211,7 @@ impl PuppetGanon {
             }
             1 => {
                 if self.timers[0] != 0 || env.keese != 0 || HIO_M028 == 0 {
-                    early = true;
+                    stop = true;
                 } else if self.move_count == 1
                     || self.move_count == 2
                     || self.move_count == 3
@@ -3211,7 +3246,7 @@ impl PuppetGanon {
                 } else if self.move_count == 0 || self.move_count == 5 {
                     self.sub = 0;
                 }
-                if !early {
+                if !stop {
                     self.move_count += 1;
                     if self.move_count > 5 {
                         self.move_count = 0;
@@ -3266,6 +3301,8 @@ pub const KEESE_SPAWN_NAME: &str = "keeth";
 pub const KEESE_SPAWN_PARAMETERS: u32 = 0xFFFF_0003;
 pub const BODY_2_ACTOR: &str = "Bgn2";
 pub const BODY_3_ACTOR: &str = "Bgn3";
+
+const PLAYER_EYE_Y: f32 = 60.0;
 
 fn blow_of(watch: &Watch<'_, '_>) -> Blow {
     let mut at = At::Idle;
@@ -3336,9 +3373,12 @@ pub fn control(
     let Some(player) = watch.players.iter().next() else {
         return;
     };
+    let player_eye = player.pos + Vec3::new(0.0, PLAYER_EYE_Y, 0.0);
     let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
     let mut spawns: Vec<KeeseSpawn> = Vec::new();
     let mut pending: Vec<Entity> = Vec::new();
+    let mut at_hits = 0usize;
+    let mut wipe_keese = false;
     for (entity, mut actor, mut boss) in &mut bosses {
         let actor = &mut *actor;
         let boss = &mut *boss;
@@ -3361,14 +3401,30 @@ pub fn control(
             next: &mut next,
             drop: &mut drop,
             keese: &mut spawns,
+            kill_keese: false,
         };
         if !boss.entered {
             boss.begin(actor, &env, &mut sink);
         } else {
             boss.execute(actor, &env, &mut sink);
         }
+        if sink.kill_keese {
+            wipe_keese = true;
+        }
+        at_hits += boss.at_hits(player_eye);
         if boss.exit_mode == 2 {
             drop.push((entity, actor.room, actor.set_id));
+        }
+    }
+    if at_hits > 0 {
+        let power = at_hits.saturating_mul(usize::from(AT_POWER));
+        health.damage(u8::try_from(power).unwrap_or(u8::MAX));
+    }
+    if wipe_keese {
+        for (entity, other) in watch.others.iter() {
+            if KEESE_ACTORS.contains(&other.name.as_str()) {
+                pending.push(entity);
+            }
         }
     }
     for spawn in spawns {
