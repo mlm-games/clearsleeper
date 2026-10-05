@@ -419,8 +419,10 @@ fn pane_scale_xy(pane: &mut PaneState, scale: f32) {
     pane.cpos_move();
 }
 
-fn pane_data(slot: &mut PaneState, setup: Option<PaneSetup>, type_id: u16) {
-    slot.set_pane_data(setup.unwrap_or_default().pane(type_id));
+fn pane_data(slot: Option<&mut PaneState>, setup: Option<PaneSetup>, type_id: u16) {
+    if let Some(slot) = slot {
+        slot.set_pane_data(setup.unwrap_or_default().pane(type_id));
+    }
 }
 
 #[derive(Resource, Debug, Clone, PartialEq)]
@@ -954,9 +956,9 @@ impl Msg1Box {
     }
 
     pub fn screen_data_set_talk(&mut self, screen: &Msg1Screen, hio: &Msg1Hio) {
-        pane_data(&mut self.m049c, screen.frame, PANE_TYPE_ID_WINDOW);
-        pane_data(&mut self.m_pane_arrow, screen.arrow, PANE_TYPE_ID_WINDOW);
-        pane_data(&mut self.m050c, screen.dot, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m049c), screen.frame, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m_pane_arrow), screen.arrow, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m050c), screen.dot, PANE_TYPE_ID_WINDOW);
         for i in 0..4 {
             self.text_pane_data(i, screen.text.get(i).copied().flatten(), PANE_TYPE_ID_TEXT_BOX);
             self.select_pane_data(
@@ -965,8 +967,8 @@ impl Msg1Box {
                 PANE_TYPE_ID_TEXT_BOX,
             );
         }
-        pane_data(&mut self.m01fc, screen.cursor1, PANE_TYPE_ID_WINDOW);
-        pane_data(&mut self.m0234, screen.cursor2, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m01fc), screen.cursor1, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m0234), screen.cursor2, PANE_TYPE_ID_WINDOW);
         for i in 0..10 {
             pane_data(
                 self.m026c.get_mut(i),
@@ -993,9 +995,9 @@ impl Msg1Box {
     }
 
     pub fn screen_data_set_item(&mut self, screen: &Msg1Screen, hio: &Msg1Hio, env: &Msg1Env) {
-        pane_data(&mut self.m049c, screen.frame, PANE_TYPE_ID_WINDOW);
-        pane_data(&mut self.m_pane_arrow, screen.arrow, PANE_TYPE_ID_WINDOW);
-        pane_data(&mut self.m050c, screen.dot, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m049c), screen.frame, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m_pane_arrow), screen.arrow, PANE_TYPE_ID_WINDOW);
+        pane_data(Some(&mut self.m050c), screen.dot, PANE_TYPE_ID_WINDOW);
         for i in 0..4 {
             self.text_pane_data(i, screen.text.get(i).copied().flatten(), PANE_TYPE_ID_TEXT_BOX);
         }
@@ -1096,7 +1098,7 @@ impl Msg1Box {
 
     pub fn screen_data_set_tact(&mut self, screen: &Msg1Screen, hio: &Msg1Hio, env: &Msg1Env) {
         if (MSG1_MSG_NO_TACT_ALT_FIRST..=MSG1_MSG_NO_TACT_ALT_LAST).contains(&self.msg_no) {
-            pane_data(&mut self.m049c, screen.tact_frame_alt, PANE_TYPE_ID_WINDOW);
+            pane_data(Some(&mut self.m049c), screen.tact_frame_alt, PANE_TYPE_ID_WINDOW);
             for i in 0..4 {
                 self.text_pane_data(
                     i,
@@ -1106,7 +1108,7 @@ impl Msg1Box {
             }
             self.tact_alt_hidden = false;
         } else {
-            pane_data(&mut self.m049c, screen.tact_frame, PANE_TYPE_ID_WINDOW);
+            pane_data(Some(&mut self.m049c), screen.tact_frame, PANE_TYPE_ID_WINDOW);
             for i in 0..4 {
                 self.text_pane_data(
                     i,

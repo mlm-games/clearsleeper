@@ -31,6 +31,7 @@ const ANGLE_Z: usize = 2;
 
 const PRM_BYTE_MASK: u32 = 0xF;
 const PRM_MASK_SET: u32 = 0xF;
+const PRM_NIBBLE_TWO: u32 = 2;
 const SWITCH_TOGE: u8 = 0x80;
 const EVENT_BIT_LAST_DAMAGE: u16 = 0x3C01;
 const TMP_BIT_SHUTTER: u32 = 0x0401;
@@ -3093,14 +3094,6 @@ impl Helmaroc {
         }
     }
 
-    fn demo_order(&mut self, out: &mut Sink<'_>) {
-        if !self.demo_ordered {
-            self.demo_ordered = true;
-            let _ = out;
-            return;
-        }
-    }
-
     fn demo_gate(&mut self) -> bool {
         if !self.demo_ordered {
             self.demo_ordered = true;
@@ -3167,6 +3160,9 @@ impl Helmaroc {
                 if self.demo_sub >= REG13_S6 + 0xBE {
                     if self.demo_sub == REG13_S6 + 0xD2 {
                         out.bgm(STRM_DK_START);
+                    }
+                    if self.demo_sub == REG13_S6 + 0xBE {
+                        out.shutter_smoke();
                     }
                     self.shake = REG13_F18 + 1.5;
                     out.se(SE_ATM_MJT_JINARI);
@@ -3322,7 +3318,11 @@ impl Helmaroc {
                 }
                 self.cam_eye = self.head.pos;
                 self.cam_eye.y += REG6_F16 - 100.0;
-                let look = turned(self.cam_yaw, [0.0, 0.0, self.demo_radius + REG6_F17]);
+                let look = turned(
+                    self.cam_pitch as i16,
+                    [0.0, 0.0, self.demo_radius + REG6_F17],
+                );
+                let look = turned(self.cam_yaw, [look.x, look.y, look.z]);
                 let look = look + self.cam_eye;
                 add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
                 if self.flown_high == 0 {
@@ -3547,6 +3547,9 @@ impl Helmaroc {
         }
         if self.rise_smoke != 0 {
             self.rise_smoke -= 1;
+            if self.rise_smoke == 0 {
+                self.rise_smoke_used = true;
+            }
         }
         if self.nail_live != 0 {
             out.se(SE_CM_DK_NAIL);
@@ -3556,44 +3559,76 @@ impl Helmaroc {
         }
         self.at_mode = 0;
     }
-}
 
-pub fn begin(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
-    if self.stage_boss_enemy || REG0_S0 != 0 {
-        self.stage_boss_enemy = true;
-        self.action = Action::AfterFight;
-        actor.pos = Vec3::splat(300000.0);
-        self.shutter_ring = -630.0;
-        self.shutter_shift = -70.0;
-        self.shutter_y = SHUTTER_BATTLE_Y;
-    } else if self.battle_mode == 0x1 {
-        self.action = Action::TFly;
-        actor.pos = Vec3::new(AREA_X, 5000.0, AREA_Z);
-        self.shutter_ring = -630.0;
-        self.shutter_shift = -70.0;
-        out.bgm(BGM_MJ_TOWER_BATTLE);
-        self.timers[0] = 0x168;
-    } else {
-        self.gravity = REG0_F4 + GRAVITY;
-        actor.speed_f_walk = HIO_M020;
-        self.fly_ca = -1;
-        self.tosaka_y1 = -2000;
-        self.health = MAX_HEALTH;
-        self.max_health = MAX_HEALTH;
-        actor.pos.y = 11000.0;
+    pub fn begin(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
+        self.entered = true;
+        if self.stage_boss_enemy || REG0_S0 != 0 {
+            self.stage_boss_enemy = true;
+            self.action = Action::AfterFight;
+            actor.pos = Vec3::splat(300000.0);
+            self.shutter_ring = SHUTTER_BATTLE;
+            self.shutter_shift = SHUTTER_SHIFT;
+            self.shutter_y = SHUTTER_BATTLE_Y;
+        } else if self.battle_mode == 0x1 {
+            self.action = Action::TFly;
+            actor.pos = Vec3::new(AREA_X, SPAWN_HEIGHT, AREA_Z);
+            self.shutter_ring = SHUTTER_BATTLE;
+            self.shutter_shift = SHUTTER_SHIFT;
+            out.bgm(BGM_MJ_TOWER_BATTLE);
+            self.timers[0] = SPAWN_TIMER;
+        } else {
+            self.gravity = REG0_F4 + GRAVITY;
+            actor.speed_f_walk = HIO_M020;
+            self.fly_ca = -1;
+            self.tosaka_y1 = -2000;
+            self.health = MAX_HEALTH;
+            self.max_health = MAX_HEALTH;
+            actor.pos.y = 11000.0;
+        }
     }
 }
 
-const MOB_NAMES: [&str; 9] = [
-    "Kamome",
-    "Dk",
-    "Kui",
-    "Obj_Tide",
-    "Bk",
-    "Boko",
-    "Bdkobj",
-    "Ep",
-];
+const SHUTTER_BATTLE: f32 = -630.0;
+const SHUTTER_SHIFT: f32 = -70.0;
+const SPAWN_HEIGHT: f32 = 5000.0;
+const SPAWN_TIMER: i16 = 0x168;
+const PURGE_NAMES: [&str; 6] = ["Kamome", "Dk", "Kui", "Bk", "Boko", "bonbori"];
+const TIDE_NAMES: [&str; 6] = ["Humi0z", "Humi4z", "Humi5z", "Tide3", "Humi2z", "Humi3z"];
+
+fn blow_of(watch: &Watch<'_, '_>) -> Blow {
+    let mut at = At::Idle;
+    if let Some(shaft) = watch
+        .shafts
+        .iter()
+        .find(|shaft| shaft.phase == arrow::Phase::Flying)
+    {
+        at = match shaft.kind {
+            arrow::TYPE_LIGHT => At::LightArrow,
+            arrow::TYPE_FIRE => At::FireArrow,
+            arrow::TYPE_ICE => At::IceArrow,
+            _ => At::Arrow,
+        };
+    } else if watch
+        .bolts
+        .iter()
+        .any(|bolt| bolt.parameter == boomerang::MODE_THROW)
+    {
+        at = At::Boomerang;
+    } else if watch.hammer.kind == hammer::CUT_HAMMER_SIDESWING
+        || watch.hammer.kind == hammer::CUT_HAMMER_FRONTSWING
+    {
+        at = At::Hammer;
+    } else if watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
+        at = At::Sword;
+    } else if !watch.blasts.list.is_empty() {
+        at = At::Bomb;
+    }
+    Blow {
+        at,
+        blade: watch.held.item,
+        soup: watch.combat.soup,
+    }
+}
 
 #[derive(SystemParam)]
 pub struct Watch<'w, 's> {
@@ -3623,48 +3658,7 @@ pub fn control(
     >,
 ) {
     let solid = watch.collision.as_deref();
-    let blade = watch.held.item;
-    let soup = watch.combat.soup;
-    let at = {
-        let mut found = At::Idle;
-        if watch
-            .shafts
-            .iter()
-            .any(|shaft| shaft.phase == arrow::Phase::Flying)
-        {
-            found = match watch
-                .shafts
-                .iter()
-                .find(|shaft| shaft.phase == arrow::Phase::Flying)
-                .map(|shaft| shaft.kind)
-            {
-                Some(arrow::TYPE_LIGHT) => At::LightArrow,
-                Some(arrow::TYPE_FIRE) => At::FireArrow,
-                Some(arrow::TYPE_ICE) => At::IceArrow,
-                _ => At::Arrow,
-            };
-        } else if watch
-            .bolts
-            .iter()
-            .any(|bolt| bolt.parameter == boomerang::MODE_THROW)
-        {
-            found = At::Boomerang;
-        } else if watch.hammer.kind == hammer::CUT_HAMMER_SIDESWING
-            || watch.hammer.kind == hammer::CUT_HAMMER_FRONTSWING
-        {
-            found = At::Hammer;
-        } else if watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
-            found = At::Sword;
-        } else if !watch.blasts.list.is_empty() {
-            found = At::Bomb;
-        }
-        found
-    };
-    let blow = Blow {
-        at,
-        blade,
-        soup,
-    };
+    let blow = blow_of(&watch);
     let mut players = watch.players;
     let Some(entry) = players.iter_mut().next() else {
         return;
@@ -3672,30 +3666,19 @@ pub fn control(
     let mut player = entry.1;
     let mut orders = Orders::default();
     let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
-    let mut mobs: Vec<Entity> = Vec::new();
-    let mut shards: Vec<Entity> = Vec::new();
-    let mut peck_broken: Option<Entity> = None;
-    for (entity, actor, boss) in &mut bosses {
+    for (_, actor, boss) in &mut bosses {
         let actor = &mut *actor;
         let boss = &mut *boss;
-        if !boss.entered {
-            boss.entered = true;
-        }
-        let peck = if boss.action == Action::TFly {
-            watch
-                .others
-                .iter()
-                .find(|(_, other)| {
-                    other.name == BDK_OBJ_ACTOR
-                        && (other.parameters & PRM_BYTE_MASK) != PRM_MASK_SET
-                })
-                .map(|(id, other)| (id, other.pos))
-        } else {
-            None
-        };
-        if boss.peck_obj.is_some() && boss.peck_obj.is_some() {
-            peck_broken = boss.peck_obj;
-        }
+        let peck = watch
+            .others
+            .iter()
+            .find(|(id, other)| {
+                *id != Entity::PLACEHOLDER
+                    && other.name == BDK_OBJ_ACTOR
+                    && (other.parameters & PRM_BYTE_MASK) != PRM_MASK_SET
+                    && Some(*id) != boss.peck_done
+            })
+            .map(|(id, other)| (id, other.pos));
         let env = Env {
             player_pos: player.pos,
             player_angle: to_s16(player.face),
@@ -3714,36 +3697,25 @@ pub fn control(
             orders: &mut orders,
             drop: &mut drop,
         };
-        boss.begin(actor, &mut sink);
+        if !boss.entered {
+            boss.begin(actor, &mut sink);
+        }
         boss.execute(actor, &env, &mut sink);
-        let _ = entity;
     }
     if orders.purge_mobs || orders.purge_shards {
         for (id, other) in watch.others.iter() {
-            if orders.purge_mobs && MOB_NAMES.contains(&other.name.as_str()) {
-                mobs.push(id);
-            } else if orders.purge_shards && other.name == BDK_OBJ_ACTOR {
-                shards.push(id);
+            let band = other.parameters & PRM_BYTE_MASK;
+            let mob = PURGE_NAMES.contains(&other.name.as_str())
+                || TIDE_NAMES.contains(&other.name.as_str())
+                || (other.name == BDK_OBJ_ACTOR && band >= PRM_NIBBLE_TWO);
+            let shard = other.name == BDK_OBJ_ACTOR && band != PRM_MASK_SET;
+            if (orders.purge_mobs && mob) || (orders.purge_shards && shard) {
+                drop.push((id, other.room, other.set_id));
             }
         }
-    }
-    for id in mobs {
-        drop.push((id, i8::MIN, 0));
-    }
-    for id in shards {
-        drop.push((id, i8::MIN, 0));
     }
     for (id, room, set_id) in drop {
-        if room != i8::MIN {
-            zones.mark_done(room, set_id);
-        }
+        zones.mark_done(room, set_id);
         let _ = commands.entity(id).despawn();
-    }
-    if let Some(id) = peck_broken {
-        for mut other in &mut commands.entity(id) {
-            if let Some(mut actor) = other.get_mut::<Actor>() {
-                actor.parameters = PRM_MASK_SET;
-            }
-        }
     }
 }
