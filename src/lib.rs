@@ -23,6 +23,7 @@ pub mod dzs;
 pub mod hud;
 pub mod input;
 pub mod menus;
+pub mod movie;
 pub mod save;
 pub mod sim;
 pub mod text;
