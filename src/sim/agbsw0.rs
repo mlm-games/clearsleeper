@@ -2799,7 +2799,7 @@ pub fn control(
         .makars
         .iter()
         .next()
-        .map(|makar| (makar.player_room, makar.flying))
+        .map(|makar| (makar.is_player_room(), makar.is_flying()))
         .unwrap_or((false, false));
     let ship_ride = watch.ships.iter().any(|ship| ship.riding);
     let bombs: Vec<BombView> = watch
