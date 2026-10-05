@@ -212,10 +212,17 @@ impl Daiocta {
         self.prm_idx = PRM_DAMAGE;
     }
 
-    fn mode_damage(&mut self, actor: &mut Actor) {
+    fn mode_damage(
+        &mut self,
+        actor: &mut Actor,
+        player: Option<&Player>,
+        riding: bool,
+        events: &mut SimEvents,
+    ) {
         actor.pos.y = self.water_y;
         if self.prm_idx == PRM_SETTLE {
             self.jump_to_water(actor);
+            self.recover(actor, player, riding, events);
         }
     }
 
@@ -224,10 +231,31 @@ impl Daiocta {
         self.prm_idx = PRM_DAMAGE_BOMB;
     }
 
-    fn mode_damage_bomb(&mut self, actor: &mut Actor) {
+    fn mode_damage_bomb(
+        &mut self,
+        actor: &mut Actor,
+        player: Option<&Player>,
+        riding: bool,
+        events: &mut SimEvents,
+    ) {
         actor.pos.y = self.water_y;
         if self.prm_idx == PRM_SETTLE {
             self.jump_to_water(actor);
+            self.recover(actor, player, riding, events);
+        }
+    }
+
+    fn recover(
+        &mut self,
+        actor: &mut Actor,
+        player: Option<&Player>,
+        riding: bool,
+        events: &mut SimEvents,
+    ) {
+        if (actor.pos.y - self.water_y).abs() <= SETTLE_RANGE {
+            self.mode_proc(Proc::Init, Mode::Wait, actor, player, riding, events);
+        } else {
+            self.mode_proc(Proc::Init, Mode::Appear, actor, player, riding, events);
         }
     }
 
@@ -272,8 +300,8 @@ impl Daiocta {
             Mode::Hide => self.mode_hide(actor, player, riding, events),
             Mode::Appear => self.mode_appear(actor, player, riding, events),
             Mode::Wait => self.mode_wait(actor),
-            Mode::Damage => self.mode_damage(actor),
-            Mode::DamageBomb => self.mode_damage_bomb(actor),
+            Mode::Damage => self.mode_damage(actor, player, riding, events),
+            Mode::DamageBomb => self.mode_damage_bomb(actor, player, riding, events),
             Mode::Delete => self.mode_delete(),
             Mode::Demo => self.mode_demo(actor),
             Mode::Null => {}

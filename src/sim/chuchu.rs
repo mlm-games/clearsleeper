@@ -100,7 +100,7 @@ const LEASH_GATE: f32 = 0.1;
 const LEASH_TURN_GATE: u16 = 0x100;
 const LEASH_JITTER: f32 = 16384.0;
 const TURN_NEAR: f32 = 40.0;
-const WANDER_BAND: f32 = 7.0 * 0x500;
+const WANDER_BAND: f32 = 7.0 * 1280.0;
 
 const HEALTH: [i32; 5] = [2, 1, 2, 4, 1];
 const AT_POWER: [u8; 5] = [1, 1, 2, 2, 2];
@@ -300,7 +300,7 @@ const HOLD_DELAY: i16 = 0x3C;
 const CLIMB_SCALE_STEP: f32 = 0.1;
 const CLIMB_SCALE_MAX: f32 = 0.2;
 const CLIMB_SCALE_GATE: f32 = 0.1;
-const CLIMB_JUMP: f32 = 0x1000;
+const CLIMB_JUMP: f32 = 4096.0;
 const CLIMB_SPAN: f32 = 43.0;
 const CLIMB_RATE: f32 = 1.0;
 const CLIMB_LEAP_SPEED: f32 = 15.0;
@@ -1159,7 +1159,7 @@ impl Chuchu {
                     self.reaction = REACT_FIRE;
                 }
             }
-            At::Light => {
+            At::FanLight => {
                 self.light.timer = LIGHT_START;
                 self.light.particle_scale = LIGHT_SCALE;
                 self.light.y_offset = LIGHT_LIFT;
@@ -1265,7 +1265,7 @@ impl Chuchu {
     }
 
     fn resolve(&mut self, actor: &Actor, player_pos: Vec3, at: At, blast: bool) {
-        let at = if blast && !matches!(at, At::Hook | At::FanLight | At::Light) {
+        let at = if blast && !matches!(at, At::Hook | At::FanLight | At::FanLight) {
             At::Bomb
         } else {
             at
@@ -1946,7 +1946,7 @@ impl Chuchu {
                     events.list.push(SimEvent::Se(SE_CV_CC_ATTACK));
                     self.anm_init(BCK_ATTACK02, 0.0, EMODE_NONE, 1.0);
                     actor.angle = [0; 3];
-                    let turn = rnd_fx(&mut self.seed, CLIMB_JUMP) + 0x3000;
+                    let turn = (rnd_fx(&mut self.seed, CLIMB_JUMP) + 12288.0) as i16;
                     actor.angle[1] = (turn as i32) as i16;
                     self.shape = actor.angle;
                     self.climb_step = 3;
@@ -2105,7 +2105,7 @@ impl Chuchu {
             }
             if self.timers[TIMER_WOBBLE] != 0 {
                 self.shakes[0] = self.shakes[0].wrapping_add(STONE_SPAN);
-                self.shape[2] = (STONE_ROLL * stream::sin_s(self.shakes[0]) as i32) as i16;
+                self.shape[2] = (STONE_ROLL * stream::sin_s(self.shakes[0])) as i16;
                 if self.timers[TIMER_WOBBLE] == 1 {
                     self.stone = 2;
                     self.stone_frame = 0;
@@ -2416,7 +2416,7 @@ fn active_at(watch: &Watch<'_, '_>) -> At {
             continue;
         }
         return match shaft.kind {
-            arrow::TYPE_LIGHT => At::Light,
+            arrow::TYPE_LIGHT => At::FanLight,
             arrow::TYPE_FIRE => At::FireArrow,
             arrow::TYPE_ICE => At::IceArrow,
             _ => At::Arrow,

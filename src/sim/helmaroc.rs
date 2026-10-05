@@ -59,11 +59,10 @@ const REG0_F10: f32 = 0.0;
 const REG0_F11: f32 = 0.0;
 const REG0_F12: f32 = 0.0;
 const REG0_F15: f32 = 0.0;
+const REG0_F5: f32 = 0.0;
+const REG0_F6: f32 = 0.0;
 const REG0_F13: f32 = 0.0;
-const REG0_F14: f32 = 0.0;
-const REG0_F15: f32 = 0.0;
 const REG0_F16: f32 = 0.0;
-const REG0_F18: f32 = 0.0;
 const REG0_S0: i16 = 0;
 const REG0_S1: i16 = 0;
 const REG0_S3: i16 = 0;
@@ -73,11 +72,7 @@ const REG0_S6: i16 = 0;
 const REG0_S7: i16 = 0;
 const REG0_S8: i16 = 0;
 
-const REG6_F0: f32 = 0.0;
 const REG6_F2: f32 = 0.0;
-const REG6_F4: f32 = 0.0;
-const REG6_F9: f32 = 0.0;
-const REG6_F10: f32 = 0.0;
 const REG6_F11: f32 = 0.0;
 const REG6_F12: f32 = 0.0;
 const REG6_F13: f32 = 0.0;
@@ -85,44 +80,33 @@ const REG6_F16: f32 = 0.0;
 const REG6_F17: f32 = 0.0;
 const REG6_F18: f32 = 0.0;
 const REG6_F19: f32 = 0.0;
-const REG6_S0: i16 = 0;
+const REG6_S1: i16 = 0;
 const REG6_S2: i16 = 0;
 const REG6_S3: i16 = 0;
 const REG6_S4: i16 = 0;
-const REG6_S6: i16 = 0;
 const REG6_S7: i16 = 0;
 
-const REG8_F0: f32 = 0.0;
-const REG8_F1: f32 = 0.0;
 const REG8_F2: f32 = 0.0;
-const REG8_F3: f32 = 0.0;
-const REG8_F4: f32 = 0.0;
-const REG8_F5: f32 = 0.0;
 const REG8_F6: f32 = 0.0;
 const REG8_F7: f32 = 0.0;
 const REG8_F8: f32 = 0.0;
 const REG8_F9: f32 = 0.0;
 const REG8_F10: f32 = 0.0;
 const REG8_F11: f32 = 0.0;
+const REG8_F14: f32 = 0.0;
 const REG8_F15: f32 = 0.0;
+const REG8_F16: f32 = 0.0;
 const REG8_F18: f32 = 0.0;
 const REG8_F19: f32 = 0.0;
-const REG8_S2: i16 = 0;
 const REG8_S4: i16 = 0;
 const REG8_S5: i16 = 0;
 const REG8_S8: i16 = 0;
 
-const REG12_F2: f32 = 0.0;
-const REG12_F3: f32 = 0.0;
 const REG12_F4: f32 = 0.0;
 const REG12_F5: f32 = 0.0;
 const REG12_F6: f32 = 0.0;
 const REG12_F7: f32 = 0.0;
-const REG12_F8: f32 = 0.0;
-const REG12_F9: f32 = 0.0;
-const REG12_F11: f32 = 0.0;
 const REG12_S7: i16 = 0;
-const REG12_S8: i16 = 0;
 
 const REG13_F0: f32 = 0.0;
 const REG13_F1: f32 = 0.0;
@@ -130,33 +114,20 @@ const REG13_F2: f32 = 0.0;
 const REG13_F3: f32 = 0.0;
 const REG13_F4: f32 = 0.0;
 const REG13_F5: f32 = 0.0;
-const REG13_F6: f32 = 0.0;
-const REG13_F7: f32 = 0.0;
-const REG13_F8: f32 = 0.0;
-const REG13_F9: f32 = 0.0;
-const REG13_F10: f32 = 0.0;
 const REG13_F11: f32 = 0.0;
-const REG13_F12: f32 = 0.0;
-const REG13_F13: f32 = 0.0;
 const REG13_F17: f32 = 0.0;
 const REG13_F18: f32 = 0.0;
 const REG13_S1: i16 = 0;
 const REG13_S2: i16 = 0;
 const REG13_S6: i16 = 0;
+const REG13_S7: i16 = 0;
 const REG13_S8: i16 = 0;
 
-const REG14_F0: f32 = 0.0;
-const REG14_F1: f32 = 0.0;
 const REG14_F2: f32 = 0.0;
-const REG14_F3: f32 = 0.0;
 const REG14_F4: f32 = 0.0;
 const REG14_F5: f32 = 0.0;
-const REG14_F7: f32 = 0.0;
-const REG14_F15: f32 = 0.0;
-const REG14_S8: i16 = 0;
 const REG14_S9: i16 = 0;
 
-const REG17_S0: i16 = 0;
 
 const AREA_X: f32 = 3600.0;
 const AREA_Y: f32 = 9800.0;
@@ -167,7 +138,7 @@ pub const CULL_MIN: [f32; 3] = [-650.0, -20.0, -400.0];
 pub const CULL_MAX: [f32; 3] = [650.0, 790.0, 320.0];
 
 const GRAVITY: f32 = -5.0;
-const GRAVITY_FALL: f32 = -2.5;
+const GRAVITY_FALL: f32 = -5.0;
 const MAX_HEALTH: i32 = 20;
 const HAMMER_HEALTH: i32 = 0x14;
 const AT_POWER_HEAD: u8 = 2;
@@ -177,14 +148,16 @@ const HEAD_OFFSET: [f32; 3] = [40.0, 0.0, -70.0];
 const BEAK_OFFSET: [f32; 3] = [120.0, 0.0, 0.0];
 const BEAK_TIP_OFFSET: [f32; 3] = [0.0, 0.0, 0.0];
 const EYE_OFFSET: [f32; 3] = [120.0, 0.0, -120.0];
-const FOOT_OFFSET: [f32; 3] = [50.0, 0.0, 0.0];
-const FOOT_OFFSET_TALL: [f32; 3] = [100.0, 200.0, 0.0];
+
 const BODY_LIFT: f32 = 380.0;
 const HEAD_RADIUS_MASKED: f32 = 110.0;
 const HEAD_RADIUS_BARE: f32 = 80.0;
 const BEAK_RADIUS: f32 = 70.0;
 const BODY_RADIUS: f32 = 250.0;
 const FOOT_RADIUS: f32 = 60.0;
+const FOOT_X: f32 = 50.0;
+const FOOT_TALL_X: f32 = 100.0;
+const FOOT_TALL_Y: f32 = 200.0;
 const FOOT_RADIUS_T_FLY: f32 = 300.0;
 const TOSAKA_RADIUS: f32 = 80.0;
 const WIND_RADIUS: f32 = 300.0;
@@ -407,6 +380,9 @@ const TURN_DIV_FACE: i16 = 4;
 const TURN_DIV_CAM: i16 = 0x10;
 const TURN_DIV_HEAD: i16 = 4;
 const TURN_DIV_NECK: i16 = 0x10;
+const BEAK_SWING: f32 = -200.0;
+const BEAK_WOBBLE: f32 = -2000.0;
+const CAM_NEAR_X: f32 = -50.0;
 const TURN_CAP: f32 = 0x800;
 const TURN_BANK: f32 = 5500.0;
 const TURN_STEP: f32 = 0.05;
@@ -479,27 +455,6 @@ impl Action {
         }
     }
 
-    fn by_code(code: i16) -> Action {
-        match code {
-            ACTION_UP_FLY => Action::UpFly,
-            ACTION_LANDING => Action::Landing,
-            ACTION_WAIT => Action::Wait,
-            ACTION_JUMP => Action::Jump,
-            ACTION_KUTI_ATTACK => Action::KutiAttack,
-            ACTION_JIDA_ATTACK => Action::JidaAttack,
-            ACTION_FLY_ATTACK => Action::FlyAttack,
-            ACTION_WIND_ATTACK => Action::WindAttack,
-            ACTION_KAMEN_DEMO => Action::KamenDemo,
-            ACTION_END => Action::End,
-            ACTION_START => Action::Start,
-            ACTION_T_FLY => Action::TFly,
-            ACTION_T_LANDING => Action::TLanding,
-            ACTION_T_LASTATTACK => Action::TLastAttack,
-            ACTION_T_DOWN => Action::TDown,
-            ACTION_AFTER_FIGHT => Action::AfterFight,
-            _ => Action::Fly,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -946,14 +901,6 @@ impl Sink<'_> {
         self.orders.purge_shards = true;
     }
 
-    fn break_peck(&mut self) {
-        self.orders.peck_broken = true;
-    }
-
-    fn kill(&mut self, entity: Entity, room: i8, set_id: u16) {
-        self.zones.mark_done(room, set_id);
-        self.drop.push((entity, room, set_id));
-    }
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -2501,7 +2448,7 @@ impl Helmaroc {
                     add_calc2(&mut actor.pos.x, AREA_X, 0.05, 50.0);
                     add_calc2(&mut actor.pos.y, REG8_F18 + 15800.0, 0.1, REG8_F19 + 20.0);
                     add_calc2(&mut actor.pos.z, AREA_Z, 0.05, 50.0);
-                    add_calc_angle_s2(&mut actor.angle[ANGLE_Y], -8000, 0x10, 0x80);
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_Y], -8000, TURN_DIV_CAM, 0x80);
                     if self.timers[0] == 0x3C {
                         out.se(SE_CV_DK_DIE);
                         self.anm_init(BCK_DEATH2, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
@@ -2777,7 +2724,7 @@ impl Helmaroc {
                         break;
                     }
                     actor.pos.y += self.speed.y;
-                    self.speed.y -= 5.0;
+                    self.speed.y -= GRAVITY_FALL;
                     if actor.pos.y < 6900.0 && self.state == 1 {
                         self.state = 2;
                         out.se(SE_CM_DK_WATER_COLUMN);
@@ -2863,11 +2810,11 @@ impl Helmaroc {
             let step = if self.action == Action::TLastAttack {
                 self.foot_radius[index] = REG0_F8 + FOOT_RADIUS_T_FLY;
                 self.foot_tg[index] = false;
-                [REG0_F3 + 100.0, REG0_F4 + 200.0, REG0_F5]
+                [REG0_F3 + FOOT_TALL_X, REG0_F4 + FOOT_TALL_Y, REG0_F5]
             } else {
                 self.foot_radius[index] = REG0_F9 + FOOT_RADIUS;
                 self.foot_tg[index] = true;
-                [REG0_F3 + 50.0, REG0_F4, REG0_F5]
+                [REG0_F3 + FOOT_X, REG0_F4, REG0_F5]
             };
             self.foot[index] = Self::at_pos(yaw, base) + turned(yaw, step);
             if self.at_mode == 2 {
@@ -2919,7 +2866,7 @@ impl Helmaroc {
             if self.piece_hold[index] == 0 {
                 self.piece_prev[index] = self.piece_pos[index];
                 self.piece_pos[index] += self.piece_move[index];
-                self.piece_move[index].y -= 5.0;
+                self.piece_move[index].y -= GRAVITY_FALL;
                 if self.piece_pos[index].y < PIECE_FLOOR {
                     self.piece_live[index] = 0;
                 }
@@ -3121,7 +3068,7 @@ impl Helmaroc {
             }
             2 => {
                 self.cam_eye =
-                    turned(actor.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X, REG0_F1 - 30.0, REG0_F2 + 50.0])
+                    turned(actor.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG0_F1 - 30.0, REG0_F2 + 50.0])
                         + self.head.pos;
                 self.cam_look =
                     turned(actor.shape_angle[ANGLE_Y], [REG0_F5 + 400.0, REG0_F6 - 100.0, REG0_F7 + 400.0])
@@ -3413,7 +3360,7 @@ impl Helmaroc {
         } else if angle < -8000 {
             angle = -8000;
         }
-        let wobble = ((REG14_F5 + BEAK_WOBBLE) * self.beak_sway_calc
+        let wobble = ((REG0_F5 + BEAK_WOBBLE) * self.beak_sway_calc
             * sin_s(self.beak_tick.wrapping_mul(REG8_S4 + 2500)))
             as i16;
         let rate = (self.beak_calc * 4000.0) as i16;
