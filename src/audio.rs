@@ -1,6 +1,6 @@
 //! Output device staging: cue bootstrap plus sim-event playback.
 
-use repame_audio::{Audio, CueDef, synth_sine_wav};
+use repame_audio::{Audio, AudioChannel, CueDef, synth_sine_wav};
 
 pub const FOOTSTEP_CUE: &str = "footstep";
 pub const SLASH_CUE: &str = "slash";
@@ -10,6 +10,7 @@ pub const PICKUP_CUE: &str = "pickup";
 pub const HURT_CUE: &str = "hurt";
 pub const HAMMER_CUE: &str = "hammer";
 pub const HAMMER_SWING_CUE: &str = "hammer-swing";
+pub const MOVIE_CUE: &str = "movie";
 
 const FOOTSTEP_HZ: f32 = 140.0;
 const FOOTSTEP_SECS: f32 = 0.09;
@@ -45,6 +46,16 @@ fn cue(gain: f32, cooldown_ms: u64, wobble: f32) -> CueDef {
         pitch_wobble: wobble,
         cooldown_ms,
         max_voices: 4,
+        ..CueDef::default()
+    }
+}
+
+pub fn movie_cue() -> CueDef {
+    CueDef {
+        bus: AudioChannel::Music,
+        gain: 1.0,
+        cooldown_ms: 0,
+        max_voices: 1,
         ..CueDef::default()
     }
 }

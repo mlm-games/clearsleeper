@@ -54,6 +54,7 @@ pub struct App {
     movie_size: (u32, u32),
     movie_image: Cell<Option<repose_core::ImageHandle>>,
     movie_uploaded: Cell<usize>,
+    movie_sound: bool,
 }
 
 impl App {
@@ -95,6 +96,7 @@ impl App {
             movie_size: (0, 0),
             movie_image: Cell::new(None),
             movie_uploaded: Cell::new(usize::MAX),
+            movie_sound: false,
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -200,24 +202,52 @@ impl App {
     }
 
     fn step_movie(&mut self, dt: Duration) {
-        let Some(movie) = self.movie.as_mut() else {
+        if self.movie.is_none() {
             return;
-        };
+        }
+        self.start_movie_sound();
         if self.movie_pixels.is_empty() {
             self.movie_frame = 0;
         } else {
-            let interval = movie.interval();
+            let interval = self.movie_interval();
             self.movie_clock += dt.as_secs_f32();
             if self.movie_clock >= interval {
                 self.movie_clock -= interval;
-                self.movie_frame = (self.movie_frame + 1) % movie.len().max(1);
+                let frames = self.movie.as_ref().map_or(1, movie::Movie::len).max(1);
+                let next = self.movie_frame + 1;
+                if next >= frames {
+                    self.audio.play(audio::MOVIE_CUE);
+                }
+                self.movie_frame = next % frames;
             } else {
                 return;
             }
         }
-        if let Ok((w, h, pixels)) = movie.frame(self.movie_frame) {
+        if let Some((w, h, pixels)) = self.movie.as_mut().and_then(|m| m.frame(self.movie_frame).ok())
+        {
             self.movie_size = (w, h);
             self.movie_pixels = movie::to_rgba(&pixels);
+        }
+    }
+
+    fn movie_interval(&self) -> f32 {
+        self.movie.as_ref().map_or(1.0 / 30.0, movie::Movie::interval)
+    }
+
+    fn start_movie_sound(&mut self) {
+        if self.movie_sound {
+            return;
+        }
+        self.movie_sound = true;
+        let Some(wave) = self.movie.as_mut().and_then(|m| m.soundtrack().ok()) else {
+            return;
+        };
+        if self
+            .audio
+            .load_cue(audio::MOVIE_CUE, audio::movie_cue(), &[&wave])
+            .is_ok()
+        {
+            self.audio.play(audio::MOVIE_CUE);
         }
     }
 
@@ -873,6 +903,8 @@ impl App {
     pub fn advance(&mut self, dt: Duration) -> u32 {
         if self.menu.screen == menus::Screen::Title {
             self.step_movie(dt);
+        } else if self.movie_sound {
+            self.audio.stop_cue(audio::MOVIE_CUE);
         }
         let steps = self.sim.step(dt);
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;

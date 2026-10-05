@@ -16,6 +16,7 @@ pub const LEFT_FILTER: usize = 0x08;
 pub const RIGHT_FILTER: usize = 0x28;
 pub const LEFT_PREVIOUS: usize = 0x48;
 pub const RIGHT_PREVIOUS: usize = 0x4C;
+pub const SAMPLE_RATE: u32 = 32000;
 
 const DEFAULT_RATE: f32 = 29.97;
 const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
@@ -133,6 +134,16 @@ impl Movie {
             right: (channel_bytes > 0)
                 .then(|| channel(&span, split, RIGHT_FILTER, RIGHT_PREVIOUS, len)),
         })
+    }
+
+    pub fn soundtrack(&mut self) -> Result<Vec<u8>, MovieError> {
+        let mut samples = Vec::with_capacity(self.len() * 2048);
+        for index in 0..self.len() {
+            if let Ok(block) = self.audio(index) {
+                block.decode(&mut samples);
+            }
+        }
+        Ok(wave(&samples))
     }
 
     fn read(&mut self, at: u64, len: usize) -> Result<Vec<u8>, MovieError> {
@@ -353,6 +364,27 @@ fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<
 
 pub fn title_path() -> PathBuf {
     crate::assets::asset_root().join("files/thpdemo/title_loop.thp")
+}
+
+fn wave(samples: &[i16]) -> Vec<u8> {
+    let data = u32::try_from(samples.len() * 2).unwrap_or(u32::MAX);
+    let mut out = Vec::with_capacity(44 + data as usize);
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16_u32.to_le_bytes());
+    out.extend_from_slice(&1_u16.to_le_bytes());
+    out.extend_from_slice(&2_u16.to_le_bytes());
+    out.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
+    out.extend_from_slice(&(SAMPLE_RATE * 4).to_le_bytes());
+    out.extend_from_slice(&4_u16.to_le_bytes());
+    out.extend_from_slice(&16_u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data.to_le_bytes());
+    for sample in samples {
+        out.extend_from_slice(&sample.to_le_bytes());
+    }
+    out
 }
 
 pub fn to_rgba(rgb: &[u8]) -> Vec<u8> {
