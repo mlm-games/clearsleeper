@@ -146,6 +146,7 @@ pub mod swtdoor;
 pub mod swpush;
 pub mod tag;
 pub mod tagkb;
+pub mod tag_msg;
 pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
@@ -336,6 +337,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if tag_msg::is_tag_msg(&source.name) {
+        tag_msg::spawn(world, source)
     } else if kytag00::is_kytag00(&source.name) {
         kytag00::spawn(world, source)
     } else if agbsw0::is_agbsw0(&source.name) {
@@ -900,6 +903,7 @@ pub fn build(
                 (
                     kytag07::control.in_set(WwSimSet::Execute),
                     kytag00::control.in_set(WwSimSet::Execute),
+                    tag_msg::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
