@@ -21,6 +21,7 @@ const SCALE_MAX: i32 = 2047;
 const DEFAULT_RATE: f32 = 29.97;
 
 const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
+const EOI: [u8; 2] = [0xFF, 0xD9];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MovieError;
@@ -32,6 +33,7 @@ pub struct Movie {
     declared: usize,
     last: usize,
     max_frame: usize,
+    max_samples: usize,
 }
 
 fn be32(data: &[u8], at: usize) -> u32 {
@@ -61,6 +63,7 @@ impl Movie {
         let last = be32(&header, LAST_OFFSET) as usize;
         let first = be32(&header, FIRST_OFFSET) as usize;
         let max_frame = be32(&header, MAX_FRAME) as usize;
+        let max_samples = be32(&header, MAX_SAMPLES) as usize;
         let frames = scan(&mut file, first, declared, last)?;
         if frames.is_empty() {
             return Err(MovieError);
@@ -72,6 +75,7 @@ impl Movie {
             declared,
             last,
             max_frame,
+            max_samples,
         })
     }
 
@@ -99,20 +103,24 @@ impl Movie {
         self.max_frame
     }
 
-    /// Decode one frame to packed 8-bit RGB.
-    pub fn frame(&mut self, index: usize) -> Result<Vec<u8>, MovieError> {
+    pub fn max_samples(&self) -> usize {
+        self.max_samples
+    }
+
+    /// Decode one frame to packed 8-bit RGB with its pixel dimensions.
+    pub fn frame(&mut self, index: usize) -> Result<(u32, u32, Vec<u8>), MovieError> {
         let start = *self.frames.get(index).ok_or(MovieError)?;
         let data = self.read_at(start, self.frame_span(index))?;
         let mut decoder = jpeg_decoder::Decoder::new(Cursor::new(&data));
-        decoder.decode().map_err(|_| MovieError)?;
-        let image = decoder
-            .get_image()
-            .ok_or(MovieError)?
-            .map_err(|_| MovieError)?;
-        Ok(image.to_vec())
+        let pixels = decoder.decode().map_err(|_| MovieError)?;
+        let info = decoder.info().ok_or(MovieError)?;
+        if info.pixel_format != jpeg_decoder::PixelFormat::RGB24 {
+            return Err(MovieError);
+        }
+        Ok((u32::from(info.width), u32::from(info.height), pixels))
     }
 
-    /// Raw bytes carried between this frame's image and the next frame.
+    /// Bytes trailing this frame's image, starting at the audio block header.
     pub fn audio(&mut self, index: usize) -> Result<Vec<u8>, MovieError> {
         let start = *self.frames.get(index).ok_or(MovieError)?;
         let end = self
@@ -124,7 +132,9 @@ impl Movie {
         if end <= start {
             return Err(MovieError);
         }
-        self.read_at(start, (end - start) as usize)
+        let span = self.read_at(start, (end - start) as usize)?;
+        let tail = find(&span, 0, &EOI).map_or(span.len(), |at| at + EOI.len());
+        Ok(span[tail..].to_vec())
     }
 
     fn frame_span(&self, index: usize) -> usize {
@@ -172,26 +182,37 @@ fn scan(file: &mut File, first: usize, count: usize, last: usize) -> Result<Vec<
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AudioBlock {
+    pub at: usize,
     pub samples: usize,
     pub bytes: usize,
 }
 
-/// The audio block is the tail of a frame's bytes; find where it starts.
-pub fn audio_block(span: &[u8]) -> Option<AudioBlock> {
-    for skip in 0..64_usize.min(span.len()) {
-        let Some(at) = span.get(skip..) else {
-            break;
-        };
-        if at.len() < AUDIO_HEADER {
-            break;
+/// One DSP-ADPCM block header: channel byte count, sample count, two
+/// 16-entry coefficient tables, then the samples as 4-bit deltas.
+pub fn audio_block(span: &[u8], max_samples: usize) -> Option<AudioBlock> {
+    (0..16_usize.min(span.len())).find_map(|at| {
+        let block = span.get(at..)?;
+        if block.len() < AUDIO_HEADER {
+            return None;
         }
-        let bytes = be32(at, 0) as usize;
-        let samples = be32(at, 4) as usize;
-        if bytes >= 32 && bytes + AUDIO_HEADER <= at.len() && samples > 0 && samples < 0x10000 {
-            return Some(AudioBlock { samples, bytes });
+        let bytes = be32(block, 0) as usize;
+        let samples = be32(block, 4) as usize;
+        let cap = if max_samples == 0 { 1 << 16 } else { max_samples };
+        if bytes < 32 || AUDIO_HEADER + bytes > block.len() || samples == 0 || samples > cap {
+            return None;
         }
+        if (0..16).any(|index| read_i16(block, TABLE_ONE + 2 * index).abs() > SCALE_MAX) {
+            return None;
+        }
+        Some(AudioBlock { at, samples, bytes })
+    })
+}
+
+fn read_i16(data: &[u8], at: usize) -> i32 {
+    match data.get(at..at + 2) {
+        Some(bytes) => i16::from_be_bytes([bytes[0], bytes[1]]) as i32,
+        None => 0,
     }
-    None
 }
 
 #[derive(Debug, Clone, Default)]
@@ -201,20 +222,19 @@ pub struct Adpcm {
 }
 
 /// Decode one DSP-ADPCM block, appending interleaved stereo samples.
-pub fn adpcm_block(span: &[u8], state: &mut Adpcm, out: &mut Vec<i16>) {
-    let Some(block) = audio_block(span) else {
+pub fn adpcm_block(span: &[u8], max_samples: usize, state: &mut Adpcm, out: &mut Vec<i16>) {
+    let Some(block) = audio_block(span, max_samples) else {
         return;
     };
-    let Some(base) = block_base(span, block.bytes) else {
-        return;
-    };
-    let Some(data) = span.get(base + AUDIO_HEADER..base + AUDIO_HEADER + block.bytes) else {
+    let Some(data) = span.get(
+        block.at + AUDIO_HEADER..block.at + AUDIO_HEADER + block.bytes,
+    ) else {
         return;
     };
     for byte in data {
         for (channel, nibble) in [(0_usize, byte >> 4), (1_usize, byte & 0x0F)] {
-            let ss = coefficient(span, base, TABLE_ONE, nibble);
-            let delta = coefficient(span, base, TABLE_TWO, nibble);
+            let ss = read_i16(span, block.at + TABLE_ONE + 2 * usize::from(nibble));
+            let delta = read_i16(span, block.at + TABLE_TWO + 2 * usize::from(nibble));
             state.scale[channel] = (state.scale[channel] + delta).clamp(SCALE_MIN, SCALE_MAX);
             state.predictor[channel] =
                 (state.predictor[channel] + ss * state.scale[channel]).clamp(SCALE_MIN, SCALE_MAX);
@@ -223,24 +243,9 @@ pub fn adpcm_block(span: &[u8], state: &mut Adpcm, out: &mut Vec<i16>) {
     }
 }
 
-fn block_base(span: &[u8], bytes: usize) -> Option<usize> {
-    (0..64_usize.min(span.len())).find(|skip| {
-        let at = skip + AUDIO_HEADER;
-        at + bytes <= span.len()
-    })
-}
-
-fn coefficient(span: &[u8], base: usize, table: usize, index: usize) -> i32 {
-    let at = base + table + 2 * usize::from(index);
-    match span.get(at..at + 2) {
-        Some(bytes) => i16::from_be_bytes([bytes[0], bytes[1]]) as i32,
-        None => 0,
-    }
-}
-
 /// Title loop shipped alongside the stage data.
 pub fn title_path() -> std::path::PathBuf {
-    assets::asset_root().join("files/thpdemo/title_loop.thp")
+    crate::assets::asset_root().join("files/thpdemo/title_loop.thp")
 }
 
 /// Expand packed RGB to the RGBA order the renderer uploads.

@@ -47,7 +47,7 @@ pub const CLIP_COOLDOWN: u8 = 0x14;
 pub const LIGHT_GAIN: f32 = 150.0;
 pub const LIGHT_RED: f32 = 600.0;
 pub const LIGHT_GREEN: f32 = 400.0;
-pub const LIGHT_BLUE: f32 = 0x78;
+pub const LIGHT_BLUE: f32 = 120.0;
 pub const LIGHT_FLUCTUATION: f32 = 250.0;
 
 pub const AT_WIND_MASK: u32 = (1 << 21) | (1 << 22);

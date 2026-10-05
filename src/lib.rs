@@ -1,5 +1,6 @@
 //! Wind Waker recreation on repame: fixed-step sim + repose views, no bevy.
 
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -9,8 +10,8 @@ use bevy_ecs::prelude::{Without, World};
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;
-use repose_core::{Modifier, Signal, signal};
-use repose_ui::{ViewExt, ZStack};
+use repose_core::{ImageFit, Modifier, Signal, signal};
+use repose_ui::{Image, ImageExt, Spacer, ViewExt, ZStack};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -50,6 +51,9 @@ pub struct App {
     movie_frame: usize,
     movie_clock: f32,
     movie_pixels: Vec<u8>,
+    movie_size: (u32, u32),
+    movie_image: Cell<Option<repose_core::ImageHandle>>,
+    movie_uploaded: Cell<usize>,
 }
 
 impl App {
@@ -88,6 +92,9 @@ impl App {
             movie_frame: 0,
             movie_clock: 0.0,
             movie_pixels: Vec::new(),
+            movie_size: (movie::WIDTH, movie::HEIGHT),
+            movie_image: Cell::new(None),
+            movie_uploaded: Cell::new(usize::MAX),
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -208,16 +215,9 @@ impl App {
                 return;
             }
         }
-        if let Ok(pixels) = movie.frame(self.movie_frame) {
+        if let Ok((w, h, pixels)) = movie.frame(self.movie_frame) {
+            self.movie_size = (w, h);
             self.movie_pixels = movie::to_rgba(&pixels);
-        }
-    }
-
-    pub fn movie_pixels(&self) -> Option<&[u8]> {
-        if self.movie_pixels.is_empty() {
-            None
-        } else {
-            Some(&self.movie_pixels)
         }
     }
 
@@ -465,6 +465,7 @@ impl App {
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
                 || entity.contains::<sim::medli::Medli>()
+                || entity.contains::<sim::grammarian::Grammarian>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
@@ -642,6 +643,13 @@ impl App {
                 let (min, max) = sage.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(bird) = entity.get::<sim::helmaroc::Helmaroc>() {
+                if !bird.drawn() {
+                    continue;
+                }
+                let (min, max) = bird.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
                 if !robot.drawn() {
                     continue;
@@ -1162,7 +1170,7 @@ pub fn run() {
 pub fn root_view(
     app: &App,
     _sched: &mut repose_core::runtime::Scheduler,
-    _ctx: &repose_core::RenderContext,
+    ctx: &repose_core::RenderContext,
 ) -> repose_core::View {
     let frame = view::build_frame(&app.snapshot(), app.cam.get(), app.room.as_ref());
     let cam = app.cam.clone();
@@ -1186,11 +1194,33 @@ pub fn root_view(
                 held.kind().is_some().then_some(held),
             )
         }
-        menus::Screen::Title => menus::title_view(),
+        menus::Screen::Title => ZStack(Modifier::new().fill_max_size())
+            .child([title_movie(app, ctx), menus::title_view()]),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
     };
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
+}
+
+/// The decoded title frame, uploaded to a texture the first time it changes.
+fn title_movie(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    if app.movie_pixels.is_empty() {
+        return Spacer();
+    }
+    let handle = match app.movie_image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            app.movie_image.set(Some(handle));
+            handle
+        }
+    };
+    if app.movie_uploaded.get() != app.movie_frame {
+        let (w, h) = app.movie_size;
+        ctx.set_image_rgba8(handle, w, h, app.movie_pixels.clone(), true);
+        app.movie_uploaded.set(app.movie_frame);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Cover)
 }
 
 /// Android entry (`cargo rapk`): the lib target owns `android_main` — a bin

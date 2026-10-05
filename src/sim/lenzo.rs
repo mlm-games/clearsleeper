@@ -147,7 +147,7 @@ pub const GALLERY_MIN_X: f32 = -600.0;
 pub const DESCEND_STEP: f32 = 50.0;
 pub const PHOTO_PROBE: f32 = 50.0;
 pub const EYE_ORBIT: f32 = 100.0;
-pub const EYE_ORBIT_SWING: f32 = 0x3000;
+pub const EYE_ORBIT_SWING: f32 = 12288.0;
 pub const EYE_ORBIT_RATE: i16 = 0x400;
 pub const EYE_ORBIT_TILT: i16 = -0x1000;
 

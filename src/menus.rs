@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use repose_core::input::PhysicalKey;
-use repose_core::{Color, Modifier, Sp, UnitExt, View};
-use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
+use repose_core::{AlignItems, Color, JustifyContent, Modifier, Sp, UnitExt, View};
+use repose_ui::{Center, Column, Row, Spacer, Text, TextStyle, ViewExt};
 
 use crate::hud;
 use crate::save::{SLOTS, SaveGame};
@@ -140,16 +140,23 @@ pub fn play_time(tick: u64) -> String {
 }
 
 pub fn title_view() -> View {
-    Center(Modifier::new().fill_max_size().hit_passthrough()).child(
-        Column(Modifier::new().gap(14.dp()).hit_passthrough()).child([
-            Text("ClearSleeper")
-                .size(Sp(76.0))
-                .color(Color::from_hex(TITLE_HEX)),
-            Text("Press Space")
-                .size(Sp(24.0))
-                .color(Color::from_hex(DIM_HEX)),
-        ]),
+    Column(
+        Modifier::new()
+            .fill_max_size()
+            .justify_content(JustifyContent::SpaceBetween)
+            .align_items(AlignItems::Center)
+            .padding(56.dp())
+            .hit_passthrough(),
     )
+    .child([
+        Spacer(),
+        Text("ClearSleeper")
+            .size(Sp(76.0))
+            .color(Color::from_hex(TITLE_HEX)),
+        Text("Press Space")
+            .size(Sp(24.0))
+            .color(Color::from_hex(DIM_HEX)),
+    ])
 }
 
 pub fn file_select_view(menu: &Menu) -> View {

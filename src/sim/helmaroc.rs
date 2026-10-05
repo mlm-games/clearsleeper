@@ -378,7 +378,7 @@ const TURN_DIV_NECK: i16 = 0x10;
 const BEAK_SWING: f32 = -200.0;
 const BEAK_WOBBLE: f32 = -2000.0;
 const CAM_NEAR_X: f32 = -50.0;
-const TURN_CAP: f32 = 0x800;
+const TURN_CAP: f32 = 2048.0;
 const TURN_BANK_I32: i32 = 5500;
 const TURN_STEP: f32 = 0.05;
 const TURN_STEP_GROUND: f32 = 0.1;
@@ -897,6 +897,7 @@ impl Sink<'_> {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Helmaroc {
+    pub speed_walk: f32,
     pub battle_mode: u8,
     pub morph: Frame,
     pub frame_count: i32,
@@ -1139,6 +1140,7 @@ impl Helmaroc {
             piece_angle: [0; PIECE_COUNT],
             piece_sway_speed: [0.0; PIECE_COUNT],
             health: MAX_HEALTH,
+            speed_walk: 0.0,
             max_health: MAX_HEALTH,
             stage_boss_enemy: false,
             stage_boss_demo: false,
@@ -1231,16 +1233,16 @@ impl Helmaroc {
         );
         add_calc2(&mut self.turn_step, SPEED_STEP, SPEED_STEP, TURN_STEP);
         add_calc2(
-            &mut actor.speed_f_walk,
+            &mut self.speed_walk,
             self.speed_f,
             SPEED_STEP,
             self.speed_step,
         );
-        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, actor.speed_f_walk]);
+        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_walk]);
         if self.resume_pending == 0 {
             self.speed = forward;
         } else {
-            let out = turned(actor.angle[ANGLE_X], forward);
+            let out = turned(actor.angle[ANGLE_X], forward.to_array());
             self.speed.x = out.x;
             self.speed.z = out.z;
             if self.morph.frame < RISE_FRAMES {
@@ -1256,13 +1258,13 @@ impl Helmaroc {
         add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
         add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
         add_calc2(
-            &mut actor.speed_f_walk,
+            &mut self.speed_walk,
             self.speed_f,
             SPEED_STEP,
             self.speed_step,
         );
-        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, actor.speed_f_walk]);
-        let out = turned(actor.angle[ANGLE_X], forward);
+        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_walk]);
+        let out = turned(actor.angle[ANGLE_X], forward.to_array());
         self.speed.x = out.x;
         self.speed.z = out.z;
         actor.pos += self.speed;
@@ -1349,13 +1351,13 @@ impl Helmaroc {
                 self.state = self.state.wrapping_add(1);
                 self.speed_f = 0.0;
                 self.speed_step = 1.0;
-                actor.speed_f_walk = 0.0;
+                self.speed_walk = 0.0;
                 break;
             }
             1 => {
                 if self.morph.frame == f32::from(REG0_S7 + 0x17) {
                     self.state = 2;
-                    actor.speed_f_walk = REG0_F8 + 50.0;
+                    self.speed_walk = REG0_F8 + 50.0;
                     self.speed_f = 40.0;
                     self.speed_step = REG0_F9 + 1.0;
                     actor.angle[ANGLE_X] = -0x3000;
@@ -1562,7 +1564,7 @@ impl Helmaroc {
                     );
                     let ground = env.ground_h(actor.pos);
                     if self.ground_hit != 0 || actor.pos.y <= ground + 1.0 {
-                        actor.speed_f_walk = 0.0;
+                        self.speed_walk = 0.0;
                         self.speed.z = 0.0;
                         self.speed.x = 0.0;
                         self.speed.y = -10.0;
@@ -1627,7 +1629,7 @@ impl Helmaroc {
                     self.state = 1;
                     self.timers[0] = self.rnd_f(30.0) as i16 + 40;
                     self.fly_ca = 0;
-                    actor.speed_f_walk = 0.0;
+                    self.speed_walk = 0.0;
                     arm = 1;
                 }
                 1 => {
@@ -1687,7 +1689,7 @@ impl Helmaroc {
                                 self.state = 2;
                                 self.anm_init(BCK_WALK1, 3.0, EMODE_LOOP, HIO_M01C, 0x19, 0);
                                 self.turn_step = 0.0;
-                                actor.speed_f_walk = 0.0;
+                                self.speed_walk = 0.0;
                             } else if self.rnd_f(1.0) < 0.5 {
                                 self.action = Action::Jump;
                                 self.state = 0;
@@ -1711,7 +1713,7 @@ impl Helmaroc {
                     self.anm_init(BCK_JUMP1, 5.0, EMODE_NONE, 0.0, 0xF, 0);
                     self.state = 6;
                     self.speed.y = REG8_F9 + 50.0;
-                    actor.speed_f_walk = 0.0;
+                    self.speed_walk = 0.0;
                     arm = 6;
                 }
                 6 => {
@@ -1763,7 +1765,7 @@ impl Helmaroc {
                     arm = 2;
                 }
                 2 => {
-                    actor.speed_f_walk = REG8_F10 + 30.0;
+                    self.speed_walk = REG8_F10 + 30.0;
                     self.speed_f = 30.0;
                     self.speed_step = 30.0;
                     if self.speed.y < 0.0 {
@@ -1856,7 +1858,7 @@ impl Helmaroc {
                         let eff = &mut self.effects[EFF_ROCK];
                         eff.kind = 2;
                         eff.count = 0;
-                        let rock_pos = turned(actor.shape_angle[ANGLE_Y], [0.0, 0.0, 500.0]);
+                        let rock_pos = turned(actor.angle[ANGLE_Y], [0.0, 0.0, 500.0]);
                         eff.pos = rock_pos + actor.pos;
                         self.eff_hane_set(self.body, 5, 0);
                         rock = true;
@@ -2040,7 +2042,7 @@ impl Helmaroc {
                         self.action = Action::Fly;
                         self.fly_ca = -1;
                         self.state = 0;
-                        actor.speed_f_walk = 0.0;
+                        self.speed_walk = 0.0;
                     }
                     break;
                 }
@@ -2079,7 +2081,7 @@ impl Helmaroc {
                     arm = 1;
                 }
                 1 => {
-                    if self.morph.frame == f32::from(23) {
+                    if self.morph.frame == 23.0 {
                         self.state = 2;
                         self.target.y += 500.0;
                     }
@@ -2153,7 +2155,7 @@ impl Helmaroc {
         self.action = Action::End;
         self.effects[EFF_ROCK].kind = 0;
         if actor.pos.y < 9810.0 {
-            if self.head.pos.y < 10000.0 {
+            if self.head.y < 10000.0 {
                 self.state = 0;
             } else {
                 self.state = 1;
@@ -2173,7 +2175,7 @@ impl Helmaroc {
         let reach = env.blow.at.reach();
         let mut hit: u8 = HIT_NONE;
         if self.mask_damage < 4 {
-            if touches(self.head.pos, self.head_radius, env.player_pos, reach) {
+            if touches(self.head, self.head_radius, env.player_pos, reach) {
                 hit = HIT_HEAD;
             }
         } else if touches(self.tosaka, self.tosaka_radius, env.player_pos, reach) {
@@ -2185,7 +2187,7 @@ impl Helmaroc {
         let result = env.blow.at.result();
         if hit == HIT_HEAD {
             self.hit_stop = 0xC;
-            if result == AT_HAMMER && self.head.pos.y < 10000.0 {
+            if result == AT_HAMMER && self.head.y < 10000.0 {
                 self.health = HAMMER_HEALTH;
                 out.se(SE_LK_HAMMER_HIT);
                 if self.battle_mode == 1 {
@@ -2217,8 +2219,8 @@ impl Helmaroc {
             self.hit_stop = 6;
             out.se(SE_CV_DK_DAMAGE);
             self.beak_timer = REG0_S5 + 0x1E;
-            self.beak_aim = bearing(env.player_pos, actor.eye);
-            if self.action == Action::KutiAttack && self.head.pos.y < 10000.0 {
+            self.beak_aim = bearing(env.player_pos, self.head);
+            if self.action == Action::KutiAttack && self.head.y < 10000.0 {
                 self.anm_init(BCK_DAMAGE1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                 self.state = 10;
                 self.beat_count = self.beat_count.wrapping_add(1);
@@ -2270,8 +2272,8 @@ impl Helmaroc {
                 for index in 0..PIECE_COUNT {
                     self.piece_live[index] = 1;
                     self.piece_pos[index] =
-                        turned(actor.shape_angle[ANGLE_Y], JOINT_ATAMA1);
-                    self.piece_rot[index][1] = actor.shape_angle[ANGLE_Y];
+                        turned(actor.angle[ANGLE_Y], JOINT_ATAMA1);
+                    self.piece_rot[index][1] = actor.angle[ANGLE_Y];
                     self.piece_rot[index][0] = REG0_S6 + 0x3625;
                     self.piece_rot[index][2] = 0;
                     let scale = 1.0 + REG0_F7;
@@ -2749,10 +2751,10 @@ impl Helmaroc {
     }
 
     fn col_set(&mut self, actor: &Actor) {
-        let yaw = actor.shape_angle[ANGLE_Y];
+        let yaw = actor.angle[ANGLE_Y];
         self.body = actor.pos;
         self.body.y += BODY_LIFT;
-        self.head_prev = self.head.pos;
+        self.head_prev = self.head;
         let mut offset = HEAD_OFFSET;
         if self.mask_damage >= 4 {
             offset[2] = 0.0;
@@ -2761,7 +2763,7 @@ impl Helmaroc {
             offset[2] += REG0_F2;
             self.head_radius = HEAD_RADIUS_MASKED;
         }
-        self.head.pos = Self::at_pos(yaw, JOINT_ATAMA1) + turned(yaw, offset);
+        self.head = Self::at_pos(yaw, JOINT_ATAMA1) + turned(yaw, offset);
         if self.at_mode == 1 {
             self.beak = Self::at_pos(yaw, JOINT_AGO) + turned(yaw, BEAK_OFFSET);
         } else {
@@ -2926,7 +2928,7 @@ impl Helmaroc {
             self.shutter_shift + AREA_Y + REG8_F2,
             REG0_F12 - SHUTTER_Z,
         );
-        self.shutter_yaw = REG6_S0 - SHUTTER_YAW;
+        self.shutter_yaw = f32::from(REG6_S0) - SHUTTER_YAW;
     }
 
     fn eff_hane_move(&mut self, index: usize, env: &Env<'_>) {
@@ -3044,11 +3046,11 @@ impl Helmaroc {
             }
             2 => {
                 self.cam_eye =
-                    turned(actor.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG0_F1 - 30.0, REG0_F2 + 50.0])
-                        + self.head.pos;
+                    turned(actor.angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG0_F1 - 30.0, REG0_F2 + 50.0])
+                        + self.head;
                 self.cam_look =
-                    turned(actor.shape_angle[ANGLE_Y], [REG0_F5 + 400.0, REG0_F6 - 100.0, REG0_F7 + 400.0])
-                        + self.head.pos;
+                    turned(actor.angle[ANGLE_Y], [REG0_F5 + 400.0, REG0_F6 - 100.0, REG0_F7 + 400.0])
+                        + self.head;
                 if self.demo_sub > REG6_S7 + 0x3C {
                     add_calc2(&mut self.fov, 20.0, 0.5, 1.0);
                 } else if self.demo_sub > 0 {
@@ -3130,14 +3132,14 @@ impl Helmaroc {
                 if self.demo_sub == REG13_S8 + 0x37 {
                     self.demo_flag = 1;
                 }
-                add_calc2(&mut self.cam_eye.x, self.head.pos.x, 0.1, 50.0);
+                add_calc2(&mut self.cam_eye.x, self.head.x, 0.1, 50.0);
                 add_calc2(
                     &mut self.cam_eye.y,
-                    (self.head.pos.y - 200.0) + REG13_F11,
+                    (self.head.y - 200.0) + REG13_F11,
                     0.1,
                     50.0,
                 );
-                add_calc2(&mut self.cam_eye.z, self.head.pos.z, 0.1, 50.0);
+                add_calc2(&mut self.cam_eye.z, self.head.z, 0.1, 50.0);
                 if self.morph.is_stop() {
                     self.anm_init(BCK_FLY3, 1.0, EMODE_LOOP, 1.0, 0xD, 0);
                 }
@@ -3191,19 +3193,19 @@ impl Helmaroc {
                     self.demo_sub = 0;
                     self.fov = 60.0;
                     self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
-                    self.cam_eye = actor.eye;
+                    self.cam_eye = self.eye;
                     self.cam_eye.y -= REG0_F7 + 100.0;
                 }
             }
             0x33 => {
-                add_calc2(&mut self.cam_eye.x, actor.eye.x, 0.1, self.demo_param * 100.0);
+                add_calc2(&mut self.cam_eye.x, self.eye.x, 0.1, self.demo_param * 100.0);
                 add_calc2(
                     &mut self.cam_eye.y,
-                    actor.eye.y - (REG0_F7 + 100.0),
+                    self.eye.y - (REG0_F7 + 100.0),
                     0.3,
                     self.demo_param * 200.0,
                 );
-                add_calc2(&mut self.cam_eye.z, actor.eye.z, 0.1, self.demo_param * 100.0);
+                add_calc2(&mut self.cam_eye.z, self.eye.z, 0.1, self.demo_param * 100.0);
                 if self.action == Action::Start {
                     self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_sub = 0;
@@ -3237,7 +3239,7 @@ impl Helmaroc {
                 if self.demo_sub == 0x3C {
                     out.bgm(STRM_DK_CLEAR);
                 }
-                self.cam_eye = self.head.pos;
+                self.cam_eye = self.head;
                 self.cam_eye.y += REG6_F16 - 100.0;
                 let look = turned(self.cam_yaw, [0.0, 0.0, self.demo_radius + REG6_F17]);
                 let look = look + self.cam_eye;
@@ -3320,9 +3322,9 @@ impl Helmaroc {
     }
 
     fn beak_step(&mut self, actor: &Actor, env: &Env<'_>) {
-        let yaw = -actor.shape_angle[ANGLE_Y];
-        let swing = self.head.pos - self.head_prev;
-        let rot = turned(yaw, swing);
+        let yaw = -actor.angle[ANGLE_Y];
+        let swing = self.head - self.head_prev;
+        let rot = turned(yaw, swing.to_array());
         let mut angle = (rot.z * (REG8_F15 + BEAK_SWING)) as i16;
         if angle > 8000 {
             angle = 8000;
@@ -3349,7 +3351,7 @@ impl Helmaroc {
             self.beak_amp = 0;
             self.beak_sway = 0;
             let reach = turned(self.beak_aim, [0.0, 0.0, self.beak_timer as f32 * (REG0_F7 + 500.0)]);
-            let wave = sin_s(self.frame_count.wrapping_mul(REG0_S4 + 7000) as i16);
+            let wave = sin_s((self.frame_count.wrapping_mul(i32::from(REG0_S4) + 7000)) as i16);
             self.tosaka_y4 = (reach.z * wave) as i16;
             self.tosaka_z4 = (reach.x * wave) as i16;
         }
@@ -3369,9 +3371,9 @@ impl Helmaroc {
     }
 
     fn attention_step(&mut self, actor: &Actor, env: &Env<'_>) {
-        self.eye = Self::at_pos(actor.shape_angle[ANGLE_Y], JOINT_ATAMA1)
+        self.eye = Self::at_pos(actor.angle[ANGLE_Y], JOINT_ATAMA1)
             + turned(
-                actor.shape_angle[ANGLE_Y],
+                actor.angle[ANGLE_Y],
                 [
                     REG0_F10 + EYE_OFFSET[0],
                     EYE_OFFSET[1],
@@ -3380,7 +3382,7 @@ impl Helmaroc {
             );
         let angle = if self.track_player {
             let delta = env.player_pos - actor.pos;
-            let mut turn = bearing(Vec3::ZERO, delta).wrapping_sub(actor.shape_angle[ANGLE_Y]);
+            let mut turn = bearing(Vec3::ZERO, delta).wrapping_sub(actor.angle[ANGLE_Y]);
             if turn > TRACK_LIMIT {
                 turn = TRACK_LIMIT;
             } else if turn < -TRACK_LIMIT {
@@ -3426,7 +3428,7 @@ impl Helmaroc {
         if self.beak_timer != 0 {
             self.beak_timer -= 1;
         }
-        if !HIO_M005 {
+        if HIO_M005 == 0 {
             self.morph.play();
             self.move_actor(actor, env, out);
             if self.action != Action::Start && self.action.code() < ACTION_LIMIT {
@@ -3493,7 +3495,7 @@ impl Helmaroc {
             self.timers[0] = SPAWN_TIMER;
         } else {
             self.gravity = REG0_F4 + GRAVITY;
-            actor.speed_f_walk = HIO_M020;
+            self.speed_walk = HIO_M020;
             self.fly_ca = -1;
             self.tosaka_y1 = -2000;
             self.health = MAX_HEALTH;
@@ -3581,7 +3583,7 @@ pub fn control(
     let player = entry.1;
     let mut orders = Orders::default();
     let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
-    for (_, actor, boss) in &mut bosses {
+    for (_, mut actor, mut boss) in &mut bosses {
         let actor = &mut *actor;
         let boss = &mut *boss;
         let peck = watch

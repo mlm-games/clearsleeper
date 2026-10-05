@@ -39,11 +39,13 @@ pub mod frame;
 pub mod floormaster;
 pub mod ghostship;
 pub mod ground;
+pub mod grammarian;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
 pub mod hammerhit;
 pub mod health;
+pub mod helmaroc;
 pub mod hmlif;
 pub mod homen;
 pub mod hookshot;
@@ -99,6 +101,7 @@ pub mod tag;
 pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
+pub mod tbox;
 pub mod tingle;
 pub mod torch;
 pub mod transition;
@@ -249,6 +252,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if aryll::is_aryll(&source.name) {
         let seer = aryll::Aryll::spawn(source.parameters);
         world.spawn((actor, seer)).id()
+    } else if helmaroc::is_helmaroc(&source.name) {
+        let bird = helmaroc::Helmaroc::spawn(source.parameters);
+        world.spawn((actor, bird)).id()
+    } else if grammarian::is_grammarian(&source.name) {
+        let grandma = grammarian::Grammarian::spawn(source.parameters);
+        world.spawn((actor, grandma)).id()
     } else if floormaster::is_floormaster(&source.name) {
         let robot = floormaster::Floormaster::spawn(source.parameters);
         world.spawn((actor, robot)).id()
@@ -688,6 +697,7 @@ pub fn build(
                     makar::control.in_set(WwSimSet::Execute),
                     lenzo::control.in_set(WwSimSet::Execute),
                     zunari::control.in_set(WwSimSet::Execute),
+                    grammarian::control.in_set(WwSimSet::Execute),
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -748,6 +758,7 @@ pub fn build(
                     pirateship::control.in_set(WwSimSet::Execute),
                     molgera::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
+                    helmaroc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
