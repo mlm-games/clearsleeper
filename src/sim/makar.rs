@@ -2219,11 +2219,11 @@ impl Makar {
                 self.set_anm(ANM_07, ctx);
             }
             if self.fly_timer != 0 && hold {
-                walk::chase_s(&mut self.fly_speed, HIO_FLY_SPEED_MAX, HIO_FLY_SPEED_STEP);
+                chase_s(&mut self.fly_speed, HIO_FLY_SPEED_MAX, HIO_FLY_SPEED_STEP);
                 self.land_timer = 0;
             } else {
                 let stop = if self.grounded { HIO_FLY_SPEED_STOP } else { 0 };
-                walk::chase_s(&mut self.fly_speed, stop, HIO_FLY_LAND_STEP);
+                chase_s(&mut self.fly_speed, stop, HIO_FLY_LAND_STEP);
             }
             self.propeller = self.propeller.wrapping_add(self.fly_speed);
             self.fall_sum += self.pos.y - self.old.y;
@@ -2632,7 +2632,7 @@ impl Makar {
 
     fn ev_act_wait(&mut self, ctx: &mut Ctx) -> bool {
         let before = self.timer;
-        if walk::chase_s(&mut self.timer, 0, 1) {
+        if chase_s(&mut self.timer, 0, 1) {
             if before < 0 {
                 ctx.reset_event();
             }
@@ -2877,12 +2877,12 @@ impl Makar {
         self.gravity = 0.0;
         if self.timer < 0 {
             if walk::chase_f(&mut self.speed.y, 0.0, WARP_BRACE)
-                && walk::chase_s(&mut self.timer, 0, 1)
+                && chase_s(&mut self.timer, 0, 1)
             {
                 self.timer = 0;
             }
         } else {
-            if walk::chase_s(&mut self.timer, WARP_SPIN_STEP, WARP_SPIN_RATE) {
+            if chase_s(&mut self.timer, WARP_SPIN_STEP, WARP_SPIN_RATE) {
                 walk::chase_f(&mut self.speed.y, WARP_DOWN_SPEED, WARP_DOWN_STEP);
                 walk::chase_f(&mut self.scale.x, 0.0, WARP_SCALE_SPEED);
                 self.scale.z = self.scale.x;

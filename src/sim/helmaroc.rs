@@ -35,9 +35,7 @@ const SWITCH_TOGE: u8 = 0x80;
 const EVENT_BIT_LAST_DAMAGE: u16 = 0x3C01;
 const TMP_BIT_SHUTTER: u32 = 0x0401;
 
-const HIO_NO: i8 = -1;
 const HIO_M005: u8 = 0;
-const HIO_M006: i16 = 0;
 const HIO_M008: f32 = 1.0;
 const HIO_M00C: f32 = 4.0;
 const HIO_M010: f32 = 1.5;
@@ -3557,5 +3555,195 @@ impl Helmaroc {
             }
         }
         self.at_mode = 0;
+    }
+}
+
+pub fn begin(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
+    if self.stage_boss_enemy || REG0_S0 != 0 {
+        self.stage_boss_enemy = true;
+        self.action = Action::AfterFight;
+        actor.pos = Vec3::splat(300000.0);
+        self.shutter_ring = -630.0;
+        self.shutter_shift = -70.0;
+        self.shutter_y = SHUTTER_BATTLE_Y;
+    } else if self.battle_mode == 0x1 {
+        self.action = Action::TFly;
+        actor.pos = Vec3::new(AREA_X, 5000.0, AREA_Z);
+        self.shutter_ring = -630.0;
+        self.shutter_shift = -70.0;
+        out.bgm(BGM_MJ_TOWER_BATTLE);
+        self.timers[0] = 0x168;
+    } else {
+        self.gravity = REG0_F4 + GRAVITY;
+        actor.speed_f_walk = HIO_M020;
+        self.fly_ca = -1;
+        self.tosaka_y1 = -2000;
+        self.health = MAX_HEALTH;
+        self.max_health = MAX_HEALTH;
+        actor.pos.y = 11000.0;
+    }
+}
+
+const MOB_NAMES: [&str; 9] = [
+    "Kamome",
+    "Dk",
+    "Kui",
+    "Obj_Tide",
+    "Bk",
+    "Boko",
+    "Bdkobj",
+    "Ep",
+];
+
+#[derive(SystemParam)]
+pub struct Watch<'w, 's> {
+    collision: Option<Res<'w, Collision>>,
+    combat: Res<'w, Combat>,
+    hammer: Res<'w, hammer::Cut>,
+    held: Res<'w, Held>,
+    blasts: Res<'w, bombflower::Blasts>,
+    players: Query<'w, 's, (Entity, &'static mut Player)>,
+    shafts: Query<'w, 's, &'static arrow::Arrow>,
+    bolts: Query<'w, 's, &'static boomerang::Boomerang>,
+    others: Query<'w, 's, (Entity, &'static Actor), Without<Helmaroc>>,
+}
+
+pub fn control(
+    watch: Watch<'_, '_>,
+    mut switches: ResMut<Switches>,
+    mut stories: ResMut<StoryBits>,
+    mut flags: ResMut<EventFlags>,
+    mut zones: ResMut<ZoneActors>,
+    mut health: ResMut<Health>,
+    mut events: ResMut<SimEvents>,
+    mut commands: Commands,
+    mut bosses: Query<
+        (Entity, &mut Actor, &mut Helmaroc),
+        (With<Helmaroc>, Without<Player>),
+    >,
+) {
+    let solid = watch.collision.as_deref();
+    let blade = watch.held.item;
+    let soup = watch.combat.soup;
+    let at = {
+        let mut found = At::Idle;
+        if watch
+            .shafts
+            .iter()
+            .any(|shaft| shaft.phase == arrow::Phase::Flying)
+        {
+            found = match watch
+                .shafts
+                .iter()
+                .find(|shaft| shaft.phase == arrow::Phase::Flying)
+                .map(|shaft| shaft.kind)
+            {
+                Some(arrow::TYPE_LIGHT) => At::LightArrow,
+                Some(arrow::TYPE_FIRE) => At::FireArrow,
+                Some(arrow::TYPE_ICE) => At::IceArrow,
+                _ => At::Arrow,
+            };
+        } else if watch
+            .bolts
+            .iter()
+            .any(|bolt| bolt.parameter == boomerang::MODE_THROW)
+        {
+            found = At::Boomerang;
+        } else if watch.hammer.kind == hammer::CUT_HAMMER_SIDESWING
+            || watch.hammer.kind == hammer::CUT_HAMMER_FRONTSWING
+        {
+            found = At::Hammer;
+        } else if watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
+            found = At::Sword;
+        } else if !watch.blasts.list.is_empty() {
+            found = At::Bomb;
+        }
+        found
+    };
+    let blow = Blow {
+        at,
+        blade,
+        soup,
+    };
+    let mut players = watch.players;
+    let Some(entry) = players.iter_mut().next() else {
+        return;
+    };
+    let mut player = entry.1;
+    let mut orders = Orders::default();
+    let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
+    let mut mobs: Vec<Entity> = Vec::new();
+    let mut shards: Vec<Entity> = Vec::new();
+    let mut peck_broken: Option<Entity> = None;
+    for (entity, actor, boss) in &mut bosses {
+        let actor = &mut *actor;
+        let boss = &mut *boss;
+        if !boss.entered {
+            boss.entered = true;
+        }
+        let peck = if boss.action == Action::TFly {
+            watch
+                .others
+                .iter()
+                .find(|(_, other)| {
+                    other.name == BDK_OBJ_ACTOR
+                        && (other.parameters & PRM_BYTE_MASK) != PRM_MASK_SET
+                })
+                .map(|(id, other)| (id, other.pos))
+        } else {
+            None
+        };
+        if boss.peck_obj.is_some() && boss.peck_obj.is_some() {
+            peck_broken = boss.peck_obj;
+        }
+        let env = Env {
+            player_pos: player.pos,
+            player_angle: to_s16(player.face),
+            player_hover: false,
+            solid,
+            blow,
+            peck,
+        };
+        let mut sink = Sink {
+            events: &mut events,
+            switches: &mut switches,
+            stories: &mut stories,
+            flags: &mut flags,
+            zones: &mut zones,
+            health: &mut health,
+            orders: &mut orders,
+            drop: &mut drop,
+        };
+        boss.begin(actor, &mut sink);
+        boss.execute(actor, &env, &mut sink);
+        let _ = entity;
+    }
+    if orders.purge_mobs || orders.purge_shards {
+        for (id, other) in watch.others.iter() {
+            if orders.purge_mobs && MOB_NAMES.contains(&other.name.as_str()) {
+                mobs.push(id);
+            } else if orders.purge_shards && other.name == BDK_OBJ_ACTOR {
+                shards.push(id);
+            }
+        }
+    }
+    for id in mobs {
+        drop.push((id, i8::MIN, 0));
+    }
+    for id in shards {
+        drop.push((id, i8::MIN, 0));
+    }
+    for (id, room, set_id) in drop {
+        if room != i8::MIN {
+            zones.mark_done(room, set_id);
+        }
+        let _ = commands.entity(id).despawn();
+    }
+    if let Some(id) = peck_broken {
+        for mut other in &mut commands.entity(id) {
+            if let Some(mut actor) = other.get_mut::<Actor>() {
+                actor.parameters = PRM_MASK_SET;
+            }
+        }
     }
 }
