@@ -2684,8 +2684,6 @@ pub struct Ctx<'a> {
 
 #[derive(SystemParam)]
 pub struct Watch<'w, 's> {
-    switches: Res<'w, Switches>,
-    stories: Res<'w, StoryBits>,
     collect: Res<'w, Collect>,
     equipped: Res<'w, Equipped>,
     charts: Res<'w, Charts>,
@@ -2799,12 +2797,12 @@ pub fn control(
     let select_item = [inventory::NO_ITEM; ITEM_BUTTON_COUNT];
 
     let facts = Facts {
-        stories: *watch.stories,
+        stories: *stories,
         collect: *watch.collect,
         equipped: *watch.equipped,
         charts: *watch.charts,
         chests: *watch.chests,
-        switches: *watch.switches,
+        switches: *switches,
         mem: *watch.mem,
         rupees: watch.rupees.count,
         life: i32::from(watch.health.units),
