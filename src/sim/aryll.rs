@@ -23,7 +23,7 @@ use crate::text::msgproc::{
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_BOX_CLOSING, STATUS_BOX_OPENING, STATUS_CLOSE_WAIT,
     STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_MSG_TYPING, STATUS_SCOPE_WAIT, STATUS_UNK0,
+    STATUS_TYPING, STATUS_SCOPE_WAIT, STATUS_UNK0,
 };
 
 pub const ARYLL_ACTOR: &str = "Ls1";
@@ -2020,7 +2020,7 @@ fn cam_set_flag_focus(&mut self) {
         let res = self.chk_parts_not_mov();
         self.npc_talk(ctx);
         let status = ctx.text.status();
-        if matches!(status, Some(STATUS_BOX_OPENING) | Some(STATUS_MSG_TYPING)) {
+        if matches!(status, Some(STATUS_BOX_OPENING) | Some(STATUS_TYPING)) {
             return res;
         }
         if status != Some(STATUS_MSG_DESTROYED) {

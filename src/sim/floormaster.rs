@@ -60,6 +60,7 @@ const PIYO_FIRST: i32 = 0x14;
 const PIYO_LAST: i32 = 0x3C;
 const NPC_FACE_GATE: i32 = 0x500;
 const THROW_SETTLE: i32 = 0x3c;
+const CHASE_STEP: f32 = 5.0;
 const IBALL_ACTOR: &str = "Iball";
 const TSUBO_ACTOR: &str = "Tsubo";
 
@@ -295,7 +296,6 @@ const REACH_BOOMERANG: f32 = 90.0;
 const BODY_RADIUS: f32 = HIO_0C8;
 const BODY_RADIUS_BUSY: f32 = HIO_0C8 * 1.5;
 const HOLE_GATE: f32 = 0.015;
-const HEAD_LIFT: f32 = 200.0;
 const ATTENTION_LIFT: f32 = 20.0;
 const LINE_LIFT: f32 = 100.0;
 const AREA_RAYS: usize = 12;
@@ -328,7 +328,7 @@ const ARM_CAP: i16 = 0x1C8;
 const ARM_RATE: i16 = 2;
 const ARM_BASE: i16 = 0x1830;
 const WANDER_SPAN_A: f32 = 3.0;
-const WANDER_SCALE_A: f32 = 0x1000.0;
+const WANDER_SCALE_A: f32 = 4096.0;
 const WANDER_SPAN_B: f32 = 5.0;
 const WANDER_TURN: i16 = 0x3000;
 const WANDER_BASE: i16 = 0x5000;
@@ -571,7 +571,7 @@ impl Phase {
         )
     }
 
-    fn by_code(code: u8) -> Phase {
+    pub fn by_code(code: u8) -> Phase {
         PHASES
             .get(usize::from(code))
             .copied()
@@ -1567,10 +1567,10 @@ impl Floormaster {
     }
 
     fn check_tg_hit(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) -> bool {
-        if ctx.blow.at == At::Idle {
+        if !timer(&mut self.hit_timer) {
             return false;
         }
-        if !timer(&mut self.hit_timer) {
+        if ctx.blow.at == At::Idle {
             return false;
         }
         let radius = if ctx.busy {
@@ -1733,6 +1733,7 @@ impl Floormaster {
             self.target_flag = NO_TARGET;
             self.target_sub = 0;
             self.carry_kind = CARRY_NONE;
+            self.mode_proc_init(Phase::Wait, actor, ctx.player);
         }
         if self.enemy_ice(&mut ctx) {
             self.ice_proc(actor);
@@ -2035,62 +2036,29 @@ impl Floormaster {
         }
         if self.target_flag == NO_TARGET {
             self.set_anm(5, false);
-        } else {
-            let aim = bearing(actor.pos, ctx.target_pos);
-            if distance_angle_s(actor.angle[1], aim) > i32::from(HIO_09A) {
-                stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV, HIO_096);
-            }
-            if self.in_area == 0 {
-                self.mode_proc_init(Phase::Disappear, actor, ctx.player);
-            } else if ctx.busy {
-                let lift = self.grab_pos.y;
-                self.grab_pos = ctx.player.pos;
-                self.grab_pos.y = lift;
-            } else {
-                if self.is_grab_pos(actor, ctx) {
-                self.set_grab_pos(ctx);
-            } else {
-                self.set_anm(5, false);
-                return;
-            }
-            if self.is_grab(ctx) {
-                if self.is_link() && self.anm_prm == 4 {
-                    if self.morph.is_stop() {
-                        self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
-                        ctx.se(SE_CM_FM_GRAB_HAND);
-                    } else if ctx.player.speed >= 1.0 {
-                        self.hand_push(ctx);
-                    }
-                } else if self.is_npc() {
-                    if self.carry_kind == CARRY_NONE {
-                        ctx.se(SE_CM_FM_GRAB_HAND);
-                        self.carry_kind = CARRY_NPC;
-                        if self.demo_mode {
-                            ctx.order(EVENT_APPEAR);
-                            self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
-                        } else if flat(actor.pos, ctx.player.pos) > HIO_0BC
-                            || (ctx.player.pos.y - actor.pos.y).abs() > HIO_0A8
-                            || ctx.event_running()
-                        {
-                            self.mode_proc_init(Phase::GrabNpcDemo, actor, ctx.player);
-                        } else {
-                            self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
-                        }
-                    }
-                } else if self.target_flag == TARGET_BOMB {
-                    if self.carry_kind == CARRY_NONE {
-                        self.carry_kind = CARRY_BOMB;
-                        ctx.se(SE_CM_FM_GRAB);
-                        self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
-                    } else {
-                        self.mode_proc_init(Phase::Wait, actor, ctx.player);
-                    }
-                } else if self.target_flag == TARGET_TSUBO && self.carry_kind == CARRY_NONE {
-                    self.carry_kind = CARRY_TSUBO;
-                    ctx.se(SE_CM_FM_GRAB);
-                    self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
-                }
-            } else if self.is_link() && self.anm_prm == 4 {
+            return;
+        }
+        let aim = bearing(actor.pos, ctx.target_pos);
+        if distance_angle_s(actor.angle[1], aim) > i32::from(HIO_09A) {
+            stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV, HIO_096);
+        }
+        if self.in_area == 0 {
+            self.mode_proc_init(Phase::Disappear, actor, ctx.player);
+            return;
+        }
+        if ctx.busy {
+            let lift = self.grab_pos.y;
+            self.grab_pos = ctx.player.pos;
+            self.grab_pos.y = lift;
+            return;
+        }
+        if !self.is_grab_pos(actor, ctx) {
+            self.set_anm(5, false);
+            return;
+        }
+        self.set_grab_pos(ctx);
+        if !self.is_grab(ctx) {
+            if self.is_link() && self.anm_prm == 4 {
                 let gap = flat(self.tip, self.grab_pos);
                 if gap > HIO_110 && gap < HIO_114 {
                     if ctx.player.speed >= 1.0 {
@@ -2102,7 +2070,44 @@ impl Floormaster {
             } else if self.anm_prm == 4 && self.morph.is_stop() && timer(&mut self.mode_timer) {
                 self.set_anm(5, false);
             }
+            return;
+        }
+        if self.is_link() && self.anm_prm == 4 {
+            if self.morph.is_stop() {
+                self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
+                ctx.se(SE_CM_FM_GRAB_HAND);
+            } else if ctx.player.speed >= 1.0 {
+                self.hand_push(ctx);
             }
+        } else if self.is_npc() {
+            if self.carry_kind != CARRY_NONE {
+                return;
+            }
+            ctx.se(SE_CM_FM_GRAB_HAND);
+            self.carry_kind = CARRY_NPC;
+            if self.demo_mode {
+                ctx.order(EVENT_APPEAR);
+                self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
+            } else if flat(actor.pos, ctx.player.pos) > HIO_0BC
+                || (ctx.player.pos.y - actor.pos.y).abs() > HIO_0A8
+                || ctx.event_running()
+            {
+                self.mode_proc_init(Phase::GrabNpcDemo, actor, ctx.player);
+            } else {
+                self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
+            }
+        } else if self.target_flag == TARGET_BOMB {
+            if self.carry_kind == CARRY_NONE {
+                self.carry_kind = CARRY_BOMB;
+                ctx.se(SE_CM_FM_GRAB);
+                self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
+            } else {
+                self.mode_proc_init(Phase::Wait, actor, ctx.player);
+            }
+        } else if self.target_flag == TARGET_TSUBO && self.carry_kind == CARRY_NONE {
+            self.carry_kind = CARRY_TSUBO;
+            ctx.se(SE_CM_FM_GRAB);
+            self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
         }
     }
 
@@ -2228,7 +2233,11 @@ impl Floormaster {
             } else {
                 let reach = flat(actor.pos, ctx.player.pos);
                 if reach < HIO_0B4 && self.kind == 2 {
-                    let aim = bearing(actor.pos, self.nearest);
+                    let aim = if self.nearest.x != 0.0 || self.nearest.z != 0.0 {
+                        bearing(actor.pos, self.nearest)
+                    } else {
+                        bearing(actor.pos, ctx.player.pos)
+                    };
                     if distance_angle_s(actor.angle[1], aim) < NPC_FACE_GATE && reach < HIO_0C4 {
                         self.mode_proc_init(Phase::Throw, actor, ctx.player);
                         return;
@@ -2255,7 +2264,9 @@ impl Floormaster {
                 ctx.se(SE_CM_FM_PULL_IN);
             }
             if self.grab_demo_link {
-                ctx.player.pos = self.grab_pos;
+                walk::chase_f(&mut self.body_offset.x, 0.0, CHASE_STEP);
+                walk::chase_f(&mut self.body_offset.y, 0.0, CHASE_STEP);
+                walk::chase_f(&mut self.body_offset.z, 0.0, CHASE_STEP);
                 if ctx.event_done(EVENT_GRAB) {
                     self.mode_proc_init(Phase::Delete, actor, ctx.player);
                 }
@@ -2310,9 +2321,6 @@ impl Floormaster {
     fn mode_grab_npc_demo(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
         self.grab_pos = self.hand;
         if ctx.running(EVENT_GRAB_NPC) {
-            if self.anm_prm == 12 && self.morph.is_stop() {
-                self.set_anm(12, false);
-            }
             if ctx.event_done(EVENT_GRAB_NPC) {
                 if self.demo_mode {
                     self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
@@ -2583,11 +2591,14 @@ pub fn control(
         hammer_side,
     };
     let mut players = watch.players;
-    let Some(entry) = players.iter_mut().next() else {
+    let mut first = None;
+    for (entity, body) in players.iter_mut() {
+        first = Some((entity, body));
+        break;
+    }
+    let Some((player_entity, mut player)) = first else {
         return;
     };
-    let player_entity = entry.0;
-    let mut player = entry.1;
     let mut spent: Vec<(Entity, i8, u16)> = Vec::new();
     for (entity, actor, boss) in &mut bosses {
         let actor = &mut *actor;

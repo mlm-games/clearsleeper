@@ -1446,7 +1446,7 @@ impl Merchant {
     }
 
     fn started_check(&self, active: &ActiveEvent, index: i16) -> bool {
-        i16::try_from(index).is_ok_and(|value| active.start_check(usize::from(value)))
+        event_slot(index).is_some_and(|value| active.start_check(value))
     }
 
     pub fn event_order(
@@ -1465,21 +1465,29 @@ impl Merchant {
                 }
             }
             ORDER_1ST => {
-                active.order(list, usize::from(self.ev_1st.max(0) as u16), entity);
-                self.bits |= BIT_EVENT_RUN;
+                if let Some(index) = event_slot(self.ev_1st) {
+                    active.order(list, index, entity);
+                    self.bits |= BIT_EVENT_RUN;
+                }
             }
             ORDER_2ND => {
-                active.order(list, usize::from(self.ev_2nd.max(0) as u16), entity);
-                self.bits |= BIT_EVENT_RUN;
+                if let Some(index) = event_slot(self.ev_2nd) {
+                    active.order(list, index, entity);
+                    self.bits |= BIT_EVENT_RUN;
+                }
             }
             ORDER_ITEM => {
-                active.order(list, usize::from(self.ev_item.max(0) as u16), entity);
-                self.bits |= BIT_EVENT_RUN;
+                if let Some(index) = event_slot(self.ev_item) {
+                    active.order(list, index, entity);
+                    self.bits |= BIT_EVENT_RUN;
+                }
             }
             ORDER_MAP => {
-                active.order(list, usize::from(self.ev_map.max(0) as u16), entity);
-                self.bits |= BIT_EVENT_RUN;
-                self.reserve_item = RESERVE_NONE;
+                if let Some(index) = event_slot(self.ev_map) {
+                    active.order(list, index, entity);
+                    self.bits |= BIT_EVENT_RUN;
+                    self.reserve_item = RESERVE_NONE;
+                }
             }
             _ => {}
         }
@@ -1536,7 +1544,7 @@ impl Merchant {
     }
 
     fn ended_check(&self, active: &ActiveEvent, index: i16) -> bool {
-        i16::try_from(index).is_ok_and(|value| active.end_check(usize::from(value)))
+        event_slot(index).is_some_and(|value| active.end_check(value))
     }
 
     pub fn chk_attention(&mut self, pos: Vec3, player: Vec3) {
@@ -1939,6 +1947,10 @@ fn event_index(list: &EventList, name: &str) -> i16 {
     list.event_index(name)
         .and_then(|index| i16::try_from(index).ok())
         .unwrap_or(NO_EVENT)
+}
+
+fn event_slot(index: i16) -> Option<usize> {
+    usize::try_from(index).ok()
 }
 
 fn dis_xz_ang_y(from: Vec3, to: Vec3) -> (f32, i16) {

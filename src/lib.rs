@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
-use bevy_ecs::prelude::{QueryFilter, Without, World};
+use bevy_ecs::prelude::{Without, World};
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;

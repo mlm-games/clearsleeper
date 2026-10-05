@@ -1330,7 +1330,7 @@ pub struct Msg2Stick {
     pub trig_a: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Msg2Se {
     Scroll1,
     TalkWinClose,

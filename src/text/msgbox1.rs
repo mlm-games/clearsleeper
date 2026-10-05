@@ -18,7 +18,7 @@ use super::{
     ICON_SELECT_YOKO_RIGHT, MesgEntry, MsgData, SELECT_OFF, STATUS_BOX_CLOSED,
     STATUS_BOX_CLOSING, STATUS_BOX_OPENING, STATUS_CLOSE_WAIT, STATUS_DEMO, STATUS_INPUT,
     STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_MSG_PREPARING, STATUS_MSG_TYPING, STATUS_SELECT_2, STATUS_SELECT_3, STATUS_SELECT_YOKO,
+    STATUS_PREPARING, STATUS_TYPING, STATUS_SELECT_2, STATUS_SELECT_3, STATUS_SELECT_YOKO,
     STATUS_STOP, STATUS_TACT,
 };
 
@@ -543,7 +543,7 @@ impl Default for Msg1Box {
             msg_no: 0,
             field_0xf0: 0,
             field_0xf4: 0,
-            status: STATUS_MSG_PREPARING,
+            status: STATUS_PREPARING,
             select_num: 0,
             pos: Vec3::ZERO,
 
@@ -2370,14 +2370,14 @@ impl Msg1Box {
             if self.msg_data.dec_wait_timer() == 0 {
                 self.msg_data.auto_send_flag = 0;
                 self.msg_data.field_0x296 = 0;
-                self.status = STATUS_MSG_TYPING;
+                self.status = STATUS_TYPING;
                 self.advance_page(font, len, env);
                 self.send_button(env);
             } else {
                 self.arrow_or_idle(hio, env);
             }
         } else if (stick.trig_a || stick.trig_b) && !env.mesg_bgm {
-            self.status = STATUS_MSG_TYPING;
+            self.status = STATUS_TYPING;
             self.advance_page(font, len, env);
             if self.mesg_entry.draw_type == 0 && stick.trig_b && !env.mesg_bgm {
                 self.short_cut_check();
@@ -2814,7 +2814,7 @@ impl Msg1Box {
             if self.mesg_entry.draw_type == 0 && stick.trig_b && !env.mesg_bgm {
                 self.short_cut_check();
             }
-            self.status = STATUS_MSG_TYPING;
+            self.status = STATUS_TYPING;
         } else {
             self.arrow_or_idle(hio, env);
         }
@@ -2883,7 +2883,7 @@ impl Msg1Box {
         env: &mut Msg1Env,
     ) -> i32 {
         if self.m1100 == MSG1_FRAME_OPEN_TALK {
-            self.status = STATUS_MSG_TYPING;
+            self.status = STATUS_TYPING;
             self.message_pane_show();
             self.yose_select(font, len);
             if self.mesg_entry.initial_sound != 0 {
@@ -2904,7 +2904,7 @@ impl Msg1Box {
         env: &mut Msg1Env,
     ) -> i32 {
         if self.m1100 == MSG1_FRAME_OPEN_ITEM {
-            self.status = STATUS_MSG_TYPING;
+            self.status = STATUS_TYPING;
             self.message_pane_show();
             self.yose_select(font, len);
             if self.mesg_entry.initial_sound != 0 {
@@ -2978,7 +2978,7 @@ impl Msg1Box {
         len: &MsgLenState<'_>,
         env: &mut Msg1Env,
     ) -> i32 {
-        self.status = STATUS_MSG_TYPING;
+        self.status = STATUS_TYPING;
         self.yose_select(font, len);
         if self.mesg_entry.initial_sound != 0 {
             env.se = Some(Msg1Se::Message(self.mesg_entry.initial_sound));
@@ -3189,10 +3189,10 @@ impl Msg1Box {
         }
 
         match self.status {
-            STATUS_MSG_PREPARING => {
+            STATUS_PREPARING => {
                 self.init_proc(clt1, &hio, env);
             }
-            STATUS_MSG_TYPING => {
+            STATUS_TYPING => {
                 self.outnow_proc(fonts, &layout, &hio, env, &stick);
             }
             STATUS_STOP => {
@@ -3479,7 +3479,7 @@ impl Msg1Box {
             }
         }
 
-        self.status = STATUS_MSG_PREPARING;
+        self.status = STATUS_PREPARING;
         self.m1164 = u32::MAX;
         self.value_init();
         self.set_string();

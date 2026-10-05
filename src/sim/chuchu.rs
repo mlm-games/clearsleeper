@@ -98,7 +98,7 @@ const LEASH_MIN: f32 = 100.0;
 const LEASH_NEAR: f32 = 100.0;
 const LEASH_GATE: f32 = 0.1;
 const LEASH_TURN_GATE: u16 = 0x100;
-const LEASH_JITTER: f32 = 0x4000.0;
+const LEASH_JITTER: f32 = 16384.0;
 const TURN_NEAR: f32 = 40.0;
 const WANDER_BAND: f32 = 7.0 * 0x500;
 

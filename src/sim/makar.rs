@@ -321,7 +321,7 @@ pub const ORDER_TALK_ITEM: i16 = 7;
 pub const NO_STAFF: usize = usize::MAX;
 pub const NO_INDEX: i16 = -1;
 
-pub const DEG2S: f32 = 0x8000.0 / 180.0;
+pub const DEG2S: f32 = 32768.0 / 180.0;
 pub const NO_GROUND: f32 = -1.0e7;
 pub const IS_ZERO: f32 = 8e-11;
 pub const SQUARE_400: f32 = 400.0 * 400.0;
@@ -974,7 +974,7 @@ fn distance_angle_s(x: i16, y: i16) -> u16 {
     x.wrapping_sub(y).unsigned_abs()
 }
 
-fn walk::chase_s(value: &mut i16, target: i16, step: i16) -> bool {
+fn chase_s(value: &mut i16, target: i16, step: i16) -> bool {
     walk::chase_angle_s(value, target, step)
 }
 

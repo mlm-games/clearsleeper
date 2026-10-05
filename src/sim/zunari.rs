@@ -22,7 +22,7 @@ use crate::text::msgproc::{
 };
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
-    STATUS_MSG_ENDS, STATUS_MSG_PREPARING,
+    STATUS_MSG_ENDS, STATUS_PREPARING,
 };
 
 pub const ZUNARI_ACTOR: &str = "Rsh1";
@@ -1249,7 +1249,7 @@ impl Zunari {
             }
         } else if status == STATUS_BOX_CLOSED {
             ctx.text.set_status(STATUS_MSG_DESTROYED);
-        } else if status == STATUS_MSG_PREPARING {
+        } else if status == STATUS_PREPARING {
             ctx.text.flags.demo_msg_flag_on();
         }
         if ctx.send_button {
@@ -1277,7 +1277,7 @@ impl Zunari {
         } else if status == STATUS_BOX_CLOSED {
             ctx.text.set_status(STATUS_MSG_DESTROYED);
             self.shop_selected = -1;
-        } else if status == STATUS_MSG_PREPARING {
+        } else if status == STATUS_PREPARING {
             ctx.text.flags.demo_msg_flag_on();
         }
         status
