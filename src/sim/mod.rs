@@ -108,6 +108,7 @@ pub mod movebox;
 pub mod msdan2;
 pub mod msg;
 pub mod nh;
+pub mod obj_akabe;
 pub mod objtime;
 pub mod npc_bmsw;
 pub mod npc_btsw;
@@ -354,6 +355,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if obj_akabe::is_akabe(&source.name) {
+        obj_akabe::spawn(world, source)
     } else if gy_ctrl::is_gy_ctrl(&source.name) {
         gy_ctrl::spawn(world, source)
     } else if salvage::is_salvage(&source.name) {
@@ -966,6 +969,7 @@ pub fn build(
                     tag_msg::control.in_set(WwSimSet::Execute),
                     salvage::control.in_set(WwSimSet::Execute),
                     gy_ctrl::control.in_set(WwSimSet::Execute),
+                    obj_akabe::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
