@@ -270,7 +270,7 @@ pub fn control(
     mut flowers: Query<(&mut Actor, &mut Kita)>,
 ) {
     let solid = collision.as_deref();
-    for (actor, mut flower) in &mut flowers {
+    for (mut actor, mut flower) in &mut flowers {
         let actor = &mut *actor;
         let flower = &mut *flower;
         if !flower.placed {

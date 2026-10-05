@@ -632,7 +632,7 @@ pub fn control(
     let solid = collision.as_deref();
     let player = players.iter().next().copied();
     let booted = equipped.item(BOOTS_SLOT) == ITEM_IRON_BOOTS;
-    for (entity, actor, mask) in &mut masks {
+    for (entity, mut actor, mut mask) in &mut masks {
         let actor = &mut *actor;
         let mask = &mut *mask;
         if !mask.entered {

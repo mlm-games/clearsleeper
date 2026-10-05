@@ -5081,7 +5081,7 @@ pub fn control(
     let archive: Option<&dyn MsgArchive> = archive
         .as_deref()
         .map(|value| value as &dyn MsgArchive);
-    for (entity, actor, medli) in &mut actors {
+    for (entity, mut actor, mut medli) in &mut actors {
         let actor = &mut *actor;
         let medli = &mut *medli;
         let press = do_intent.0 && !medli.do_held;
@@ -5151,11 +5151,11 @@ pub fn control(
             room_drawn: true,
             cancel_button: target.0,
             staff_cut,
-            stories: &mut *stories,
-            switches: &mut *switches,
-            events: &mut *events,
+            mut stories: &mut *stories,
+            mut switches: &mut *switches,
+            mut events: &mut *events,
             list: &*list,
-            active: &mut *active,
+            mut active: &mut *active,
             text: &mut text,
             give_item: None,
             goto_sea: false,

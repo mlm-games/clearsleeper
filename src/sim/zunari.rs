@@ -1733,8 +1733,8 @@ pub struct Msg<'w, 's> {
 }
 
 pub fn control(
-    world: World,
-    msg: Msg,
+    mut world: World,
+    mut msg: Msg,
     mut actors: Query<(Entity, &mut Actor, &mut Zunari)>,
     mut commands: Commands,
 ) {
@@ -1742,7 +1742,7 @@ pub fn control(
     let b_button = world.target.0;
     let do_pressed = world.do_intent.0;
     let clear_count = msg.text_flags.clear_count;
-    for (entity, actor, zunari) in &mut actors {
+    for (entity, mut actor, mut zunari) in &mut actors {
         let actor = &mut *actor;
         let zunari = &mut *zunari;
         let pressed = do_pressed && !zunari.do_held;

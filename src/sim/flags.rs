@@ -514,7 +514,7 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     list: Res<EventList>,
     players: Query<&Player>,
-    tags: Query<(Entity, &Actor, &mut TagEvent)>,
+    mut tags: Query<(Entity, &Actor, &mut TagEvent)>,
     forced: Query<(Entity, &SwitchOn)>,
     mut posts: Query<(Entity, &LetterMsg, &mut super::talk::Talk)>,
     mut commands: Commands,

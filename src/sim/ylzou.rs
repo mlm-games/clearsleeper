@@ -286,7 +286,7 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut statues: Query<(Entity, &mut Actor, &mut Ylzou)>,
 ) {
-    for (entity, actor, statue) in &mut statues {
+    for (entity, mut actor, mut statue) in &mut statues {
         let actor = &mut *actor;
         let statue = &mut *statue;
         if statue.step == STEP_UNSET {

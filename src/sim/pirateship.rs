@@ -83,7 +83,7 @@ pub fn control(
     mut guns: Query<(&mut Actor, &Catapult), Without<Pirate>>,
     mut commands: Commands,
 ) {
-    for (entity, actor, pirate) in &mut ships {
+    for (entity, actor, mut pirate) in &mut ships {
         if pirate.catapult.is_none() && pirate.kind != KIND_ARRIVAL {
             let child = Actor {
                 name: TOUSEKI_ACTOR.to_owned(),
@@ -95,7 +95,7 @@ pub fn control(
             };
             pirate.catapult = Some(commands.spawn((child, Catapult { ship: entity })).id());
         }
-        for (mount, gun) in &mut guns {
+        for (mut mount, gun) in &mut guns {
             if gun.ship != entity {
                 continue;
             }

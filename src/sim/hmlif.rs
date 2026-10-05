@@ -277,6 +277,6 @@ pub fn control(
     mut lifts: Query<(&mut Actor, &mut Hmlif)>,
 ) {
     for (actor, mut lift) in &mut lifts {
-        lift.execute(&mut *actor, &arrows, &mut switches, &mut events);
+        lift.execute(&mut *mut actor, &arrows, &mut switches, &mut events);
     }
 }

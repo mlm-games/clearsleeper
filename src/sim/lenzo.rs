@@ -2011,7 +2011,7 @@ pub fn control(
     let pressed = do_intent.0;
     let running = info.event_run_check();
 
-    for (entity, actor, lenz) in &mut lenses {
+    for (entity, mut actor, mut lenz) in &mut lenses {
         let actor = &mut *actor;
         let lenz = &mut *lenz;
         if !lenz.entered {

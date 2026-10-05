@@ -96,7 +96,7 @@ pub fn control(
     let Some(player) = players.iter().next() else {
         return;
     };
-    for (actor, mut tingle) in &mut actors {
+    for (mut actor, mut tingle) in &mut actors {
         let dx = player.pos.x - actor.pos.x;
         let dz = player.pos.z - actor.pos.z;
         tingle.distance = (dx * dx + dz * dz).sqrt();

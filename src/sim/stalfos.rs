@@ -1911,7 +1911,7 @@ pub fn control(
     };
     let finisher = matches!(combat.kind, CutKind::EA | CutKind::EB);
     let mut gone: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, st, hp) in &mut stalfoses {
+    for (entity, mut actor, mut st, mut hp) in &mut stalfoses {
         let actor = &mut *actor;
         let st = &mut *st;
         if !st.placed {

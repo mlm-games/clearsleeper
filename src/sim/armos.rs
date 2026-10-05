@@ -1649,7 +1649,7 @@ pub fn control(
         turn: watch.hammer.kind == hammer::CUT_HAMMER_SIDESWING,
     };
     let mut spent: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, statue) in &mut statues {
+    for (entity, mut actor, mut statue) in &mut statues {
         let actor = &mut *actor;
         let statue = &mut *statue;
         if !statue.entered {

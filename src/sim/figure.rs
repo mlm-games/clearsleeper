@@ -698,7 +698,7 @@ pub fn control(
     mut figures: Query<(&Actor, &mut Figure), Without<Player>>,
 ) {
     let player = players.iter().next().copied();
-    for (actor, figure) in &mut figures {
+    for (actor, mut figure) in &mut figures {
         if !figure.entered {
             figure.entered = true;
             figure.ctor(actor, &regs);

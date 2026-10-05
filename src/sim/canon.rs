@@ -398,7 +398,7 @@ pub fn control(
 ) {
     let published: Vec<Vec3> = blasts.list.clone();
     let spins: Vec<Vec3> = booms.iter().map(|boom| boom.pos).collect();
-    for (actor, canon) in &mut canons {
+    for (actor, mut canon) in &mut canons {
         canon.execute(
             actor.pos,
             actor.angle,

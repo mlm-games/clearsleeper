@@ -295,6 +295,14 @@ const AT_BOOMERANG: u8 = 10;
 const AT_HELMAROC: u8 = 11;
 const AT_OTHER: u8 = 12;
 const LANCE_POWER_MAX: i32 = 2;
+const REACH_SWORD: f32 = 20.0;
+const REACH_ARROW: f32 = 35.0;
+const REACH_BOOMERANG: f32 = 90.0;
+const REACH_HAMMER: f32 = 50.0;
+const REACH_HOOKSHOT: f32 = 5.0;
+const REACH_BOMB: f32 = 150.0;
+const REACH_TSUBO: f32 = 30.0;
+const PLAYER_BODY_RADIUS: f32 = 20.0;
 
 const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -694,6 +702,19 @@ impl At {
         }
     }
 
+    fn reach(self) -> f32 {
+        match self {
+            Self::Sword => REACH_SWORD,
+            Self::Arrow | Self::FireArrow | Self::IceArrow | Self::LightArrow => REACH_ARROW,
+            Self::Boomerang => REACH_BOOMERANG,
+            Self::Hammer => REACH_HAMMER,
+            Self::Hookshot => REACH_HOOKSHOT,
+            Self::Bomb => REACH_BOMB,
+            Self::Tsubo | Self::TsuboJug => REACH_TSUBO,
+            _ => 0.0,
+        }
+    }
+
     fn at_se(self) -> u32 {
         match self {
             Self::Hammer => SE_LK_HAMMER_HIT,
@@ -830,9 +851,10 @@ fn timer8(value: &mut u8) -> bool {
 pub struct Env<'a> {
     pub player_pos: Vec3,
     pub player_angle: i16,
+    pub player_hover: bool,
     pub solid: Option<&'a Collision>,
     pub blow: Blow,
-    pub peck: Option<Vec3>,
+    pub peck: Option<(Entity, Vec3)>,
 }
 
 impl Env<'_> {
@@ -867,6 +889,13 @@ impl Env<'_> {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Orders {
+    pub purge_mobs: bool,
+    pub purge_shards: bool,
+    pub peck_broken: bool,
+}
+
 pub struct Sink<'a> {
     pub events: &'a mut SimEvents,
     pub switches: &'a mut Switches,
@@ -874,7 +903,8 @@ pub struct Sink<'a> {
     pub flags: &'a mut EventFlags,
     pub zones: &'a mut ZoneActors,
     pub health: &'a mut Health,
-    pub drop: &'a mut Vec<Entity>,
+    pub orders: &'a mut Orders,
+    pub drop: &'a mut Vec<(Entity, i8, u16)>,
 }
 
 impl Sink<'_> {
@@ -890,9 +920,21 @@ impl Sink<'_> {
         self.events.list.push(SimEvent::Bgm(0));
     }
 
+    fn clear_mobs(&mut self) {
+        self.orders.purge_mobs = true;
+    }
+
+    fn purge_shards(&mut self) {
+        self.orders.purge_shards = true;
+    }
+
+    fn break_peck(&mut self) {
+        self.orders.peck_broken = true;
+    }
+
     fn kill(&mut self, entity: Entity, room: i8, set_id: u16) {
         self.zones.mark_done(room, set_id);
-        self.drop.push(entity);
+        self.drop.push((entity, room, set_id));
     }
 }
 
@@ -977,12 +1019,23 @@ pub struct Helmaroc {
     pub beak_sway_calc: f32,
     pub head_prev: Vec3,
     pub head: Vec3,
+    pub head_radius: f32,
     pub beak: Vec3,
+    pub beak_radius: f32,
+    pub tosaka: Vec3,
+    pub tosaka_radius: f32,
     pub body: Vec3,
+    pub body_radius: f32,
     pub foot: [Vec3; FOOT_COUNT],
+    pub foot_radius: [f32; FOOT_COUNT],
+    pub foot_at: [bool; FOOT_COUNT],
+    pub foot_tg: [bool; FOOT_COUNT],
+    pub foot_split: [bool; FOOT_COUNT],
     pub wind_active: [u8; WIND_COUNT],
     pub wind_pos: [Vec3; WIND_COUNT],
     pub wind_move: [Vec3; WIND_COUNT],
+    pub wind_radius: [f32; WIND_COUNT],
+    pub wind_anchor: Vec3,
     pub piece_live: [i8; PIECE_COUNT],
     pub piece_pos: [Vec3; PIECE_COUNT],
     pub piece_prev: [Vec3; PIECE_COUNT],
@@ -1096,12 +1149,23 @@ impl Helmaroc {
             beak_sway_calc: 0.0,
             head_prev: Vec3::ZERO,
             head: Vec3::ZERO,
+            head_radius: HEAD_RADIUS_MASKED,
             beak: Vec3::ZERO,
+            beak_radius: BEAK_RADIUS,
+            tosaka: Vec3::ZERO,
+            tosaka_radius: TOSAKA_RADIUS,
             body: Vec3::ZERO,
+            body_radius: BODY_RADIUS,
             foot: [Vec3::ZERO; FOOT_COUNT],
+            foot_radius: [FOOT_RADIUS; FOOT_COUNT],
+            foot_at: [false; FOOT_COUNT],
+            foot_tg: [true; FOOT_COUNT],
+            foot_split: [false; FOOT_COUNT],
             wind_active: [0; WIND_COUNT],
             wind_pos: [Vec3::ZERO; WIND_COUNT],
             wind_move: [Vec3::ZERO; WIND_COUNT],
+            wind_radius: [WIND_RADIUS; WIND_COUNT],
+            wind_anchor: Vec3::ZERO,
             piece_live: [0; PIECE_COUNT],
             piece_pos: [Vec3::ZERO; PIECE_COUNT],
             piece_prev: [Vec3::ZERO; PIECE_COUNT],
@@ -2050,5 +2114,773 @@ impl Helmaroc {
         }
         if glide {
             out.se(SE_CM_DK_GLIDING);
+        }
+    }
+
+    fn wind_attack(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        let mut arm = self.state;
+        let mut done = false;
+        loop {
+            match arm {
+                0 => {
+                    self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
+                    self.rise_smoke = 0x19;
+                    self.state += 1;
+                    self.target = actor.pos;
+                    self.turn_step = 0.0;
+                    arm = 1;
+                }
+                1 => {
+                    if self.morph.frame == f32::from(23) {
+                        self.state = 2;
+                        self.target.y += 500.0;
+                    }
+                    break;
+                }
+                2 => {
+                    if self.morph.is_stop() {
+                        self.anm_init(BCK_FLY2, 5.0, EMODE_LOOP, 2.0, 0xC, 0);
+                        self.state = 3;
+                        self.timers[0] = 200;
+                    }
+                    break;
+                }
+                3 => {
+                    self.wind_set(actor, env, out, actor.pos);
+                    if self.frame_count & 1 == 0 {
+                        let mut offset = self.body;
+                        offset.x += self.rnd_fx(300.0);
+                        offset.y -= self.rnd_f(200.0);
+                        offset.z += self.rnd_fx(300.0);
+                        self.eff_hane_set(offset, 1, 1);
+                    }
+                    add_calc2(&mut self.wind_power, 1.0, 1.0, 0.05);
+                    add_calc2(&mut self.turn_step, 1.0, 1.0, 0.05);
+                    if self.timers[0] == 0 || self.hit_stop != 0 {
+                        self.action = Action::Landing;
+                        self.state = 3;
+                        self.target = env.player_pos;
+                        self.speed.y = -20.0;
+                        done = true;
+                        break;
+                    }
+                    break;
+                }
+                _ => break,
+            }
+        }
+        if done {
+            return;
+        }
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_Y],
+            env.player_bearing(actor.pos),
+            TURN_DIV_FACE,
+            TURN_CAP as i16,
+        );
+        let sway_y = sin_s(self.frame_count.wrapping_mul(1500) as i16);
+        let sway_x = sin_s(self.frame_count.wrapping_mul(700) as i16);
+        let sway_z = sin_s(self.frame_count.wrapping_mul(500) as i16);
+        add_calc2(
+            &mut actor.pos.y,
+            self.target.y + sway_y * self.turn_step * 100.0,
+            0.1,
+            60.0,
+        );
+        add_calc2(
+            &mut actor.pos.x,
+            self.target.x + sway_x * self.turn_step * 200.0,
+            0.1,
+            40.0,
+        );
+        add_calc2(
+            &mut actor.pos.z,
+            self.target.z + sway_z * self.turn_step * 200.0,
+            0.1,
+            40.0,
+        );
+    }
+
+    fn end_set(&mut self, actor: &Actor, out: &mut Sink<'_>) {
+        self.action = Action::End;
+        self.effects[EFF_ROCK].kind = 0;
+        if actor.pos.y < 9810.0 {
+            if self.body.y < 10000.0 {
+                self.state = 0;
+            } else {
+                self.state = 1;
+            }
+        } else {
+            self.state = 2;
+            self.flown_high = 1;
+        }
+        self.demo_count = 100;
+        out.stop_bgm();
+    }
+
+    fn damage_check(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        if self.hit_stop != 0 || !self.at_pending(env) {
+            return;
+        }
+        let reach = env.blow.at.reach();
+        let mut hit: u8 = HIT_NONE;
+        if self.mask_damage < 4 {
+            if touches(self.head.pos, self.head_radius, env.player_pos, reach) {
+                hit = HIT_HEAD;
+            }
+        } else if touches(self.tosaka, self.tosaka_radius, env.player_pos, reach) {
+            hit = HIT_TOSAKA;
+        }
+        if hit == HIT_NONE {
+            return;
+        }
+        let result = env.blow.at.result();
+        if hit == HIT_HEAD {
+            self.hit_stop = 0xC;
+            if result == AT_HAMMER && self.head.pos.y < 10000.0 {
+                self.health = HAMMER_HEALTH;
+                out.se(SE_LK_HAMMER_HIT);
+                if self.battle_mode == 1 {
+                    self.action = Action::TDown;
+                    self.state = 0;
+                    self.mask_timer = REG6_S3 + 10;
+                    self.hit_stop = 0x1E;
+                    out.se(SE_CV_DK_LAST_DAMAGE);
+                    out.stop_bgm();
+                } else {
+                    out.stories.set(EVENT_BIT_LAST_DAMAGE);
+                    self.mask_damage += 1;
+                    if self.mask_damage == 4 {
+                        self.mask_damage = 3;
+                        self.action = Action::KamenDemo;
+                        self.state = 0;
+                        out.se(SE_CM_DK_BREAK_MASK);
+                    } else {
+                        self.mask_timer = REG6_S3 + 10;
+                        self.timers[2] = 0xF;
+                        self.hit_stop = 0x1E;
+                    }
+                }
+                self.beak_timer = 0;
+            } else {
+                out.se(env.blow.at.at_se());
+            }
+        } else {
+            self.hit_stop = 6;
+            out.se(SE_CV_DK_DAMAGE);
+            self.beak_timer = REG0_S5 + 0x1E;
+            self.beak_aim = bearing(env.player_pos, actor.eye);
+            let mut flinched = false;
+            if self.action == Action::KutiAttack && self.body.y < 10000.0 {
+                self.anm_init(BCK_DAMAGE1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                self.state = 10;
+                self.beat_count += 1;
+                if i32::from(self.beat_count) >= 6 {
+                    self.timers[2] = 10;
+                    self.hit_stop = 0x14;
+                }
+                flinched = true;
+            } else if self.ground_hit != 0 {
+                if self.action == Action::KutiAttack {
+                    self.action = Action::Wait;
+                    self.anm_init(BCK_WAIT1, 10.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                    self.state = 1;
+                    self.timers[0] = self.rnd_f(30.0) as i16 + 30;
+                    self.timers[1] = self.timers[0];
+                    self.fly_ca = 0;
+                }
+                self.anm_init(BCK_DAMAGE3, 2.0, EMODE_NONE, 1.0, BAS_NONE, 1);
+                flinched = true;
+            } else {
+                self.anm_init(BCK_DAMAGE2, 2.0, EMODE_NONE, 1.0, 0x9, 1);
+                flinched = true;
+            }
+            let power = env.blow.at.power(env.blow.blade, env.blow.soup);
+            self.health -= power;
+            if self.health <= 0 {
+                out.se(SE_LK_LAST_HIT);
+                out.se(SE_CV_DK_LAST_DAMAGE);
+                self.end_set(actor, out);
+            } else {
+                out.se(env.blow.at.at_se());
+                let _ = flinched;
+            }
+        }
+    }
+
+    fn at_pending(&self, env: &Env<'_>) -> bool {
+        !matches!(env.blow.at, At::Idle)
+    }
+
+    fn kamen_demo(&mut self, actor: &Actor, out: &mut Sink<'_>) {
+        self.beak_amp = 0;
+        match self.state {
+            0 => {
+                self.anm_init(BCK_NUKENAI1, 0.0, EMODE_NONE, 0.0, BAS_NONE, 0);
+                self.state = 1;
+                self.demo_count = 1;
+            }
+            1 => {
+                self.beak_sway = 0;
+                self.beak_aim = 0;
+                self.fov = 45.0;
+                for index in 0..PIECE_COUNT {
+                    self.piece_live[index] = 1;
+                    self.piece_pos[index] =
+                        turned(actor.shape_angle[ANGLE_Y], JOINT_ATAMA1);
+                    self.piece_rot[index][1] = actor.shape_angle[ANGLE_Y];
+                    self.piece_rot[index][0] = REG0_S6 + 0x3625;
+                    self.piece_rot[index][2] = 0;
+                    let scale = 1.0 + REG0_F7;
+                    let away = turned(
+                        self.piece_rot[index][1],
+                        [
+                            -KAMEN_BREAK_OFF_X[index],
+                            0.01 * REG0_F15 + (55.0 - KAMEN_BREAK_OFF_Y[index]),
+                            0.01 * REG0_F16 + (110.0 - KAMEN_BREAK_OFF_Z[index]),
+                        ],
+                    );
+                    self.piece_pos[index] += away;
+                    self.piece_prev[index] = self.piece_pos[index];
+                    self.piece_move[index] = turned(
+                        self.piece_rot[index][1],
+                        [
+                            scale * KAMEN_BREAK_SD_X[index],
+                            0.0,
+                            scale * KAMEN_BREAK_SD_Z[index],
+                        ],
+                    );
+                    self.piece_hold[index] = KAMEN_BREAK_TIME[index];
+                }
+                self.state = 2;
+            }
+            2 => {
+                if self.demo_sub > REG0_S8 + 0x2D {
+                    self.beak_amp = 500;
+                    self.beak_free = 1;
+                }
+                if self.demo_sub >= 0x6E && REG8_S8 == 0 {
+                    self.demo_count = 150;
+                    self.action = Action::KutiAttack;
+                    self.anm_init(BCK_NUKENAI1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                    self.state = 5;
+                    self.timers[0] = self.rnd_f(120.0) as i16 + 30;
+                    out.bgm(BGM_UNK_110);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn start(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        match self.state {
+            0 => {
+                if env.player_pos.y >= 9800.0 && !env.player_hover {
+                    if self.timers[0] == 0 {
+                        self.state = 1;
+                        self.demo_state = 10;
+                        self.demo_count = 0;
+                        self.demo_sub = 0;
+                        out.clear_mobs();
+                    }
+                } else {
+                    self.timers[0] = 0x14;
+                }
+                self.timers[0] = 0x1E;
+            }
+            1 => {
+                if self.demo_flag != 0 {
+                    self.demo_flag = 0;
+                    self.state = 2;
+                    self.tail_hold = REG0_S6 + 0x19;
+                    actor.pos.y = REG0_F10 + 8500.0;
+                    self.speed.y = REG0_F12 + 80.0;
+                    self.anm_init(BCK_S_DEMO1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                    out.se(SE_CM_DK_ROUND_UP);
+                }
+            }
+            2 => {
+                actor.pos.y += self.speed.y;
+                self.speed.y -= REG0_F13 + 1.0;
+                actor.angle[ANGLE_Y] = actor.angle[ANGLE_Y].wrapping_add(0x1300);
+                if self.demo_flag != 0 {
+                    self.demo_flag = 0;
+                    self.state = 3;
+                    self.anm_init(BCK_S_DEMO2, 5.0, EMODE_NONE, 1.0, 0x15, 0);
+                    self.timers[0] = 0x2D;
+                }
+            }
+            3 => {
+                if self.timers[0] != 0 {
+                    actor.pos.y += self.speed.y;
+                    self.speed.y -= REG0_F13 + 1.0;
+                }
+                if self.timers[0] == REG8_S8 + 5 {
+                    out.se(SE_CV_DK_ENTER);
+                }
+                add_calc_angle_s2(
+                    &mut actor.angle[ANGLE_Y],
+                    env.player_bearing(actor.pos),
+                    10,
+                    0x1300,
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn end(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
+        self.beak_amp = 4000;
+        self.hit_stop = 10;
+        let mut groan = false;
+        let mut arm = self.state;
+        loop {
+            match arm {
+                0 => {
+                    self.anm_init(BCK_LAST_DAMAGE1, 2.0, EMODE_NONE, 1.0, 0x10, 0);
+                    self.state = 5;
+                    self.timers[0] = 0xB3;
+                    break;
+                }
+                1 => {
+                    self.anm_init(BCK_LAST_DAMAGE3, 2.0, EMODE_NONE, 1.0, 0x12, 0);
+                    self.state = 5;
+                    self.timers[0] = 0xB3;
+                    break;
+                }
+                2 => {
+                    self.anm_init(BCK_LAST_DAMAGE2, 2.0, EMODE_NONE, 1.0, 0x11, 0);
+                    self.state = 5;
+                    self.timers[0] = 0;
+                    break;
+                }
+                5 => {
+                    if self.morph.is_stop() {
+                        self.state = 6;
+                        self.anm_init(BCK_DEATH1, 2.0, EMODE_LOOP, 1.0, 0xA, 0);
+                        self.timers[0] = REG6_S3 + 300;
+                        groan = true;
+                        arm = 6;
+                    } else {
+                        if self.timers[0] == 0 {
+                            add_calc2(&mut actor.pos.y, 10800.0, 0.1, 50.0);
+                            groan = true;
+                        }
+                        break;
+                    }
+                }
+                6 => {
+                    groan = true;
+                    if self.timers[0] == 0xAA {
+                        self.demo_count = 0x6E;
+                    }
+                    add_calc2(&mut actor.pos.x, AREA_X, 0.05, 50.0);
+                    add_calc2(&mut actor.pos.y, REG8_F18 + 15800.0, 0.1, REG8_F19 + 20.0);
+                    add_calc2(&mut actor.pos.z, AREA_Z, 0.05, 50.0);
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_Y], -8000, 0x10, 0x80);
+                    if self.timers[0] == 0x3C {
+                        out.se(SE_CV_DK_DIE);
+                        self.anm_init(BCK_DEATH2, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                    }
+                    if self.timers[0] == 0 && REG6_S4 == 0 {
+                        self.state = 7;
+                        for index in 0..PIECE_COUNT {
+                            self.piece_live[index] = 0;
+                        }
+                        out.purge_shards();
+                        self.target = actor.pos;
+                        self.target.y += 200.0;
+                        actor.angle[ANGLE_Y] = 0x4000;
+                        out.se(SE_CM_DK_DIE_EXPLODE);
+                        self.timers[0] = 0x1E;
+                    }
+                    break;
+                }
+                7 => {
+                    actor.pos.x = 100000.0;
+                    actor.pos.y = 100000.0;
+                    if self.timers[0] == 0 {
+                        self.demo_count += 1;
+                        self.state = 8;
+                    }
+                    break;
+                }
+                8 => break,
+                _ => break,
+            }
+        }
+        if groan && self.timers[4] == 0 {
+            self.timers[4] = self.rnd_f(30.0) as i16 + 25;
+            out.se(SE_CV_DK_MODAE);
+        }
+        add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
+        add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
+    }
+
+    fn t_fly(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        self.track_player = true;
+        let mut dy = 0.0;
+        let mut dz = -500.0;
+        let mut step = 20.0;
+        if self.frame_count == 100 {
+            out.switches.set(SWITCH_TOGE);
+        }
+        match self.state {
+            -10 => {
+                self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
+                self.state += 1;
+            }
+            -9 => {
+                if self.morph.is_stop() {
+                    self.state = 0;
+                }
+            }
+            0 => {
+                self.anm_init(BCK_FLY2, 5.0, EMODE_LOOP, 1.0, 0xC, 0);
+                self.state += 1;
+            }
+            1 => {
+                if let Some((entity, peck)) = env.peck {
+                    self.target = peck;
+                    self.anm_init(BCK_ATTACK_T1, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                    self.state += 1;
+                    out.se(SE_CV_DK_ATTACK);
+                    self.peck_obj = Some(entity);
+                } else {
+                    self.target = env.player_pos;
+                    if self.timers[0] == 0 {
+                        self.anm_init(BCK_ATTACK_T2, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                        self.state = 10;
+                        out.se(SE_CV_DK_ATTACK);
+                        out.se(SE_CM_DK_FOOT_ATTACK);
+                        self.timers[0] = HIO_M028;
+                    }
+                }
+            }
+            2 => {
+                let frame = self.frame_i();
+                if i32::from(REG0_S3 + 0x2B) <= frame && frame <= i32::from(REG0_S4 + 0x32) {
+                    self.wind_set(actor, env, out, actor.pos);
+                    self.at_mode = 1;
+                    dz = REG8_F8 + 150.0;
+                    step = 300.0;
+                    if self.peck_obj.is_some() && self.frame_i() == 0x30 {
+                        self.peck_obj = None;
+                        out.break_peck();
+                        out.se(SE_CM_DK_PECK);
+                    }
+                }
+                if self.morph.is_stop() {
+                    self.state = 0;
+                    self.turn_step = 0.0;
+                }
+            }
+            10 => {
+                let frame = self.frame_i();
+                if i32::from(REG0_S3 + 0x17) <= frame && frame <= i32::from(REG0_S4 + 0x32) {
+                    self.wind_set(actor, env, out, actor.pos);
+                    dy = REG8_F9 - 50.0;
+                    dz = REG8_F10 + 250.0;
+                    step = 300.0;
+                    if frame <= i32::from(REG0_S5 + 0x23) {
+                        self.at_mode = 2;
+                    }
+                }
+                if touches(self.foot[0], self.foot_radius[0], env.player_pos, PLAYER_BODY_RADIUS)
+                    || touches(self.foot[1], self.foot_radius[1], env.player_pos, PLAYER_BODY_RADIUS)
+                {
+                    out.se(SE_CM_DK_FOOT_ATK_COL);
+                }
+                if self.morph.is_stop() {
+                    self.state = 0;
+                    self.turn_step = 0.0;
+                }
+            }
+            _ => {}
+        }
+        let pos = self.target - Vec3::new(AREA_X, AREA_Y, AREA_Z);
+        let angle = bearing(Vec3::ZERO, pos);
+        add_calc_angle_s2(&mut actor.angle[ANGLE_Y], angle, 10, 0x800);
+        let dist = turned(angle, [0.0, dy, dz - 450.0]);
+        add_calc2(
+            &mut actor.pos.x,
+            self.target.x + dist.x,
+            0.2,
+            step * self.turn_step,
+        );
+        if self.speed.y > 0.0 {
+            actor.pos.y += self.speed.y;
+            self.speed.y -= 5.0;
+        } else {
+            add_calc2(
+                &mut actor.pos.y,
+                self.target.y + dist.y,
+                0.2,
+                step * self.turn_step,
+            );
+        }
+        add_calc2(
+            &mut actor.pos.z,
+            self.target.z + dist.z,
+            0.2,
+            step * self.turn_step,
+        );
+        add_calc2(&mut self.turn_step, 1.0, 1.0, 0.02);
+        if env.player_pos.y > REG0_F3 + 9300.0 - 50.0 {
+            self.action = Action::TLastAttack;
+            self.state = 0;
+        }
+    }
+
+    fn t_landing(&mut self, actor: &mut Actor) {
+        self.track_player = true;
+        if self.state == 0 {
+            self.anm_init(BCK_TOBITATU_T1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+            self.state += 1;
+        }
+        self.pos_move(actor);
+    }
+
+    fn t_lastattack(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        let goal_z = REG0_F9 * 0.01 + (-3872.0);
+        let goal_y = REG0_F8 * 0.01 + 9579.0;
+        self.target.x = REG0_F7 * 0.01 + 2825.0 - 40.0;
+        self.target.y = goal_y;
+        self.target.z = goal_z;
+        add_calc2(&mut actor.pos.x, self.target.x, 0.5, 30.0);
+        add_calc2(&mut actor.pos.z, self.target.z, 0.5, 30.0);
+        actor.pos.y += self.speed.y;
+        self.speed.y -= 5.0;
+        let mut falling = false;
+        if actor.pos.y <= self.target.y {
+            actor.pos.y = self.target.y;
+            self.speed.y = -1.0;
+            falling = true;
+        }
+        let mut angle = env.player_bearing(actor.pos).wrapping_sub(0x8000);
+        if angle < -0xEB8 {
+            angle = -0xEB8;
+        } else if 0xE8 < angle {
+            angle = 0xE8;
+        }
+        add_calc_angle_s2(
+            &mut actor.angle[ANGLE_Y],
+            angle.wrapping_add(0x8000),
+            TURN_DIV_WALK,
+            TURN_CAP as i16,
+        );
+        match self.state {
+            0 => {
+                self.speed.y = REG0_F6 + 80.0;
+                self.state += 1;
+                self.anm_init(BCK_TYAKUTI_T1, 10.0, EMODE_NONE, 0.001, 0x18, 0);
+            }
+            1 => {
+                if falling {
+                    self.anm_init(BCK_TYAKUTI_T1, 1.0, EMODE_NONE, 1.0, 0x18, 0);
+                    self.state += 1;
+                    out.se(SE_CM_DK_PECK);
+                    self.eff_hane_set(self.body, 5, 0);
+                }
+            }
+            2 => {
+                if self.morph.is_stop() {
+                    self.anm_init(BCK_WAIT_T1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                    self.state += 1;
+                }
+            }
+            3 => {
+                if self.timers[0] == 0
+                    && env.player_distance(actor.pos) < REG0_F13 + 700.0
+                {
+                    self.anm_init(BCK_ATTACK_T3, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                    out.se(SE_CV_DK_ATTACK);
+                    self.state = 4;
+                }
+            }
+            4 => {
+                let frame = self.frame();
+                if frame > 10.0 && frame < 15.0 {
+                    self.at_mode = 1;
+                }
+                if i32::from(REG0_S5 + 0xD) == self.frame_i() {
+                    out.se(SE_CM_DK_PECK);
+                    self.eff_hane_set(self.body, 5, 0);
+                }
+                if self.morph.is_stop() {
+                    self.anm_init(BCK_WAIT_T1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                    self.state = 3;
+                    self.timers[0] = self.rnd_f(100.0) as i16 + 100;
+                }
+            }
+            _ => {}
+        }
+        if env.player_pos.y < REG0_F3 + 9290.0 - 50.0 {
+            self.action = Action::TFly;
+            self.state = -10;
+            self.speed.y = REG0_F7 + 70.0;
+        }
+    }
+
+    fn t_down(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
+        let mut arm = self.state;
+        loop {
+            match arm {
+                0 => {
+                    self.anm_init(BCK_TO_DAMAGE_T1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
+                    self.state += 1;
+                    self.timers[0] = REG0_S6 + 0x50;
+                    self.timers[1] = REG0_S7 + 0x50;
+                    self.demo_count = 0x32;
+                    self.blure_rate = 0xB4;
+                    self.eff_hane_set(self.body, 5, 0);
+                    out.switches.clear(SWITCH_TOGE);
+                    arm = 1;
+                }
+                1 | 2 => {
+                    if self.morph.is_stop() {
+                        self.anm_init(BCK_DAMAGE_T1, 2.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                    }
+                    add_calc2(&mut actor.pos.x, AREA_X, 0.2, REG0_F4 + 10.0);
+                    add_calc2(&mut actor.pos.z, AREA_Z, 0.2, REG0_F4 + 10.0);
+                    add_calc_angle_s2(&mut self.blure_rate, 1, 1, 2);
+                    if self.timers[1] == 1 {
+                        self.anm_init(BCK_RAKKA_T1, REG0_F6 + 20.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                        self.blure_rate = 1;
+                        out.se(SE_CM_DK_FALL_WATER);
+                    }
+                    if self.timers[0] != 0 {
+                        break;
+                    }
+                    actor.pos.y += self.speed.y;
+                    self.speed.y -= 5.0;
+                    if actor.pos.y < 6900.0 && self.state == 1 {
+                        self.state = 2;
+                        out.se(SE_CM_DK_WATER_COLUMN);
+                    }
+                    if actor.pos.y < 5500.0 {
+                        self.action = Action::Start;
+                        self.state = 0;
+                        actor.pos.y = -25000.0;
+                        self.reset_health();
+                    }
+                    break;
+                }
+                _ => break,
+            }
+        }
+    }
+
+    fn after_fight(&mut self) {
+        self.hit_stop = 10;
+    }
+
+    fn move_actor(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+        match self.action {
+            Action::Fly => self.fly(actor, env),
+            Action::UpFly => self.up_fly(actor, env),
+            Action::Landing => self.landing(actor, env),
+            Action::Wait => self.wait(actor, env),
+            Action::Jump => self.jump(actor, env),
+            Action::KutiAttack => self.kuti_attack(actor, out),
+            Action::JidaAttack => self.jida_attack(actor, env),
+            Action::FlyAttack => self.fly_attack(actor, env, out),
+            Action::WindAttack => self.wind_attack(actor, env, out),
+            Action::KamenDemo => self.kamen_demo(actor, out),
+            Action::End => self.end(actor, out),
+            Action::Start => self.start(actor, env, out),
+            Action::TFly => self.t_fly(actor, env, out),
+            Action::TLanding => self.t_landing(actor),
+            Action::TLastAttack => self.t_lastattack(actor, env, out),
+            Action::TDown => self.t_down(actor, out),
+            Action::AfterFight => self.after_fight(),
+        }
+        if self.resume_pending != 0 && self.morph.is_stop() {
+            self.anm_init(self.resume_bck, 20.0, self.resume_loop, 1.0, self.resume_bas, 0);
+            self.resume_pending = 0;
+        }
+    }
+
+    fn at_pos(yaw: i16, joint: [f32; 3]) -> Vec3 {
+        turned(yaw, joint)
+    }
+
+    fn col_set(&mut self, actor: &Actor) {
+        let yaw = actor.shape_angle[ANGLE_Y];
+        self.body = actor.pos;
+        self.body.y += BODY_LIFT;
+        self.head_prev = self.head.pos;
+        let mut offset = HEAD_OFFSET;
+        if self.mask_damage >= 4 {
+            offset[2] = 0.0;
+            self.head_radius = HEAD_RADIUS_BARE;
+        } else {
+            offset[2] += REG0_F2;
+            self.head_radius = HEAD_RADIUS_MASKED;
+        }
+        self.head.pos = Self::at_pos(yaw, JOINT_ATAMA1) + turned(yaw, offset);
+        if self.at_mode == 1 {
+            self.beak = Self::at_pos(yaw, JOINT_AGO) + turned(yaw, BEAK_OFFSET);
+        } else {
+            self.beak.y = HEAD_OFF_Y;
+        }
+        self.beak_radius = REG8_F6 + BEAK_RADIUS;
+        self.body_radius = REG8_F8 + BODY_RADIUS;
+        if self.mask_damage >= 4 {
+            self.tosaka = Self::at_pos(yaw, JOINT_TOSAKA_A3) + turned(yaw, BEAK_TIP_OFFSET);
+            self.tosaka_radius = REG8_F11 + TOSAKA_RADIUS;
+        }
+        for index in 0..FOOT_COUNT {
+            let base = if index == 0 {
+                JOINT_ASHI_L3
+            } else {
+                JOINT_ASHI_R3
+            };
+            let step = if self.action == Action::TLastAttack {
+                self.foot_radius[index] = REG0_F8 + FOOT_RADIUS_T_FLY;
+                self.foot_tg[index] = false;
+                [REG0_F3 + 100.0, REG0_F4 + 200.0, REG0_F5]
+            } else {
+                self.foot_radius[index] = REG0_F9 + FOOT_RADIUS;
+                self.foot_tg[index] = true;
+                [REG0_F3 + 50.0, REG0_F4, REG0_F5]
+            };
+            self.foot[index] = Self::at_pos(yaw, base) + turned(yaw, step);
+            if self.at_mode == 2 {
+                self.foot_at[index] = true;
+                self.foot_split[index] = matches!(
+                    self.action,
+                    Action::FlyAttack | Action::TFly | Action::JidaAttack
+                );
+                if self.foot_at_live == 0 {
+                    self.foot_at_live = 1;
+                }
+            } else {
+                self.foot_at[index] = false;
+                self.foot_at_live = 0;
+            }
+        }
+    }
+
+    fn kankyo_cont(&mut self, actor: &Actor) {
+        self.wind_anchor = actor.pos;
+        self.wind_dir = turned(actor.angle[ANGLE_Y], [0.0, 0.0, 1.0]);
+        self.wind_scale.x = self.wind_power * 2000.0;
+        self.wind_scale.z = 0.0;
+        add_calc0(&mut self.wind_power, 1.0, 0.02);
+        self.wind_scale.y = if self.wind_power > 1.0 { 1.0 } else { 0.0 };
+        for index in 0..WIND_COUNT {
+            if self.wind_active[index] != 0 {
+                self.wind_pos[index] += self.wind_move[index];
+                self.wind_radius[index] = if self.battle_mode == 1 {
+                    REG8_F7 + WIND_RADIUS_BATTLE
+                } else {
+                    REG8_F6 + WIND_RADIUS
+                };
+                self.wind_active[index] += 1;
+                if self.wind_active[index] > 25 {
+                    self.wind_active[index] = 0;
+                }
+            }
         }
     }

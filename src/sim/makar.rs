@@ -3415,7 +3415,7 @@ pub struct Pad<'w> {
 }
 
 pub fn control(
-    world: World,
+    mut world: World,
     mut talk: Talk,
     pad: Pad,
     collision: Option<Res<Collision>>,
@@ -3433,7 +3433,7 @@ pub fn control(
     let clear_count = talk.text_flags.clear_count;
     let event_mode = talk.info.event_run_check();
     let archive = talk.archive.as_deref().map(|held| held as &dyn MsgArchive);
-    for (entity, actor, makar) in &mut actors {
+    for (entity, mut actor, mut makar) in &mut actors {
         let actor = &mut *actor;
         let makar = &mut *makar;
         let current = ActiveEvent::staff_cut(&world.active, &world.list, STAFF_NAME)

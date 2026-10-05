@@ -348,7 +348,7 @@ pub fn control(
         .filter(|shaft| shaft.phase == arrow::Phase::Flying)
         .map(|shaft| (shaft.pos + shaft.speed * arrow::CAPSULE_STRETCH, arrow::POWER))
         .collect();
-    for (actor, lift) in &mut lifts {
+    for (mut actor, mut lift) in &mut lifts {
         let actor = &mut *actor;
         let lift = &mut *lift;
         if let Some(placed) = lift.placed.take() {

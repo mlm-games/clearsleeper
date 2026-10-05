@@ -2480,7 +2480,7 @@ pub fn control(
         .map(|(actor, _)| (actor.pos, actor.room))
         .collect();
     let mut spent: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, slime) in &mut slimes {
+    for (entity, mut actor, mut slime) in &mut slimes {
         let actor = &mut *actor;
         let slime = &mut *slime;
         if !slime.entered {

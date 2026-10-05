@@ -2051,7 +2051,7 @@ pub fn control(
     let select_num = boxes.select_num;
     let player = players.iter().next().copied();
     let pressed = do_intent.0;
-    for (entity, actor, merchant) in &mut actors {
+    for (entity, mut actor, mut merchant) in &mut actors {
         let actor = &mut *actor;
         let merchant = &mut *merchant;
         if !merchant.started {

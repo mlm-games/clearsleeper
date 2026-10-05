@@ -746,7 +746,7 @@ pub fn control(
     };
     let view = *player;
     let mut gone: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, mol) in &mut molgeras {
+    for (entity, mut actor, mut mol) in &mut molgeras {
         let actor = &mut *actor;
         let mol = &mut *mol;
         if mol.finished {

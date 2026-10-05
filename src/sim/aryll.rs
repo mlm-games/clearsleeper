@@ -2405,15 +2405,15 @@ pub struct Msg<'w, 's> {
 }
 
 pub fn control(
-    world: World,
-    msg: Msg,
+    mut world: World,
+    mut msg: Msg,
     mut others: Query<&Actor, Without<Aryll>>,
     mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
 ) {
     let player = msg.players.iter().next().copied();
     let frame = world.frame.0 as u32;
     let clear_count = msg.text_flags.clear_count;
-    for (entity, actor, aryll) in &mut actors {
+    for (entity, mut actor, mut aryll) in &mut actors {
         let actor = &mut *actor;
         let aryll = &mut *aryll;
         let mut text = Text {
