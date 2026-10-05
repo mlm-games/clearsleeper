@@ -1201,7 +1201,8 @@ impl Helmaroc {
             REG0_S3 + 10,
             (self.turn_scale * self.turn_step) as i16,
         );
-        let mut bank = (i32::from(before) - i32::from(actor.angle[ANGLE_Y])) as f32 * 0x20;
+        let turn = i32::from(before) - i32::from(actor.angle[ANGLE_Y]);
+        let mut bank = (turn * 0x20) as i16 as i32;
         let cap = i32::from(REG0_S1) + TURN_BANK_I32;
         if bank > cap {
             bank = cap;
@@ -1337,7 +1338,7 @@ impl Helmaroc {
                 self.rise_smoke = 0x19;
                 let out = turned(actor.angle[ANGLE_Y], [0.0, 2000.0, 5000.0]);
                 self.target = actor.pos + out;
-                self.state += 1;
+                self.state = self.state.wrapping_add(1);
                 self.speed_f = 0.0;
                 self.speed_step = 1.0;
                 actor.speed_f_walk = 0.0;
@@ -1423,7 +1424,7 @@ impl Helmaroc {
                 }
                 self.turn_step = 0.0;
                 if (self.target - actor.pos).length() > 1000.0 {
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                     self.timers[0] = 0;
                 }
             }
@@ -1440,7 +1441,7 @@ impl Helmaroc {
                     } else {
                         self.action = Action::FlyAttack;
                         self.state = 0;
-                        self.swoop_count += 1;
+                        self.swoop_count = self.swoop_count.wrapping_add(1);
                     }
                 }
             }
@@ -1661,7 +1662,7 @@ impl Helmaroc {
                             }
                             self.state = 0;
                         } else {
-                            self.sit_count += 1;
+                            self.sit_count = self.sit_count.wrapping_add(1);
                             if dist < REG0_F11 + 450.0 {
                                 self.action = Action::JidaAttack;
                                 self.state = 0;
@@ -2064,7 +2065,7 @@ impl Helmaroc {
                 0 => {
                     self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
                     self.rise_smoke = 0x19;
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                     self.target = actor.pos;
                     self.turn_step = 0.0;
                     arm = 1;
@@ -2153,7 +2154,7 @@ impl Helmaroc {
             self.state = 2;
             self.flown_high = 1;
         }
-        self.demo_count = 100;
+        self.demo_state = 100;
         out.stop_bgm();
     }
 
@@ -2182,7 +2183,7 @@ impl Helmaroc {
                 if self.battle_mode == 1 {
                     self.action = Action::TDown;
                     self.state = 0;
-                    self.mask_timer = REG6_S3 + 10;
+                    self.mask_timer = (REG6_S3 + 10) as u8;
                     self.hit_stop = 0x1E;
                     out.se(SE_CV_DK_LAST_DAMAGE);
                     out.stop_bgm();
@@ -2195,7 +2196,7 @@ impl Helmaroc {
                         self.state = 0;
                         out.se(SE_CM_DK_BREAK_MASK);
                     } else {
-                        self.mask_timer = REG6_S3 + 10;
+                        self.mask_timer = (REG6_S3 + 10) as u8;
                         self.timers[2] = 0xF;
                         self.hit_stop = 0x1E;
                     }
@@ -2252,7 +2253,7 @@ impl Helmaroc {
             0 => {
                 self.anm_init(BCK_NUKENAI1, 0.0, EMODE_NONE, 0.0, BAS_NONE, 0);
                 self.state = 1;
-                self.demo_count = 1;
+                self.demo_state = 1;
             }
             1 => {
                 self.beak_sway = 0;
@@ -2294,7 +2295,7 @@ impl Helmaroc {
                     self.beak_free = 1;
                 }
                 if self.demo_sub >= 0x6E && REG8_S8 == 0 {
-                    self.demo_count = 150;
+                    self.demo_state = 150;
                     self.action = Action::KutiAttack;
                     self.anm_init(BCK_NUKENAI1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                     self.state = 5;
@@ -2406,7 +2407,7 @@ impl Helmaroc {
                 6 => {
                     groan = true;
                     if self.timers[0] == 0xAA {
-                        self.demo_count = 0x6E;
+                        self.demo_state = 0x6E;
                     }
                     add_calc2(&mut actor.pos.x, AREA_X, 0.05, 50.0);
                     add_calc2(&mut actor.pos.y, REG8_F18 + 15800.0, 0.1, REG8_F19 + 20.0);
@@ -2434,7 +2435,7 @@ impl Helmaroc {
                     actor.pos.x = 100000.0;
                     actor.pos.y = 100000.0;
                     if self.timers[0] == 0 {
-                        self.demo_count = self.demo_count.wrapping_add(1);
+                        self.demo_state = self.demo_state.wrapping_add(1);
                         self.state = 8;
                     }
                     break;
@@ -2462,7 +2463,7 @@ impl Helmaroc {
         match self.state {
             -10 => {
                 self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
-                self.state += 1;
+                self.state = self.state.wrapping_add(1);
             }
             -9 => {
                 if self.morph.is_stop() {
@@ -2471,13 +2472,13 @@ impl Helmaroc {
             }
             0 => {
                 self.anm_init(BCK_FLY2, 5.0, EMODE_LOOP, 1.0, 0xC, 0);
-                self.state += 1;
+                self.state = self.state.wrapping_add(1);
             }
             1 => {
                 if let Some((entity, peck)) = env.peck {
                     self.target = peck;
                     self.anm_init(BCK_ATTACK_T1, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                     out.se(SE_CV_DK_ATTACK);
                     self.peck_obj = Some(entity);
                 } else {
@@ -2570,7 +2571,7 @@ impl Helmaroc {
         self.track_player = true;
         if self.state == 0 {
             self.anm_init(BCK_TOBITATU_T1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
-            self.state += 1;
+            self.state = self.state.wrapping_add(1);
         }
         self.pos_move(actor);
     }
@@ -2606,13 +2607,13 @@ impl Helmaroc {
         match self.state {
             0 => {
                 self.speed.y = REG0_F6 + 80.0;
-                self.state += 1;
+                self.state = self.state.wrapping_add(1);
                 self.anm_init(BCK_TYAKUTI_T1, 10.0, EMODE_NONE, 0.001, 0x18, 0);
             }
             1 => {
                 if falling {
                     self.anm_init(BCK_TYAKUTI_T1, 1.0, EMODE_NONE, 1.0, 0x18, 0);
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                     out.se(SE_CM_DK_PECK);
                     self.eff_hane_set(self.body, 5, 0);
                 }
@@ -2620,7 +2621,7 @@ impl Helmaroc {
             2 => {
                 if self.morph.is_stop() {
                     self.anm_init(BCK_WAIT_T1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                 }
             }
             3 => {
@@ -2662,10 +2663,10 @@ impl Helmaroc {
             match arm {
                 0 => {
                     self.anm_init(BCK_TO_DAMAGE_T1, 2.0, EMODE_NONE, 1.0, BAS_NONE, 0);
-                    self.state += 1;
+                    self.state = self.state.wrapping_add(1);
                     self.timers[0] = REG0_S6 + 0x50;
                     self.timers[1] = REG0_S7 + 0x50;
-                    self.demo_count = 0x32;
+                    self.demo_state = 0x32;
                     self.blure_rate = 0xB4;
                     self.eff_hane_set(self.body, 5, 0);
                     out.switches.clear(SWITCH_TOGE);
@@ -2811,7 +2812,7 @@ impl Helmaroc {
                 } else {
                     REG8_F6 + WIND_RADIUS
                 };
-                self.wind_active[index] += 1;
+                self.wind_active[index] = self.wind_active[index].wrapping_add(1);
                 if self.wind_active[index] > 25 {
                     self.wind_active[index] = 0;
                 }
@@ -2892,10 +2893,10 @@ impl Helmaroc {
                     }
                 }
             } else {
-                self.piece_hold[index] -= 1;
+                self.piece_hold[index] = self.piece_hold[index].wrapping_sub(1);
                 if self.piece_hold[index] < 0x14 {
-                    rot_x = (sin_s(self.piece_hold[index].wrapping_mul(3300)) * 200.0) as i16;
-                    rot_z = (cos_s(self.piece_hold[index].wrapping_mul(4800)) * 200.0) as i16;
+                    rot_x = (sin_s((self.piece_hold[index] as i16).wrapping_mul(3300)) * 200.0) as i16;
+                    rot_z = (cos_s((self.piece_hold[index] as i16).wrapping_mul(4800)) * 200.0) as i16;
                 }
             }
             self.piece_rot[index][0] = self.piece_rot[index][0].wrapping_add(rot_x);
@@ -2994,7 +2995,7 @@ impl Helmaroc {
     fn my_effect_move(&mut self, env: &Env<'_>) {
         for index in 0..EFF_COUNT {
             if self.effects[index].kind != 0 {
-                self.effects[index].count += 1;
+                self.effects[index].count = self.effects[index].count.wrapping_add(1);
                 if self.effects[index].kind == 1 {
                     self.eff_hane_move(index, env);
                 } else if self.effects[index].kind == 2 {
@@ -3021,7 +3022,7 @@ impl Helmaroc {
                 if !self.demo_gate() {
                     run = false;
                 } else {
-                    self.demo_state += 1;
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_param = 0.0;
                     self.demo_count = 0;
                     self.demo_sub = 0;
@@ -3048,7 +3049,7 @@ impl Helmaroc {
                 if !self.demo_gate() {
                     run = false;
                 } else {
-                    self.demo_state += 1;
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_param = 0.0;
                     self.demo_count = 0;
                     self.demo_sub = 0;
@@ -3174,7 +3175,7 @@ impl Helmaroc {
                 if !self.demo_gate() {
                     run = false;
                 } else {
-                    self.demo_state += 1;
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_param = 0.0;
                     self.demo_count = 0;
                     self.demo_sub = 0;
@@ -3194,7 +3195,7 @@ impl Helmaroc {
                 );
                 add_calc2(&mut self.cam_eye.z, actor.eye.z, 0.1, self.demo_param * 100.0);
                 if self.action == Action::Start {
-                    self.demo_state += 1;
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_sub = 0;
                 }
                 add_calc2(&mut self.demo_param, 1.0, 1.0, REG0_F4 + 0.02);
@@ -3208,7 +3209,7 @@ impl Helmaroc {
                 if !self.demo_gate() {
                     run = false;
                 } else {
-                    self.demo_state += 1;
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_param = 0.0;
                     self.demo_count = 0;
                     self.demo_sub = 0;
@@ -3260,7 +3261,7 @@ impl Helmaroc {
             }
             0x70 => {
                 self.cam_eye = self.target;
-                self.demo_state += 1;
+                self.demo_state = self.demo_state.wrapping_add(1);
                 self.demo_sub = 0;
                 self.fov = 45.0;
             }
@@ -3343,7 +3344,7 @@ impl Helmaroc {
             self.beak_amp = 0;
             self.beak_sway = 0;
             let reach = turned(self.beak_aim, [0.0, 0.0, self.beak_timer as f32 * (REG0_F7 + 500.0)]);
-            let wave = sin_s(self.frame_count.wrapping_mul(REG0_S4 + 7000));
+            let wave = sin_s(self.frame_count.wrapping_mul(REG0_S4 + 7000) as i16);
             self.tosaka_y4 = (reach.z * wave) as i16;
             self.tosaka_z4 = (reach.x * wave) as i16;
         }
@@ -3432,7 +3433,7 @@ impl Helmaroc {
                     self.ground_hit = 3;
                 }
                 if self.ground_hit != 0 {
-                    self.ground_hit -= 1;
+                    self.ground_hit = self.ground_hit.wrapping_sub(1);
                 }
             }
             self.damage_check(actor, env, out);

@@ -1249,7 +1249,7 @@ impl Makar {
         self.anm_frame = 0.0;
         self.anm_last = 0.0;
         self.anm_end = MORPH_END_FRAME;
-        self.anm_speed = (data[3]) as f32.max(1.0);
+        self.anm_speed = ((data[3]) as f32).max(1.0);
         self.anm_loop = data[1] == ANM_LOOP;
         let _ = (data[0].unsigned_abs(), if secondary { data[2] } else { 0 }, data[5]);
         self.anm_done = false;

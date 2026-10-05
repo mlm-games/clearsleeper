@@ -972,7 +972,7 @@ impl Floormaster {
     }
 
     fn set_rnd(&mut self, low: i32, high: i32) -> i32 {
-        low + (self.rnd_f((high - low) as f32.abs()) as i32)
+        low + (self.rnd_f(((high - low) as f32).abs()) as i32)
     }
 
     fn set_anm(&mut self, prm: u8, force: bool) {

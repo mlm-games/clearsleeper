@@ -1,3 +1,6 @@
+use crate::text::{
+    ICON_ARROW_DOWN, ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP,
+};
 use super::{
     CTRL_A_BUTTON, CTRL_ARROW_DOWN, CTRL_ARROW_LEFT, CTRL_ARROW_RIGHT, CTRL_ARROW_UP,
     CTRL_B_BUTTON, CTRL_C_STICK, CTRL_DPAD, CTRL_FLASHING_A_BUTTON, CTRL_HEART, CTRL_L_BUTTON,
@@ -1105,8 +1108,8 @@ impl MsgData {
                     if state.clear_count == 0 && self.entry.textbox_type == 0xC {
                         for pair in super::ZFONT.iter() {
                             if pair[0] == code as u16 {
-                                self.field_0xd4[0] = (pair[1] >> 8) & 0xFF;
-                                self.field_0xd4[1] = pair[1] & 0xFF;
+                                self.field_0xd4[0] = ((pair[1] >> 8) & 0xFF) as u8;
+                                self.field_0xd4[1] = (pair[1] & 0xFF) as u8;
                                 self.field_0xd4[2] = 0;
                                 code = pair[1] as i32;
                                 break;
