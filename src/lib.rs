@@ -887,6 +887,13 @@ impl App {
                     max.y - min.y,
                     (max.x - min.x) * 0.5,
                 )
+            } else if entity.contains::<sim::spotbox::SpotBox>() {
+                (
+                    view::ActorKind::Scenery,
+                    -sim::spotbox::HALF,
+                    sim::spotbox::HALF * 2.0,
+                    sim::spotbox::HALF,
+                )
             } else if let Some(gun) = entity.get::<sim::canon::Canon>() {
                 if !gun.drawn() {
                     continue;
