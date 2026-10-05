@@ -5,6 +5,7 @@ pub mod amos_knight;
 pub mod armos;
 pub mod aryll;
 pub mod arrow;
+pub mod atttag;
 pub mod balloon;
 pub mod barrier;
 pub mod barrel;
@@ -62,8 +63,10 @@ pub mod item;
 pub mod jump;
 pub mod kita;
 pub mod kn;
+pub mod kytag01;
 pub mod kytag04;
 pub mod kytag06;
+pub mod kytag07;
 pub mod ladder;
 pub mod koisi;
 pub mod layer;
@@ -115,6 +118,7 @@ pub mod switem;
 pub mod swtdoor;
 pub mod swpush;
 pub mod tag;
+pub mod tagkb;
 pub mod taglight;
 pub mod trapdoor;
 pub mod talk;
@@ -334,6 +338,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if spotbox::is_spotbox(&source.name) {
         let spot = spotbox::SpotBox::spawn(source.parameters);
         world.spawn((actor, spot)).id()
+    } else if kytag06::is_kytag06(&source.name) {
+        let tag = kytag06::Kytag06::spawn(world.resource::<flags::Collect>());
+        world.spawn((actor, tag)).id()
     } else if kytag04::is_kytag04(&source.name) {
         let tag = kytag04::Kytag04::spawn(source.angle);
         world.spawn((actor, tag)).id()
@@ -559,6 +566,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, swatk::Swatk::spawn(source.parameters))).id()
     } else if switem::is_switem(&source.name) {
         world.spawn((actor, switem::Switem::spawn(source.parameters))).id()
+    } else if tagkb::is_tagkb(&source.name) {
+        let tag = tagkb::TagKb::spawn(source.parameters);
+        world.spawn((actor, tag)).id()
+    } else if kytag07::is_kytag07(&source.name) {
+        world.spawn((actor, kytag07::Kytag07::spawn())).id()
+    } else if atttag::is_atttag(&source.name) {
+        world.spawn((actor, atttag::Atttag::spawn())).id()
+    } else if kytag01::is_kytag01(&source.name) {
+        world.spawn((actor, kytag01::Kytag01::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -729,12 +745,19 @@ pub fn build(
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     kytag04::control.in_set(WwSimSet::Execute),
+                    kytag06::control.in_set(WwSimSet::Execute),
+                    dummy::control.in_set(WwSimSet::Execute),
                     spotbox::control.in_set(WwSimSet::Execute),
                     rectangle::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
+                    tagkb::control.in_set(WwSimSet::Execute),
+                    kytag07::control.in_set(WwSimSet::Execute),
+                    kytag01::control.in_set(WwSimSet::Execute),
+                    atttag::control.in_set(WwSimSet::Execute),
+
 
                 )
                     .chain(),
