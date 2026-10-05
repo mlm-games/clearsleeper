@@ -1065,6 +1065,18 @@ impl App {
                 let (min, max) = sim::cafelmp::Cafelmp::spawn().cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::mjdoor::MjDoor>() {
+                let (min, max) = sim::mjdoor::MjDoor::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::turu::Turu>() {
+                let (min, max) = sim::turu::Turu::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::spcitem::SpcItem>() {
+                let (min, max) = sim::spcitem::SpcItem::spawn(0, &sim::flags::EventFlags::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::komore::Komore>() {
                 let (min, max) = sim::komore::Komore::spawn().cull();
                 lift = min[1];

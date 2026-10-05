@@ -90,6 +90,7 @@ pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
+pub mod mjdoor;
 pub mod morth;
 pub mod molgera;
 pub mod movebox;
@@ -134,6 +135,7 @@ pub mod statue;
 pub mod stone;
 pub mod stream;
 pub mod swim;
+pub mod spcitem;
 pub mod swc00;
 pub mod swhammer;
 pub mod swatk;
@@ -149,6 +151,7 @@ pub mod talk;
 pub mod tama;
 pub mod tbox;
 pub mod tingle;
+pub mod turu;
 pub mod torch;
 pub mod transition;
 pub mod tsubo;
@@ -688,6 +691,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, pbco::Pbco::spawn())).id()
     } else if retag::is_retag(&source.name) {
         world.spawn((actor, retag::ReTag::spawn())).id()
+    } else if mjdoor::is_mjdoor(&source.name) {
+        let door = mjdoor::MjDoor::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, door)).id()
+    } else if turu::is_turu(&source.name) {
+        world.spawn((actor, turu::Turu::spawn(source.parameters, world.resource::<flags::Switches>()))).id()
+    } else if spcitem::is_spcitem(&source.name) {
+        let item = spcitem::SpcItem::spawn(source.parameters, world.resource::<flags::EventFlags>());
+        world.spawn((actor, item)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -887,7 +898,9 @@ pub fn build(
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
-                    kytag02::control.in_set(WwSimSet::Execute),                    retag::control.in_set(WwSimSet::Execute),
+                    kytag02::control.in_set(WwSimSet::Execute),                    retag::control.in_set(WwSimSet::Execute),                    turu::control.in_set(WwSimSet::Execute),
+                    spcitem::control.in_set(WwSimSet::Execute),
+
 
                 )
                     .chain(),
@@ -998,7 +1011,8 @@ pub fn build(
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
                     tama::control.in_set(WwSimSet::Execute),
-                    swatk::control.in_set(WwSimSet::Execute),
+                    swatk::control.in_set(WwSimSet::Execute),                    mjdoor::control.in_set(WwSimSet::Execute),
+
                     vmsms::control.in_set(WwSimSet::Execute),
                     objtime::control.in_set(WwSimSet::Execute),
                     swc00::control.in_set(WwSimSet::Execute),
