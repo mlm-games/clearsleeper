@@ -75,6 +75,7 @@ pub mod kita;
 pub mod kn;
 pub mod komore;
 pub mod kytag02;
+pub mod kytag00;
 pub mod kytag01;
 pub mod kytag04;
 pub mod kytag06;
@@ -335,6 +336,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if kytag00::is_kytag00(&source.name) {
+        kytag00::spawn(world, source)
     } else if agbsw0::is_agbsw0(&source.name) {
         let agbsw0 = agbsw0::Agbsw0::spawn(source.parameters);
         world.spawn((actor, agbsw0)).id()
@@ -776,6 +779,7 @@ pub fn build(
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
+    kytag00::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -895,6 +899,7 @@ pub fn build(
                     .chain(),
                 (
                     kytag07::control.in_set(WwSimSet::Execute),
+                    kytag00::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),

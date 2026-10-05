@@ -22,7 +22,21 @@ use super::stream::{cos_s, sin_s};
 use super::swim::Swim;
 use super::walk::to_s16;
 
-pub const AGBSW0_ACTORS: [&str; 3] = ["agbA", "agbA2", "agbAT"];
+pub const AGBSW0_ACTORS: [&str; 13] = [
+    "agbA",
+    "agbAT",
+    "agbA2",
+    "agbF",
+    "agbF2",
+    "agbMARK",
+    "agbMW",
+    "agbCSW",
+    "agbTBOX",
+    "agbR",
+    "agbB",
+    "agbD",
+    "agbFA",
+];
 
 pub fn is_agbsw0(name: &str) -> bool {
     AGBSW0_ACTORS.contains(&name)
