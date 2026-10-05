@@ -1081,6 +1081,14 @@ impl App {
                 let (min, max) = sim::spcitem::SpcItem::spawn(0, &sim::flags::EventFlags::default()).cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::doguud::DoguuD>() {
+                let (min, max) = sim::doguud::DoguuD::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::eayogn::Eayogn>() {
+                let (min, max) = sim::eayogn::Eayogn::spawn(&sim::flags::Collect::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::dmgroom::Dmgroom>() {
                 let (min, max) = sim::dmgroom::Dmgroom::spawn().cull();
                 lift = min[1];

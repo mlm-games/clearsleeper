@@ -32,10 +32,12 @@ pub mod combat;
 pub mod daiocta;
 pub mod damage;
 pub mod death;
+pub mod doguud;
 pub mod door;
 pub mod dmgroom;
 pub mod demokmm;
 pub mod dummy;
+pub mod eayogn;
 pub mod ending;
 pub mod enemy;
 pub mod event;
@@ -47,6 +49,7 @@ pub mod flags;
 pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
+pub mod gaship2;
 pub mod ghostship;
 pub mod gntakie;
 pub mod gntakis;
@@ -89,6 +92,7 @@ pub mod koisi;
 pub mod layer;
 pub mod leaves;
 pub mod lenzo;
+pub mod lines;
 pub mod lock;
 pub mod magma;
 pub mod makar;
@@ -115,6 +119,7 @@ pub mod pirateship;
 pub mod puppet_ganon;
 pub mod player;
 pub mod player_status;
+pub mod rforce;
 pub mod raft;
 pub mod rectangle;
 pub mod redead;
@@ -150,6 +155,7 @@ pub mod switem;
 pub mod swtdoor;
 pub mod swpush;
 pub mod tag;
+pub mod tagba1;
 pub mod tagkb;
 pub mod tag_msg;
 pub mod tagkk1;
@@ -170,6 +176,7 @@ pub mod vmsms;
 pub mod vmsdz;
 pub mod walk;
 pub mod wall;
+pub mod wlvtag;
 pub mod wind;
 pub mod xfuta;
 pub mod windmill;
@@ -725,6 +732,20 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if xfuta::is_xfuta(&source.name) {
         let home = actor.pos;
         world.spawn((actor, xfuta::Xfuta::spawn(home))).id()
+    } else if doguud::is_doguud(&source.name) {
+        world.spawn((actor, doguud::DoguuD::spawn())).id()
+    } else if gaship2::is_gaship2(&source.name) {
+        world.spawn((actor, gaship2::Gaship2::spawn())).id()
+    } else if tagba1::is_tagba1(&source.name) {
+        let tag = tagba1::TagBa1::spawn(world.resource::<flags::EventFlags>());
+        world.spawn((actor, tag)).id()
+    } else if wlvtag::is_wlv_tag(&source.name) {
+        let tag = wlvtag::WlvTag::spawn(source.parameters, world.resource::<schedule::Schedule>());
+        world.spawn((actor, tag)).id()
+    } else if eayogn::is_eayogn(&source.name) {
+        world.spawn((actor, eayogn::Eayogn::spawn(world.resource::<flags::Collect>()))).id()
+    } else if rforce::is_rforce(&source.name) {
+        world.spawn((actor, rforce::Rforce::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1067,7 +1088,13 @@ pub fn build(
                     gohdan::control.in_set(WwSimSet::Execute),
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
-                    puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),
+                    puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),                    gaship2::control.in_set(WwSimSet::Execute),                    eayogn::control.in_set(WwSimSet::Execute),
+                    doguud::control.in_set(WwSimSet::Execute),
+
+                    rforce::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
+
+                    tagba1::control.in_set(WwSimSet::Execute),
+
 
 
                 )
