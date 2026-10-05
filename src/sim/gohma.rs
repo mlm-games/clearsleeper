@@ -16,7 +16,6 @@ pub type Xyz = [f32; 3];
 
 const ZERO_XYZ: Xyz = [0.0, 0.0, 0.0];
 
-const HIO_NO: i16 = -1;
 const HIO_M05: u8 = 0;
 const HIO_M06: u8 = 0;
 const HIO_M07: u8 = 0;
@@ -24,9 +23,6 @@ const HIO_M08: f32 = 1.0;
 const HIO_M0C: i16 = 0x96;
 const HIO_M0E: i16 = 5;
 const HIO_M10: u8 = 0;
-const HIO_M11: i16 = 0;
-const HIO_M12: i16 = 0;
-const HIO_M13: i16 = 0;
 const HIO_M14: f32 = 100.0;
 const HIO_M18: f32 = 0.5;
 const HIO_M1C: f32 = 0.5;
@@ -34,9 +30,6 @@ const HIO_M20: f32 = 0.2;
 const HIO_M24: f32 = 0.2;
 const HIO_M2C: i16 = 10;
 const HIO_M28: f32 = 150.0;
-const HIO_M30: f32 = 4.0;
-const HIO_M34: f32 = 20.0;
-const HIO_M38: f32 = 6.0;
 const HIO_M3C: i16 = 0xb6;
 const HIO_M3E: i16 = 0x9c;
 const HIO_M40: i16 = 0x56;
@@ -81,7 +74,6 @@ const SE_BTD_DROP_HEAD: u32 = 0x583B;
 const SE_MAGTAIL_ATTACK: u32 = 0x5810;
 const SE_BOSS_EXPLODE: u32 = 0x583C;
 const SE_ATM_JINARI: u32 = 0x105E;
-const SE_ATM_MAGMA_CHILL: u32 = 0x1863;
 const SE_OBJ_BTD_FIRE_DROP: u32 = 0x6942;
 const SE_LK_LAST_HIT: u32 = 0x2828;
 const SE_LK_B_BOSS_WARP: u32 = 0x2888;
@@ -96,6 +88,10 @@ const SE_CV_BTD_BEF_FIRE: u32 = 0x483A;
 const SE_CV_BTD_JITABATA: u32 = 0x4838;
 const SE_CV_BTD_AFT_JITABATA: u32 = 0x4839;
 const SE_CV_BTD_DIE: u32 = 0x483C;
+const SE_LK_SW_HIT_S: u32 = 0x2803;
+const SE_LK_ARROW_HIT: u32 = 0x2879;
+const SE_LK_HAMMER_HIT: u32 = 0x2855;
+const SE_LK_HS_SPIKE: u32 = 0x286F;
 
 const BGM_GOMA: u32 = 0x80000003;
 const BGM_GOMA_2: u32 = 0x80000010;
@@ -121,8 +117,6 @@ const REG0_F14: f32 = 0.0;
 const REG0_F15: f32 = 0.0;
 const REG0_F16: f32 = 0.0;
 const REG0_F18: f32 = 0.0;
-const REG0_S0: i16 = 0;
-const REG0_S1: i16 = 0;
 const REG0_S2: i16 = 0;
 const REG0_S3: i16 = 0;
 const REG0_S4: i16 = 0;
@@ -261,12 +255,21 @@ const PUNCH_BCK: [i32; 10] = [
     BCK_LATTACK5,
 ];
 
-const HIBI_BRK: [i32; 3] = [0x4B, 0x4C, 0x4D];
-
 const AT_SIZE: [f32; 19] = [
     100.0, 100.0, 250.0, 300.0, 300.0, 300.0, 300.0, 100.0, 250.0, 100.0, 250.0, 150.0, 150.0, 150.0, 150.0, 150.0,
     150.0, 150.0, 150.0,
 ];
+
+const AT_SPH_SRC_RADIUS: f32 = 200.0;
+const AT_SPH_COUNT: usize = 19;
+const HAND_CYL_COUNT: usize = 6;
+const REACH_SWORD: f32 = 20.0;
+const REACH_ARROW: f32 = 35.0;
+const REACH_HAMMER: f32 = 50.0;
+const REACH_HOOKSHOT: f32 = 5.0;
+const REACH_BOOMERANG: f32 = 90.0;
+const DEAD_HEAD_CENTRE: Xyz = [0.0, -20000.0, 0.0];
+const PARKED_CENTRE: Xyz = [0.0, -10000.0, 0.0];
 
 const HAND_CO_POS_X: [f32; 6] = [630.0, 750.0, 700.0, -630.0, -750.0, -700.0];
 const HAND_CO_POS_Y: [f32; 6] = [0.0, 100.0, 0.0, 0.0, 100.0, 0.0];
@@ -282,8 +285,6 @@ const MAX_HEALTH: i32 = 10;
 const EYE_RADIUS: f32 = 80.0;
 const FIRE_RADIUS: f32 = 100.0;
 const EYE_REACH: f32 = 400.0;
-const HAND_TURN: i16 = 0x1068;
-const HAND_SCALE: f32 = 0.95;
 const HAND_AT_FRAME: i16 = 0x14;
 const HAND_ANGLE_TARGET: i16 = 13000;
 const HAND_ANGLE_STEP: i16 = 0x1000;
@@ -524,11 +525,148 @@ impl Sibuki {
     };
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AtSph {
+    pub centre: Xyz,
+    pub radius: f32,
+    pub at_set: bool,
+    pub at_atp: u8,
+    pub co_set: bool,
+    pub tg_set: bool,
+    pub tg_shield: bool,
+}
+
+impl AtSph {
+    const SRC: Self = AtSph {
+        centre: ZERO_XYZ,
+        radius: AT_SPH_SRC_RADIUS,
+        at_set: true,
+        at_atp: 1,
+        co_set: true,
+        tg_set: true,
+        tg_shield: true,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HandCyl {
+    pub centre: Xyz,
+    pub radius: f32,
+    pub height: f32,
+    pub at_set: bool,
+    pub at_atp: u8,
+    pub co_set: bool,
+    pub tg_set: bool,
+    pub tg_shield: bool,
+}
+
+impl HandCyl {
+    const SRC: Self = HandCyl {
+        centre: ZERO_XYZ,
+        radius: 0.0,
+        height: 0.0,
+        at_set: false,
+        at_atp: 0,
+        co_set: true,
+        tg_set: true,
+        tg_shield: true,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum At {
+    Idle,
+    Sword,
+    Arrow,
+    FireArrow,
+    IceArrow,
+    LightArrow,
+    Hammer,
+    Bomb,
+    Boomerang,
+    Hookshot,
+}
+
+impl At {
+    fn reach(self) -> f32 {
+        match self {
+            At::Idle => 0.0,
+            At::Sword => REACH_SWORD,
+            At::Hookshot => REACH_HOOKSHOT,
+            At::Arrow | At::FireArrow | At::IceArrow | At::LightArrow => REACH_ARROW,
+            At::Hammer => REACH_HAMMER,
+            At::Bomb => super::bombflower::BLAST_RADIUS,
+            At::Boomerang => REACH_BOOMERANG,
+        }
+    }
+
+    fn power(self, blade: u8, soup: bool) -> i32 {
+        match self {
+            At::Sword => super::damage::sword_power(blade, soup),
+            At::Arrow | At::FireArrow | At::IceArrow | At::LightArrow => super::damage::ARROW,
+            At::Bomb => super::damage::BOMB,
+            At::Boomerang => super::damage::BOMERANG,
+            At::Hammer => super::hammer::AT_POWER,
+            At::Idle | At::Hookshot => 0,
+        }
+    }
+
+    fn resulting_type(self) -> u8 {
+        match self {
+            At::Sword => 1,
+            At::Bomb | At::Boomerang => 2,
+            At::Hookshot => 0,
+            At::Idle => 0xC,
+            At::Arrow
+            | At::FireArrow
+            | At::IceArrow
+            | At::LightArrow
+            | At::Hammer => 5,
+        }
+    }
+
+    fn se(self) -> u32 {
+        match self {
+            At::Arrow | At::FireArrow | At::IceArrow | At::LightArrow => SE_LK_ARROW_HIT,
+            At::Hammer => SE_LK_HAMMER_HIT,
+            At::Hookshot => SE_LK_HS_SPIKE,
+            At::Idle | At::Sword | At::Bomb | At::Boomerang => SE_LK_SW_HIT_S,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Blow {
+    pub at: At,
+    pub blade: u8,
+    pub soup: bool,
+}
+
+impl Blow {
+    fn reach(&self) -> f32 {
+        self.at.reach()
+    }
+
+    fn power(&self) -> i32 {
+        self.at.power(self.blade, self.soup)
+    }
+
+    fn resulting_type(&self) -> u8 {
+        self.at.resulting_type()
+    }
+
+    fn se(&self) -> u32 {
+        self.at.se()
+    }
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Gohma {
     pub health: i32,
     pub max_health: i32,
     pub phase2: u8,
+    pub m_at_sphs: [AtSph; AT_SPH_COUNT],
+    pub m_hand_cyls: [HandCyl; HAND_CYL_COUNT],
     pub m02e1: i8,
     pub m02e2: i16,
     pub m02e4: i16,
@@ -559,8 +697,8 @@ pub struct Gohma {
     pub m5e94: i16,
     pub m5e96: i16,
     pub m5e98: [Xyz; 25],
-    pub m5fc4: [i16; 2],
-    pub m5fea: [i16; 2],
+    pub m5fc4: [i16; AT_SPH_COUNT],
+    pub m5fea: [i16; HAND_CYL_COUNT],
     pub m6028: [i16; 7],
     pub m602c: i16,
     pub m602e: i16,
@@ -614,6 +752,7 @@ pub struct Gohma {
     pub dr2_4ca: i16,
     pub eye_pos: Xyz,
     pub eye_radius: f32,
+    pub eye_shield: bool,
     pub fire_pos: Xyz,
     pub fire_radius: f32,
     pub speed_f: f32,
@@ -630,6 +769,13 @@ pub struct Gohma {
 pub struct Watch<'w, 's> {
     players: Query<'w, 's, (Entity, &'static Player)>,
     others: Query<'w, 's, (Entity, &'static Actor), Without<Gohma>>,
+    combat: Res<'w, super::combat::Combat>,
+    held: Res<'w, super::item::Held>,
+    hammer: Res<'w, super::hammer::Cut>,
+    blasts: Res<'w, super::bombflower::Blasts>,
+    shafts: Query<'w, 's, &'static super::arrow::Arrow>,
+    bolts: Query<'w, 's, &'static super::boomerang::Boomerang>,
+    chains: Query<'w, 's, &'static super::hookshot::Hookshot>,
 }
 
 
@@ -661,6 +807,7 @@ pub struct Env {
     pub player_eye: Vec3,
     pub player_angle: [i16; 3],
     pub player_cut: bool,
+    pub blow: Blow,
     pub demo_stage: bool,
     pub kui: u32,
     pub kui_health: i32,
@@ -679,6 +826,8 @@ impl Gohma {
             health: MAX_HEALTH,
             max_health: MAX_HEALTH,
             phase2: 0,
+            m_at_sphs: [AtSph::SRC; AT_SPH_COUNT],
+            m_hand_cyls: [HandCyl::SRC; HAND_CYL_COUNT],
             m02e1: 0,
             m02e2: 0,
             m02e4: 0,
@@ -709,8 +858,8 @@ impl Gohma {
             m5e94: 0,
             m5e96: 0,
             m5e98: [ZERO_XYZ; 25],
-            m5fc4: [0, 0],
-            m5fea: [0, 0],
+            m5fc4: [0; AT_SPH_COUNT],
+            m5fea: [0; HAND_CYL_COUNT],
             m6028: [0, 0, 0, 0, 0, 0, 0],
             m602c: 0,
             m602e: 0,
@@ -764,6 +913,7 @@ impl Gohma {
             dr2_4ca: 0,
             eye_pos: ZERO_XYZ,
             eye_radius: 50.0,
+            eye_shield: true,
             fire_pos: ZERO_XYZ,
             fire_radius: 100.0,
             speed_f: 0.0,
@@ -797,10 +947,6 @@ impl Gohma {
         self.rnd_f(65536.0) as i16
     }
 
-    fn get_anm_phase(&self) -> u8 {
-        if self.phase2 != 0 { 1 } else { 0 }
-    }
-
     fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32, sound_idx: i32) {
         self.morph_sound_idx = sound_idx;
         self.morph_bck = bck;
@@ -829,6 +975,50 @@ pub fn control(
         return;
     };
     for (_, mut actor, mut boss) in &mut bosses {
+        let at = {
+            let mut found = At::Idle;
+            if watch
+                .chains
+                .iter()
+                .any(|chain| chain.phase != super::hookshot::Phase::Wait)
+            {
+                found = At::Hookshot;
+            } else {
+                for shaft in watch.shafts.iter() {
+                    if shaft.phase != super::arrow::Phase::Flying {
+                        continue;
+                    }
+                    found = match shaft.kind {
+                        super::arrow::TYPE_LIGHT => At::LightArrow,
+                        super::arrow::TYPE_FIRE => At::FireArrow,
+                        super::arrow::TYPE_ICE => At::IceArrow,
+                        _ => At::Arrow,
+                    };
+                    break;
+                }
+                if found == At::Idle
+                    && watch
+                        .bolts
+                        .iter()
+                        .any(|bolt| bolt.parameter == super::boomerang::MODE_THROW)
+                {
+                    found = At::Boomerang;
+                }
+                if found == At::Idle
+                    && (watch.hammer.kind == super::hammer::CUT_HAMMER_SIDESWING
+                        || watch.hammer.kind == super::hammer::CUT_HAMMER_FRONTSWING)
+                {
+                    found = At::Hammer;
+                }
+                if found == At::Idle && watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
+                    found = At::Sword;
+                }
+                if found == At::Idle && !watch.blasts.list.is_empty() {
+                    found = At::Bomb;
+                }
+            }
+            found
+        };
         let kui = watch
             .others
             .iter()
@@ -842,6 +1032,11 @@ pub fn control(
             player_eye: player.pos,
             player_angle: [0, 0, 0],
             player_cut: false,
+            blow: Blow {
+                at,
+                blade: watch.held.item,
+                soup: watch.combat.soup,
+            },
             demo_stage: false,
             kui: if kui.is_some() { 1 } else { 0 },
             kui_health: boss.kui_health,
@@ -924,7 +1119,9 @@ impl Gohma {
         }
         self.move_step(actor, env, out);
         self.scale = HIO_M08;
-        self.morph.play();
+        if HIO_M05 == 0 {
+            self.morph.play();
+        }
         self.damage_check(actor, env, out);
         self.face_step(actor, env);
         self.hahen_move();
@@ -932,44 +1129,102 @@ impl Gohma {
         self.demo_camera(actor, env, out);
         self.btd_effect();
         self.btd_kankyo();
+        self.cc_at_sph_set();
+        self.cc_hand_cyl_set(actor);
+        self.eye_sph_set();
         self.collide(actor, env);
     }
 
-    fn collide(&mut self, actor: &Actor, env: &Env) {
-        self.eye_radius = REG0_F5 + EYE_RADIUS;
-        self.eye_pos = self.m03e0;
+    fn cc_at_sph_set(&mut self) {
+        let mut scale = 1.0f32;
+        if self.phase2 != 0 {
+            scale = 0.6;
+        }
+        for i in 0..AT_SPH_COUNT {
+            if self.phase2 != 0 && i != 8 && i != 10 {
+                self.m_at_sphs[i].tg_shield = false;
+            }
+            self.m_at_sphs[i].radius = scale * AT_SIZE[i];
+            self.m_at_sphs[i].centre = if self.m6e4c != 0 {
+                DEAD_HEAD_CENTRE
+            } else {
+                self.m02fc[i]
+            };
+            if i == 8 || i == 10 {
+                if self.m5e84 == 1 || self.m5e84 == 2 {
+                    self.m_at_sphs[i].at_set = true;
+                    if self.m5e84 == 2 {
+                        self.m_at_sphs[i].at_atp = 2;
+                    } else {
+                        self.m_at_sphs[i].at_atp = 1;
+                    }
+                } else {
+                    self.m_at_sphs[i].at_set = false;
+                }
+                self.m_at_sphs[i].co_set = false;
+                self.m_at_sphs[i].tg_set = false;
+            } else {
+                if i < 2 && self.m5e84 == 3 {
+                    self.m_at_sphs[i].at_set = true;
+                } else {
+                    self.m_at_sphs[i].at_set = false;
+                }
+                if i < 2 && self.phase2 == 0 {
+                    self.m_at_sphs[i].co_set = false;
+                    self.m_at_sphs[i].tg_set = false;
+                }
+            }
+        }
+    }
+
+    fn cc_hand_cyl_set(&mut self, actor: &Actor) {
         let mut turn = 0i16;
         let mut scale = 1.0f32;
         if self.m5e7c == 2 {
-            turn = -HAND_TURN;
-            scale = HAND_SCALE;
+            turn = -(REG0_S5.wrapping_add(0x1068));
+            scale = REG0_F10 + 0.95;
         } else if self.m5e7c == 3 {
-            turn = HAND_TURN;
-            scale = HAND_SCALE;
+            turn = REG0_S5.wrapping_add(0x1068);
+            scale = REG0_F10 + 0.95;
         }
-        for idx in 0..self.m5fea.len() {
-            let live = self.m5e7c != 0
-                && (self.m5e7c == 1
-                    || (self.m5e7c == 2 && idx <= 2)
-                    || (self.m5e7c == 3 && idx >= 3));
-            if live {
+        for cyl in self.m_hand_cyls.iter_mut() {
+            cyl.centre = PARKED_CENTRE;
+        }
+        for i in 0..HAND_CYL_COUNT {
+            if self.m5e7c != 0
+                && ((self.m5e7c == 1 || (self.m5e7c == 2 && i <= 2))
+                    || (self.m5e7c == 3 && i >= 3))
+            {
                 let local = [
-                    HAND_CO_POS_X.get(idx).copied().unwrap_or(0.0),
-                    HAND_CO_POS_Y.get(idx).copied().unwrap_or(0.0),
-                    scale * HAND_CO_POS_Z.get(idx).copied().unwrap_or(0.0),
+                    HAND_CO_POS_X[i],
+                    HAND_CO_POS_Y[i],
+                    scale * HAND_CO_POS_Z[i],
                 ];
-                let world = mtx_position_y(
-                    actor.angle[ANGLE_Y].wrapping_add(turn),
-                    local,
-                );
-                self.m5e98[19 + idx] = [world[0] + actor.pos.x, world[1] + actor.pos.y, world[2] + actor.pos.z];
+                self.m5e98[i + 19] = mtx_position_y(actor.angle[ANGLE_Y].wrapping_add(turn), local);
+                self.m5e98[i + 19][0] += actor.pos.x;
+                self.m5e98[i + 19][1] += actor.pos.y;
+                self.m5e98[i + 19][2] += actor.pos.z;
+                self.m_hand_cyls[i].centre = self.m5e98[i + 19];
+                self.m_hand_cyls[i].height = HAND_CO_SIZE_H[i];
+                self.m_hand_cyls[i].radius = HAND_CO_SIZE_R[i];
             }
         }
         self.m5e7c = 0;
+    }
+
+    fn eye_sph_set(&mut self) {
+        if self.phase2 != 0 {
+            self.eye_shield = false;
+        }
+        self.eye_radius = REG0_F5 + EYE_RADIUS;
+        self.eye_pos = self.m03e0;
+    }
+
+    fn collide(&mut self, _actor: &Actor, env: &Env) {
         if let Some(item) = env.item_pos {
             if env.item_speed > 10.0 {
                 let delta = item - self.eye3();
-                if abs3(delta.x, delta.y, delta.z) < EYE_REACH {
+                if delta.length() < EYE_REACH {
                     self.m02f8 = HAND_AT_FRAME;
                 }
             }
@@ -1109,13 +1364,14 @@ impl Gohma {
             self.eff_off();
             return;
         }
-        if self.phase2 == 0 && self.action_state == 0 {
+        if self.phase2 == 0 && self.action_state == 0 && self.eye_hit(env) {
             self.action_state = 10;
+            out.se(env.blow.se());
         }
-        if self.phase2 == 1 && self.action_state == 0 {
+        if self.phase2 == 1 && self.action_state == 0 && self.eye_hit(env) {
             self.action_state = 7;
-            self.total_damage = self.total_damage.saturating_add(1);
-            self.health -= 1;
+            self.total_damage = self.total_damage.wrapping_add(env.blow.power() as i8);
+            self.health -= env.blow.power();
             if self.health <= 0 || HIO_M06 != 0 {
                 self.m02e4 = 0xb;
                 self.gohma_state = 0x32;
@@ -1127,7 +1383,11 @@ impl Gohma {
                     self.gohma_state = 10;
                     self.total_damage = 0;
                 } else {
-                    let anm = self.hit_anm(actor, env);
+                    let anm = if env.blow.resulting_type() == 1 {
+                        self.hit_anm(actor, env)
+                    } else {
+                        BCK_HIT_M
+                    };
                     self.anm_init(anm, 1.0, EMODE_NONE, 1.0, -1);
                     self.gohma_state = 3;
                 }
@@ -1138,21 +1398,76 @@ impl Gohma {
             out.se(SE_CV_BTD_DAMAGE);
             self.eff_off();
         }
-        for lane in 0..self.m5fc4.len() {
-            if self.m5fc4[lane] == 0 {
-                self.m5fc4[lane] = 10;
+        for i in 0..AT_SPH_COUNT {
+            if self.m5fc4[i] == 0 {
+                if self.at_sph_hit(i, env) {
+                    self.m5fc4[i] = 10;
+                    self.m5e98[i] = self.m02fc[i];
+                    out.se_at(env.blow.se(), self.m5e98[i]);
+                    break;
+                }
             } else {
-                self.m5fc4[lane] -= 1;
+                self.m5fc4[i] -= 1;
             }
         }
-        for lane in 0..self.m5fea.len() {
-            if self.m5fea[lane] == 0 {
-                self.m5fea[lane] = 10;
-                return;
+        for i in 0..HAND_CYL_COUNT {
+            if self.m5fea[i] == 0 {
+                if self.hand_cyl_hit(i, env) {
+                    self.m5fea[i] = 10;
+                    out.se_at(env.blow.se(), self.m5e98[i + 19]);
+                    return;
+                }
             } else {
-                self.m5fea[lane] -= 1;
+                self.m5fea[i] -= 1;
             }
         }
+    }
+
+    fn eye_hit(&self, env: &Env) -> bool {
+        let reach = env.blow.reach();
+        if reach <= 0.0 {
+            return false;
+        }
+        abs3(
+            env.player_eye.x - self.eye_pos[0],
+            env.player_eye.y - self.eye_pos[1],
+            env.player_eye.z - self.eye_pos[2],
+        ) <= self.eye_radius + reach
+    }
+
+    fn at_sph_hit(&self, i: usize, env: &Env) -> bool {
+        if !self.m_at_sphs[i].tg_set {
+            return false;
+        }
+        if env.blow.reach() <= 0.0 {
+            return false;
+        }
+        let centre = self.m_at_sphs[i].centre;
+        abs3(
+            env.player_eye.x - centre[0],
+            env.player_eye.y - centre[1],
+            env.player_eye.z - centre[2],
+        ) <= self.m_at_sphs[i].radius + env.blow.reach()
+    }
+
+    fn hand_cyl_hit(&self, i: usize, env: &Env) -> bool {
+        if !self.m_hand_cyls[i].tg_set {
+            return false;
+        }
+        if env.blow.reach() <= 0.0 {
+            return false;
+        }
+        let centre = self.m_hand_cyls[i].centre;
+        let half = self.m_hand_cyls[i].height * 0.5;
+        let below = env.player_eye.y - (centre[1] - half);
+        let above = (centre[1] + half) - env.player_eye.y;
+        let dy = if below < above { below } else { above };
+        let dy = if dy < 0.0 { 0.0 } else { dy };
+        abs3(
+            env.player_eye.x - centre[0],
+            dy,
+            env.player_eye.z - centre[2],
+        ) <= self.m_hand_cyls[i].radius + env.blow.reach()
     }
 
     fn hit_anm(&self, actor: &Actor, env: &Env) -> i32 {
@@ -1300,7 +1615,7 @@ fn wrapping_div(value: i16, scale: i16) -> i16 {
 }
 
 fn abs3(x: f32, y: f32, z: f32) -> f32 {
-    x.abs() + y.abs() + z.abs()
+    (x * x + y * y + z * z).sqrt()
 }
 
 fn bearing(from: Vec3, to: Vec3) -> i16 {
