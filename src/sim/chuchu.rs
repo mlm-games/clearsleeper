@@ -1191,7 +1191,7 @@ impl Chuchu {
                     events.list.push(SimEvent::Se(SE_LK_MS_WEP_HIT));
                 }
             }
-            At::Idle | At::FanLight => {}
+            At::Idle => {}
         }
         if !guarded {
             let power = blow.at.power(blow.blade, blow.soup);
@@ -1265,7 +1265,7 @@ impl Chuchu {
     }
 
     fn resolve(&mut self, actor: &Actor, player_pos: Vec3, at: At, blast: bool) {
-        let at = if blast && !matches!(at, At::Hook | At::FanLight | At::FanLight) {
+        let at = if blast && !matches!(at, At::Hook | At::FanLight) {
             At::Bomb
         } else {
             at

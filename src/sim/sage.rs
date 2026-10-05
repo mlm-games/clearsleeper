@@ -739,7 +739,6 @@ impl Sage {
                 Step::RtHit0 => self.rt_hit0(ctx),
                 Step::RtHit1 => self.rt_hit1(ctx),
                 Step::HtHide => self.ht_hide(actor, ctx),
-                _ => false,
             };
             self.set_attention(temp);
             self.smoke_proc();
