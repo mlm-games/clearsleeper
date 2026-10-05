@@ -58,6 +58,7 @@ pub mod gohdan;
 pub mod gohma;
 pub mod ground;
 pub mod grammarian;
+pub mod gy_ctrl;
 pub mod gnbtaki;
 pub mod gryw;
 pub mod gull;
@@ -353,6 +354,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if gy_ctrl::is_gy_ctrl(&source.name) {
+        gy_ctrl::spawn(world, source)
     } else if salvage::is_salvage(&source.name) {
         world
             .spawn((
@@ -837,6 +840,7 @@ pub fn build(
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
     salvage::init(&mut sim.world);
+    gy_ctrl::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -961,6 +965,7 @@ pub fn build(
                     kytag00::control.in_set(WwSimSet::Execute),
                     tag_msg::control.in_set(WwSimSet::Execute),
                     salvage::control.in_set(WwSimSet::Execute),
+                    gy_ctrl::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
