@@ -55,6 +55,7 @@ pub struct App {
     movie_image: Cell<Option<repose_core::ImageHandle>>,
     movie_uploaded: Cell<usize>,
     movie_sound: bool,
+    movie_done: bool,
 }
 
 impl App {
@@ -97,6 +98,7 @@ impl App {
             movie_image: Cell::new(None),
             movie_uploaded: Cell::new(usize::MAX),
             movie_sound: false,
+            movie_done: false,
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -112,6 +114,9 @@ impl App {
             self.stage.as_ref(),
         );
         self.rooms = self.stage.as_ref().map(assets::start_set).unwrap_or_default();
+        self.sim
+            .world
+            .insert_resource(sim::door::StayRoom(-1));
         self.room_tick = 0;
         self.room_actors.clear();
         let spawn = self.sim.world.resource::<sim::area::Area>().spawn;
@@ -150,11 +155,15 @@ impl App {
             self.stage_item(false);
             self.stage_use(false);
         }
-        let cmds = if window_focused {
+        let mut cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
         } else {
             Vec::new()
         };
+        if self.menu.screen == menus::Screen::Title && self.movie_done {
+            cmds.push(menus::Cmd::Confirm);
+            self.movie_done = false;
+        }
         self.menu_prev.clone_from(held);
         if self.menu.screen == menus::Screen::Playing || cmds.is_empty() {
             return;
@@ -217,6 +226,7 @@ impl App {
                 let next = self.movie_frame + 1;
                 if next >= frames {
                     self.audio.play(audio::MOVIE_CUE);
+                    self.movie_done = true;
                 }
                 self.movie_frame = next % frames;
             } else {

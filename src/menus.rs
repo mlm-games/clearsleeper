@@ -145,16 +145,13 @@ pub fn title_view() -> View {
             .fill_max_size()
             .justify_content(JustifyContent::SPACE_BETWEEN)
             .align_items(AlignItems::CENTER)
-            .padding(56.dp())
+            .padding(28.dp())
             .hit_passthrough(),
     )
     .child([
         Spacer(),
-        Text("ClearSleeper")
-            .size(Sp(76.0))
-            .color(Color::from_hex(TITLE_HEX)),
         Text("Press Space")
-            .size(Sp(24.0))
+            .size(Sp(18.0))
             .color(Color::from_hex(DIM_HEX)),
     ])
 }
