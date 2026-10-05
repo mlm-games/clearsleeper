@@ -64,6 +64,7 @@ pub mod layer;
 pub mod leaves;
 pub mod lenzo;
 pub mod lock;
+pub mod magma;
 pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
@@ -73,14 +74,18 @@ pub mod msg;
 pub mod nh;
 pub mod pickup;
 pub mod pirateship;
+pub mod puppet_ganon;
 pub mod player;
 pub mod raft;
+pub mod rectangle;
 pub mod redead;
 pub mod rockfall;
 pub mod roll;
 pub mod sage;
 pub mod scenery;
+pub mod scenechange;
 pub mod schedule;
+pub mod seatag;
 pub mod select;
 pub mod medli;
 pub mod merchant;
@@ -114,6 +119,7 @@ pub mod wind;
 pub mod windmill;
 pub mod warship;
 pub mod water;
+pub mod woodbox;
 pub mod ylzou;
 pub mod zelda;
 pub mod zunari;
@@ -508,6 +514,17 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             Some(door) => world.spawn((actor, door)).id(),
             None => world.spawn(actor).id(),
         }
+    } else if rectangle::is_rectangle(&source.name) {
+        world.spawn((actor, rectangle::Rectangle::spawn())).id()
+    } else if seatag::is_seatag(&source.name) {
+        world.spawn((actor, seatag::Seatag::spawn())).id()
+    } else if magma::is_magma(&source.name) {
+        world.spawn((actor, magma::Magma::spawn())).id()
+    } else if woodbox::is_wood_box(&source.name) {
+        world.spawn((actor, woodbox::WoodBox::spawn())).id()
+    } else if scenechange::is_scene_change(&source.name) {
+        let change = scenechange::SceneChange::spawn(actor.angle);
+        world.spawn((actor, change)).id()
     } else {
         world.spawn(actor).id()
     }
@@ -669,6 +686,12 @@ pub fn build(
                     windmill::control.in_set(WwSimSet::Execute),
                     buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
+                    rectangle::control.in_set(WwSimSet::Execute),
+                    seatag::control.in_set(WwSimSet::Execute),
+                    scenechange::control.in_set(WwSimSet::Execute),
+                    magma::control.in_set(WwSimSet::Execute),
+                    woodbox::control.in_set(WwSimSet::Execute),
+
                 )
                     .chain(),
                 (
