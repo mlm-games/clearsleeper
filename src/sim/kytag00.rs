@@ -4,7 +4,7 @@ use super::actor::Actor;
 use super::flags::Switches;
 use super::player::Player;
 
-pub const KYTAG00_ACTORS: [&str; 1] = ["ky_tag0"];
+pub const KYTAG00_ACTORS: [&str; 3] = ["ky_tag0", "ky00you", "kytag00"];
 
 pub fn is_kytag00(name: &str) -> bool {
     KYTAG00_ACTORS.contains(&name)

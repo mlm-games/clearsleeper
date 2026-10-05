@@ -6,7 +6,7 @@ use super::actor::Actor;
 use super::collision::Collision;
 use super::ground::grounded;
 
-pub const TSUBO_ACTORS: [&str; 12] = [
+pub const TSUBO_ACTORS: [&str; 13] = [
     "Odokuro",
     "Tsubo",
     "Ktaru",
@@ -19,6 +19,7 @@ pub const TSUBO_ACTORS: [&str; 12] = [
     "Kmi02",
     "KkibaB",
     "Okioke",
+    "Hbox2S",
 ];
 
 pub const POT: u8 = 0;

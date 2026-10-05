@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-pub const WOOD_BOX_ACTORS: [&str; 1] = ["woodbx"];
+pub const WOOD_BOX_ACTORS: [&str; 2] = ["woodbx", "woodb"];
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WoodBox;

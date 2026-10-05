@@ -9,7 +9,7 @@ use crate::text::msgproc::{
     FPC_M_ERROR_PROCESS_ID, MsgGameInfo, MsgProcs, fop_msgm_message_set_actor,
 };
 
-pub const TAG_MSG_ACTORS: [&str; 1] = ["TagMsg2"];
+pub const TAG_MSG_ACTORS: [&str; 2] = ["TagMsg2", "TagMsg"];
 
 pub fn is_tag_msg(name: &str) -> bool {
     TAG_MSG_ACTORS.contains(&name)

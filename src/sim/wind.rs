@@ -7,7 +7,7 @@ use super::player::Player;
 use super::schedule::Schedule;
 use super::walk;
 
-pub const WIND_TAG_ACTORS: [&str; 2] = ["Yaflw00", "Ybgaf00"];
+pub const WIND_TAG_ACTORS: [&str; 3] = ["windtag", "wind_tag", "WindTag"];
 
 pub const NO_SWITCH: u8 = 0xFF;
 

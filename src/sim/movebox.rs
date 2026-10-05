@@ -15,7 +15,23 @@ use super::water;
 
 pub const MOVEBOX_ACTOR: &str = "DBLK0";
 
-pub const MOVEBOX_ACTORS: [&str; 3] = ["DBLK0", "DBLK1", "DKkiba"];
+pub const MOVEBOX_ACTORS: [&str; 15] = [
+    "osiBLK0",
+    "osiBLK1",
+    "Kkiba",
+    "Hseki2",
+    "Hseki7",
+    "Mmrr",
+    "MkieBB",
+    "Ecube",
+    "Hjump1",
+    "Hbox1",
+    "MpwrB",
+    "DBLK0",
+    "DBLK1",
+    "DKkiba",
+    "Hbox2",
+];
 
 pub fn is_movebox(name: &str) -> bool {
     MOVEBOX_ACTORS.contains(&name)
