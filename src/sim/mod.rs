@@ -127,6 +127,7 @@ pub mod redead;
 pub mod retag;
 pub mod rockfall;
 pub mod roll;
+pub mod salvage;
 pub mod sage;
 pub mod scenery;
 pub mod scenechange;
@@ -352,6 +353,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if salvage::is_salvage(&source.name) {
+        world
+            .spawn((
+                actor,
+                salvage::Salvage::default(),
+                salvage::Scale(glam::Vec3::from_array(source.scale)),
+            ))
+            .id()
     } else if tag_msg::is_tag_msg(&source.name) {
         tag_msg::spawn(world, source)
     } else if kytag00::is_kytag00(&source.name) {
@@ -827,6 +836,7 @@ pub fn build(
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
+    salvage::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -950,6 +960,7 @@ pub fn build(
                     kytag07::control.in_set(WwSimSet::Execute),
                     kytag00::control.in_set(WwSimSet::Execute),
                     tag_msg::control.in_set(WwSimSet::Execute),
+                    salvage::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
