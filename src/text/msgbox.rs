@@ -4,6 +4,7 @@ use super::font::{CharQuad, FontBank};
 use super::msgdata::MsgLenState;
 use super::msglayout::MsgLayoutState;
 use super::msgget::{MsgArchive, MsgGet};
+use super::msghio::MsgMeterHio;
 use super::msgproc::{
     MsgGameInfo, MeterMsgHio, MsgIconPic, fop_msgm_out_font_draw, fop_msgm_out_font_set,
     fop_msgm_value_increase,
@@ -1942,10 +1943,10 @@ impl Msg2Box {
             .unwrap_or(0);
 
         let out = [
-            self.output_text.get(index).cloned().flatten(),
-            self.output_ruby.get(index).cloned().flatten(),
-            self.output_text_sdw.get(index).cloned().flatten(),
-            self.output_ruby_sdw.get(index).cloned().flatten(),
+            self.output_text.get(index).cloned(),
+            self.output_ruby.get(index).cloned(),
+            self.output_text_sdw.get(index).cloned(),
+            self.output_ruby_sdw.get(index).cloned(),
         ];
 
         let message = self.message.clone();
@@ -2106,21 +2107,21 @@ impl Msg2Box {
             let above = self.pane_above;
             let extra = i32::from(self.mesg_entry.field_0x16);
             let target = self.scroll_line.wrapping_sub(extra);
-            self.message_out(font, above, target, len, layout, hio);
+            self.message_out(font, usize::from(above), target, len, layout, hio);
         }
 
         let center = self.pane_center;
         let line = self.scroll_line;
-        self.message_out(font, center, line, len, layout, hio);
+        self.message_out(font, usize::from(center), line, len, layout, hio);
 
         let stop = self
             .msg_data
-            .get(center)
+            .get(usize::from(center))
             .is_some_and(|d| d.mesg_status == STATUS_STOP);
         if stop {
             let below = self.pane_below;
             let extra = i32::from(self.mesg_entry.field_0x16);
-            self.message_out(font, below, line.wrapping_add(extra), len, layout, hio);
+            self.message_out(font, usize::from(below), line.wrapping_add(extra), len, layout, hio);
         }
     }
 
@@ -2290,7 +2291,7 @@ impl Msg2Box {
             if self.scroll_line != 0 {
                 let below = self.pane_below;
                 self.stick_state = 1;
-                self.screen_data_set(below);
+                self.screen_data_set(usize::from(below));
                 self.scroll_phase = 3;
                 self.scroll_line =
                     self.scroll_line.wrapping_sub(i32::from(self.mesg_entry.field_0x16));
@@ -2303,7 +2304,7 @@ impl Msg2Box {
         {
             let above = self.pane_above;
             self.stick_state = 2;
-            self.screen_data_set(above);
+            self.screen_data_set(usize::from(above));
             self.scroll_phase = 1;
             self.scroll_line = self.scroll_line.wrapping_add(i32::from(self.mesg_entry.field_0x16));
             self.status = STATUS_UNK5;
@@ -2323,7 +2324,7 @@ impl Msg2Box {
             if self.scroll_line != 0 {
                 let below = self.pane_below;
                 self.stick_state = 1;
-                self.screen_data_set(below);
+                self.screen_data_set(usize::from(below));
                 self.scroll_phase = 3;
                 self.scroll_line =
                     self.scroll_line.wrapping_sub(i32::from(self.mesg_entry.field_0x16));
@@ -2354,20 +2355,20 @@ impl Msg2Box {
         let center = self.pane_center;
         if self.open_t == 0 {
             let line = self.scroll_line;
-            self.message_out(font, center, line, len, layout, hio);
+            self.message_out(font, usize::from(center), line, len, layout, hio);
             let stop = self
                 .msg_data
-                .get(center)
+                .get(usize::from(center))
                 .is_some_and(|d| d.mesg_status == STATUS_STOP);
             if stop {
                 let below = self.pane_below;
                 let extra = i32::from(self.mesg_entry.field_0x16);
-                self.message_out(font, below, line.wrapping_add(extra), len, layout, hio);
+                self.message_out(font, usize::from(below), line.wrapping_add(extra), len, layout, hio);
             }
         } else if self.open_t == self.pop_speed {
             self.status = self
                 .msg_data
-                .get(center)
+                .get(usize::from(center))
                 .map(|d| d.mesg_status)
                 .unwrap_or(STATUS_TYPING);
         }
@@ -2379,7 +2380,7 @@ impl Msg2Box {
         }
         let stop = self
             .msg_data
-            .get(center)
+            .get(usize::from(center))
             .is_some_and(|d| d.mesg_status == STATUS_STOP);
         let alpha = self.box_alpha as u8;
         if stop {
@@ -2467,7 +2468,7 @@ impl Msg2Box {
             let above = self.pane_above;
             let y = self
                 .text_pane
-                .get(above)
+                .get(usize::from(above))
                 .map(|p| p.state.pos_top_left[1])
                 .unwrap_or(0.0f32);
             if y < -self.pane_height {
@@ -2480,15 +2481,15 @@ impl Msg2Box {
                 let new_below = self.pane_below;
                 let stop = self
                     .msg_data
-                    .get(self.pane_center)
+                    .get(usize::from(self.pane_center))
                     .is_some_and(|d| d.mesg_status == STATUS_STOP);
                 let line = self.scroll_line;
                 let extra = i32::from(self.mesg_entry.field_0x16);
                 if stop {
-                    self.message_out(font, new_below, line.wrapping_add(extra), len, layout, hio);
+                    self.message_out(font, usize::from(new_below), line.wrapping_add(extra), len, layout, hio);
                 } else {
-                    self.message_pane_hide(new_below);
-                    self.out_font_hide(new_below);
+                    self.message_pane_hide(usize::from(new_below));
+                    self.out_font_hide(usize::from(new_below));
                 }
                 self.shade = 0;
                 self.arrow_up_hide();
@@ -2503,7 +2504,7 @@ impl Msg2Box {
             let below = self.pane_below;
             let y = self
                 .text_pane
-                .get(below)
+                .get(usize::from(below))
                 .map(|p| p.state.pos_top_left[1])
                 .unwrap_or(0.0f32);
             if y > board_height {
@@ -2517,10 +2518,10 @@ impl Msg2Box {
                 let line = self.scroll_line;
                 let extra = i32::from(self.mesg_entry.field_0x16);
                 if self.scroll_line > 0 {
-                    self.message_out(font, new_above, line.wrapping_sub(extra), len, layout, hio);
+                    self.message_out(font, usize::from(new_above), line.wrapping_sub(extra), len, layout, hio);
                 } else {
-                    self.message_pane_hide(new_above);
-                    self.out_font_hide(new_above);
+                    self.message_pane_hide(usize::from(new_above));
+                    self.out_font_hide(usize::from(new_above));
                 }
                 self.shade = 0;
                 self.arrow_up_hide();
@@ -2535,7 +2536,7 @@ impl Msg2Box {
             let center = self.pane_center;
             let center_y = self
                 .text_pane
-                .get(center)
+                .get(usize::from(center))
                 .map(|p| p.state.pos_top_left[1])
                 .unwrap_or(0.0f32);
             if center_y <= origin_y {
@@ -2543,7 +2544,7 @@ impl Msg2Box {
                 self.scroll_phase = 0;
                 let stop = self
                     .msg_data
-                    .get(center)
+                    .get(usize::from(center))
                     .is_some_and(|d| d.mesg_status == STATUS_STOP);
                 if stop {
                     self.status = STATUS_STOP;
@@ -2566,7 +2567,7 @@ impl Msg2Box {
             let center = self.pane_center;
             let center_y = self
                 .text_pane
-                .get(center)
+                .get(usize::from(center))
                 .map(|p| p.state.pos_top_left[1])
                 .unwrap_or(0.0f32);
             if center_y >= origin_y {
@@ -2591,13 +2592,13 @@ impl Msg2Box {
         let center = self.pane_center;
         let below = self.pane_below;
         let height = self.pane_height;
-        if let Some(p) = self.text_pane.get_mut(above) {
+        if let Some(p) = self.text_pane.get_mut(usize::from(above)) {
             p.state.pos_top_left[1] = origin_y - height;
         }
-        if let Some(p) = self.text_pane.get_mut(center) {
+        if let Some(p) = self.text_pane.get_mut(usize::from(center)) {
             p.state.pos_top_left[1] = origin_y;
         }
-        if let Some(p) = self.text_pane.get_mut(below) {
+        if let Some(p) = self.text_pane.get_mut(usize::from(below)) {
             p.state.pos_top_left[1] = origin_y + height;
         }
     }

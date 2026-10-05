@@ -64,28 +64,15 @@ impl App {
         if let Err(e) = audio::load_cues(&mut audio) {
             log::warn!("clearsleeper: cue bank failed to load ({e})");
         }
-        let mut sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        let stage = assets::load_stage_tables(assets::SEA_STAGE);
-        sim::build(
-            &mut sim,
-            assets::load_stage(assets::SEA_STAGE),
-            stage.as_ref(),
-        );
         let sea_shade = assets::load_sea_shade().unwrap_or(0.0);
-        let rooms = stage.as_ref().map(assets::start_set).unwrap_or_default();
-        let spawn = sim.world.resource::<sim::area::Area>().spawn;
-        let cam = signal(OrbitCamera {
-            target: spawn,
-            ..OrbitCamera::default()
-        });
         let mut app = Self {
-            sim,
-            cam,
+            sim: Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ)),
+            cam: signal(OrbitCamera::default()),
             audio,
             room: None,
             menu: menus::Menu::new(),
-            stage,
-            rooms,
+            stage: None,
+            rooms: Vec::new(),
             room_tick: 0,
             room_actors: Vec::new(),
             sea_shade,
@@ -93,15 +80,33 @@ impl App {
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
         };
-        let stories = *app.sim.world.resource::<sim::flags::StoryBits>();
-        let frame = app.sim.world.resource::<sim::frame::CurrentFrame>().0;
-        if let Some(tables) = app.stage.as_ref() {
-            let rooms = app.rooms.clone();
-            if let Some(set) = load_rooms(tables, &rooms, stories) {
-                app.install_room_set(set, frame);
+        app.reset_world();
+        app
+    }
+
+    fn reset_world(&mut self) {
+        self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
+        self.stage = assets::load_stage_tables(assets::SEA_STAGE);
+        sim::build(
+            &mut self.sim,
+            assets::load_stage(assets::SEA_STAGE),
+            self.stage.as_ref(),
+        );
+        self.rooms = self.stage.as_ref().map(assets::start_set).unwrap_or_default();
+        self.room_tick = 0;
+        self.room_actors.clear();
+        let spawn = self.sim.world.resource::<sim::area::Area>().spawn;
+        self.cam.set(OrbitCamera {
+            target: spawn,
+            ..OrbitCamera::default()
+        });
+        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
+        if let Some(tables) = self.stage.clone() {
+            let rooms = self.rooms.clone();
+            if let Some(set) = load_rooms(&tables, &rooms, stories) {
+                self.install_room_set(set, 0);
             }
         }
-        app
     }
 
     /// Frame boundary: poll the shell into the sim's intent resources.
@@ -169,7 +174,7 @@ impl App {
     }
 
     fn start_new(&mut self, slot: usize) {
-        self.sim.world.resource_mut::<sim::frame::CurrentFrame>().0 = 0;
+        self.reset_world();
         if let Err(e) = self.write_slot(slot) {
             log::warn!("clearsleeper: slot {slot} write failed ({e})");
         }
