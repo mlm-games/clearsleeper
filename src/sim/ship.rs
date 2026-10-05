@@ -49,6 +49,134 @@ pub struct Ship {
     held: bool,
 }
 
+pub const CRANE_BASE_ANGLE: i16 = 0x3000;
+pub const ROPE_SEGMENTS: i32 = 250;
+pub const ROPE_PITCH: f32 = -10.0;
+pub const ROPE_HOOK_OFFSET: f32 = 160.0;
+pub const ROPE_OUT_STEP: i32 = 2;
+pub const ROPE_HOOK_TRIGGER: i32 = 20;
+pub const CRANE_ANIM_LEAD: f32 = 5.0;
+pub const CRANE_ANIM_SCALE: f32 = 0.333_333_34;
+pub const CRANE_ANGLE_RATE: i16 = 0x1000;
+pub const CRANE_ANGLE_MAX_STEP: i16 = 0x400;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CranePhase {
+    #[default]
+    Idle,
+    Ready,
+    Down,
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Crane {
+    pub phase: CranePhase,
+    pub hook: bool,
+    pub rope_count: i32,
+    pub base_angle: i16,
+    pub angle: i16,
+    pub angle_rate: i16,
+    pub top: Option<Vec3>,
+    pub segment: Vec3,
+    pub anim_frame: f32,
+}
+
+impl Default for Crane {
+    fn default() -> Self {
+        Self {
+            phase: CranePhase::Idle,
+            hook: false,
+            rope_count: 0,
+            base_angle: CRANE_BASE_ANGLE,
+            angle: 0,
+            angle_rate: 0,
+            top: None,
+            segment: Vec3::ZERO,
+            anim_frame: 0.0,
+        }
+    }
+}
+
+fn add_calc_angle(current: &mut i16, target: i16, scale: i32, max_step: i16, min_step: i16) {
+    let diff = i32::from(target - *current);
+    let step = (diff * scale) / 0x100;
+    let step = if step > i32::from(max_step) {
+        max_step
+    } else if step < i32::from(-max_step) {
+        -max_step
+    } else {
+        step as i16
+    };
+    let step = if step.abs() < min_step {
+        min_step
+    } else {
+        step
+    };
+    *current = current.wrapping_add(step);
+}
+
+impl Crane {
+    pub fn on_hook(&mut self) {
+        self.hook = true;
+    }
+
+    pub fn off_hook(&mut self) {
+        self.hook = false;
+    }
+
+    pub fn crane_top(&self) -> Option<Vec3> {
+        self.top
+    }
+
+    pub fn extend_rope(&mut self, length_change: i32, min_segment: i32) {
+        let current = self.rope_count;
+        let mut target = current + length_change;
+        if target >= ROPE_SEGMENTS {
+            target = ROPE_SEGMENTS;
+        } else if target < min_segment {
+            target = min_segment;
+        }
+        let applied = target - current;
+        if applied > 0 {
+            self.segment.y += ROPE_PITCH * applied as f32;
+        }
+        self.rope_count = target;
+    }
+
+    pub fn step_ready(&mut self) {
+        add_calc_angle(
+            &mut self.angle_rate,
+            0,
+            2,
+            CRANE_ANGLE_RATE,
+            CRANE_ANGLE_MAX_STEP,
+        );
+        self.extend_rope(ROPE_OUT_STEP, 0);
+        if self.rope_count == ROPE_HOOK_TRIGGER {
+            self.phase = CranePhase::Down;
+        }
+        if self.anim_frame < 30.0 {
+            self.anim_frame += 1.0;
+        }
+        let scaled = (self.anim_frame - CRANE_ANIM_LEAD) * CRANE_ANIM_SCALE;
+        self.angle = (scaled.clamp(0.0, 1.0) * f32::from(self.base_angle)) as i16;
+    }
+
+    pub fn tick_top(&mut self, ship_pos: Vec3, ship_yaw: i16) {
+        if !self.hook {
+            self.top = None;
+            return;
+        }
+        let yaw = from_s16(ship_yaw + self.angle);
+        let offset = ROPE_HOOK_OFFSET * self.rope_count as f32;
+        self.top = Some(Vec3::new(
+            ship_pos.x + yaw.sin() * offset,
+            ship_pos.y + ROPE_PITCH * self.rope_count as f32,
+            ship_pos.z + yaw.cos() * offset,
+        ));
+    }
+}
+
 impl Ship {
     pub fn velocity(&self, heading: i16) -> Vec3 {
         let yaw = from_s16(heading);
@@ -62,10 +190,14 @@ pub fn control(
     camera: Res<CameraYaw>,
     do_intent: Res<DoIntent>,
     dialogue: Res<Dialogue>,
-    mut ships: Query<(&mut Actor, &mut Ship)>,
+    mut ships: Query<(&mut Actor, &mut Ship, &mut Crane)>,
     mut players: Query<&mut Player>,
 ) {
-    for (mut actor, mut ship) in &mut ships {
+    for (mut actor, mut ship, mut crane) in &mut ships {
+        if crane.phase == CranePhase::Ready {
+            crane.step_ready();
+        }
+        crane.tick_top(actor.pos, actor.angle[1]);
         let mut edge = do_intent.0 && !ship.held && !dialogue.open;
         ship.held = do_intent.0;
         if let Some(mut player) = players.iter_mut().next() {

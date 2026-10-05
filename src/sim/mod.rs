@@ -239,7 +239,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         room: source.room,
     };
     if source.name == ship::SHIP_ACTOR {
-        world.spawn((actor, ship::Ship::default())).id()
+        world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
     } else if source.name == enemy::ENEMY_ACTOR {
         let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
         world
