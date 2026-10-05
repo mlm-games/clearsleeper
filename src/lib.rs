@@ -986,6 +986,10 @@ impl App {
                     max.y - min.y,
                     (max.x - min.x) * 0.5,
                 )
+            } else if entity.contains::<sim::cafelmp::Cafelmp>() {
+                let (min, max) = sim::cafelmp::Cafelmp::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::pbka::Pbka>() {
                 let (min, max) = sim::pbka::Pbka::spawn().cull();
                 lift = min[1];

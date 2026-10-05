@@ -14,6 +14,7 @@ pub mod bemos;
 pub mod barricade;
 pub mod bird;
 pub mod boko;
+pub mod cafelmp;
 pub mod buoybarrel;
 pub mod canon;
 pub mod bomb;
@@ -69,6 +70,7 @@ pub mod kalle_demos;
 pub mod kamome;
 pub mod kita;
 pub mod kn;
+pub mod kytag02;
 pub mod kytag01;
 pub mod kytag04;
 pub mod kytag06;
@@ -90,6 +92,7 @@ pub mod movebox;
 pub mod msdan2;
 pub mod msg;
 pub mod nh;
+pub mod objtime;
 pub mod npc_bmsw;
 pub mod npc_btsw;
 pub mod npc_mt;
@@ -143,8 +146,10 @@ pub mod tingle;
 pub mod torch;
 pub mod transition;
 pub mod tsubo;
+pub mod usovmc;
 pub mod volcano;
 pub mod vgnfd;
+pub mod vmsms;
 pub mod vmsdz;
 pub mod walk;
 pub mod wall;
@@ -653,6 +658,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, gntakie::Gntakie::spawn())).id()
     } else if vmsdz::is_vmsdz(&source.name) {
         world.spawn((actor, vmsdz::Vmsdz::spawn())).id()
+    } else if cafelmp::is_cafelmp(&source.name) {
+        world.spawn((actor, cafelmp::Cafelmp::spawn())).id()
+    } else if usovmc::is_usovmc(&source.name) {
+        world.spawn((actor, usovmc::Usovmc::spawn())).id()
+    } else if vmsms::is_vmsms(&source.name) {
+        let stones = vmsms::Vmsms::spawn(world.resource::<flags::EventFlags>());
+        world.spawn((actor, stones)).id()
+    } else if objtime::is_objtime(&source.name) {
+        let timer = objtime::Objtime::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, timer)).id()
+    } else if kytag02::is_kytag02(&source.name) {
+        world.spawn((actor, kytag02::Kytag02::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -831,6 +848,8 @@ pub fn build(
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
+                    cafelmp::control.in_set(WwSimSet::Execute),
+
                     pbka::control.in_set(WwSimSet::Execute),
                     gntakie::control.in_set(WwSimSet::Execute),
                     vmsdz::control.in_set(WwSimSet::Execute),
@@ -841,6 +860,8 @@ pub fn build(
                     kytag07::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
+                    usovmc::control.in_set(WwSimSet::Execute),
+                    kytag02::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -946,7 +967,10 @@ pub fn build(
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
                     tama::control.in_set(WwSimSet::Execute),
-                    swatk::control.in_set(WwSimSet::Execute),                    swc00::control.in_set(WwSimSet::Execute),
+                    swatk::control.in_set(WwSimSet::Execute),
+                    vmsms::control.in_set(WwSimSet::Execute),
+                    objtime::control.in_set(WwSimSet::Execute),
+                    swc00::control.in_set(WwSimSet::Execute),
                     swtdoor::control.in_set(WwSimSet::Execute),
                     tagkb::control.in_set(WwSimSet::Execute),
 
