@@ -4,10 +4,10 @@ use super::actor::Actor;
 
 pub const SPOTBOX_ACTORS: [&str; 2] = ["spotbox", "spotbx1"];
 
-pub const TYPE_MASK: u32 = 1; // <- d_a_spotbox.h:12
-pub const BASE_SMALL: f32 = 100.0; // <- d_a_spotbox.cpp:15
-pub const BASE_LARGE: f32 = 1000.0; // <- d_a_spotbox.cpp:15
-pub const HALF: f32 = 0.5; // <- d_a_spotbox.cpp:20
+pub const TYPE_MASK: u32 = 1;
+pub const BASE_SMALL: f32 = 100.0;
+pub const BASE_LARGE: f32 = 1000.0;
+pub const HALF: f32 = 0.5;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct SpotBox {

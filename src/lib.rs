@@ -902,6 +902,14 @@ impl App {
                 let (base, height, half) = gun.hull();
                 lift = base;
                 (view::ActorKind::Scenery, 0, height, half)
+            } else if entity.contains::<sim::spotbox::SpotBox>() {
+                lift = -(sim::spotbox::HALF);
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    sim::spotbox::HALF * 2.0,
+                    sim::spotbox::HALF,
+                )
             } else if let Some(cell) = entity.get::<sim::door::JailDoor>() {
                 if cell.open() {
                     continue;
