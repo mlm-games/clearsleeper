@@ -32,6 +32,7 @@ pub mod bmdhand;
 pub mod bwdg;
 pub mod dr2;
 pub mod fgmahou;
+pub mod hitobj;
 pub mod hole;
 pub mod bird;
 pub mod bwds;
@@ -2151,6 +2152,8 @@ pub fn build(
                 death::check.in_set(WwSimSet::Execute),
                 cleared::control.in_set(WwSimSet::Execute),
                 (att::control.in_set(WwSimSet::Execute)
+                    .before(contact_run::run),),
+                (hitobj::control.in_set(WwSimSet::Execute)
                     .before(contact_run::run),),
                 contact_run::run.in_set(WwSimSet::Execute),
                 frame::advance.in_set(WwSimSet::After),
