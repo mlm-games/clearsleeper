@@ -96,6 +96,7 @@ pub mod fan;
 pub mod ff;
 pub mod obj_eff;
 pub mod obj_hha;
+pub mod obj_mmrr;
 pub mod pirate_flag;
 pub mod shand;
 pub mod tag_hint;
@@ -616,6 +617,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if fgmahou::is_fgmahou(&source.name) {
         let orb = fgmahou::FgMahou::spawn(source.parameters);
         world.spawn((actor, orb)).id()
+    } else if obj_mmrr::is_obj_mmrr(&source.name) {
+        let m = obj_mmrr::ObjMmrr::spawn(source.parameters);
+        world.spawn((actor, m)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1959,6 +1963,7 @@ pub fn build(
                 shand::control.in_set(WwSimSet::Execute),
                 pirate_flag::control.in_set(WwSimSet::Execute),
                 obj_eff::control.in_set(WwSimSet::Execute),
+                obj_mmrr::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
