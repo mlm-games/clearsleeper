@@ -415,6 +415,8 @@ pub struct StickControl {
     pub bits: u8,
     pub horizontal_wait: i16,
     pub vertical_wait: i16,
+    pub vertical_repeat_angle: i16,
+    pub horizontal_repeat_left: i16,
     pub first_wait: i16,
     pub second_wait: i16,
     pub step: i16,
@@ -440,7 +442,7 @@ impl StickControl {
             prev_bits: 0,
             bits: 0,
             horizontal_wait: first,
-            vertical_wait: first,
+            vertical_wait: 0,
             first_wait: second,
             second_wait: second,
             step,
@@ -450,6 +452,8 @@ impl StickControl {
             angle_base: 0,
             repeat_angle: STICK_HALF_DEAD,
             half_dead: STICK_HALF_DEAD,
+            vertical_repeat_angle: first,
+            horizontal_repeat_left: second,
         };
         stick.init();
         stick
@@ -460,10 +464,10 @@ impl StickControl {
         self.vertical_wait = 0;
         self.prev_bits = 0;
         self.bits = 0;
-        self.repeat_left = 0;
+        self.angle_base = 0;
         self.horizontal_wait = self.first_wait;
-        self.vertical_wait = self.first_wait;
-        self.repeat_count = self.second_wait;
+        self.vertical_repeat_angle = self.first_wait;
+        self.horizontal_repeat_left = self.second_wait;
         self.repeat_left = self.second_wait;
     }
 
@@ -471,13 +475,13 @@ impl StickControl {
         self.repeat_count = 0;
         self.bits &= 0xFC;
         self.horizontal_wait = self.first_wait;
-        self.repeat_left = self.second_wait;
+        self.horizontal_repeat_left = self.second_wait;
     }
 
     pub fn y_init(&mut self) {
         self.vertical_wait = 0;
         self.bits &= !0x0C;
-        self.vertical_wait = self.first_wait;
+        self.vertical_repeat_angle = self.first_wait;
         self.repeat_left = self.second_wait;
     }
 
@@ -564,11 +568,11 @@ impl StickControl {
     pub fn check_left_trigger(&mut self) -> bool {
         if self.repeat_count == 0 && self.bits & 1 != 0 {
             self.repeat_count = self.horizontal_wait;
-            let mut wait = self.horizontal_wait;
-            let mut left = self.repeat_left;
-            self.repeat_step(&mut wait, &mut left);
-            self.horizontal_wait = wait;
-            self.repeat_left = left;
+            let mut angle = self.horizontal_wait;
+            let mut left = self.horizontal_repeat_left;
+            self.repeat_step(&mut angle, &mut left);
+            self.horizontal_wait = angle;
+            self.horizontal_repeat_left = left;
             true
         } else {
             false
@@ -578,11 +582,11 @@ impl StickControl {
     pub fn check_right_trigger(&mut self) -> bool {
         if self.repeat_count == 0 && self.bits & 2 != 0 {
             self.repeat_count = self.horizontal_wait;
-            let mut wait = self.horizontal_wait;
-            let mut left = self.repeat_left;
-            self.repeat_step(&mut wait, &mut left);
-            self.horizontal_wait = wait;
-            self.repeat_left = left;
+            let mut angle = self.horizontal_wait;
+            let mut left = self.horizontal_repeat_left;
+            self.repeat_step(&mut angle, &mut left);
+            self.horizontal_wait = angle;
+            self.horizontal_repeat_left = left;
             true
         } else {
             false
@@ -591,11 +595,11 @@ impl StickControl {
 
     pub fn check_up_trigger(&mut self) -> bool {
         if self.vertical_wait == 0 && self.bits & 4 != 0 {
-            self.vertical_wait = self.vertical_wait;
-            let mut wait = self.vertical_wait;
+            self.vertical_wait = self.vertical_repeat_angle;
+            let mut angle = self.vertical_repeat_angle;
             let mut left = self.repeat_left;
-            self.repeat_step(&mut wait, &mut left);
-            self.vertical_wait = wait;
+            self.repeat_step(&mut angle, &mut left);
+            self.vertical_repeat_angle = angle;
             self.repeat_left = left;
             true
         } else {
@@ -605,11 +609,11 @@ impl StickControl {
 
     pub fn check_down_trigger(&mut self) -> bool {
         if self.vertical_wait == 0 && self.bits & 8 != 0 {
-            self.vertical_wait = self.vertical_wait;
-            let mut wait = self.vertical_wait;
+            self.vertical_wait = self.vertical_repeat_angle;
+            let mut angle = self.vertical_repeat_angle;
             let mut left = self.repeat_left;
-            self.repeat_step(&mut wait, &mut left);
-            self.vertical_wait = wait;
+            self.repeat_step(&mut angle, &mut left);
+            self.vertical_repeat_angle = angle;
             self.repeat_left = left;
             true
         } else {

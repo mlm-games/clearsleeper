@@ -8,9 +8,11 @@ use crate::sim::flags::EventFlags;
 use crate::sim::pickup::Rupees;
 use crate::sim::player_status::{PlayerStatus, STTS0_BOW_AIM};
 use crate::text::msgproc::MsgProcs;
+use crate::ui_meter_gauges as gauges;
 use crate::ui_meter_gauges::{
     self, boss_gauge_collect, GaugeEnv, GaugeOutput, MeterGauges, MeterTuning,
 };
+use crate::ui_meter_vitals as vitals;
 use crate::ui_meter_vitals::{self, Vitals, VitalsEnv};
 
 pub const SCREEN_PARTS1: &str = "main_parts1.blo";
