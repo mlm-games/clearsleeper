@@ -1896,6 +1896,9 @@ pub fn build(
                 grammarian::control.in_set(WwSimSet::Execute),
                 apzl::control.in_set(WwSimSet::Execute),
                 npc_nz::control.in_set(WwSimSet::Execute),
+            )
+                .chain(),
+            (
                 npc_ho::control.in_set(WwSimSet::Execute),
                 npc_hi1::control.in_set(WwSimSet::Execute),
                 npc_fa1::control.in_set(WwSimSet::Execute),
@@ -1906,6 +1909,8 @@ pub fn build(
                 sss::control.in_set(WwSimSet::Execute),
                 tag_hint::control.in_set(WwSimSet::Execute),
                 tag_md_cb::control.in_set(WwSimSet::Execute),
+                shop::control.in_set(WwSimSet::Execute),
+                zelda::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),

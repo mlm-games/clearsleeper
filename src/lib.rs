@@ -716,8 +716,11 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
-            } else if entity.contains::<sim::shop::Shop>()
-                || entity.contains::<sim::lenzo::Lenzo>()
+            } else if let Some(x) = entity.get::<sim::shop::Shop>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::lenzo::Lenzo>()
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
                 || entity.contains::<sim::medli::Medli>()
