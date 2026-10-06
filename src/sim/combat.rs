@@ -1,8 +1,14 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use super::actor::Actor;
 use super::collision::Collision;
 use super::damage;
+use super::damage_resolve::{
+    AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
+    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, Atk, Attacker, CcAtInfo,
+    DamageFx, HitAudio, HitStop, NAME_PLAYER, PlayerCut, Target, cc_at_check,
+};
 use super::enemy;
 use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
@@ -12,6 +18,7 @@ use super::intent::{CameraYaw, ItemIntent, MoveIntent};
 use super::jump::{self, Jump};
 use super::lock::Lock;
 use super::player::Player;
+use super::registry::ActorRegistry;
 use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::Swim;
@@ -28,6 +35,21 @@ const DECEL_MIN: f32 = 0.5;
 const SWORD_OFFSET: f32 = 20.0;
 const SWORD_RADIUS: f32 = 20.0;
 const FLINCH_TICKS: u32 = 10;
+/// `dCcG_SE_UNK1` (`d_cc_d.h:66`), the `SrcGObjAt Se` every sword cut's AT object carries: the
+/// hit-sound ladder reads it as neither wood, nor metal, nor arrow, nor hookshot.
+const AT_SE_SWORD: u8 = 1;
+/// The chain step the reference's cut-count field holds on the fourth cut, the finisher and the
+/// only one of the four the `mHitSoundId` ladder gives a non-zero selector.
+const CUT_COUNT_FINISH: u8 = 4;
+
+/// The struck actor's status word, read through the process id the registry holds for it the way
+/// the reference reads it off the actor. An actor the registry has no entry for carries no bits.
+pub fn actor_status(registry: &ActorRegistry, entity: Entity) -> u32 {
+    registry
+        .proc_id(entity)
+        .and_then(|proc_id| registry.status(proc_id))
+        .unwrap_or(0)
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CutKind {
@@ -53,6 +75,35 @@ fn cut(kind: CutKind) -> (u32, f32, f32) {
 
 fn is_finisher(kind: CutKind) -> bool {
     kind == CutKind::EA || kind == CutKind::EB
+}
+
+/// The player's cut type each cut kind carries. The reference writes the same six cut types onto
+/// both the normal-cut and the finish-cut AT parameters, so the mapping is one to one.
+fn cut_type(kind: CutKind) -> u8 {
+    match kind {
+        CutKind::A => CUT_TYPE_CUT_A,
+        CutKind::F => CUT_TYPE_CUT_F,
+        CutKind::R => CUT_TYPE_CUT_R,
+        CutKind::L => CUT_TYPE_CUT_L,
+        CutKind::EA => CUT_TYPE_CUT_EA,
+        CutKind::EB => CUT_TYPE_CUT_EB,
+    }
+}
+
+/// The AT special parameter: the reference's normal cuts take `dCcG_At_Spl_UNK0` and its finish
+/// cuts take `dCcG_At_Spl_UNK1`, the value that marks the hit a critical one.
+fn cut_spl(kind: CutKind) -> u8 {
+    if is_finisher(kind) { AT_SPL_UNK1 } else { AT_SPL_UNK0 }
+}
+
+/// The cut count the hit-sound selector ladder reads: the chain step, which the reference sets to
+/// four on the fourth cut, the finisher.
+fn cut_count(kind: CutKind, combo: u32) -> u8 {
+    if is_finisher(kind) {
+        CUT_COUNT_FINISH
+    } else {
+        u8::try_from(combo).unwrap_or(0)
+    }
 }
 
 #[derive(Resource, Debug, Clone, Copy, Default)]
@@ -135,6 +186,8 @@ pub struct Outcome<'w> {
     combat: ResMut<'w, Combat>,
     zones: ResMut<'w, super::flags::ZoneActors>,
     events: ResMut<'w, SimEvents>,
+    stop: ResMut<'w, HitStop>,
+    audio: ResMut<'w, HitAudio>,
 }
 
 pub fn control(
@@ -153,6 +206,7 @@ pub fn control(
     >,
     mut out: Outcome<'_>,
     mut players: Query<&mut Player>,
+    registry: Res<ActorRegistry>,
     mut commands: Commands,
 ) {
     let pressed = item.0 && !out.combat.held;
@@ -214,7 +268,30 @@ pub fn control(
         if out.combat.frame >= DAMAGE_START && out.combat.frame < DAMAGE_END {
             let center_x = player.pos.x + SWORD_OFFSET * player.yaw.sin();
             let center_z = player.pos.z + SWORD_OFFSET * player.yaw.cos();
-            let power = damage::sword_power(blade, soup);
+            let kind = out.combat.kind;
+            let swing = PlayerCut {
+                cut_type: cut_type(kind),
+                cut_count: cut_count(kind, out.combat.combo),
+                pos: player.pos,
+            };
+            let swing_atk = Atk {
+                at_type: AT_TYPE_SWORD,
+                at_se: AT_SE_SWORD,
+                at_spl: cut_spl(kind),
+                at_atp: damage::sword_power(blade, soup) as u8,
+                ac: Some(Attacker {
+                    name: NAME_PLAYER.to_owned(),
+                    pos: player.pos,
+                    speed: Vec3::new(
+                        player.speed * player.yaw.sin(),
+                        player.speed_y,
+                        player.speed * player.yaw.cos(),
+                    ),
+                    bomb_state: 0,
+                    tsubo_type: 0,
+                }),
+            };
+            let mut fx: Vec<DamageFx> = Vec::new();
             let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for (entity, actor, hp, mut hurt) in actors.iter_mut() {
                 let Some(mut hp) = hp else {
@@ -222,15 +299,38 @@ pub fn control(
                 };
                 let dx = actor.pos.x - center_x;
                 let dz = actor.pos.z - center_z;
-                if dx * dx + dz * dz <= SWORD_RADIUS * SWORD_RADIUS {
-                    hp.0 -= power;
-                    if let Some(hurt) = hurt.as_deref_mut() {
-                        hurt.0 = FLINCH_TICKS;
-                    }
-                    out.events.list.push(SimEvent::Hit);
-                    if hp.0 <= 0 {
-                        dead.push((entity, actor.room, actor.set_id));
-                    }
+                if dx * dx + dz * dz > SWORD_RADIUS * SWORD_RADIUS {
+                    continue;
+                }
+                let mut target = Target {
+                    name: actor.name.clone(),
+                    pos: actor.pos,
+                    room: actor.room,
+                    status: actor_status(&registry, entity),
+                    health: *hp,
+                    ..Default::default()
+                };
+                let mut info = CcAtInfo {
+                    mp_obj: Some(swing_atk.clone()),
+                    p_particle_pos: Some(actor.pos),
+                    ..Default::default()
+                };
+                cc_at_check(
+                    &mut target,
+                    &mut info,
+                    &swing,
+                    &mut out.events,
+                    &mut out.stop,
+                    &mut out.audio,
+                    &mut fx,
+                );
+                hp.0 = target.health.0;
+                if let Some(hurt) = hurt.as_deref_mut() {
+                    hurt.0 = FLINCH_TICKS;
+                }
+                out.events.list.push(SimEvent::Hit);
+                if hp.0 <= 0 {
+                    dead.push((entity, actor.room, actor.set_id));
                 }
             }
             for (entity, room, set_id) in dead {

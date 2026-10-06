@@ -3,10 +3,17 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::combat::HitPoints;
+use super::combat::{HitPoints, actor_status};
 use super::damage;
+use super::damage_resolve::{
+    AT_SE_ARROW, AT_SPL_UNK0, AT_TYPE_FIRE_ARROW, AT_TYPE_ICE_ARROW, AT_TYPE_LIGHT_ARROW,
+    AT_TYPE_NORMAL_ARROW, Atk, AtkType, Attacker, CcAtInfo, CUT_TYPE_NONE, DamageFx, HitAudio,
+    HitStop, NAME_ARROW, PlayerCut, Target, cc_at_check,
+};
 use super::enemy::Hurt;
 use super::ground;
+use super::player::Player;
+use super::registry::ActorRegistry;
 use super::ship::Ship;
 use super::walk::{swept, to_s16};
 
@@ -33,6 +40,26 @@ pub const FIRE_WATER_FRAMES: i32 = 1;
 pub const ICE_WATER_FRAMES: i32 = 10 * 30;
 pub const MAGIC_COST: [i16; 4] = [0, 1, 1, 2];
 pub const ROUNDS: u8 = 5;
+
+/// `SrcObjAt Atp` for the fire and ice arrows in the reference's arrow attack table.
+const ATP_FIRE_ICE: u8 = 4;
+/// `SrcObjAt Atp` for the light arrow. The charge reads the damage as a signed byte, so this value
+/// is negative and the light arrow takes no health off anything it strikes.
+const ATP_LIGHT: u8 = 0xFF;
+/// `dCcG_At_Spl_UNKB`, the special parameter a loosed light arrow's AT object takes.
+const AT_SPL_UNKB: u8 = 0xB;
+
+/// The AT type and the power one arrow kind carries, the two rows of the reference's arrow attack
+/// table: the normal arrow is `POWER`, the fire and ice arrows `ATP_FIRE_ICE`, the light arrow
+/// `ATP_LIGHT`.
+fn arrow_attack(kind: u8) -> (AtkType, u8) {
+    match kind {
+        TYPE_FIRE => (AT_TYPE_FIRE_ARROW, ATP_FIRE_ICE),
+        TYPE_ICE => (AT_TYPE_ICE_ARROW, ATP_FIRE_ICE),
+        TYPE_LIGHT => (AT_TYPE_LIGHT_ARROW, ATP_LIGHT),
+        _ => (AT_TYPE_NORMAL_ARROW, POWER as u8),
+    }
+}
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -125,6 +152,7 @@ pub fn is_arrow(name: &str) -> bool {
 pub fn control(
     collision: Option<Res<super::collision::Collision>>,
     wet: Option<Res<super::water::Water>>,
+    registry: Res<ActorRegistry>,
     mut arrows: Query<(Entity, &mut Arrow)>,
     mut foes: Query<
         (
@@ -136,11 +164,24 @@ pub fn control(
         ),
         Without<Ship>,
     >,
+    players: Query<&Player>,
     mut flags: ResMut<super::flags::ZoneActors>,
+    mut stop: ResMut<HitStop>,
+    mut audio: ResMut<HitAudio>,
+    mut events: ResMut<super::events::SimEvents>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
     let soaked = wet.as_deref().is_some_and(|water| water.in_area);
+    let shooter = PlayerCut {
+        cut_type: CUT_TYPE_NONE,
+        cut_count: 0,
+        pos: players
+            .iter()
+            .next()
+            .map_or(Vec3::ZERO, |player| player.pos),
+    };
+    let mut fx: Vec<DamageFx> = Vec::new();
     let mut spent: Vec<Entity> = Vec::new();
     let mut slain: Vec<(i8, u16)> = Vec::new();
     for (entity, mut arrow) in &mut arrows {
@@ -151,7 +192,7 @@ pub fn control(
                 let step = arrow.speed;
                 arrow.pos += step;
                 let tip = arrow.pos + step * CAPSULE_STRETCH;
-                let mut struck: Option<(Entity, Option<i32>, i8, u16)> = None;
+                let mut struck: Option<(Entity, Option<i32>, Vec3, i8, u16)> = None;
                 let mut nearest = f32::INFINITY;
                 for (foe, actor, colliders, _, _) in &foes {
                     if !swept(from, tip, actor.pos, CAPSULE_RADIUS + BODY_HALF) {
@@ -164,14 +205,18 @@ pub fn control(
                     // `_atHit` ignores any actor without a JntHit, then `procMove` refines
                     // the strike through `searchJntHitPosAngleOffset` to pick the joint.
                     let angle = [to_s16(arrow.pitch), to_s16(arrow.yaw), 0];
-                    let joint = colliders.and_then(|colliders| {
-                        let (joint, _) = colliders.search(angle, actor, arrow.pos);
-                        (joint >= 0).then_some(joint)
-                    });
+                    let contact = colliders.map(|colliders| colliders.search(angle, actor, arrow.pos));
+                    let joint = contact.and_then(|(joint, _)| (joint >= 0).then_some(joint));
                     nearest = distance;
-                    struck = Some((foe, joint, actor.room, actor.set_id));
+                    struck = Some((
+                        foe,
+                        joint,
+                        contact.map_or(actor.pos, |(_, pos)| pos),
+                        actor.room,
+                        actor.set_id,
+                    ));
                 }
-                let Some((foe, joint, room, set_id)) = struck else {
+                let Some((foe, joint, contact, room, set_id)) = struck else {
                     if soaked && arrow.kind != TYPE_LIGHT {
                         arrow.drown();
                         continue;
@@ -181,8 +226,47 @@ pub fn control(
                     }
                     continue;
                 };
-                if let Ok((_, _, _, mut hp, mut hurt)) = foes.get_mut(foe) {
-                    hp.0 -= POWER;
+                if let Ok((_, actor, _, mut hp, mut hurt)) = foes.get_mut(foe) {
+                    let (at_type, at_atp) = arrow_attack(arrow.kind);
+                    let mut target = Target {
+                        name: actor.name.clone(),
+                        pos: actor.pos,
+                        room: actor.room,
+                        status: actor_status(&registry, foe),
+                        health: *hp,
+                        ..Default::default()
+                    };
+                    let mut info = CcAtInfo {
+                        mp_obj: Some(Atk {
+                            at_type,
+                            at_se: AT_SE_ARROW,
+                            at_spl: if arrow.kind == TYPE_LIGHT {
+                                AT_SPL_UNKB
+                            } else {
+                                AT_SPL_UNK0
+                            },
+                            at_atp,
+                            ac: Some(Attacker {
+                                name: NAME_ARROW.to_owned(),
+                                pos: arrow.pos,
+                                speed: arrow.speed,
+                                bomb_state: 0,
+                                tsubo_type: 0,
+                            }),
+                        }),
+                        p_particle_pos: Some(contact),
+                        ..Default::default()
+                    };
+                    cc_at_check(
+                        &mut target,
+                        &mut info,
+                        &shooter,
+                        &mut events,
+                        &mut stop,
+                        &mut audio,
+                        &mut fx,
+                    );
+                    hp.0 = target.health.0;
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = FLINCH;
                     }

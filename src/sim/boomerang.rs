@@ -2,10 +2,16 @@ use bevy_ecs::prelude::*;
 
 use glam::Vec3;
 
-use super::combat::HitPoints;
+use super::combat::{HitPoints, actor_status};
 use super::damage;
+use super::damage_resolve::{
+    AT_SE_WOOD, AT_SPL_UNK0, AT_TYPE_BOOMERANG, Atk, Attacker, CcAtInfo, CUT_TYPE_NONE, DamageFx,
+    HitAudio, HitStop, NAME_BOOMERANG, PlayerCut, Target, cc_at_check,
+};
 use super::enemy::Hurt;
+use super::events::SimEvents;
 use super::player::Player;
+use super::registry::ActorRegistry;
 use super::ship::Ship;
 use super::walk::{self, within};
 
@@ -147,7 +153,9 @@ impl Boomerang {
         distance
     }
 
-    pub fn step(&mut self) {
+    /// One step along the flight path. The returned vector is the frame's movement, the velocity
+    /// the damage resolution aims a knockback from.
+    pub fn step(&mut self) -> Vec3 {
         self.model_yaw = self.model_yaw.wrapping_sub(SPIN);
         let delta = self.target - self.pos;
         let distance = delta.length();
@@ -163,6 +171,7 @@ impl Boomerang {
             self.speed * self.pitch.cos() * self.heading.cos(),
         );
         self.pos += step;
+        step
     }
 
     pub fn catches(&self, home: Vec3) -> bool {
@@ -176,16 +185,26 @@ fn shortest(from: f32, to: f32) -> f32 {
 
 pub fn control(
     mut zones: ResMut<super::flags::ZoneActors>,
+    registry: Res<ActorRegistry>,
     mut booms: Query<(Entity, &mut Boomerang)>,
     players: Query<&Player>,
     riding: Query<&Ship>,
     held: Option<ResMut<super::item::Held>>,
     mut foes: Query<(Entity, &super::actor::Actor, &mut HitPoints, Option<&mut Hurt>)>,
+    mut stop: ResMut<HitStop>,
+    mut audio: ResMut<HitAudio>,
+    mut events: ResMut<SimEvents>,
     mut commands: Commands,
 ) {
     let Some(player) = players.iter().next() else {
         return;
     };
+    let thrower = PlayerCut {
+        cut_type: CUT_TYPE_NONE,
+        cut_count: 0,
+        pos: player.pos,
+    };
+    let mut fx: Vec<DamageFx> = Vec::new();
     let on_ship = riding.iter().any(|ship| ship.riding);
     let mut caught = false;
     let mut spent: Vec<Entity> = Vec::new();
@@ -197,15 +216,50 @@ pub fn control(
         if on_ship && !boom.returning {
             boom.extend(true);
         }
-        boom.step();
+        let carried = boom.step();
         if boom.returning {
             boom.home(player);
         } else {
+            let swing = Atk {
+                at_type: AT_TYPE_BOOMERANG,
+                at_se: AT_SE_WOOD,
+                at_spl: AT_SPL_UNK0,
+                at_atp: damage::BOMERANG as u8,
+                ac: Some(Attacker {
+                    name: NAME_BOOMERANG.to_owned(),
+                    pos: boom.pos,
+                    speed: carried,
+                    bomb_state: 0,
+                    tsubo_type: 0,
+                }),
+            };
             for (foe, actor, mut hp, mut hurt) in &mut foes {
                 if boom.struck.contains(&foe) || !within(boom.pos, actor.pos, CAPSULE_RADIUS + HIT_REACH) {
                     continue;
                 }
-                hp.0 -= damage::BOMERANG;
+                let mut target = Target {
+                    name: actor.name.clone(),
+                    pos: actor.pos,
+                    room: actor.room,
+                    status: actor_status(&registry, foe),
+                    health: *hp,
+                    ..Default::default()
+                };
+                let mut info = CcAtInfo {
+                    mp_obj: Some(swing.clone()),
+                    p_particle_pos: Some(actor.pos),
+                    ..Default::default()
+                };
+                cc_at_check(
+                    &mut target,
+                    &mut info,
+                    &thrower,
+                    &mut events,
+                    &mut stop,
+                    &mut audio,
+                    &mut fx,
+                );
+                hp.0 = target.health.0;
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = FLINCH;
                 }

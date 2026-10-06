@@ -1623,7 +1623,9 @@ impl App {
         } else if self.movie_sound {
             self.audio.stop_cue(audio::MOVIE_CUE);
         }
-        let steps = self.sim.step(dt);
+        let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
+            && self.menu.screen == menus::Screen::Playing;
+        let steps = if held { 0 } else { self.sim.step(dt) };
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
         if game_over && self.menu.screen == menus::Screen::Playing {
             self.menu.screen = menus::Screen::GameOver;
