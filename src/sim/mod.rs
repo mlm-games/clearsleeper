@@ -102,6 +102,7 @@ pub mod ikari;
 pub mod inventory;
 pub mod item;
 pub mod ivan;
+pub mod isle_timer;
 pub mod jump;
 pub mod kanban;
 pub mod npc_ah;
@@ -260,6 +261,7 @@ pub mod vrbox;
 pub mod volcano;
 pub mod vgnfd;
 pub mod vmsms;
+pub mod vibration;
 pub mod vteng;
 pub mod vmsdz;
 pub mod warpfo;
@@ -1172,6 +1174,9 @@ pub fn build(
     event_manager::init(&mut sim.world);
     shape::init(&mut sim.world);
     stage_data::init(&mut sim.world);
+    vibration::init(&mut sim.world);
+    isle_timer::init(&mut sim.world);
+    registry::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -1249,6 +1254,7 @@ pub fn build(
             (
                 (
                     registry::control.in_set(WwSimSet::Execute),
+                    isle_timer::control.in_set(WwSimSet::Execute),
                     daynight::control.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
                 ssturu::control.in_set(WwSimSet::Execute),
@@ -1300,6 +1306,7 @@ pub fn build(
                 (torch::control.in_set(WwSimSet::Execute),
                 usovmc::control.in_set(WwSimSet::Execute),
                 obj_akabe::control.in_set(WwSimSet::Execute),
+                acorn_leaf::control.in_set(WwSimSet::Execute),
                 sie_flag::control.in_set(WwSimSet::Execute),
                 barrel::control.in_set(WwSimSet::Execute),
                 fallrock::control.in_set(WwSimSet::Execute),
@@ -1341,6 +1348,7 @@ pub fn build(
                 spcitem::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
+                vibration::control.in_set(WwSimSet::Execute),
                 (ajavw::control.in_set(WwSimSet::Execute),
                 dmgroom::control.in_set(WwSimSet::Execute),
                 hotfloor::control.in_set(WwSimSet::Execute),
