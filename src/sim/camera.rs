@@ -1,6 +1,9 @@
 use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 
+use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
+use super::cam_type::{TYPE_FIELD, TYPES, type_index};
+
 const DEFAULT_FOVY: f32 = 0.7853982;
 const DEFAULT_ASPECT: f32 = 4.0 / 3.0;
 const DEFAULT_NEAR: f32 = 0.1;
@@ -121,16 +124,33 @@ impl View {
 pub struct Camera {
     pub view: Option<View>,
     pub port: ViewPort,
+    /// `dCamera_c::mCurType`, a row of [`TYPES`].
+    pub cam_type: usize,
+    /// `dCamera_c::mCurMode`. Retail gives it no name; it selects one of the twenty style slots.
+    pub mode: usize,
+    /// `dCamera_c::mCurStyle` / `dCamParam_c::mStyleIdx`, a [`cam_style::CamStyleId`] value.
+    pub current_style: i16,
+    /// `dCamera_c::m524`, which retail keeps at `0xFF` while no force is pending.
+    pub forced_type: Option<usize>,
+    /// `dCamera_c::m528`, the actor a forced type is aimed at.
+    pub forced_owner: Option<Entity>,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         let mut view = View::default();
         view.refresh();
-        Self {
+        let mut camera = Self {
             view: Some(view),
             port: ViewPort::default(),
-        }
+            cam_type: TYPE_FIELD,
+            mode: 0,
+            current_style: cam_style::NONE,
+            forced_type: None,
+            forced_owner: None,
+        };
+        camera.set_style(TYPE_FIELD, 0);
+        camera
     }
 }
 
@@ -145,6 +165,80 @@ impl Camera {
 
     pub fn fovy(&self) -> Option<f32> {
         self.view.as_ref().map(|view| view.fovy)
+    }
+
+    /// `onTypeChange` / `onModeChange` / `onStyleChange` / `dCamParam_c::Change`: adopt the style
+    /// a type holds for a mode. False when the type, the mode or the style is out of range.
+    pub fn set_style(&mut self, cam_type: usize, mode: usize) -> bool {
+        let style = match TYPES.get(cam_type).and_then(|t| t.styles.get(mode)) {
+            Some(style) => *style,
+            None => return false,
+        };
+        self.cam_type = cam_type;
+        self.mode = mode;
+        self.change_style(style)
+    }
+
+    /// `dCamParam_c::Change`: indices past the table fall back to `dCamStyle_NN00_e`.
+    pub fn change_style(&mut self, style: i16) -> bool {
+        let known = usize::try_from(style).is_ok_and(|i| i < STYLE_COUNT);
+        let style = if known { style } else { 0 };
+        if self.current_style != style {
+            self.current_style = style;
+            self.refresh_fovy();
+        }
+        known
+    }
+
+    /// `dCamParam_c::Val`: the current style's parameter at `index`.
+    pub fn val(&self, index: usize) -> f32 {
+        cam_style::val_by_id(self.current_style, index)
+    }
+
+    /// `dCamParam_c::Algorythmn`, the engine the current style dispatches to.
+    pub fn engine(&self) -> Option<CamEngine> {
+        cam_style::style_by_id(self.current_style).map(|s| s.engine)
+    }
+
+    /// `dCamParam_c::CheckFlag` against the current style.
+    pub fn has_flag(&self, mask: u16) -> bool {
+        cam_style::style_by_id(self.current_style).is_some_and(|s| s.flag & mask != 0)
+    }
+
+    /// The current style's four-character tag.
+    pub fn style_tag(&self) -> Option<[u8; 4]> {
+        cam_style::style_by_id(self.current_style).map(|s| s.tag)
+    }
+
+    /// `dCamParam_c::Fovy(0.0f)` at the neutral ratio: the style's base vertical field of view,
+    /// which retail keeps in degrees against a radians projection. Styles that leave the slot at
+    /// [`cam_style::PARAM_UNSET`] keep the field of view they already had.
+    pub fn refresh_fovy(&mut self) {
+        let base = self.val(param::FOVY_BASE);
+        if base == cam_style::PARAM_UNSET {
+            return;
+        }
+        if let Some(view) = self.view_mut() {
+            view.set_fovy(base.to_radians());
+        }
+    }
+
+    /// `dCamera_c::SetTypeForce(char*, actor*)`: records a pending camera type and its owner
+    /// actor, and refuses while a force is already pending. The type itself is applied by the next
+    /// `nextType`, not here.
+    pub fn set_type_force(&mut self, name: &str, owner: Option<Entity>) -> bool {
+        if self.forced_type.is_some() {
+            return false;
+        }
+        self.forced_type = type_index(name);
+        self.forced_owner = owner;
+        self.forced_type.is_some()
+    }
+
+    /// `dCamera_c::nextType` drops the force once it has been applied.
+    pub fn clear_type_force(&mut self) {
+        self.forced_type = None;
+        self.forced_owner = None;
     }
 
     /// `mDoLib_project__FP3VecP3Vec`.
