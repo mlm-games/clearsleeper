@@ -6,11 +6,10 @@ use crate::sim::daynight::{DayNight, TIME_WRAP};
 use crate::ui_menu_option::value_increase;
 use crate::ui_menu_save::{
     blank_save, Color, MemCard, Pane, Particles, SavePad as SavePadInput, StickControl,
-    pane_trans_group,
 };
 
 pub const SCREEN_LABEL: &str = "file_select.blo";
-pub const SCREEN_ARCHIVE: &str = "files/res/Menu/Menu1.arc";
+pub const SCREEN_ARCHIVE: &str = "files/res/Stage/Name/Stage.arc";
 pub const GAME_OVER_LABEL: &str = "gameover.blo";
 pub const GAME_OVER_ARCHIVE: &str = "files/res/Object/Gover.arc";
 pub const TEXT_BUFFER_NAME: usize = 0x30;
@@ -116,11 +115,20 @@ pub const TRIFORCE_TAGS: [&str; 9] = [
 pub const PEARL_TAGS: [&str; 3] = ["it03", "it01", "it02"];
 pub const PEARL_SHADOW_TAGS: [&str; 3] = ["ik03", "ik01", "ik02"];
 
-pub const SLOT_KEY_TAGS: [&str; 6] = ["ak00", "1dat", "a000", "a001", "a002", "a003"];
+pub const SLOT_KEY_TAGS: [&str; 16] = [
+    "ak00", "1dat", "a000", "a001", "a002", "a003", "a004", "a005", "a006", "a007",
+    "a008", "a009", "ak01", "ak02", "ak03", "ak04",
+];
 pub const SLOT_KEY_EXTRA_TAGS: [&str; 4] = ["ak01", "ak02", "ak03", "ak04"];
-pub const SLOT_KEY2_TAGS: [&str; 6] = ["bk00", "2dat", "b000", "b001", "b002", "b003"];
+pub const SLOT_KEY2_TAGS: [&str; 16] = [
+    "bk00", "2dat", "b000", "b001", "b002", "b003", "b004", "b005", "b006", "b007",
+    "b008", "b009", "bk01", "bk02", "bk03", "bk04",
+];
 pub const SLOT_KEY2_EXTRA_TAGS: [&str; 4] = ["bk01", "bk02", "bk03", "bk04"];
-pub const SLOT_KEY3_TAGS: [&str; 6] = ["ck00", "3dat", "c000", "c001", "c002", "c003"];
+pub const SLOT_KEY3_TAGS: [&str; 16] = [
+    "ck00", "3dat", "c000", "c001", "c002", "c003", "c004", "c005", "c006", "c007",
+    "c008", "c009", "ck01", "ck02", "ck03", "ck04",
+];
 pub const SLOT_KEY3_EXTRA_TAGS: [&str; 4] = ["ck01", "ck02", "ck03", "ck04"];
 
 pub const NAME_TAGS: [&str; 3] = ["nam1", "nam2", "nam3"];
@@ -508,8 +516,10 @@ pub struct PaneGroups {
     pub menu_cursor: Pane,
     pub yes_key: [Pane; 2],
     pub yes_label: Pane,
+    pub yes_text: Pane,
     pub no_key: [Pane; 2],
     pub no_label: Pane,
+    pub no_text: Pane,
     pub start_key: [Pane; 2],
     pub start_label: Pane,
     pub copy_key: [Pane; 2],
@@ -521,6 +531,7 @@ pub struct PaneGroups {
     pub back_key: [Pane; 2],
     pub back_pic: Pane,
     pub back_label: Pane,
+    pub back_text: Pane,
 }
 
 impl Default for PaneGroups {
@@ -541,8 +552,10 @@ impl Default for PaneGroups {
             menu_cursor: Pane::new("1cu1"),
             yes_key: [Pane::new("ysk0"), Pane::new("ysk1")],
             yes_label: Pane::new("ys00"),
+            yes_text: Pane::new("yes"),
             no_key: [Pane::new("nok0"), Pane::new("nok1")],
             no_label: Pane::new("no00"),
+            no_text: Pane::new("no"),
             start_key: [Pane::new("sk00"), Pane::new("sk01")],
             start_label: Pane::new("s000"),
             copy_key: [Pane::new("cpk0"), Pane::new("cpk1")],
@@ -554,6 +567,7 @@ impl Default for PaneGroups {
             back_key: [Pane::new("rek0"), Pane::new("rek1")],
             back_pic: Pane::new("re00"),
             back_label: Pane::new("retu"),
+            back_text: Pane::new("stat"),
         }
     }
 }
@@ -578,35 +592,35 @@ impl FileSelectPanes {
         for pane in &mut self.slots.key[0][..2] {
             bind(pane, screen);
         }
-        for index in 2..6 {
+        for index in 2..12 {
             let mut tag = String::from("a00");
             tag.push((b'0' + (index as u8 - 2)) as char);
             bind_fixed(&mut self.slots.key[0][index], screen, &leak(&tag));
         }
-        for index in 6..10 {
-            let mut tag = String::from("ak01");
-            let base = b'0' + (index as u8 - 6);
-            tag.push(base as char);
+        for index in 12..16 {
+            let mut tag = String::from("ak");
+            tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[0][index], screen, &leak(&tag));
         }
-        for index in 2..6 {
+        }
+        for index in 2..12 {
             let mut tag = String::from("b00");
             tag.push((b'0' + (index as u8 - 2)) as char);
             bind_fixed(&mut self.slots.key[1][index], screen, &leak(&tag));
         }
-        for index in 6..10 {
-            let mut tag = String::from("bk01");
-            tag.push((b'0' + (index as u8 - 6)) as char);
+        for index in 12..16 {
+            let mut tag = String::from("bk");
+            tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[1][index], screen, &leak(&tag));
         }
-        for index in 2..6 {
+        for index in 2..12 {
             let mut tag = String::from("c00");
             tag.push((b'0' + (index as u8 - 2)) as char);
             bind_fixed(&mut self.slots.key[2][index], screen, &leak(&tag));
         }
-        for index in 6..10 {
-            let mut tag = String::from("ck01");
-            tag.push((b'0' + (index as u8 - 6)) as char);
+        for index in 12..16 {
+            let mut tag = String::from("ck");
+            tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[2][index], screen, &leak(&tag));
         }
         for index in 0..2 {
@@ -658,10 +672,12 @@ impl FileSelectPanes {
             bind(pane, screen);
         }
         bind(&mut self.groups.yes_label, screen);
+        bind(&mut self.groups.yes_text, screen);
         for pane in &mut self.groups.no_key {
             bind(pane, screen);
         }
         bind(&mut self.groups.no_label, screen);
+        bind(&mut self.groups.no_text, screen);
         for pane in &mut self.groups.start_key {
             bind(pane, screen);
         }
@@ -685,6 +701,7 @@ impl FileSelectPanes {
         }
         bind(&mut self.groups.back_pic, screen);
         bind(&mut self.groups.back_label, screen);
+        bind(&mut self.groups.back_text, screen);
     }
 }
 
@@ -1279,7 +1296,7 @@ impl FileSelect {
             IDX_07,
             0,
         );
-        let temp2 = self.pane_trance_rec_tlt(0, 
+        let temp2 = self.pane_trance_rec_tlt(0,
             self.timer - IDX_0f as i16,
             IDX_0c,
             IDX_18 as f32,
@@ -1289,7 +1306,7 @@ impl FileSelect {
             1,
             0,
         );
-        let temp3 = self.pane_trance_rec_tlt(1, 
+        let temp3 = self.pane_trance_rec_tlt(1,
             self.timer - (IDX_0f as i16 + IDX_10 as i16),
             IDX_0d,
             IDX_18 as f32,
@@ -1299,7 +1316,7 @@ impl FileSelect {
             1,
             0,
         );
-        let temp4 = self.pane_trance_rec_tlt(2, 
+        let temp4 = self.pane_trance_rec_tlt(2,
             self.timer - (IDX_0f as i16 + IDX_10 as i16 * 2),
             IDX_0e,
             IDX_18 as f32,
@@ -1309,7 +1326,7 @@ impl FileSelect {
             1,
             0,
         );
-        let temp5 = self.pane_trance_rec_info(0, 
+        let temp5 = self.pane_trance_rec_info(0,
             self.timer - IDX_14 as i16,
             IDX_11,
             0.0,
@@ -1319,7 +1336,7 @@ impl FileSelect {
             1,
             0,
         );
-        let temp6 = self.pane_trance_rec_info(1, 
+        let temp6 = self.pane_trance_rec_info(1,
             self.timer - IDX_15 as i16,
             IDX_12,
             0.0,
@@ -1329,7 +1346,7 @@ impl FileSelect {
             1,
             0,
         );
-        let temp7 = self.pane_trance_rec_info(2, 
+        let temp7 = self.pane_trance_rec_info(2,
             self.timer - IDX_16 as i16,
             IDX_13,
             0.0,
@@ -1376,7 +1393,7 @@ impl FileSelect {
     fn rec_row_trance_out(&mut self) -> (bool, bool) {
         match self.select_num {
             0 => {
-                let temp2 = self.pane_trance_rec_tlt(0, 
+                let temp2 = self.pane_trance_rec_tlt(0,
                     self.timer,
                     IDX_0c,
                     0.0,
@@ -1386,7 +1403,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_info(0, 
+                let temp3 = self.pane_trance_rec_info(0,
                     self.timer,
                     IDX_11,
                     0.0,
@@ -1399,7 +1416,7 @@ impl FileSelect {
                 (temp2, temp3)
             }
             1 => {
-                let temp2 = self.pane_trance_rec_tlt(1, 
+                let temp2 = self.pane_trance_rec_tlt(1,
                     self.timer,
                     IDX_0d,
                     0.0,
@@ -1409,7 +1426,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_info(1, 
+                let temp3 = self.pane_trance_rec_info(1,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -1422,7 +1439,7 @@ impl FileSelect {
                 (temp2, temp3)
             }
             _ => {
-                let temp2 = self.pane_trance_rec_tlt(2, 
+                let temp2 = self.pane_trance_rec_tlt(2,
                     self.timer,
                     IDX_0e,
                     0.0,
@@ -1432,7 +1449,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_info(1, 
+                let temp3 = self.pane_trance_rec_info(1,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -1457,7 +1474,7 @@ impl FileSelect {
 
     pub fn close_back(&mut self) -> bool {
         let temp1 = self.pane_trance_title(self.timer, IDX_08, 0.0, IDX_48 as f32, 0, 1);
-        let temp2 = self.pane_trance_rec_tlt(0, 
+        let temp2 = self.pane_trance_rec_tlt(0,
             self.timer,
             IDX_0c,
             0.0,
@@ -1467,7 +1484,7 @@ impl FileSelect {
             0,
             1,
         );
-        let temp3 = self.pane_trance_rec_info(0, 
+        let temp3 = self.pane_trance_rec_info(0,
             self.timer,
             IDX_11,
             0.0,
@@ -1477,7 +1494,7 @@ impl FileSelect {
             0,
             1,
         );
-        let temp4 = self.pane_trance_rec_tlt(1, 
+        let temp4 = self.pane_trance_rec_tlt(1,
             self.timer - IDX_10 as i16,
             IDX_0d,
             0.0,
@@ -1487,7 +1504,7 @@ impl FileSelect {
             0,
             1,
         );
-        let temp5 = self.pane_trance_rec_info(1, 
+        let temp5 = self.pane_trance_rec_info(1,
             self.timer - IDX_10 as i16,
             IDX_12,
             0.0,
@@ -1497,7 +1514,7 @@ impl FileSelect {
             0,
             1,
         );
-        let temp6 = self.pane_trance_rec_tlt(2, 
+        let temp6 = self.pane_trance_rec_tlt(2,
             self.timer - IDX_10 as i16 * 2,
             IDX_0e,
             0.0,
@@ -1507,7 +1524,7 @@ impl FileSelect {
             0,
             1,
         );
-        let temp7 = self.pane_trance_rec_info(1, 
+        let temp7 = self.pane_trance_rec_info(1,
             self.timer - IDX_10 as i16 * 2,
             IDX_12,
             0.0,
@@ -1537,7 +1554,7 @@ impl FileSelect {
     fn copy_pair_trance_out(&mut self) -> (bool, bool, bool, bool) {
         match self.flag_3924 {
             0 => {
-                let temp3 = self.pane_trance_rec_tlt(0, 
+                let temp3 = self.pane_trance_rec_tlt(0,
                     self.timer,
                     IDX_0c,
                     0.0,
@@ -1547,7 +1564,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(0, 
+                let temp4 = self.pane_trance_rec_info(0,
                     self.timer,
                     IDX_11,
                     0.0,
@@ -1558,7 +1575,7 @@ impl FileSelect {
                     1,
                 );
                 if self.flag_3925 == 0 {
-                    let temp5 = self.pane_trance_rec_tlt(1, 
+                    let temp5 = self.pane_trance_rec_tlt(1,
                         self.timer - IDX_37 as i16,
                         IDX_0d,
                         0.0,
@@ -1568,7 +1585,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(1, 
+                    let temp6 = self.pane_trance_rec_info(1,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1580,7 +1597,7 @@ impl FileSelect {
                     );
                     (temp3, temp4, temp5, temp6)
                 } else {
-                    let temp5 = self.pane_trance_rec_tlt(2, 
+                    let temp5 = self.pane_trance_rec_tlt(2,
                         self.timer - IDX_37 as i16,
                         IDX_0e,
                         0.0,
@@ -1590,7 +1607,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(1, 
+                    let temp6 = self.pane_trance_rec_info(1,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1604,7 +1621,7 @@ impl FileSelect {
                 }
             }
             1 => {
-                let temp3 = self.pane_trance_rec_tlt(1, 
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer,
                     IDX_0d,
                     0.0,
@@ -1614,7 +1631,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(1, 
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -1625,7 +1642,7 @@ impl FileSelect {
                     1,
                 );
                 if self.flag_3925 == 0 {
-                    let temp5 = self.pane_trance_rec_tlt(0, 
+                    let temp5 = self.pane_trance_rec_tlt(0,
                         self.timer - IDX_37 as i16,
                         IDX_0c,
                         0.0,
@@ -1635,7 +1652,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(0, 
+                    let temp6 = self.pane_trance_rec_info(0,
                         self.timer - IDX_37 as i16,
                         IDX_11,
                         0.0,
@@ -1647,7 +1664,7 @@ impl FileSelect {
                     );
                     (temp3, temp4, temp5, temp6)
                 } else {
-                    let temp5 = self.pane_trance_rec_tlt(2, 
+                    let temp5 = self.pane_trance_rec_tlt(2,
                         self.timer - IDX_37 as i16,
                         IDX_0e,
                         0.0,
@@ -1657,7 +1674,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(1, 
+                    let temp6 = self.pane_trance_rec_info(1,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1671,7 +1688,7 @@ impl FileSelect {
                 }
             }
             _ => {
-                let temp3 = self.pane_trance_rec_tlt(2, 
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer,
                     IDX_0e,
                     0.0,
@@ -1681,7 +1698,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(1, 
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -1692,7 +1709,7 @@ impl FileSelect {
                     1,
                 );
                 if self.flag_3925 == 0 {
-                    let temp5 = self.pane_trance_rec_tlt(0, 
+                    let temp5 = self.pane_trance_rec_tlt(0,
                         self.timer - IDX_37 as i16,
                         IDX_0c,
                         0.0,
@@ -1702,7 +1719,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(0, 
+                    let temp6 = self.pane_trance_rec_info(0,
                         self.timer - IDX_37 as i16,
                         IDX_11,
                         0.0,
@@ -1714,7 +1731,7 @@ impl FileSelect {
                     );
                     (temp3, temp4, temp5, temp6)
                 } else {
-                    let temp5 = self.pane_trance_rec_tlt(1, 
+                    let temp5 = self.pane_trance_rec_tlt(1,
                         self.timer - IDX_37 as i16,
                         IDX_0d,
                         0.0,
@@ -1724,7 +1741,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp6 = self.pane_trance_rec_info(1, 
+                    let temp6 = self.pane_trance_rec_info(1,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1908,8 +1925,7 @@ impl FileSelect {
             }
         }
 
-        pane_trans_group(
-            &mut self.panes.groups.record_cursor,
+        self.panes.groups.record_cursor[0].pane_trans(
             0.0,
             f32::from(self.select_num) * SLOT_ROW_DY + self.slide,
         );
@@ -1959,7 +1975,7 @@ impl FileSelect {
     pub fn rec_data_pane_move(&mut self) -> bool {
         let (temp1, temp2, temp3, temp4, temp5, temp6) = match self.select_num {
             0 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(1,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -1969,7 +1985,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(1,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -1979,7 +1995,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -1989,7 +2005,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -2003,7 +2019,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4, true, true)
             }
             1 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -2013,7 +2029,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -2023,7 +2039,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -2033,7 +2049,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -2043,7 +2059,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(1,
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
@@ -2053,7 +2069,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(1,
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
@@ -2067,7 +2083,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4, temp5, temp6)
             }
             _ => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -2077,7 +2093,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
                     0.0,
@@ -2087,7 +2103,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -2097,7 +2113,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer - IDX_2a as i16,
                     IDX_28,
                     0.0,
@@ -2107,7 +2123,7 @@ impl FileSelect {
                     0,
                     1,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(2,
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
@@ -2117,7 +2133,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(2,
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
@@ -2657,7 +2673,7 @@ impl FileSelect {
         let temp = match self.flag_3924 {
             0 => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(1, 
+                    self.pane_trance_rec_info(1,
                         self.timer - IDX_3a as i16,
                         IDX_12,
                         0.0,
@@ -2668,7 +2684,7 @@ impl FileSelect {
                         1,
                     )
                 } else {
-                    self.pane_trance_rec_info(2, 
+                    self.pane_trance_rec_info(2,
                         self.timer - IDX_3a as i16,
                         IDX_13,
                         0.0,
@@ -2682,7 +2698,7 @@ impl FileSelect {
             }
             1 => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(0, 
+                    self.pane_trance_rec_info(0,
                         self.timer - IDX_3a as i16,
                         IDX_11,
                         0.0,
@@ -2693,7 +2709,7 @@ impl FileSelect {
                         1,
                     )
                 } else {
-                    self.pane_trance_rec_info(2, 
+                    self.pane_trance_rec_info(2,
                         self.timer - IDX_3a as i16,
                         IDX_13,
                         0.0,
@@ -2707,7 +2723,7 @@ impl FileSelect {
             }
             _ => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(0, 
+                    self.pane_trance_rec_info(0,
                         self.timer - IDX_3a as i16,
                         IDX_11,
                         0.0,
@@ -2718,7 +2734,7 @@ impl FileSelect {
                         1,
                     )
                 } else {
-                    self.pane_trance_rec_info(1, 
+                    self.pane_trance_rec_info(1,
                         self.timer - IDX_3a as i16,
                         IDX_12,
                         0.0,
@@ -2736,12 +2752,6 @@ impl FileSelect {
         self.timer += 1;
 
         if temp {
-            let from = usize::from(self.flag_3924);
-            let to = usize::from(self.flag_3926);
-            if let Some(save) = card.slots[from].clone() {
-                card.slots[to] = Some(save);
-            }
-            card.set_checksum_game_data(to);
             self.set_save_data(card);
             self.make_rec_info(self.flag_3926);
             self.timer = 0;
@@ -2753,7 +2763,7 @@ impl FileSelect {
         let temp = match self.flag_3924 {
             0 => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(1, 
+                    self.pane_trance_rec_info(1,
                         self.timer - IDX_3a as i16,
                         IDX_12,
                         0.0,
@@ -2764,7 +2774,7 @@ impl FileSelect {
                         0,
                     )
                 } else {
-                    self.pane_trance_rec_info(2, 
+                    self.pane_trance_rec_info(2,
                         self.timer - IDX_3a as i16,
                         IDX_13,
                         0.0,
@@ -2778,7 +2788,7 @@ impl FileSelect {
             }
             1 => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(0, 
+                    self.pane_trance_rec_info(0,
                         self.timer - IDX_3a as i16,
                         IDX_11,
                         0.0,
@@ -2789,7 +2799,7 @@ impl FileSelect {
                         0,
                     )
                 } else {
-                    self.pane_trance_rec_info(2, 
+                    self.pane_trance_rec_info(2,
                         self.timer - IDX_3a as i16,
                         IDX_13,
                         0.0,
@@ -2803,7 +2813,7 @@ impl FileSelect {
             }
             _ => {
                 if self.flag_3925 == 0 {
-                    self.pane_trance_rec_info(0, 
+                    self.pane_trance_rec_info(0,
                         self.timer - IDX_3a as i16,
                         IDX_11,
                         0.0,
@@ -2814,7 +2824,7 @@ impl FileSelect {
                         0,
                     )
                 } else {
-                    self.pane_trance_rec_info(1, 
+                    self.pane_trance_rec_info(1,
                         self.timer - IDX_3a as i16,
                         IDX_12,
                         0.0,
@@ -2857,7 +2867,7 @@ impl FileSelect {
         let span = IDX_40 as f32;
         let (temp1, temp2, temp3, temp4) = match self.flag_3924 {
             0 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(1,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2867,7 +2877,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(1,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2877,7 +2887,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2887,7 +2897,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2900,7 +2910,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4)
             }
             1 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2910,7 +2920,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2920,7 +2930,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2930,7 +2940,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2943,7 +2953,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4)
             }
             _ => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2953,7 +2963,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -2963,7 +2973,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2973,7 +2983,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -2994,7 +3004,7 @@ impl FileSelect {
         match self.flag_3924 {
             0 => {
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(2,
                         self.timer - param_1,
                         IDX_28,
                         span,
@@ -3004,7 +3014,7 @@ impl FileSelect {
                         1,
                         0,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(2,
                         self.timer - param_1,
                         IDX_28,
                         span,
@@ -3016,7 +3026,7 @@ impl FileSelect {
                     );
                     temp1 && temp2
                 } else {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3026,7 +3036,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3036,7 +3046,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(1,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3046,7 +3056,7 @@ impl FileSelect {
                         1,
                         0,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(1,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3060,7 +3070,7 @@ impl FileSelect {
                 }
             }
             1 => {
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(1,
                     self.timer - param_1,
                     IDX_28,
                     0.0,
@@ -3070,7 +3080,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(1,
                     self.timer - param_1,
                     IDX_28,
                     0.0,
@@ -3081,7 +3091,7 @@ impl FileSelect {
                     2,
                 );
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3091,7 +3101,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3101,7 +3111,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(2,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3111,7 +3121,7 @@ impl FileSelect {
                         1,
                         0,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(2,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3123,7 +3133,7 @@ impl FileSelect {
                     );
                     temp1 && temp2 && temp3 && temp4 && temp5 && temp6
                 } else {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3133,7 +3143,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3143,7 +3153,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(0,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3153,7 +3163,7 @@ impl FileSelect {
                         1,
                         0,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(0,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3167,7 +3177,7 @@ impl FileSelect {
                 }
             }
             _ => {
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(2,
                     self.timer - param_1,
                     IDX_28,
                     0.0,
@@ -3177,7 +3187,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(2,
                     self.timer - param_1,
                     IDX_28,
                     0.0,
@@ -3188,7 +3198,7 @@ impl FileSelect {
                     2,
                 );
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3198,7 +3208,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3208,7 +3218,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(1,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3218,7 +3228,7 @@ impl FileSelect {
                         1,
                         0,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(1,
                         self.timer - param_2,
                         IDX_28,
                         span,
@@ -3230,18 +3240,37 @@ impl FileSelect {
                     );
                     temp1 && temp2 && temp3 && temp4 && temp5 && temp6
                 } else {
-                    temp5 && temp6
+                    let temp3 = self.pane_trance_rec_tlt(0,
+                        self.timer - param_2,
+                        IDX_28,
+                        span,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1,
+                        0,
+                    );
+                    let temp4 = self.pane_trance_rec_info(0,
+                        self.timer - param_2,
+                        IDX_28,
+                        span,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1,
+                        0,
+                    );
+                    temp3 && temp4 && temp5 && temp6
                 }
             }
         }
     }
-
     pub fn data_select_pane_copy_move2(&mut self, param_1: i16, param_2: i16) -> bool {
         let span = IDX_40 as f32;
         match self.flag_3924 {
             0 => {
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(1,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3251,7 +3280,7 @@ impl FileSelect {
                         0,
                         2,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(1,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3261,7 +3290,7 @@ impl FileSelect {
                         0,
                         2,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3271,7 +3300,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3283,7 +3312,7 @@ impl FileSelect {
                     );
                     temp1 && temp2 && temp3 && temp4
                 } else {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(1,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3293,7 +3322,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(1,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3303,7 +3332,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(2,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3313,7 +3342,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(2,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3328,7 +3357,7 @@ impl FileSelect {
             }
             1 => {
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3338,7 +3367,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(2,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3348,7 +3377,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(0,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3358,7 +3387,7 @@ impl FileSelect {
                         0,
                         2,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(0,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3370,7 +3399,7 @@ impl FileSelect {
                     );
                     temp1 && temp2 && temp3 && temp4
                 } else {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3380,7 +3409,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3390,7 +3419,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(2,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3400,7 +3429,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(2,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3415,7 +3444,7 @@ impl FileSelect {
             }
             _ => {
                 if self.flag_3925 == 0 {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(1,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3425,7 +3454,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(1,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3435,7 +3464,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(0,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3445,7 +3474,7 @@ impl FileSelect {
                         0,
                         2,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(0,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3457,7 +3486,7 @@ impl FileSelect {
                     );
                     temp1 && temp2 && temp3 && temp4
                 } else {
-                    let temp1 = self.pane_trance_rec_tlt(
+                    let temp1 = self.pane_trance_rec_tlt(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3467,7 +3496,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp2 = self.pane_trance_rec_info(
+                    let temp2 = self.pane_trance_rec_info(0,
                         self.timer - param_1,
                         IDX_28,
                         0.0,
@@ -3477,7 +3506,7 @@ impl FileSelect {
                         0,
                         1,
                     );
-                    let temp3 = self.pane_trance_rec_tlt(
+                    let temp3 = self.pane_trance_rec_tlt(1,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3487,7 +3516,7 @@ impl FileSelect {
                         IDX_07,
                         2,
                     );
-                    let temp4 = self.pane_trance_rec_info(
+                    let temp4 = self.pane_trance_rec_info(1,
                         self.timer - param_2,
                         IDX_28,
                         0.0,
@@ -3597,7 +3626,7 @@ impl FileSelect {
     pub fn data_select_pane_back_from_copy_move(&mut self, param_1: u8, param_2: u8) -> bool {
         let (temp1, temp2, temp3, temp4, temp5, temp6) = match self.flag_3924 {
             0 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(1,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3607,7 +3636,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(1,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3617,7 +3646,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3627,7 +3656,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3640,7 +3669,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4, true, true)
             }
             1 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3650,7 +3679,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3660,7 +3689,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3670,7 +3699,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3680,7 +3709,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2) * 2),
                     IDX_28,
                     0.0,
@@ -3690,7 +3719,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2) * 2),
                     IDX_28,
                     0.0,
@@ -3703,7 +3732,7 @@ impl FileSelect {
                 (temp1, temp2, temp3, temp4, temp5, temp6)
             }
             _ => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(0,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3713,7 +3742,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(0,
                     self.timer - i16::from(param_1),
                     IDX_28,
                     0.0,
@@ -3723,7 +3752,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3733,7 +3762,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer - (i16::from(param_1) + i16::from(param_2)),
                     IDX_28,
                     0.0,
@@ -3743,7 +3772,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2) * 2),
                     IDX_28,
                     0.0,
@@ -3753,7 +3782,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(2,
                     self.timer - (i16::from(param_1) + i16::from(param_2) * 2),
                     IDX_28,
                     0.0,
@@ -3952,7 +3981,7 @@ impl FileSelect {
 
     pub fn erase_pane_move_ok(&mut self, card: &mut MemCard) {
         let temp1 = match self.select_num {
-            0 => self.pane_trance_rec_info(0, 
+            0 => self.pane_trance_rec_info(0,
                 self.timer - IDX_3a as i16,
                 IDX_11,
                 0.0,
@@ -3962,7 +3991,7 @@ impl FileSelect {
                 IDX_07,
                 1,
             ),
-            1 => self.pane_trance_rec_info(1, 
+            1 => self.pane_trance_rec_info(1,
                 self.timer - IDX_3a as i16,
                 IDX_12,
                 0.0,
@@ -3972,7 +4001,7 @@ impl FileSelect {
                 IDX_07,
                 1,
             ),
-            _ => self.pane_trance_rec_info(2, 
+            _ => self.pane_trance_rec_info(2,
                 self.timer - IDX_3a as i16,
                 IDX_13,
                 0.0,
@@ -3996,7 +4025,7 @@ impl FileSelect {
 
     pub fn erase_pane_move_ok2(&mut self) {
         let temp1 = match self.select_num {
-            0 => self.pane_trance_rec_info(0, 
+            0 => self.pane_trance_rec_info(0,
                 self.timer - IDX_3b as i16,
                 IDX_11,
                 IDX_3c as f32,
@@ -4006,7 +4035,7 @@ impl FileSelect {
                 IDX_07,
                 0,
             ),
-            1 => self.pane_trance_rec_info(1, 
+            1 => self.pane_trance_rec_info(1,
                 self.timer - IDX_3b as i16,
                 IDX_12,
                 IDX_3c as f32,
@@ -4016,7 +4045,7 @@ impl FileSelect {
                 IDX_07,
                 0,
             ),
-            _ => self.pane_trance_rec_info(2, 
+            _ => self.pane_trance_rec_info(2,
                 self.timer - IDX_3b as i16,
                 IDX_13,
                 IDX_3c as f32,
@@ -4157,7 +4186,7 @@ impl FileSelect {
         let span = IDX_40 as f32;
         match self.select_num {
             0 => {
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(1,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -4167,7 +4196,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(1,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -4177,7 +4206,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -4187,7 +4216,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -4200,7 +4229,7 @@ impl FileSelect {
                 temp3 && temp4 && temp5 && temp6
             }
             1 => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(1,
                     self.timer - param_3,
                     IDX_28,
                     0.0,
@@ -4210,7 +4239,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(1,
                     self.timer - param_3,
                     IDX_28,
                     0.0,
@@ -4220,27 +4249,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
-                    self.timer - param_1,
-                    IDX_28,
-                    span,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1,
-                    0,
-                );
-                let temp4 = self.pane_trance_rec_info(
-                    self.timer - param_1,
-                    IDX_28,
-                    span,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1,
-                    0,
-                );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(2,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -4250,8 +4259,28 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(2,
                     self.timer - param_2,
+                    IDX_28,
+                    span,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1,
+                    0,
+                );
+                let temp5 = self.pane_trance_rec_tlt(0,
+                    self.timer - param_1,
+                    IDX_28,
+                    span,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1,
+                    0,
+                );
+                let temp6 = self.pane_trance_rec_info(0,
+                    self.timer - param_1,
                     IDX_28,
                     span,
                     0.0,
@@ -4263,7 +4292,7 @@ impl FileSelect {
                 temp1 && temp2 && temp3 && temp4 && temp5 && temp6
             }
             _ => {
-                let temp1 = self.pane_trance_rec_tlt(
+                let temp1 = self.pane_trance_rec_tlt(2,
                     self.timer - param_3,
                     IDX_28,
                     0.0,
@@ -4273,7 +4302,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp2 = self.pane_trance_rec_info(
+                let temp2 = self.pane_trance_rec_info(2,
                     self.timer - param_3,
                     IDX_28,
                     0.0,
@@ -4283,7 +4312,7 @@ impl FileSelect {
                     IDX_07,
                     2,
                 );
-                let temp3 = self.pane_trance_rec_tlt(
+                let temp3 = self.pane_trance_rec_tlt(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -4293,7 +4322,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp4 = self.pane_trance_rec_info(
+                let temp4 = self.pane_trance_rec_info(0,
                     self.timer - param_1,
                     IDX_28,
                     span,
@@ -4303,7 +4332,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp5 = self.pane_trance_rec_tlt(
+                let temp5 = self.pane_trance_rec_tlt(1,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -4313,7 +4342,7 @@ impl FileSelect {
                     1,
                     0,
                 );
-                let temp6 = self.pane_trance_rec_info(
+                let temp6 = self.pane_trance_rec_info(1,
                     self.timer - param_2,
                     IDX_28,
                     span,
@@ -4587,7 +4616,7 @@ impl FileSelect {
 
     pub fn ex_data_save_pane_move_ok(&mut self, card: &mut MemCard) {
         let temp1 = match self.select_num {
-            0 => self.pane_trance_rec_info(0, 
+            0 => self.pane_trance_rec_info(0,
                 self.timer - IDX_3a as i16,
                 IDX_11,
                 0.0,
@@ -4597,7 +4626,7 @@ impl FileSelect {
                 IDX_07,
                 1,
             ),
-            1 => self.pane_trance_rec_info(1, 
+            1 => self.pane_trance_rec_info(1,
                 self.timer - IDX_3a as i16,
                 IDX_12,
                 0.0,
@@ -4607,7 +4636,7 @@ impl FileSelect {
                 IDX_07,
                 1,
             ),
-            _ => self.pane_trance_rec_info(2, 
+            _ => self.pane_trance_rec_info(2,
                 self.timer - IDX_3a as i16,
                 IDX_13,
                 0.0,
@@ -4633,7 +4662,7 @@ impl FileSelect {
 
     pub fn ex_data_save_pane_move_ok2(&mut self) {
         let temp1 = match self.select_num {
-            0 => self.pane_trance_rec_info(0, 
+            0 => self.pane_trance_rec_info(0,
                 self.timer - IDX_3b as i16,
                 IDX_11,
                 IDX_3c as f32,
@@ -4643,7 +4672,7 @@ impl FileSelect {
                 IDX_07,
                 0,
             ),
-            1 => self.pane_trance_rec_info(1, 
+            1 => self.pane_trance_rec_info(1,
                 self.timer - IDX_3b as i16,
                 IDX_12,
                 IDX_3c as f32,
@@ -4653,7 +4682,7 @@ impl FileSelect {
                 IDX_07,
                 0,
             ),
-            _ => self.pane_trance_rec_info(2, 
+            _ => self.pane_trance_rec_info(2,
                 self.timer - IDX_3b as i16,
                 IDX_13,
                 IDX_3c as f32,
@@ -5199,12 +5228,23 @@ impl FileSelect {
             MenuItem::Erase => &mut self.panes.groups.erase_label,
             MenuItem::Back => &mut self.panes.groups.back_label,
         };
+        let text = match item {
+            MenuItem::Yes => Some(&mut self.panes.groups.yes_text),
+            MenuItem::No => Some(&mut self.panes.groups.no_text),
+            MenuItem::Start => None,
+            MenuItem::Copy => None,
+            MenuItem::Erase => None,
+            MenuItem::Back => Some(&mut self.panes.groups.back_text),
+        };
         group[0].pane_trans(0.0, param_2 + value * span);
         if param_5 == 1 {
             value = 1.0 - value;
         }
         group[0].set_now_alpha(value);
         label.set_now_alpha(value);
+        if let Some(pane) = text {
+            pane.set_now_alpha(value);
+        }
         false
     }
 }
@@ -5326,12 +5366,12 @@ pub struct SceneRequest {
     pub menu_open: bool,
     pub stop_status: bool,
     pub enable_next_stage: bool,
+    pub restart_option: bool,
 }
 
 #[derive(Resource, Clone, Debug)]
 pub struct TitleScene {
     pub movie_id: u32,
-    pub movie_found: bool,
     pub movie_rest_frame: i32,
     pub movie_volume: f32,
     pub scene: SceneName,
@@ -5343,7 +5383,6 @@ impl Default for TitleScene {
     fn default() -> Self {
         Self {
             movie_id: 0,
-            movie_found: false,
             movie_rest_frame: 0,
             movie_volume: 1.0,
             scene: SceneName::Title,
@@ -5359,45 +5398,37 @@ impl TitleScene {
         self.requests.menu_open = false;
         self.requests.stop_status = false;
         self.requests.enable_next_stage = true;
-        self.movie_id = if scene == SceneName::Title { 0 } else { 1 };
-        self.movie_found = false;
+        self.movie_id = u32::from(scene != SceneName::Title);
     }
 
-    pub fn execute(&mut self, pad: &PadInput, overlap_peek: bool, reset_to_opening: bool) -> bool {
-        if !overlap_peek && !reset_to_opening {
-            if !self.movie_found {
-                if self.movie_rest_frame == 0 {
-                    return true;
-                }
-                self.movie_found = true;
-            }
-
-            if self.scene == SceneName::Ending {
-                if self.movie_rest_frame == 0 {
-                    if self.clear_count == 0 {
-                        self.requests.change_to = Some(SceneName::NameSelect);
-                        self.requests.overlap = 0;
-                        self.requests.transition = 5;
-                    } else {
-                        self.requests.change_to = Some(SceneName::Opening);
-                        self.requests.overlap = 0;
-                        self.requests.transition = 5;
-                    }
-                    self.movie_volume = 0.0;
-                    self.requests.movie_volume = 0.0;
-                }
-            } else if pad.trig_a
-                || pad.trig_b
-                || pad.trig_start
-                || self.movie_rest_frame == 0
-            {
-                self.requests.change_to = Some(SceneName::Opening);
-                self.requests.overlap = 0;
-                self.requests.transition = 5;
-                self.movie_volume = 0.0;
-                self.requests.movie_volume = 0.0;
-            }
+    pub fn execute(
+        &mut self,
+        pad: &PadInput,
+        overlap_peek: bool,
+        reset_to_opening: bool,
+        movie_ready: bool,
+    ) -> bool {
+        if overlap_peek || reset_to_opening || !movie_ready {
+            return true;
         }
+
+        let leave = self.scene == SceneName::Ending
+            && self.movie_rest_frame == 0
+            || self.scene != SceneName::Ending
+                && (pad.trig_a || pad.trig_b || pad.trig_start || self.movie_rest_frame == 0);
+        if !leave {
+            return true;
+        }
+
+        if self.scene == SceneName::Ending && self.clear_count == 0 {
+            self.requests.change_to = Some(SceneName::NameSelect);
+        } else {
+            self.requests.change_to = Some(SceneName::Opening);
+        }
+        self.requests.overlap = 0;
+        self.requests.transition = 5;
+        self.requests.movie_volume = 0.0;
+        self.movie_volume = 0.0;
         true
     }
 
@@ -5407,10 +5438,6 @@ impl TitleScene {
 
     pub fn delete(&mut self) -> SceneRequest {
         std::mem::take(&mut self.requests)
-    }
-
-    pub fn draw(&self) -> Vec<&'static str> {
-        Vec::new()
     }
 }
 
@@ -5562,21 +5589,24 @@ impl MenuScene {
             }
 
             if trig {
-                let stage = self.cursor_id.clamp(0, i32::from(self.info.num).saturating_sub(1)) as usize;
-                let Some(stage) = self.info.stage.get(stage) else {
+                let slot = self
+                    .cursor_id
+                    .clamp(0, i32::from(self.info.num).saturating_sub(1))
+                    as usize;
+                let Some(info) = self.info.stage.get(slot) else {
                     return true;
                 };
-                let Some(point) = self.group_point.get_mut(stage as usize + stage) else {
+                let Some(point) = self.group_point.get_mut(slot) else {
                     return true;
                 };
                 if pad.hold_b {
                     *point -= 1;
                     if *point < 0 {
-                        *point = stage.rooms.len() as i8 - 1;
+                        *point = info.rooms.len() as i8 - 1;
                     }
                 } else {
                     *point += 1;
-                    if *point >= stage.rooms.len() as i8 {
+                    if *point >= info.rooms.len() as i8 {
                         *point = 0;
                     }
                 }
@@ -5708,7 +5738,7 @@ impl MenuScene {
         true
     }
 
-    pub fn draw(&self) -> Vec<String> {
+    pub fn draw(&mut self) -> Vec<String> {
         let mut out = Vec::new();
         out.push("menu".to_string());
         if self.start_code != 0 {
@@ -5716,35 +5746,36 @@ impl MenuScene {
         }
         let num = usize::from(self.info.num);
         let line_num = num.min(20);
-        let mut scroll = self.cursor_id - self.start_id;
+        let scroll = self.cursor_id - self.start_id;
         if scroll < 5 {
-            self_clamp_start(&mut self.start_id, scroll - 5);
-        } else if scroll > 15 {
-            let mut r5 = i32::try_from(num).unwrap_or(0) - 20;
-            if r5 < 0 {
-                r5 = 0;
+            self.start_id += scroll - 5;
+            if self.start_id < 0 {
+                self.start_id = 0;
             }
-            self_clamp_start(&mut self.start_id, scroll - 15);
-            if self.start_id > r5 {
-                self.start_id = r5;
+        } else if scroll > 15 {
+            let mut limit = i32::try_from(num).unwrap_or(0) - 20;
+            if limit < 0 {
+                limit = 0;
+            }
+            self.start_id += scroll - 15;
+            if self.start_id > limit {
+                self.start_id = limit;
             }
         }
-        scroll = self.cursor_id - self.start_id;
-        let mut y = 70;
         for id in self.start_id..self.start_id + line_num as i32 {
             let marker = if self.cursor_id == id { 'O' } else { ' ' };
-            let stage = self.info.stage.get(id.max(0) as usize);
+            let index = id.max(0) as usize;
+            let stage = self.info.stage.get(index);
             let name = stage.map_or("", |entry| entry.name.as_str());
             let room = stage
                 .and_then(|entry| {
-                    let point = self.group_point.get(id.max(0) as usize).copied().unwrap_or(0);
+                    let point = self.group_point.get(index).copied().unwrap_or(0);
                     usize::try_from(point)
                         .ok()
                         .and_then(|at| entry.rooms.get(at))
                 })
                 .map_or("", |entry| entry.name.as_str());
             out.push(format!("{} {:2} {} <{}>", marker, id, name, room));
-            y += 16;
         }
         out.push("X: advance  Y: back".to_string());
         if self.time_pattern >= 6 {
@@ -5769,21 +5800,14 @@ impl MenuScene {
             "pad3 (A): demo23 {}",
             if self.demo23 != 0 { "ON" } else { "OFF" }
         ));
-        let _ = y;
         out
     }
 
     pub fn delete(&mut self) -> bool {
         self.display_flag &= !2;
         self.display_flag &= !2;
+        self.requests.restart_option = false;
         true
-    }
-}
-
-fn self_clamp_start(start: &mut i32, delta: i32) {
-    *start += delta;
-    if *start < 0 {
-        *start = 0;
     }
 }
 
@@ -5798,9 +5822,9 @@ pub const GOVER_STEP_B: f32 = -9.0;
 pub const GOVER_PARTICLE_X: [f32; GOVER_LETTER_COUNT] =
     [-175.0, -130.0, -80.0, -30.0, 32.0, 75.0, 120.0, 160.0];
 pub const GOVER_PARTICLE_Y: f32 = 50.0;
-pub const GOVER_PARTICLE_SMOKE: u16 = 0x0000;
-pub const GOVER_PARTICLE_RING: u16 = 0x0001;
-pub const GOVER_PARTICLE_HA: u16 = 0x0002;
+pub const GOVER_PARTICLE_SMOKE: u16 = 0x002F;
+pub const GOVER_PARTICLE_RING: u16 = 0x002E;
+pub const GOVER_PARTICLE_HA: u16 = 0x0030;
 pub const GOVER_ROT_TABLE: [i16; 6] = [40, 30, 20, -20, -30, -40];
 pub const GOVER_HOLD: i16 = 90;
 pub const GOVER_TAIL: i16 = 0x46;
@@ -5834,6 +5858,7 @@ pub struct GameOver {
     pub menu_open: bool,
     pub gameover_status: u8,
     pub reset: bool,
+    pub add_death_count: bool,
     pub rng_seed: [i32; 3],
     pub sounds: Vec<u32>,
     pub life: u16,
@@ -5858,6 +5883,7 @@ impl Default for GameOver {
             menu_open: false,
             gameover_status: 0,
             reset: false,
+            add_death_count: false,
             rng_seed: [100; 3],
             sounds: Vec::new(),
             life: GOVER_LIFE_REFILL,
@@ -5877,6 +5903,7 @@ impl GameOver {
             self.backdrop.parts_set_file(layout);
             self.backdrop.init_alpha = 0xFF;
         }
+        self.add_death_count = true;
         self.hold = GOVER_HOLD;
         self.tail = GOVER_TAIL;
         self.anime_start = false;
@@ -5896,6 +5923,7 @@ impl GameOver {
 
     pub fn set_back_alpha(&mut self, alpha: f32) {
         self.alpha = alpha;
+        self.backdrop.set_now_alpha(alpha);
     }
 
     pub fn value_init(&mut self) {
@@ -5921,14 +5949,11 @@ impl GameOver {
     }
 
     pub fn set_emitter0(&mut self, particles: &mut Particles, x: f32, y: f32, z: f32) {
-        let emitter = particles.set_2d_fore(GOVER_PARTICLE_SMOKE, x, y, z);
-        self.emitters[0] = Some(particles.layer.len().saturating_sub(1) + particles.spawned.len().saturating_sub(1));
-        let _ = emitter;
+        self.emitters[0] = Some(particles.set_2d_fore(GOVER_PARTICLE_SMOKE, x, y, z));
     }
 
     pub fn set_emitter1(&mut self, particles: &mut Particles, x: f32, y: f32, z: f32) {
-        particles.set_2d_menu_fore(GOVER_PARTICLE_HA, x, y, z);
-        self.emitters[1] = Some(particles.layer.len().saturating_sub(1));
+        self.emitters[1] = Some(particles.set_2d_menu_fore(GOVER_PARTICLE_HA, x, y, z));
     }
 
     pub fn stop_emitter0(&mut self, particles: &mut Particles) {
@@ -6101,8 +6126,10 @@ impl GameOver {
         &mut self,
         particles: &mut Particles,
         save_open: &mut dyn FnMut() -> bool,
-        save_move: &mut dyn FnMut() -> bool,
+        save_move: &mut dyn FnMut(),
         save_close: &mut dyn FnMut() -> bool,
+        save_status: &mut dyn FnMut() -> u8,
+        save_end_status: &mut dyn FnMut() -> u8,
     ) -> bool {
         if self.state == 3 {
             if save_open() {
@@ -6110,18 +6137,23 @@ impl GameOver {
                 self.life = GOVER_LIFE_REFILL;
             }
         } else if self.state == 4 {
-            if save_move() && self.state == 4 {
+            save_move();
+            if save_status() == 3 {
                 self.state = 5;
             }
         } else if self.state == 5 {
             if save_close() {
-                if self.gameover_status == 0 {
-                    self.gameover_status = 3;
-                    self.menu_open = false;
-                    self.reset = true;
-                } else if self.gameover_status == 1 {
-                    self.gameover_status = 2;
-                    self.menu_open = false;
+                match save_end_status() {
+                    0 => {
+                        self.gameover_status = 3;
+                        self.menu_open = false;
+                        self.reset = true;
+                    }
+                    1 => {
+                        self.gameover_status = 2;
+                        self.menu_open = false;
+                    }
+                    _ => {}
                 }
 
                 self.stop_emitter1(particles);
@@ -6130,7 +6162,7 @@ impl GameOver {
         } else if self.state != 6 && self.anime_start {
             if self.hold == GOVER_HOLD {
                 if self.anime_open(particles) {
-                    particles.set_2d_fore(GOVER_PARTICLE_SMOKE, 0.0, 0.0, 0.0);
+                    self.set_emitter0(particles, 0.0, 0.0, 0.0);
                     self.set_emitter1(particles, 0.0, 0.0, 0.0);
                     self.hold -= 1;
                 }
@@ -6150,14 +6182,6 @@ impl GameOver {
         }
 
         true
-    }
-
-    pub fn draw(&mut self) {
-        for index in 0..GOVER_LETTER_COUNT {
-            let alpha = self.letter[index].now_alpha;
-            let _ = alpha;
-        }
-        self.backdrop.set_now_alpha(self.alpha);
     }
 
     pub fn delete_check(&self) -> bool {

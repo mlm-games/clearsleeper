@@ -904,38 +904,37 @@ pub struct Emitter {
 
 #[derive(Resource, Clone, Debug, Default)]
 pub struct Particles {
-    pub spawned: Vec<Emitter>,
     pub layer: Vec<Emitter>,
 }
 
 impl Particles {
     pub fn reset(&mut self) {
-        self.spawned.clear();
         self.layer.clear();
     }
 
-    pub fn set_2d_fore(&mut self, id: u16, x: f32, y: f32, z: f32) -> Emitter {
-        let emitter = Emitter {
+    pub fn set_2d_fore(&mut self, id: u16, x: f32, y: f32, z: f32) -> usize {
+        self.push(Emitter {
             id,
             x,
             y,
             z,
             alive: true,
-        };
-        self.spawned.push(emitter);
-        emitter
+        })
     }
 
-    pub fn set_2d_menu_fore(&mut self, id: u16, x: f32, y: f32, z: f32) -> Emitter {
-        let emitter = Emitter {
+    pub fn set_2d_menu_fore(&mut self, id: u16, x: f32, y: f32, z: f32) -> usize {
+        self.push(Emitter {
             id,
             x,
             y,
             z,
             alive: true,
-        };
+        })
+    }
+
+    fn push(&mut self, emitter: Emitter) -> usize {
         self.layer.push(emitter);
-        emitter
+        self.layer.len() - 1
     }
 
     pub fn stop(&mut self, index: usize) {
@@ -958,6 +957,9 @@ pub struct MemCard {
     pub picture_data: Option<usize>,
     pub picture_write: Option<usize>,
     pub data_version: u32,
+    pub save_table: u32,
+    pub staged_save: bool,
+    pub game_start_stage_set: bool,
     pub data_num: u8,
     pub new_file: u8,
     pub no_file: u8,
@@ -989,6 +991,9 @@ impl Default for MemCard {
             picture_data: None,
             picture_write: None,
             data_version: SAVE_VERSION,
+            save_table: 0,
+            staged_save: false,
+            game_start_stage_set: false,
             data_num: 0,
             new_file: 1,
             no_file: 0,
@@ -1062,6 +1067,25 @@ impl MemCard {
 
     pub fn set_data_num(&mut self, num: u8) {
         self.data_num = num;
+    }
+
+    pub fn exchange_player_recollection_data(&mut self) {}
+
+    pub fn get_save_table(&self) -> u32 {
+        self.save_table
+    }
+
+    pub fn set_save_table(&mut self, table: u32) {
+        self.save_table = table;
+    }
+
+    pub fn put_save(&mut self, save_table: u32) {
+        self.save_table = save_table;
+        self.staged_save = true;
+    }
+
+    pub fn set_game_start_stage(&mut self) {
+        self.game_start_stage_set = true;
     }
 
     pub fn get_new_file(&self) -> u8 {
@@ -1341,6 +1365,7 @@ pub struct ErrorPanel {
     pub stick: StickControl,
     pub pal_language: u8,
     pub tick_rate: u8,
+    pub sounds: Vec<u32>,
 }
 
 impl Default for ErrorPanel {
@@ -1354,6 +1379,7 @@ impl Default for ErrorPanel {
             message: String::new(),
             state: 0,
             status: 0,
+            sounds: Vec::new(),
             yes_no: 1,
             flag_2f7: 0,
             flag_2f8: 0,
@@ -1482,8 +1508,15 @@ impl ErrorPanel {
         self.panes[1].hide();
     }
 
+    pub fn close_message(&mut self) {
+        self.timer = 0;
+        self.state = 2;
+        self.sounds.push(SE_ALERT_PANEL_OUT);
+    }
+
     pub fn set_err_message(&mut self, msg_no: u32, mode: i32) {
         self.flag_2fa = mode as u8;
+        self.sound(SE_ALERT_PANEL_IN);
         self.initial();
         let buffer = self.pending_message(msg_no);
         let line_count = self.line_count(&buffer);
@@ -2089,12 +2122,12 @@ impl SaveMenu {
             3 => {
                 rt = if self.error_flag != 0 {
                     if self.error_type == 2 {
-                        self.open_for_ending2(env)
+                        self.open_for_ending2()
                     } else {
                         true
                     }
                 } else {
-                    self.open_for_ending(env)
+                    self.open_for_ending()
                 };
             }
             _ => {}
@@ -2132,8 +2165,8 @@ impl SaveMenu {
         match self.use_type {
             1 => rt = self.close_for_collect(env),
             0 => rt = self.close_for_item(env),
-            2 => rt = self.close_for_game_over(env),
-            3 => rt = self.close_for_ending(env),
+            2 => rt = self.close_for_game_over(),
+            3 => rt = self.close_for_ending(),
             _ => {}
         }
         self.timer += 1;
@@ -2394,15 +2427,15 @@ impl SaveMenu {
         base && second && title && menu
     }
 
-    pub fn close_for_game_over(&mut self, env: &mut SaveEnv<'_>) -> bool {
+    pub fn close_for_game_over(&mut self) -> bool {
         match self.end_status {
-            1 => self.close_for_game_over_1(env),
-            0 => self.close_for_game_over_2(env),
+            1 => self.close_for_game_over_1(),
+            0 => self.close_for_game_over_2(),
             _ => false,
         }
     }
 
-    pub fn close_for_game_over_1(&mut self, env: &mut SaveEnv<'_>) -> bool {
+    pub fn close_for_game_over_1(&mut self) -> bool {
         if self.timer == 0 {
             self.sound(SE_SAVE_PANEL_OUT);
         }
@@ -2438,12 +2471,9 @@ impl SaveMenu {
         } else {
             self.menu_down()
         };
-        let _ = env;
         base && second && title && menu
     }
-
-    pub fn close_for_game_over_2(&mut self, env: &mut SaveEnv<'_>) -> bool {
-        let _ = env;
+    pub fn close_for_game_over_2(&mut self) -> bool {
         let mut title_rt = false;
         let mut base_rt = false;
         let mut yes_rt = false;
@@ -2582,12 +2612,10 @@ impl SaveMenu {
         }
         false
     }
-
-    pub fn open_for_ending(&mut self, env: &mut SaveEnv<'_>) -> bool {
+    pub fn open_for_ending(&mut self) -> bool {
         if self.timer == 0 {
             self.sound(SE_SAVE_PANEL_IN);
         }
-        let _ = env;
         let mut second = false;
         let base = self.pane_trance_base(
             self.timer - IDX_09 as i16,
@@ -2618,12 +2646,10 @@ impl SaveMenu {
         let menu = self.menu_up();
         base && second && title && menu
     }
-
-    pub fn open_for_ending2(&mut self, env: &mut SaveEnv<'_>) -> bool {
+    pub fn open_for_ending2(&mut self) -> bool {
         if self.timer == 0 {
             self.sound(SE_SAVE_PANEL_IN);
         }
-        let _ = env;
         let mut second = false;
         let base = self.pane_trance_base(
             self.timer - IDX_09 as i16,
@@ -2653,12 +2679,10 @@ impl SaveMenu {
         );
         base && second && title
     }
-
-    pub fn close_for_ending(&mut self, env: &mut SaveEnv<'_>) -> bool {
+    pub fn close_for_ending(&mut self) -> bool {
         if self.timer == 0 {
             self.sound(SE_SAVE_PANEL_OUT);
         }
-        let _ = env;
         let mut second = false;
         let base = self.pane_trance_base(
             self.timer - IDX_0a as i16,
@@ -2693,7 +2717,6 @@ impl SaveMenu {
         };
         base && second && title && menu
     }
-
     pub fn move_step(&mut self, env: &mut SaveEnv<'_>) {
         if env.system.is_reset() {
             return;
@@ -2701,7 +2724,7 @@ impl SaveMenu {
         let probe = env.card.get_probe_stat();
         if (probe == 0 || probe == 1) && !env.system.is_reset() {
             if self.flag_53b == 0 && self.error.get_status() == 1 {
-                self.error.state = 2;
+                self.error.close_message();
                 self.flag_533 = 0xFF;
                 self.flag_52d = proc_mem_card_check;
                 self.proc = proc_mem_card_err_msg_wait_key3;
@@ -2710,15 +2733,15 @@ impl SaveMenu {
         }
         self.error.move_step(&env.pad);
         match dispatch(self.proc) {
-            Proc::NoSave => self.no_save(env),
+            Proc::NoSave => self.no_save(),
             Proc::NoSave2 => self.no_save2(),
             Proc::SaveQuestion => self.save_question(env),
             Proc::MemCardCheck => self.mem_card_check(env),
             Proc::OpenSaveMenu => self.open_save_menu(),
             Proc::CloseSaveMenu => self.close_save_menu(env),
             Proc::MemCardErrMsgWaitKey => self.mem_card_err_msg_wait_key(),
-            Proc::MemCardErrMsgWaitKey2 => self.mem_card_err_msg_wait_key2(env),
-            Proc::MemCardErrMsgWaitKey3 => self.mem_card_err_msg_wait_key3(env),
+            Proc::MemCardErrMsgWaitKey2 => self.mem_card_err_msg_wait_key2(),
+            Proc::MemCardErrMsgWaitKey3 => self.mem_card_err_msg_wait_key3(),
             Proc::MemCardErrGoIplSel => self.mem_card_err_go_ipl_sel(),
             Proc::MemCardErrGoIplSel2 => self.mem_card_err_go_ipl_sel2(env),
             Proc::MemCardErrMsgWaitFormatSel => self.mem_card_err_msg_wait_format_sel(),
@@ -2752,14 +2775,12 @@ impl SaveMenu {
         }
     }
 
-    pub fn no_save(&mut self, env: &mut SaveEnv<'_>) {
+    pub fn no_save(&mut self) {
         self.flag_533 = 0xFF;
         self.error.set_err_message(MSG_CARD_UNAVAILABLE, 0);
         self.proc = proc_mem_card_err_msg_wait_key3;
         self.flag_52d = proc_no_save2;
-        let _ = env;
     }
-
     pub fn no_save2(&mut self) {
         self.proc = proc_save_wait;
         self.save_status = 3;
@@ -2853,7 +2874,7 @@ impl SaveMenu {
         }
     }
 
-    pub fn close_save_menu(&mut self, env: &mut SaveEnv<'_>) {
+    pub fn close_save_menu(&mut self) {
         let rt = if self.flag_53a == 1 {
             true
         } else {
@@ -2869,17 +2890,15 @@ impl SaveMenu {
             self.text_a = format!("\u{1}{msg}");
             self.error.set_err_message(u32::from(self.flag_532), 0);
             self.proc = self.flag_52d;
-            let _ = env;
         }
     }
-
     pub fn mem_card_err_msg_wait_key(&mut self) {
         if self.error.get_status() == 2 {
             self.proc = proc_open_save_menu;
         }
     }
 
-    pub fn mem_card_err_msg_wait_key2(&mut self, env: &mut SaveEnv<'_>) {
+    pub fn mem_card_err_msg_wait_key2(&mut self) {
         if self.error.get_status() == 2 {
             if self.flag_533 != 0xFF {
                 self.error.set_err_message(u32::from(self.flag_533), 0);
@@ -2889,11 +2908,9 @@ impl SaveMenu {
                 self.error.set_err_message(MSG_RECOVER_YES, 0);
                 self.proc = self.flag_52e;
             }
-            let _ = env;
         }
     }
-
-    pub fn mem_card_err_msg_wait_key3(&mut self, env: &mut SaveEnv<'_>) {
+    pub fn mem_card_err_msg_wait_key3(&mut self) {
         if self.error.get_status() == 2 {
             if self.flag_533 != 0xFF {
                 let msg_no = u32::from(self.flag_533);
@@ -2901,10 +2918,8 @@ impl SaveMenu {
                 self.flag_533 = 0xFF;
             }
             self.proc = self.flag_52d;
-            let _ = env;
         }
     }
-
     pub fn mem_card_err_go_ipl_sel(&mut self) {
         if self.error.get_status() == 2 {
             if self.error.get_yes_no() != 0 {
@@ -2955,12 +2970,12 @@ impl SaveMenu {
     pub fn mem_card_format(&mut self, env: &mut SaveEnv<'_>) {
         self.op_result = env.card.format_sync();
         if self.op_result != 0 {
-            self.error.state = 2;
+            self.error.close_message();
             self.proc = proc_mem_card_format_check;
         }
     }
 
-    pub fn mem_card_format_check(&mut self, env: &mut SaveEnv<'_>) {
+    pub fn mem_card_format_check(&mut self) {
         if self.error.get_status() == 2 {
             if self.op_result == 2 {
                 self.error.set_err_message(MSG_FORMAT_FAIL, 0);
@@ -2973,10 +2988,8 @@ impl SaveMenu {
                 self.flag_52d = proc_mem_card_check;
             }
             self.flag_53b = 0;
-            let _ = env;
         }
     }
-
     pub fn mem_card_make_game_file_sel(&mut self, env: &mut SaveEnv<'_>) {
         if self.error.get_status() == 2 {
             if self.error.get_yes_no() != 0 {
@@ -2998,7 +3011,7 @@ impl SaveMenu {
     pub fn mem_card_make_game_file(&mut self, env: &mut SaveEnv<'_>) {
         self.op_result = env.card.save_sync();
         if self.op_result != 0 {
-            self.error.state = 2;
+            self.error.close_message();
             self.proc = proc_mem_card_make_game_file_check;
         }
     }
@@ -3059,13 +3072,15 @@ impl SaveMenu {
         };
 
         if can_save {
-            env.card.set_data_num(self.flag_536);
+            env.card.exchange_player_recollection_data();
+            env.card.put_save(env.card.get_save_table());
+            env.card.set_game_start_stage();
             let slot = usize::from(env.card.get_data_num());
-            if let Some(save) = env.pending_save.clone() {
-                env.card.set_memory_to_card(slot, save);
-            }
             let test = env.card.test_checksum_game_data(slot);
             if test {
+                if let Some(save) = env.pending_save.clone() {
+                    env.card.set_memory_to_card(slot, save);
+                }
                 self.text_b = format!("\u{1}{MSG_SAVING}");
                 self.data_write(env);
                 self.proc = proc_mem_card_data_save_wait;
@@ -3411,7 +3426,6 @@ impl SaveMenu {
             } else {
                 self.sound(SE_SAVE_CANCEL);
             }
-            self.cursor_anime();
             return true;
         } else if env.pad.trig_b {
             if param_0 != 0 {

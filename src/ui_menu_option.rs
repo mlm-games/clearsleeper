@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::j2d::{Kind, Screen, ScreenPane};
 use crate::sim::vibration::{RND_MOD, RND_MUL, RND_SCALE, RND_SEED, Vibration};
+use crate::text::font::ResFont;
 
 pub const SCREEN_LABEL: &str = "option.blo";
 pub const SCREEN_ARCHIVE: &str = "files/res/Msg/optres.arc";
@@ -21,6 +22,7 @@ pub const NOTE_SPACE_TIMER: i32 = 0;
 pub const SCALE_FADE: i32 = 196;
 pub const BAR_OFFSET: f32 = 6.0;
 pub const BAR_PERIOD: i16 = 20;
+pub const BAR_TILT_THRESHOLD: i16 = 10;
 pub const NOTE_TITLE_ANGLE: f32 = 20.0;
 pub const NOTE_DY: f32 = 35.0;
 pub const TITLE_DY: f32 = -50.0;
@@ -751,6 +753,7 @@ pub struct OptionPanes {
     pub icon: [Pane; ICON_COUNT],
     pub icon_shadow: [Pane; ICON_COUNT],
     pub note_text: [Pane; TYPE_PARTS],
+    pub note_title: Pane,
     pub note_anchor: Pane,
     pub no_key: Pane,
     pub note_bar: [Pane; CURSOR_BAR_PARTS],
@@ -775,13 +778,14 @@ impl Default for OptionPanes {
                 Pane::new("st00"),
                 Pane::new("str0"),
             ],
+            note_title: Pane::new("no11"),
             note_anchor: Pane::new("nt00"),
             no_key: Pane::new("nk00"),
             note_bar: [Pane::new("yaz2"), Pane::new("yaz1")],
             row: [
                 Pane::new("ttyu"),
+                Pane::new(""),
                 Pane::new("tvib"),
-                Pane::new("tmon"),
                 Pane::new("tsou"),
             ],
             attention: [Pane::new("thld"), Pane::new("tsic")],
@@ -817,6 +821,7 @@ impl OptionPanes {
         for index in 0..TYPE_PARTS {
             self.note_text[index].parts_set_opt(screen);
         }
+        self.note_title.parts_set_opt(screen);
         self.note_anchor.parts_set_opt(screen);
         self.no_key.parts_set_opt(screen);
         for index in 0..CURSOR_BAR_PARTS {
@@ -982,11 +987,12 @@ impl OptionMenu {
         &mut self,
         screen: Screen,
         msgs: &dyn MsgSource,
+        font: &ResFont,
         config: &PlayerConfig,
         rumbles: &mut Rumbles,
     ) {
         self.screen = Some(screen);
-        self.screen_set(msgs);
+        self.screen_set(msgs, font);
         self.initialize(config, rumbles.supported);
         self.quit_status = 0;
         self.rumble_pattern = 0;
@@ -1005,7 +1011,7 @@ impl OptionMenu {
         self.text_area = [main, ruby, spare, other];
     }
 
-    pub fn screen_set(&mut self, msgs: &dyn MsgSource) {
+    pub fn screen_set(&mut self, msgs: &dyn MsgSource, font: &ResFont) {
         let Some(screen) = self.screen.clone() else {
             return;
         };
@@ -1027,20 +1033,19 @@ impl OptionMenu {
         for index in 0..TYPE_PARTS {
             let text = self.text_row[index].clone();
             self.panes.attention[index].set_string(&text);
-            self.change_scale_center(LabelSlot::Attention0, &text.clone());
-            self.change_scale_center(LabelSlot::Vibration0, &text);
-            let _ = index;
+            let slot = if index == 0 {
+                LabelSlot::Attention0
+            } else {
+                LabelSlot::Attention1
+            };
+            self.change_scale_center(slot, &text, font);
         }
 
         let vibration = [self.text_row[2].clone(), self.text_row[3].clone()];
+        let vibration_slots = [LabelSlot::Vibration0, LabelSlot::Vibration1];
         for index in 0..TYPE_PARTS {
             self.panes.vibration[index].set_string(&vibration[index]);
-            let slot = if index == 0 {
-                LabelSlot::Vibration0
-            } else {
-                LabelSlot::Vibration1
-            };
-            self.change_scale_center(slot, &vibration[index].clone());
+            self.change_scale_center(vibration_slots[index], &vibration[index], font);
         }
 
         let sound = [
@@ -1055,16 +1060,16 @@ impl OptionMenu {
         ];
         for index in 0..SOUND_PARTS {
             self.panes.sound[index].set_string(&sound[index]);
-            self.change_scale_center(sound_slots[index], &sound[index].clone());
+            self.change_scale_center(sound_slots[index], &sound[index], font);
         }
 
         for (index, slot) in ROW_LABEL_SLOTS.into_iter().enumerate() {
             let text = msgs.message(ROW_LABEL_MESSAGES[index]);
-            self.change_scale_right(slot, &text);
+            self.change_scale_right(slot, &text, font);
         }
 
-        self.panes.note_anchor.user_area =
-            normalize_angle(rotation_degrees(self.panes.note_anchor.rotation));
+        self.panes.note_title.user_area =
+            normalize_angle(rotation_degrees(self.panes.note_title.rotation));
         self.panes.title.user_area = normalize_angle(rotation_degrees(self.panes.title.rotation));
         self.panes.note_frame.user_area =
             normalize_angle(rotation_degrees(self.panes.note_frame.rotation));
@@ -1122,10 +1127,9 @@ impl OptionMenu {
             self.panes.sound[index].set_now_alpha_zero();
         }
 
-        for index in 0..2 {
+        for index in [0usize, 2, 3] {
             self.panes.row[index].set_now_alpha_zero();
         }
-        self.panes.row[3].set_now_alpha_zero();
 
         for index in 0..CURSOR_PARTS {
             self.panes.cursor[index].pane_trans(0.0, 0.0);
@@ -1144,19 +1148,19 @@ impl OptionMenu {
     pub fn note_init(&mut self) {
         let f31 = -12.0;
 
-        self.panes.note_anchor.pane_trans(0.0, NOTE_DY);
+        self.panes.note_title.pane_trans(0.0, NOTE_DY);
 
-        self.panes.note_anchor.rotate(
-            self.panes.note_anchor.size.x / 2.0,
-            self.panes.note_anchor.size.y / 2.0,
-            f31 + f32::from(self.panes.note_anchor.user_area as i16),
+        self.panes.note_title.rotate(
+            self.panes.note_title.size.x / 2.0,
+            self.panes.note_title.size.y / 2.0,
+            f31 + f32::from(self.panes.note_title.user_area as i16),
         );
 
         self.panes.note_text[0].set_now_alpha_zero();
         self.panes.note_text[1].set_now_alpha_zero();
         self.panes.note_anchor.set_now_alpha_zero();
         self.panes.no_key.set_now_alpha_zero();
-        self.panes.backdrop.set_now_alpha_zero();
+        self.panes.note_title.set_now_alpha_zero();
     }
 
     pub fn title_init(&mut self) {
@@ -1218,10 +1222,9 @@ impl OptionMenu {
             self.panes.note_bar[index].set_now_alpha(alpha);
         }
 
-        for index in 0..2 {
+        for index in [0usize, 2, 3] {
             self.panes.row[index].set_now_alpha(alpha);
         }
-        self.panes.row[3].set_now_alpha(alpha);
 
         self.panes.cursor[0].set_now_alpha(alpha);
         self.panes.cursor[1].set_now_alpha(alpha);
@@ -1234,12 +1237,12 @@ impl OptionMenu {
             0,
         );
         let f30 = (1.0 - alpha) * -12.0;
-        self.panes.note_anchor.pane_trans(0.0, (1.0 - alpha) * NOTE_DY);
+        self.panes.note_title.pane_trans(0.0, (1.0 - alpha) * NOTE_DY);
 
-        self.panes.note_anchor.rotate(
-            self.panes.note_anchor.size.x / 2.0,
-            self.panes.note_anchor.size.y / 2.0,
-            f30 + f32::from(self.panes.note_anchor.user_area as i16),
+        self.panes.note_title.rotate(
+            self.panes.note_title.size.x / 2.0,
+            self.panes.note_title.size.y / 2.0,
+            f30 + f32::from(self.panes.note_title.user_area as i16),
         );
 
         self.panes.note_text[0].set_now_alpha(alpha);
@@ -1357,7 +1360,7 @@ impl OptionMenu {
     }
 
     pub fn bar_anime(&mut self) {
-        let fvar1 = if self.panes.note_bar[0].user_area < BAR_PERIOD {
+        let fvar1 = if self.panes.note_bar[0].user_area < BAR_TILT_THRESHOLD {
             BAR_OFFSET
         } else {
             -BAR_OFFSET
@@ -1617,21 +1620,21 @@ impl OptionMenu {
         for index in 0..ICON_COUNT {
             if self.panes.icon[index].user_area != -1 {
                 let base_x = self.panes.note_text[0].pos_top_left.x
-                    + (self.panes.note_anchor.pos_top_left.x
+                    + (self.panes.note_title.pos_top_left.x
                         + self.panes.note_anchor.pos_top_left.x);
                 let base_y = self.panes.note_text[0].pos_top_left.y
-                    + (self.panes.note_anchor.pos_top_left.y
+                    + (self.panes.note_title.pos_top_left.y
                         + self.panes.note_anchor.pos_top_left.y);
                 self.panes.icon_shadow[index].pos_top_left.x =
                     self.panes.icon[index].pos_top_left.x + base_x;
                 self.panes.icon_shadow[index].pos_top_left.y =
                     self.panes.icon[index].pos_top_left.y + base_y;
 
-                let offset_x =
-                    self.panes.note_anchor.pos_center.x - self.panes.icon_shadow[index].pos_top_left.x;
-                let offset_y = self.panes.note_anchor.pos_center.y
+                let offset_x = self.panes.note_title.pos_center.x
+                    - self.panes.icon_shadow[index].pos_top_left.x;
+                let offset_y = self.panes.note_title.pos_center.y
                     - self.panes.icon_shadow[index].pos_top_left.y;
-                let rotation = f32::from(self.panes.note_anchor.rotation as i16) * 180.0 / 32768.0;
+                let rotation = rotation_degrees(self.panes.note_title.rotation);
                 self.panes.icon_shadow[index].rotate(offset_x, offset_y, rotation);
             } else {
                 self.panes.icon[index].set_now_alpha_zero();
@@ -1647,43 +1650,47 @@ impl OptionMenu {
         }
     }
 
-    pub fn string_length(&mut self, slot: LabelSlot, text: &str) -> f32 {
-        let (cell, char_space) = {
-            let pane = self.label(slot);
-            (pane.font_size_x, pane.char_space)
+    pub fn string_length(&mut self, slot: LabelSlot, text: &str, font: &ResFont) -> f32 {
+        let cell = self.label(slot).font_size_x;
+        let char_space = self.label(slot).char_space;
+        let ratio = if cell <= 0.0 {
+            0.0
+        } else {
+            cell / font.cell_width() as f32
         };
-        let mut total = 0.0f32;
-        let mut first = true;
-        let bytes: Vec<char> = text.chars().collect();
+
+        let mut length = 0.0f32;
+        let mut started = false;
+        let chars: Vec<char> = text.chars().collect();
         let mut at = 0usize;
-        while at < bytes.len() {
-            if bytes[at] == '\u{1a}' {
-                let len = bytes.get(at + 1).map_or(0, |c| *c as usize);
+        while at < chars.len() {
+            if chars[at] == '\u{1a}' {
+                let len = chars.get(at + 1).map_or(0, |c| *c as usize);
                 at += 1 + len;
+                continue;
+            }
+            let code = u32::from(chars[at] as u32);
+            at += 1;
+            if code > 0xFF {
+                continue;
+            }
+            let code = code as u16;
+            let width = font.char_width(code) as f32;
+            if started {
+                length += char_space + width * ratio;
             } else {
-                let code = u32::from(bytes[at] as u32);
-                at += 1;
-                let width = char_width(code);
-                if first {
-                    total = f32::from(width);
-                    first = false;
-                } else {
-                    total += f32::from(width) + char_space;
-                }
+                length = (width + font.char_offset(code) as f32) * ratio;
+                started = true;
             }
         }
-        let ratio = if cell == 0.0 { 0.0 } else { 1.0 / cell };
-        let mut scaled = if first { 0.0 } else { total * ratio };
-        if !first {
-            total = total * ratio;
+
+        if length > SCALE_FADE as f32 {
+            let scaled = cell * (SCALE_FADE as f32 / length);
+            self.label_mut(slot).font_size_x = scaled as i32 as f32;
+            length = SCALE_FADE as f32;
         }
-        if scaled > f32::from(SCALE_FADE) {
-            self.label_mut(slot).font_size_x =
-                self.label(slot).font_size_x * (f32::from(SCALE_FADE) / scaled);
-            scaled = f32::from(SCALE_FADE);
-        }
-        let _ = total;
-        scaled
+
+        length
     }
 
     fn label(&self, slot: LabelSlot) -> &Pane {
@@ -1720,8 +1727,8 @@ impl OptionMenu {
         }
     }
 
-    pub fn change_scale_center(&mut self, slot: LabelSlot, text: &str) {
-        let length = self.string_length(slot, text);
+    pub fn change_scale_center(&mut self, slot: LabelSlot, text: &str, font: &ResFont) {
+        let length = self.string_length(slot, text, font);
         let pane = self.label_mut(slot);
         pane.size.x = length;
         pane.size_orig.x = length;
@@ -1730,8 +1737,8 @@ impl OptionMenu {
         pane.pos_top_left_orig.x = left;
     }
 
-    pub fn change_scale_right(&mut self, slot: LabelSlot, text: &str) {
-        let length = self.string_length(slot, text);
+    pub fn change_scale_right(&mut self, slot: LabelSlot, text: &str, font: &ResFont) {
+        let length = self.string_length(slot, text, font);
         let pos = self.label(slot).pos_top_left.x + self.label(slot).size.x;
         let pane = self.label_mut(slot);
         pane.size.x = length;
@@ -2015,11 +2022,6 @@ pub fn count_lines(text: &str) -> usize {
     count
 }
 
-pub fn char_width(code: u32) -> i32 {
-    let _ = code;
-    16
-}
-
 pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
     if max <= 0 {
         return 1.0;
@@ -2045,15 +2047,14 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
 pub fn row_label(row: OptionRow) -> &'static str {
     match row {
         OptionRow::Attention => "ttyu",
-        OptionRow::Ruby => "trub",
+        OptionRow::Ruby => "",
         OptionRow::Vibration => "tvib",
         OptionRow::Sound => "tsou",
     }
 }
 
-pub fn option_entries() -> [OptionRow; 4] = [
+pub fn option_entries() -> [OptionRow; 3] = [
     OptionRow::Attention,
-    OptionRow::Ruby,
     OptionRow::Vibration,
     OptionRow::Sound,
 ]
@@ -2061,7 +2062,7 @@ pub fn option_entries() -> [OptionRow; 4] = [
 pub fn option_messages(row: OptionRow) -> [u32; 3] {
     match row {
         OptionRow::Attention => [MSG_ATTENTION_0, MSG_ATTENTION_1, 0],
-        OptionRow::Ruby => [MSG_ATTENTION_0, MSG_ATTENTION_1, 0],
+        OptionRow::Ruby => [0, 0, 0],
         OptionRow::Vibration => [MSG_VIBRATION_0, MSG_VIBRATION_1, 0],
         OptionRow::Sound => [MSG_SOUND_0, MSG_SOUND_1, MSG_SOUND_2],
     }
