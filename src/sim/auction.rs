@@ -1,4 +1,6 @@
 use bevy_ecs::prelude::*;
+
+use super::isle_timer::{self, IsleTimer};
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
@@ -141,7 +143,6 @@ const ITEM_SET_ID: u16 = 0xFFFF;
 
 const TIMER_MODE_BID: i32 = 2;
 const TIMER_MODE_AUCTION: i32 = 4;
-const TIMER_STEP_MS: i32 = 17;
 const TIMER_SHORT_MS: i32 = 30000;
 const TIMER_LONG_MS: i32 = 60000;
 
@@ -786,7 +787,9 @@ impl Auction {
         }
         self.event_order(ctx);
         if self.timer_mode == TIMER_MODE_AUCTION {
-            self.timer_now += TIMER_STEP_MS;
+            self.timer_now = self.timer_limit - ctx.timer.rest_time();
+        } else {
+            ctx.timer.delete_request();
         }
     }
 
@@ -1084,6 +1087,13 @@ impl Auction {
         } else {
             TIMER_LONG_MS
         };
+        let limit = self.timer_limit as u16;
+        if ctx
+            .timer
+            .create_timer(isle_timer::MODE_AUCTION, limit, 0, 0, 0.0, 0.0, 0.0, 0.0)
+        {
+            ctx.timer.timer_start(isle_timer::MODE_AUCTION, 0);
+        }
         self.gauge_id = PROC_ERROR;
         self.timer_ready = false;
         self.msg_hold = 1;
@@ -2033,6 +2043,7 @@ struct Ctx<'a, 'w, 's> {
     order_flags: &'a mut OrderFlags,
     item_partner: &'a mut ItemPartner,
     counters: &'a mut Counters,
+    timer: &'a mut IsleTimer,
     layout: &'a mut Layout,
     procs: &'a mut MsgProcs,
     info: &'a mut MsgGameInfo,
@@ -2114,6 +2125,7 @@ pub fn control(
     mut item_partner: ResMut<ItemPartner>,
     mut one: ResMut<Msg1Box>,
     mut two: ResMut<Msg2Box>,
+    mut isle_timer: ResMut<IsleTimer>,
     mut actors: Query<(Entity, &Actor, &mut Auction), (With<Auction>, Without<Player>)>,
     mut commands: Commands,
 ) {
@@ -2167,6 +2179,7 @@ pub fn control(
             order_flags: &mut order_flags,
             item_partner: &mut item_partner,
             counters: &mut counters,
+            timer: &mut isle_timer,
             layout: &mut layout,
             procs: &mut procs,
             info: &mut info,

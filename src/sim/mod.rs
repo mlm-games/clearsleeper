@@ -1288,6 +1288,9 @@ pub fn build(
                 hami4::control.in_set(WwSimSet::Execute),
                 vrbox::control.in_set(WwSimSet::Execute),
                 tide::control.in_set(WwSimSet::Execute),
+                )
+                    .chain(),
+                (
                 pscnchg::control.in_set(WwSimSet::Execute),
                 vdora::control.in_set(WwSimSet::Execute),
                 )
@@ -1330,6 +1333,10 @@ pub fn build(
                 usovmc::control.in_set(WwSimSet::Execute),
                 obj_akabe::control.in_set(WwSimSet::Execute),
                 acorn_leaf::control.in_set(WwSimSet::Execute),
+                molgera::control.in_set(WwSimSet::Execute),
+                magma::control.in_set(WwSimSet::Execute),
+                daiocta::control.in_set(WwSimSet::Execute),
+                buoybarrel::control.in_set(WwSimSet::Execute),
                 sie_flag::control.in_set(WwSimSet::Execute),
                 barrel::control.in_set(WwSimSet::Execute),
                 fallrock::control.in_set(WwSimSet::Execute),
@@ -1488,7 +1495,6 @@ pub fn build(
                     hfuck1::control.in_set(WwSimSet::Execute),
                     jbaba::control.in_set(WwSimSet::Execute),
                     dragon::control.in_set(WwSimSet::Execute),
-                    sitem::control.in_set(WwSimSet::Execute),
                     ykgr::control.in_set(WwSimSet::Execute),
                     mkiek::control.in_set(WwSimSet::Execute),
                 tagba1::control.in_set(WwSimSet::Execute),
