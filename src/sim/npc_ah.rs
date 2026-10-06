@@ -8,7 +8,7 @@ use super::flags::{EventFlags, Switches};
 use super::intent::DoIntent;
 use super::player::Player;
 use super::stream::add_calc_angle_s2;
-use super::walk::{from_s16, to_s16};
+use super::walk::{add_calc_angle_s, from_s16, to_s16};
 use crate::assets::MsgArchives;
 use crate::text::driver::TextFlags;
 use crate::text::msgbox::Msg2Box;
@@ -31,7 +31,12 @@ pub fn is_npc_ah(name: &str) -> bool {
 
 const STAFF_AH: &str = "Ah"; // <- l_npc_staff_id[0], :29
 
-// NpcDatStruct l_npc_dat - d_a_npc_ah.cpp:47-56, field order per d_a_npc_ah.h:15-49
+// l_npc_dat - d_a_npc_ah.cpp:47-56, field order per d_a_npc_ah.h:15-49.
+// The layout prefix 0x00-0x27 is byte-identical to daNpcMn_c's `NpcDatStruct`
+// (d_a_npc_mn.h:16-31), so its semantic names carry over only where AH's own reader reads the
+// slot the same way. It does not for 0x18: AH spends 0x18/0x1C/0x20 on a rotated x/y/z
+// attention offset (`attnInfoPos.set(field_0x18, field_0x1C, field_0x20)`, :387), not on the
+// single `mAttnPosOfsY` scalar, and it pushes the distances to 0x28/0x2C.
 const DAT_MAX_HEAD_X: i16 = 0x1000; // <- mMax_head_x, :48
 const DAT_MAX_HEAD_Y: i16 = 0x2000; // <- mMax_head_y, :48
 const DAT_MAX_BACKBONE_X: i16 = 0x0000; // <- mMax_backbone_x, :48
@@ -41,18 +46,18 @@ const DAT_MIN_HEAD_Y: i16 = -0x2000; // <- mMin_head_y 0xE000, :49
 const DAT_MIN_BACKBONE_X: i16 = 0x0000; // <- mMin_backbone_x, :49
 const DAT_MIN_BACKBONE_Y: i16 = -0x1000; // <- mMin_backbone_y 0xF000, :49
 const DAT_MAX_TURN_STEP: i16 = 0x0800; // <- mMax_turn_step, :50
-const DAT_PLAYER_EYE_Y: f32 = 0.0; // <- field_0x14, :50
-const DAT_ATTN_X: f32 = 0.0; // <- field_0x18, :50
-const DAT_ATTN_Y: f32 = 190.0; // <- field_0x1C, :51
-const DAT_ATTN_Z: f32 = -20.0; // <- field_0x20, :51
-const DAT_EYE_Y: f32 = 150.0; // <- field_0x24, :52
-const DAT_ATTN_DIST: f32 = 200.0; // <- field_0x28, :52
-const DAT_ATTN_DIST_NEAR: f32 = 0.0; // <- field_0x2C, :53
-const DAT_ATTN_ANGLE: i16 = 0x7FFF; // <- field_0x30, :53
-const DAT_LOOK_MAX_VEL: i16 = 0x0800; // <- field_0x32, :53
-const DAT_RETURN_TIMER: i16 = 0x001E; // <- field_0x50, :55
-const DAT_FIELD_52: u8 = 0x00; // <- field_0x52, :55
-const DAT_FIELD_53: u8 = 0x00; // <- field_0x53, :55
+const DAT_PLAYER_EYE_OFS_Y: f32 = 0.0; // <- field_0x14, :50; dNpc_playerEyePos(l_npc_dat.field_0x14), :718
+const DAT_ATTN_POS_OFS_X: f32 = 0.0; // <- field_0x18, :50; attnInfoPos.set, :387
+const DAT_ATTN_POS_OFS_Y: f32 = 190.0; // <- field_0x1C, :51; attnInfoPos.set, :387
+const DAT_ATTN_POS_OFS_Z: f32 = -20.0; // <- field_0x20, :51; attnInfoPos.set, :387
+const DAT_EYE_POS_OFS_Y: f32 = 150.0; // <- field_0x24, :51; eyePos.set(... field_0x24 ...), :392
+const DAT_ATTN_DIST: f32 = 200.0; // <- field_0x28, :51; field_0x720 = l_npc_dat.field_0x28, :292
+const DAT_NEAR_DIST: f32 = 0.0; // <- field_0x2C, :52; l_npc_dat.field_0x2C > distXZ, :735
+const DAT_ATTN_ANGLE: i16 = 0x7FFF; // <- field_0x30, :52; field_0x730 = l_npc_dat.field_0x30, :293
+const DAT_LOOK_AT_MAX_VEL: i16 = 0x0800; // <- field_0x32, :52; mTargetAngle = l_npc_dat.field_0x32, :764
+const DAT_RETURN_TIMER: i16 = 0x001E; // <- field_0x50, :55; field_0x72E = l_npc_dat.field_0x50, :733
+const DAT_FIELD_52: u8 = 0x00; // <- field_0x52, :55; field_0x74F = l_npc_dat.field_0x52, :290
+const DAT_FIELD_53: u8 = 0x00; // <- field_0x53, :55; field_0x750 = l_npc_dat.field_0x53, :291
 
 // l_msg_ah_0..9 - :58-111; each entry is a two-slot chain terminated by 0x0000.
 const MSG_AH: [u32; 10] = [
@@ -63,21 +68,13 @@ const ATTN_DIST_EXTEND: f32 = 40.0; // <- :712
 const ATTN_ANGLE_EXTEND: i32 = 0x71C; // <- :713
 const LOOK_MAX_VEL_STEP: i16 = 0x800; // <- :795
 const LOOK_MAX_VEL_SCALE: i16 = 4; // <- :795
-const JNT_SCALE: i16 = 4; // <- d_npc.cpp dNpc_JntCtrl_c::follow
-const JNT_MIN_STEP: i32 = 1; // <- d_npc.cpp dNpc_JntCtrl_c::move
-const PLAYER_HEAD_TOP: f32 = 40.0; // <- d_a_player_main.cpp:11575
+const JNT_SCALE: i16 = 4; // <- angCalcS speed, d_npc.cpp:44; addCalcAngleL scale, d_npc.cpp:81
+const JNT_MIN_STEP: i32 = 1; // <- addCalcAngleL minStep, d_npc.cpp:81
+const JNT_ANG_MIN_STEP: i16 = 0x60; // <- addCalcAngleS minStep, d_npc.cpp:20
+const PLAYER_HEAD_TOP: f32 = 40.0; // <- head_offset.x, d_a_player_main.cpp:11560
 
 const CULL_MIN: [f32; 3] = [-70.0, 0.0, -70.0]; // <- fopAcM_setCullSizeBox, :281
 const CULL_MAX: [f32; 3] = [70.0, 200.0, 70.0]; // <- :281
-
-const BTP_TIMER_MIN: f32 = 30.0; // <- :823
-const BTP_TIMER_RANGE: f32 = 100.0; // <- :823
-const BTP_FRAME_MAX: u8 = 0xFF; // <- mBtpFrame >= getFrameMax() stand-in, :822
-
-const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
-const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
-const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
-const RND_SEED: i32 = 100;
 
 const ITEM_BOMB: u32 = 7; // <- eventMesSet mItemNo = 7, :550
 const ITEM_ARROW: u32 = 5; // <- eventMesSet mItemNo = 5, :556
@@ -88,11 +85,15 @@ const SWITCH_PR2: u8 = 0x6C; // <- phase_1 case 2, :167
 const SWITCH_PR5: u8 = 0x10; // <- phase_1 case 5, :175
 const FLAG_0520: u32 = 0x0520; // <- dSv_event_flag_c::UNK_0520, :170
 
+// `daObj::PrmAbstract(actor, width, shift)` = `(param >> shift) & ((1 << width) - 1)`
+// (d_a_obj.h:13-16) takes the WIDTH first. `getPrmArg0` spells its call
+// `PrmAbstract(this, PRM_SWSAVE_S, PRM_SWSAVE_W)` (:668), so 0x08 is the width and 0x00 the
+// shift - the enum's own suffixes read the other way round.
 const PRM_ARG0_MAX: u8 = 0xA; // <- getPrmArg0 clamp, :669
-const PRM_SWSAVE_S: u32 = 0x08; // <- daNpcAh_c::Prm_e::PRM_SWSAVE_S, d_a_npc_ah.h:54
-const PRM_SWSAVE_W: u32 = 0x00; // <- :55
-const PRM_SWSAVE2_S: u32 = 0x08; // <- :57
-const PRM_SWSAVE2_W: u32 = 0x08; // <- :56
+const PRM_ARG0_WIDTH: u32 = 0x08; // <- PRM_SWSAVE_S, d_a_npc_ah.h:54
+const PRM_ARG0_SHIFT: u32 = 0x00; // <- PRM_SWSAVE_W, d_a_npc_ah.h:55
+const PRM_SWBIT_WIDTH: u32 = 0x08; // <- PRM_SWSAVE2_S, d_a_npc_ah.h:56
+const PRM_SWBIT_SHIFT: u32 = 0x08; // <- PRM_SWSAVE2_W, d_a_npc_ah.h:57
 
 const NO_STATUS: u8 = 0xFF; // <- talk2, :574
 const PREV_STATUS_NONE: u16 = 0xFFFF; // <- talk2 field_0x734 = -1, :579
@@ -114,23 +115,12 @@ const ANM_LOOP: u8 = 2; // <- J3DFrameCtrl::EMode_LOOP, :873
 const ANM_NONE: u8 = 1; // <- J3DFrameCtrl::EMode_NONE, :874
 const MORF_OVERRIDE_NONE: f32 = -1.0; // <- daNpcAh_c::field_0x71C, :119
 
-fn rnd(seed: &mut [i32; 3]) -> f32 {
-    for lane in 0..3 {
-        seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
-    }
-    let sum = seed[0] as f32 / RND_SCALE[0]
-        + seed[1] as f32 / RND_SCALE[1]
-        + seed[2] as f32 / RND_SCALE[2];
-    (sum % 1.0).abs()
+/// `daObj::PrmAbstract` (d_a_obj.h:13-16).
+fn prm(parameters: u32, width: u32, shift: u32) -> u8 {
+    ((parameters >> shift) & ((1 << width) - 1)) as u8
 }
 
-fn calc_timer(value: &mut i16) -> i16 {
-    if *value != 0 {
-        *value -= 1;
-    }
-    *value
-}
-
+/// `cMtx_YrotS` + `cMtx_multVec` (`:388-389`).
 fn rot_y(angle: i16, vec: Vec3) -> Vec3 {
     let rad = from_s16(angle);
     Vec3::new(
@@ -199,10 +189,11 @@ impl JntCtrl {
         self.max_turn_step[0][1] = max_turn_step;
     }
 
+    /// `dNpc_JntCtrl_c::angCalcS` (d_npc.cpp:17-29): `cLib_addCalcAngleS` (c_lib.h:22), the
+    /// five-argument `minStep` form, so `walk::add_calc_angle_s` - not `add_calc_angle_s2`.
     fn ang_calc_s(out: &mut i16, target: i16, speed: i16, max_vel: i16) -> bool {
         let orig = out.wrapping_sub(target);
-        let mut diff = orig;
-        add_calc_angle_s2(&mut diff, 0, speed, max_vel);
+        let diff = add_calc_angle_s(orig, 0, speed, max_vel, JNT_ANG_MIN_STEP);
         if i32::from(diff).abs() > i32::from(speed) {
             *out = out.wrapping_add(diff.wrapping_sub(orig));
         } else {
@@ -379,9 +370,6 @@ pub struct NpcAh {
     pub prev_msg_status: u16,
     pub anm_dat: Option<AhAnmDat>,
     pub bck_idx: u8,
-    pub btp_frame: u8,
-    pub btp_timer: i16,
-    pub seed: [i32; 3],
     pub jnt: JntCtrl,
 }
 
@@ -417,9 +405,6 @@ impl NpcAh {
             prev_msg_status: PREV_STATUS_NONE,
             anm_dat: None,
             bck_idx: BCK_WAIT01,
-            btp_frame: 0,
-            btp_timer: 0,
-            seed: [RND_SEED; 3],
             jnt: JntCtrl::create(),
         }
     }
@@ -434,15 +419,13 @@ impl NpcAh {
 
     /// `daNpcAh_c::getPrmArg0` (`:667-671`).
     fn prm_arg0(&self, parameters: u32) -> u8 {
-        let mask = (1u32 << PRM_SWSAVE_W) - 1;
-        let raw = ((parameters >> PRM_SWSAVE_S) & mask) as u8;
+        let raw = prm(parameters, PRM_ARG0_WIDTH, PRM_ARG0_SHIFT);
         if raw >= PRM_ARG0_MAX { 0 } else { raw }
     }
 
     /// `daNpcAh_c::getSwBit` (`:674-676`).
     pub fn sw_bit(&self, parameters: u32) -> u8 {
-        let mask = (1u32 << PRM_SWSAVE2_W) - 1;
-        ((parameters >> PRM_SWSAVE2_S) & mask) as u8
+        prm(parameters, PRM_SWBIT_WIDTH, PRM_SWBIT_SHIFT)
     }
 
     /// `phase_1` (`:162-187`): the `cPhs_STOP_e` cases, which cancel creation entirely.
@@ -524,19 +507,6 @@ impl NpcAh {
         }
     }
 
-    /// `daNpcAh_c::playTexPatternAnm` (`:820-830`), minus the `getFrameMax()` bound
-    /// (the BTP archive does not ship).
-    fn play_tex_pattern_anm(&mut self) {
-        if calc_timer(&mut self.btp_timer) == 0 {
-            if self.btp_frame >= BTP_FRAME_MAX {
-                self.btp_frame = self.btp_frame.wrapping_sub(BTP_FRAME_MAX);
-                self.btp_timer = (rnd(&mut self.seed) * BTP_TIMER_RANGE + BTP_TIMER_MIN) as i16;
-            } else {
-                self.btp_frame = self.btp_frame.wrapping_add(1);
-            }
-        }
-    }
-
     /// `daNpcAh_c::playAnm` (`:833-851`), minus the `mpMorf->play` return (BCK frame
     /// counts are unavailable), so the animation-chain advance cannot run.
     fn play_anm(&mut self) {}
@@ -588,7 +558,8 @@ impl NpcAh {
                     self.sticky_attn = 0;
                     self.timer_return = DAT_RETURN_TIMER;
                 }
-                if DAT_ATTN_DIST_NEAR > dist_xz {
+                // `l_npc_dat.field_0x2C > distXZ` (:735)
+                if DAT_NEAR_DIST > dist_xz {
                     self.eye_pos = eye;
                     self.attn_mode = ATTN_PLAYER;
                     self.head_only_follow = self.sticky_attn == 0;
@@ -612,7 +583,8 @@ impl NpcAh {
                 }
             }
         }
-        self.target_angle = DAT_LOOK_MAX_VEL;
+        // `mTargetAngle = l_npc_dat.field_0x32;` (:764)
+        self.target_angle = DAT_LOOK_AT_MAX_VEL;
     }
 
     /// `daNpcAh_c::lookBack` (`:768-802`).
@@ -853,15 +825,32 @@ impl NpcAh {
         } else {
             self.event_move(arg0, ctx);
         }
-        self.play_tex_pattern_anm();
+        // `playTexPatternAnm();` (:380) - omitted. Both of its arms read
+        // `m_head_tex_pattern->getFrameMax()` (:822, :823) and `mBtpFrame` is written only here and
+        // read only by `_draw`'s `mBtpAnm.entry(morfModelData, mBtpFrame)` (:328); the BTP archive
+        // does not ship, so the bound is unavailable and no stand-in is invented.
         self.play_anm();
+        // `cXyz attnInfoPos; attnInfoPos.set(field_0x18, field_0x1C, field_0x20);
+        // cMtx_YrotS(mDoMtx_stack_c::get(), current.angle.y); cMtx_multVec(...);
+        // attnInfoPos += current.pos; attention_info.position.set(attnInfoPos);` (:386-391).
+        // Retail rotates this offset - unlike daNpcMn_c's pure-Y form (d_a_npc_mn.cpp:599) - so
+        // the x/y/z triple stands. `attention_info` is a RULE 3b absence, hence the discard.
         let attn = actor.pos
             + rot_y(
                 actor.angle[1],
-                Vec3::new(DAT_ATTN_X, DAT_ATTN_Y, DAT_ATTN_Z),
+                Vec3::new(
+                    DAT_ATTN_POS_OFS_X,
+                    DAT_ATTN_POS_OFS_Y,
+                    DAT_ATTN_POS_OFS_Z,
+                ),
             );
         let _ = attn;
-        self.eye_pos = Vec3::new(actor.pos.x, actor.pos.y + DAT_EYE_Y, actor.pos.z);
+        // `eyePos.set(current.pos.x, current.pos.y + l_npc_dat.field_0x24, current.pos.z);` (:392)
+        self.eye_pos = Vec3::new(
+            actor.pos.x,
+            actor.pos.y + DAT_EYE_POS_OFS_Y,
+            actor.pos.z,
+        );
         self.look_back(actor, ctx);
     }
 }
@@ -1016,7 +1005,7 @@ pub fn control(
             player_eye: player.map(|link| {
                 Vec3::new(
                     link.pos.x,
-                    link.pos.y + PLAYER_HEAD_TOP + DAT_PLAYER_EYE_Y,
+                    link.pos.y + PLAYER_HEAD_TOP + DAT_PLAYER_EYE_OFS_Y,
                     link.pos.z,
                 )
             }),
