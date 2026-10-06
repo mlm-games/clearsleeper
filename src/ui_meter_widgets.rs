@@ -166,7 +166,7 @@ pub const SLOT_COUNT_2: usize = 2;
 pub const SLOT_COUNT_3: usize = 3;
 pub const SLOT_COUNT_4: usize = 4;
 
-pub const HEX_8000: f32 = 0x8000;
+pub const HEX_8000: f32 = 0x8000u32 as f32;
 pub const DEG_180: f32 = 180.0;
 
 pub const SCROLL_SLOT0: usize = 0;
@@ -319,7 +319,7 @@ impl Default for Quad {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Pane {
     pub tag: String,
     pub kind: j2d::Kind,
@@ -346,6 +346,38 @@ pub struct Pane {
     pub blend_color: [f32; 4],
     pub blend_alpha: [f32; 4],
     pub rotation: Option<Rotation>,
+}
+
+impl Default for Pane {
+    fn default() -> Self {
+        Self {
+            tag: String::new(),
+            kind: j2d::Kind::Pane,
+            found: false,
+            visible: false,
+            pos_top_left_orig: F2::default(),
+            pos_top_left: F2::default(),
+            pos_center_orig: F2::default(),
+            pos_center: F2::default(),
+            size_orig: F2::default(),
+            size: F2::default(),
+            init_alpha: 0,
+            now_alpha: 0,
+            user_area: 0,
+            alpha: 0,
+            flip: false,
+            mirror_offset: F2::default(),
+            mirror_scale: F2::default(),
+            black: Color::default(),
+            white: Color::default(),
+            corner: [Color::default(); 4],
+            texture: None,
+            appended: Vec::new(),
+            blend_color: [0.0; 4],
+            blend_alpha: [0.0; 4],
+            rotation: None,
+        }
+    }
 }
 
 impl Pane {
@@ -628,7 +660,7 @@ pub struct MapStat {
     pub stay_valid: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MapView {
     pub alpha: u8,
     pub mode: u8,
@@ -705,12 +737,12 @@ impl Default for Tuning {
             row_scale_y: 100,
             item_scale_y: 0x5a,
             row_offset_x: 7,
-            row_offset_y: 0xfff4,
+            row_offset_y: 0xfff4u16 as i16,
             star_base: 0x14,
             star_span: [0xf, 5, 5, 5],
             star_jitter: [0, 0xc, 3, 3, 3],
-            clock_scroll_x: [0xffea, 0xffdd, 0xfffa],
-            clock_scroll_y: [0xffd5, 0xfffd, 0xfff3],
+            clock_scroll_x: [0xffeau16 as i16, 0xffddu16 as i16, 0xfffau16 as i16],
+            clock_scroll_y: [0xffd5u16 as i16, 0xfffdu16 as i16, 0xfff3u16 as i16],
             clock_steps: [0x8c, 0x82, 0x8c],
             bubble_size: 0x14 as f32,
             blink_steps: 0x14,
@@ -831,7 +863,7 @@ pub struct Panes {
     pub direction_arrow: [Pane; 4],
 }
 
-#[derive(Resource, Debug, Clone, PartialEq)]
+#[derive(Resource, Debug, Clone)]
 pub struct Widget {
     pub tuning: Tuning,
     pub pane: Panes,
@@ -1169,7 +1201,11 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         1 => ratio.sqrt(),
         3 => (ratio * 2.0 - 1.0) * 2.0 - 1.0,
         4 => {
-            let wave = (ratio * 0xFFFF as f32 * 0.5).sin();
+            let wave = (ratio * 0x8000u32 as f32 * 0.5).sin();
+            wave * wave
+        }
+        5 => {
+            let wave = (ratio * 0xFFFFu32 as f32 * 0.5).sin();
             wave * wave
         }
         _ => ratio,
@@ -1183,7 +1219,8 @@ pub fn alpha_close(timer: &mut i16, value: &mut i16) -> f32 {
         1.0
     } else if *timer == 9 {
         if *value < ALPHA_OPEN_STEPS {
-            let alpha = 1.0 - value_increase(ALPHA_OPEN_STEPS as i32, *value, ALPHA_ROOT);
+            let alpha =
+                1.0 - value_increase(ALPHA_OPEN_STEPS as i32, i32::from(*value), ALPHA_ROOT);
             *value += 1;
             alpha
         } else {
@@ -1202,7 +1239,7 @@ pub fn alpha_open(timer: &mut i16, value: &mut i16) -> f32 {
         0.0
     } else if *timer == 7 {
         if *value < ALPHA_OPEN_STEPS {
-            let alpha = value_increase(ALPHA_OPEN_STEPS as i32, *value, ALPHA_ROOT);
+            let alpha = value_increase(ALPHA_OPEN_STEPS as i32, i32::from(*value), ALPHA_ROOT);
             *value += 1;
             alpha
         } else {
@@ -1665,7 +1702,7 @@ pub fn key_move(widget: &mut Widget, input: &mut Input) {
             } else if target < 0 {
                 target = 0;
             }
-            widget.key_adjust = target - i32::from(widget.key_shown);
+            widget.key_adjust = (target - i32::from(widget.key_shown)) as i16;
             input.key_num = target;
             input.pending_key = 0;
         }
@@ -1765,7 +1802,7 @@ pub fn compass_get_on_proc(widget: &mut Widget, input: &mut Input) {
         }
         _ => {}
     }
-    let heading = input.ship_angle.wrapping_add(0x8000) as i16;
+    let heading = (i32::from(input.ship_angle) + 0x8000) as i16;
     let heading = -(heading as f32) * DEG_180 / HEX_8000;
     compass_rotate(
         &mut widget.pane.clock_needle,
@@ -3217,16 +3254,19 @@ pub fn swim_main_blink(widget: &mut Widget, input: &mut Input) {
     let limit = (total * 2) as i16;
     if step < total as i16 {
         let ratio = f32::from(step) / total as f32;
-        mask.r = (75.0 + (ratio * f32::from(i32::from(widget.swim_low.r) - 0x4B))) as u8;
-        mask.g = (75.0 + (ratio * f32::from(i32::from(widget.swim_low.g) - 0x4B))) as u8;
-        mask.b = (255.0 + (ratio * f32::from(i32::from(widget.swim_low.b) - 0xFF))) as u8;
+        mask.r = (75.0 + (ratio * ((i32::from(widget.swim_low.r) - 0x4B) as f32))) as u8;
+        mask.g = (75.0 + (ratio * ((i32::from(widget.swim_low.g) - 0x4B) as f32))) as u8;
+        mask.b = (255.0 + (ratio * ((i32::from(widget.swim_low.b) - 0xFF) as f32))) as u8;
         base_black = Color::mix(widget.swim_base_black, widget.swim_full_black, ratio);
         base_white = Color::mix(widget.swim_base_white, widget.swim_full_white, ratio);
     } else if step < limit {
         let ratio = (f32::from(step) - total as f32) / total as f32;
-        mask.r = (f32::from(widget.swim_low.r) + (ratio * (0x4B - f32::from(widget.swim_low.r)))) as u8;
-        mask.g = (f32::from(widget.swim_low.g) + (ratio * (0x4B - f32::from(widget.swim_low.g)))) as u8;
-        mask.b = (f32::from(widget.swim_low.b) + (ratio * (0xFF - f32::from(widget.swim_low.b)))) as u8;
+        mask.r = (f32::from(widget.swim_low.r)
+            + (ratio * ((0x4B - i32::from(widget.swim_low.r)) as f32))) as u8;
+        mask.g = (f32::from(widget.swim_low.g)
+            + (ratio * ((0x4B - i32::from(widget.swim_low.g)) as f32))) as u8;
+        mask.b = (f32::from(widget.swim_low.b)
+            + (ratio * ((0xFF - i32::from(widget.swim_low.b)) as f32))) as u8;
         base_black = Color::mix(widget.swim_full_black, widget.swim_base_black, ratio);
         base_white = Color::mix(widget.swim_full_white, widget.swim_base_white, ratio);
     } else if step >= limit {
@@ -3244,11 +3284,10 @@ pub fn swim_main_blink(widget: &mut Widget, input: &mut Input) {
                 input.air.max / 2 - input.air.count,
                 ALPHA_ROOT,
             );
-            widget.swim_blink_steps = widget.tuning.blink_steps as i32
-                + (ratio
-                    * f32::from(
-                        widget.tuning.blink_short as i32 - widget.tuning.blink_steps as i32,
-                    )) as i32;
+            widget.swim_blink_steps = (widget.tuning.blink_steps as f32
+                + ratio
+                    * (widget.tuning.blink_short as f32 - widget.tuning.blink_steps as f32))
+                as i32;
             let low = Color::rgba(
                 widget.tuning.low_r,
                 widget.tuning.low_g,
@@ -3294,10 +3333,8 @@ pub fn swim_main_blink(widget: &mut Widget, input: &mut Input) {
 
 pub fn swim_main_down(widget: &mut Widget, input: &mut Input) {
     let count = input.air.count;
-    pane_bottom_scale_y(
-        &mut widget.pane.gauge_blink,
-        count as f32 / f32::from(widget.pane.gauge_blink.user_area),
-    );
+    let area = f32::from(widget.pane.gauge_blink.user_area);
+    pane_bottom_scale_y(&mut widget.pane.gauge_blink, count as f32 / area);
     widget.pane.gauge_main.pos_top_left.y = (widget.pane.gauge_blink.pos_center_orig.y
         - widget.pane.gauge_blink.size_orig.y / 2.0)
         - widget.pane.gauge_main.pos_top_left.y;

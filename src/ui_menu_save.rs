@@ -339,8 +339,8 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         0 => v * v,
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
-        4 => (v * 0x800 * 0.5).sin() * (v * 0x800 * 0.5).sin(),
-        5 => (v * 0xFFFF * 0.5).sin() * (v * 0xFFFF * 0.5).sin(),
+        4 => (v * (0x8000u32 as f32) * 0.5).sin() * (v * (0x8000u32 as f32) * 0.5).sin(),
+        5 => (v * (0xFFFFu32 as f32) * 0.5).sin() * (v * (0xFFFFu32 as f32) * 0.5).sin(),
         _ => v,
     }
 }
@@ -828,7 +828,7 @@ impl StickControl {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadInput {
     pub trig_a: bool,
     pub trig_b: bool,
@@ -1487,8 +1487,8 @@ impl ErrorPanel {
             pane.size = pane.size_orig;
             pane.cpos_move();
         }
-        self.panes[0].now_alpha = ERROR_FRAME[1];
-        self.panes[1].now_alpha = ERROR_FRAME[2];
+        self.panes[0].now_alpha = ERROR_FRAME[1] as u8;
+        self.panes[1].now_alpha = ERROR_FRAME[2] as u8;
         self.panes[0].user_area = ERROR_FRAME[3] as i16;
         self.panes[1].user_area = ERROR_FRAME[4] as i16;
         self.flag_2f8 = 0;
@@ -1516,7 +1516,7 @@ impl ErrorPanel {
 
     pub fn set_err_message(&mut self, msg_no: u32, mode: i32) {
         self.flag_2fa = mode as u8;
-        self.sound(SE_ALERT_PANEL_IN);
+        self.sounds.push(SE_ALERT_PANEL_IN);
         self.initial();
         let buffer = self.pending_message(msg_no);
         let line_count = self.line_count(&buffer);
@@ -1738,8 +1738,8 @@ impl ErrorPanel {
     }
 
     pub fn yn_cursor_move(&mut self) {
-        self.panes[0].now_alpha = ERROR_FRAME[1];
-        self.panes[1].now_alpha = ERROR_FRAME[2];
+        self.panes[0].now_alpha = ERROR_FRAME[1] as u8;
+        self.panes[1].now_alpha = ERROR_FRAME[2] as u8;
         self.panes[0].user_area = ERROR_FRAME[3] as i16;
         self.panes[1].user_area = ERROR_FRAME[4] as i16;
         self.flag_2f8 = 0;
@@ -2038,7 +2038,7 @@ impl SaveMenu {
 
     pub fn initialize_ex(&mut self, msgs: &dyn MsgSource) {
         let msg = msgs.message(0x3A);
-        self.text_a = msg;
+        self.text_a = msg.clone();
         self.text_b = msg;
     }
 
@@ -2071,8 +2071,8 @@ impl SaveMenu {
         self.pane_trance_title(self.timer, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let yes_y = IDX_1e as f32;
         let no_y = IDX_1e as f32;
-        self.pane_trance_menu(self.timer, IDX_18, yes_y, 0.0, 1, 0);
-        self.pane_trance_menu(self.timer, IDX_18, no_y, 0.0, 1, 0);
+        self.pane_trance_menu(self.timer, IDX_18, MenuSlot::Yes, yes_y, 0.0, 1, 0);
+        self.pane_trance_menu(self.timer, IDX_18, MenuSlot::No, no_y, 0.0, 1, 0);
         self.panes.cursor.hide();
     }
 
@@ -2547,7 +2547,7 @@ impl SaveMenu {
         self.pane_rotate(
             self.timer - IDX_1b as i16,
             IDX_10,
-            MenuSlot::Yes,
+            TitleSlot::Yes,
             30.0,
             32.0,
             -7.0,
@@ -2577,7 +2577,7 @@ impl SaveMenu {
         self.pane_rotate(
             self.timer - (IDX_1b as i16 + IDX_1c as i16),
             IDX_10,
-            MenuSlot::No,
+            TitleSlot::No,
             30.0,
             32.0,
             7.0,
@@ -2606,8 +2606,8 @@ impl SaveMenu {
                 0,
             );
             self.pane_rotate(0, IDX_10, TitleSlot::Base, 250.5, 0.0, 0.0, 0);
-            self.pane_rotate(0, IDX_10, MenuSlot::Yes, 30.0, 32.0, 0.0, 0);
-            self.pane_rotate(0, IDX_10, MenuSlot::No, 30.0, 32.0, 0.0, 0);
+            self.pane_rotate(0, IDX_10, TitleSlot::Yes, 30.0, 32.0, 0.0, 0);
+            self.pane_rotate(0, IDX_10, TitleSlot::No, 30.0, 32.0, 0.0, 0);
             return true;
         }
         false
@@ -2738,7 +2738,7 @@ impl SaveMenu {
             Proc::SaveQuestion => self.save_question(env),
             Proc::MemCardCheck => self.mem_card_check(env),
             Proc::OpenSaveMenu => self.open_save_menu(),
-            Proc::CloseSaveMenu => self.close_save_menu(env),
+            Proc::CloseSaveMenu => self.close_save_menu(),
             Proc::MemCardErrMsgWaitKey => self.mem_card_err_msg_wait_key(),
             Proc::MemCardErrMsgWaitKey2 => self.mem_card_err_msg_wait_key2(),
             Proc::MemCardErrMsgWaitKey3 => self.mem_card_err_msg_wait_key3(),
@@ -2747,7 +2747,7 @@ impl SaveMenu {
             Proc::MemCardErrMsgWaitFormatSel => self.mem_card_err_msg_wait_format_sel(),
             Proc::MemCardErrMsgWaitFormatSel2 => self.mem_card_err_msg_wait_format_sel2(env),
             Proc::MemCardFormat => self.mem_card_format(env),
-            Proc::MemCardFormatCheck => self.mem_card_format_check(env),
+            Proc::MemCardFormatCheck => self.mem_card_format_check(),
             Proc::MemCardMakeGameFileSel => self.mem_card_make_game_file_sel(env),
             Proc::MemCardMakeGameFile => self.mem_card_make_game_file(env),
             Proc::MemCardMakeGameFileCheck => self.mem_card_make_game_file_check(env),
@@ -2805,7 +2805,7 @@ impl SaveMenu {
             self.timer = 0;
             match self.use_type {
                 0 | 1 | 2 => {
-                    self.text_b = format!("\u{1}{MESSAGE_TABLE[0]}");
+                    self.text_b = format!("\u{1}{}", MESSAGE_TABLE[0]);
                     self.proc = proc_game_continue;
                 }
                 3 => {
@@ -3304,14 +3304,14 @@ impl SaveMenu {
                 self.proc = proc_save_wait;
                 self.save_status = 3;
             } else if self.use_type == 2 {
-                self.flag_534 = CONTINUE_DELAY;
+                self.flag_534 = CONTINUE_DELAY as u8;
                 self.proc = proc_game_continue4;
             } else if self.flag_52f == 2 {
                 self.proc = proc_save_wait;
                 self.save_status = 3;
             } else {
                 self.timer = 0;
-                self.flag_534 = QUIT_DELAY;
+                self.flag_534 = QUIT_DELAY as u8;
                 self.proc = proc_game_continue3;
             }
         }
@@ -3319,7 +3319,7 @@ impl SaveMenu {
 
     pub fn game_continue3(&mut self, env: &mut SaveEnv<'_>) {
         let alpha_wipe_rt = self.pane_scale_alpha_wipe(self.timer, IDX_23, 1.0, 0, 1);
-        let close_rt = self.close_for_game_over_2(env);
+        let close_rt = self.close_for_game_over_2();
 
         self.timer += 1;
         if alpha_wipe_rt && close_rt {

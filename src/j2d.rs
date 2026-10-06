@@ -77,7 +77,7 @@ impl Default for ScreenPane {
             color_black: 0x0000_0000,
             color_white: 0xFFFF_FFFF,
             corner_color: [0xFFFF_FFFF; 4],
-            frame_textures: [None; 4],
+            frame_textures: std::array::from_fn(|_| None),
             contents_texture: None,
             window_box: Bounds {
                 x: 0.0,

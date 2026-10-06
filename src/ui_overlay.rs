@@ -12,7 +12,7 @@ pub const PANE_TYPE_ID_PICTURE: u16 = 0x12;
 
 pub const G_CM3D_F_INF: f32 = 1000000000.0;
 pub const G_CM3D_F_ABS_MIN: f32 = 3.8146973e-06;
-pub const S2RAD_CONSTANT: f32 = std::f32::consts::PI / 0x8000;
+pub const S2RAD_CONSTANT: f32 = std::f32::consts::PI / 32768.0_f32;
 
 pub fn s2rad(units: i16) -> f32 {
     units as f32 * S2RAD_CONSTANT
@@ -186,7 +186,7 @@ pub struct PaneQuad {
     pub text: String,
 }
 
-#[derive(Resource, Debug, Clone, Default, PartialEq)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct PlaceName {
     pub screen: Option<j2d::Screen>,
     pub pane: PaneState,
@@ -332,7 +332,7 @@ pub struct PlaceNameEnv {
     pub res_load: Phase,
 }
 
-#[derive(Resource, Debug, Clone, Default, PartialEq)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct PlaceNameProcess {
     pub card: PlaceName,
     pub dvd: Option<DvdThread>,
@@ -608,7 +608,7 @@ impl Ground for GroundProbe<'_> {
     }
 }
 
-#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq)]
 pub struct WaterMarkShared {
     pub circle_cnt: i16,
     pub player_foot_now_id: i16,

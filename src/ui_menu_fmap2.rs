@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 
 use crate::assets::{Archive, AssetRoot, yaz0_decode};
 use crate::j2d::{Kind, Screen, ScreenPane};
@@ -626,8 +627,8 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         0 => v * v,
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
-        4 => (v * 0x8000 * 0.5).sin() * (v * 0x8000 * 0.5).sin(),
-        5 => (v * 0xFFFF * 0.5).sin() * (v * 0xFFFF * 0.5).sin(),
+        4 => (v * 0x8000_f32 * 0.5).sin() * (v * 0x8000_f32 * 0.5).sin(),
+        5 => (v * 0xFFFF_f32 * 0.5).sin() * (v * 0xFFFF_f32 * 0.5).sin(),
         _ => v,
     }
 }
@@ -901,7 +902,7 @@ impl MsgSource for ChartText {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct ChartTuning {
     pub pane_frame: u8,
     pub pane_slide: i16,
@@ -1298,7 +1299,7 @@ impl ChartStick {
     }
 }
 
-#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
 pub struct ChartPadInput {
     pub trig_a: bool,
     pub trig_b: bool,
@@ -1890,7 +1891,7 @@ impl ChartLayer {
             f32::from(self.player_grid_y) * AREA_GRID_STEP,
         );
         self.collect_map_tex_change(charts);
-        self.fin_collect_map_tex_change();
+        self.fin_collect_map_tex_change(charts);
         let name = self.pane_name;
         self.name_page_mut(name, 0).hide();
         self.name_page_mut(name ^ 1, 0).hide();

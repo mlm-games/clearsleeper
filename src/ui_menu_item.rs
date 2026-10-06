@@ -787,8 +787,8 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         0 => v * v,
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
-        4 => (v * 0x800 * 0.5).sin() * (v * 0x800 * 0.5).sin(),
-        5 => (v * 0xFFFF * 0.5).sin() * (v * 0xFFFF * 0.5).sin(),
+        4 => (v * (0x8000u32 as f32) * 0.5).sin() * (v * (0x8000u32 as f32) * 0.5).sin(),
+        5 => (v * (0xFFFFu32 as f32) * 0.5).sin() * (v * (0xFFFFu32 as f32) * 0.5).sin(),
         _ => v,
     }
 }
@@ -1293,6 +1293,22 @@ impl ItemPanes {
 
     pub fn sub_frame_mut(&mut self, i: usize) -> &mut Pane {
         &mut self.panes[P_SB0 + i]
+    }
+
+    pub fn name_box(&self, i: usize) -> &Pane {
+        &self.panes[P_NM00 + i]
+    }
+
+    pub fn name_box_mut(&mut self, i: usize) -> &mut Pane {
+        &mut self.panes[P_NM00 + i]
+    }
+
+    pub fn out_box(&self, i: usize) -> &Pane {
+        &self.panes[P_FT0 + i]
+    }
+
+    pub fn out_box_mut(&mut self, i: usize) -> &mut Pane {
+        &mut self.panes[P_FT0 + i]
     }
 
     pub fn item_icon(&self, i: usize) -> &Pane {
@@ -3012,7 +3028,7 @@ impl ItemMenu {
     pub fn sync(&mut self, equipped: &Equipped, record: &ItemRecord) {
         self.equip = *equipped;
         self.record = *record;
-        self.play_select = *record.select_item;
+        self.play_select = record.select_item;
     }
 
     pub fn slot_item(&self, slot: u8) -> u8 {
@@ -3059,15 +3075,17 @@ impl ItemMenu {
         self.panes.out_box_mut(0).show();
         self.out_font
             .set_pane(&mut self.panes, P_WD, P_FT15, P_FT16, P_FT17);
+        let name_font_x = self.panes.name_box(0).font_size_x;
+        let name_font_y = self.panes.name_box(0).font_size_y;
         for index in 0..NAME_BUFFER_COUNT {
-            self.panes.name_box_mut(index).set_font_size(
-                self.panes.name_box(0).font_size_x,
-                self.panes.name_box(0).font_size_y,
-            );
+            self.panes
+                .name_box_mut(index)
+                .set_font_size(name_font_x, name_font_y);
         }
+        let name_char_space = self.panes.name_box(0).get_char_space();
         self.panes
             .name_box_mut(1)
-            .set_char_space(self.panes.name_box(0).get_char_space());
+            .set_char_space(name_char_space);
         for index in 0..SUB_ITEM_COUNT {
             self.panes.sub_item_mut(index).hide();
             self.panes.sub_shadow_mut(index).hide();
@@ -3750,9 +3768,8 @@ impl ItemMenu {
         self.panes.out_box_mut(0).set_font_size(NAME_CELL_SCALE, NAME_CELL_SCALE);
         let size = self.panes.name_box(0).get_font_size();
         self.panes.name_box_mut(1).set_font_size(size.0, size.1);
-        self.panes
-            .name_box_mut(1)
-            .set_char_space(self.panes.name_box(0).get_char_space());
+        let char_space = self.panes.name_box(0).get_char_space();
+        self.panes.name_box_mut(1).set_char_space(char_space);
 
         self.name_buf[1] = self.name_buf[0].clone();
         let carried = self.name_buf[0].clone();

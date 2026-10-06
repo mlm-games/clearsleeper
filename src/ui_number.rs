@@ -14,8 +14,8 @@ use crate::text::{
     CTRL_B_BUTTON, CTRL_C_STICK, CTRL_DPAD, CTRL_FLASHING_A_BUTTON, CTRL_HEART, CTRL_L_BUTTON,
     CTRL_MAIN_STICK, CTRL_MAIN_STICK_DOWN, CTRL_MAIN_STICK_LEFT, CTRL_MAIN_STICK_LEFT_RIGHT,
     CTRL_MAIN_STICK_RIGHT, CTRL_MAIN_STICK_UP, CTRL_MAIN_STICK_UP_DOWN, CTRL_MUSIC_NOTE,
-    CTRL_R_BUTTON, CTRL_X_BUTTON, CTRL_Y_BUTTON, CTRL_Z_BUTTON, ICON_A_BUTTON, ICON_ARROW_LEFT,
-    ICON_ARROW_RIGHT, ICON_ARROW_UP, ICON_B_BUTTON, ICON_C_STICK, ICON_DPAD,
+    CTRL_R_BUTTON, CTRL_X_BUTTON, CTRL_Y_BUTTON, CTRL_Z_BUTTON, ICON_A_BUTTON, ICON_ARROW_DOWN,
+    ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP, ICON_B_BUTTON, ICON_C_STICK, ICON_DPAD,
     ICON_FLASHING_A_BUTTON, ICON_HEART, ICON_L_BUTTON, ICON_MAIN_STICK, ICON_MAIN_STICK_DOWN,
     ICON_MAIN_STICK_LEFT, ICON_MAIN_STICK_LEFT_RIGHT, ICON_MAIN_STICK_RIGHT, ICON_MAIN_STICK_UP,
     ICON_MAIN_STICK_UP_DOWN, ICON_MUSIC_NOTE, ICON_R_BUTTON, ICON_X_BUTTON, ICON_Y_BUTTON,
@@ -75,7 +75,7 @@ pub fn digit_texture(digit: i32) -> String {
     format!("rupy_num_{digit:02}.bti")
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rotation {
     pub offset: [f32; 2],
     pub axis: u8,
@@ -1489,13 +1489,13 @@ impl OutFont {
         let mut var_f29 = 0.0f32;
         if self.shrink == 0 {
             let height = self.text_box.as_ref().map_or(0.0, TextBox::height);
-            let line_space = self.text_box.as_ref().map_or(0.0, TextBox::line_space);
+            let line_space = self.text_box.as_ref().map_or(0.0, |b| b.line_space);
             var_f29 = ((height - self.size_x) - f32::from(self.line_count) * line_space) / 2.0;
         }
 
         let mut tag = TextBuf::<OUT_FONT_TAG_BUF>::new();
         let box_width = self.text_box.as_ref().map_or(0.0, TextBox::width);
-        let line_space = self.text_box.as_ref().map_or(0.0, TextBox::line_space);
+        let line_space = self.text_box.as_ref().map_or(0.0, |b| b.line_space);
         let temp_r30 = ((box_width - self.width) / 2.0) as i32;
         if temp_r30 > 0 {
             tag.push_str(&format!("\u{1b}CR[{temp_r30}]"));

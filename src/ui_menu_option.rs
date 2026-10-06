@@ -710,7 +710,7 @@ impl StickControl {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadInput {
     pub trig_a: bool,
     pub trig_b: bool,
@@ -1321,10 +1321,10 @@ impl OptionMenu {
         let mut y = 0.0f32;
         let row = self.row();
         let target = match row {
-            OptionRow::Attention => self.value_pane(row, self.attention),
-            OptionRow::Ruby => self.value_pane(row, self.ruby),
-            OptionRow::Vibration => self.value_pane(row, self.vibration),
-            OptionRow::Sound => self.value_pane(row, self.sound),
+            OptionRow::Attention => self.panes.value_pane(row, self.attention),
+            OptionRow::Ruby => self.panes.value_pane(row, self.ruby),
+            OptionRow::Vibration => self.panes.value_pane(row, self.vibration),
+            OptionRow::Sound => self.panes.value_pane(row, self.sound),
         };
         if let Some(pane) = target {
             x[0] = pane.pos_top_left_orig.x - 20.0;
@@ -1348,8 +1348,8 @@ impl OptionMenu {
             OptionRow::Vibration => &mut self.panes.vibration[..TYPE_PARTS],
             OptionRow::Sound => &mut self.panes.sound[..SOUND_PARTS],
         };
-        for index in 0..count.min(panes.len()) {
-            if index == value {
+        for index in 0..usize::from(count).min(panes.len()) {
+            if index == value as usize {
                 panes[index].set_init_alpha();
             } else {
                 panes[index].set_now_alpha_zero();
@@ -1400,8 +1400,8 @@ impl OptionMenu {
 
     pub fn cursor_anime(&mut self) {
         let r29 = self.panes.cursor[0].user_area / 7;
-        for index in 0..3 {
-            if index == r29 {
+        for index in 0..3usize {
+            if index == r29 as usize {
                 self.panes.cursor[index * 2].set_init_alpha();
                 self.panes.cursor[index * 2 + 1].set_init_alpha();
             } else {
@@ -1423,13 +1423,14 @@ impl OptionMenu {
         config: &mut PlayerConfig,
         rumbles: &mut Rumbles,
         vibration: &mut Vibration,
+        msgs: &dyn MsgSource,
     ) {
         match trigger {
             STICK_UP => {
                 if self.panes.cursor[1].user_area > 0 {
                     self.panes.cursor[1].user_area -= 1;
                     self.cursor_move();
-                    self.note_set();
+                    self.note_set(msgs);
                     self.sound(SE_MENU_CURSOR);
                 }
             }
@@ -1437,7 +1438,7 @@ impl OptionMenu {
                 if self.panes.cursor[1].user_area < 3 {
                     self.panes.cursor[1].user_area += 1;
                     self.cursor_move();
-                    self.note_set();
+                    self.note_set(msgs);
                     self.sound(SE_MENU_CURSOR);
                 }
             }
@@ -1755,6 +1756,7 @@ impl OptionMenu {
         config: &mut PlayerConfig,
         rumbles: &mut Rumbles,
         vibration: &mut Vibration,
+        msgs: &dyn MsgSource,
     ) {
         let check_trigger = self
             .stick
@@ -1764,7 +1766,7 @@ impl OptionMenu {
             self.vibration = 0;
 
             for index in 0..TYPE_PARTS {
-                if index == self.vibration {
+                if index == self.vibration as usize {
                     self.panes.vibration[index].set_init_alpha();
                 } else {
                     self.panes.vibration[index].set_now_alpha_zero();
@@ -1811,7 +1813,7 @@ impl OptionMenu {
             self.panes.backing[1].user_area = 0;
         } else {
             if self.panes.backing[1].user_area == 0 {
-                self.stick_move(check_trigger, config, rumbles, vibration);
+                self.stick_move(check_trigger, config, rumbles, vibration, msgs);
             }
 
             let mut svar2 = if self.panes.note_anchor.user_area < 2 {
@@ -1823,7 +1825,7 @@ impl OptionMenu {
             self.panes.backing[1].user_area += 1;
 
             if self.panes.backing[1].user_area > svar2 {
-                svar2 = i32::from(self.panes.note_anchor.user_area);
+                svar2 = i16::from(self.panes.note_anchor.user_area);
 
                 if svar2 < 2 {
                     self.panes.note_anchor.user_area = (svar2 + 1) as i16;
@@ -1873,16 +1875,16 @@ impl OptionMenu {
 
         self.panes.backing[0].user_area += 1;
 
-        if self.panes.backing[0].user_area <= OPEN_FADE {
+        if self.panes.backing[0].user_area <= OPEN_FADE as i16 {
             self.main_move();
-        } else if self.panes.backing[0].user_area <= OPEN_DONE {
+        } else if self.panes.backing[0].user_area <= OPEN_DONE as i16 {
             self.note_move();
 
             self.title_move();
 
-            self.move_step(pad, config, rumbles, vibration);
+            self.move_step(pad, config, rumbles, vibration, msgs);
 
-            if self.panes.backing[0].user_area == OPEN_DONE {
+            if self.panes.backing[0].user_area == OPEN_DONE as i16 {
                 self.quit_status = QUIT_CLOSING;
 
                 self.panes.backing[0].user_area = 0;
@@ -1932,13 +1934,21 @@ impl OptionMenu {
     }
 
     pub fn scale_alpha(&mut self, alpha_scale: f32) {
+        let values = [
+            self.panes.title.now_alpha,
+            self.panes.note_frame.now_alpha,
+            self.panes.note_flag.now_alpha,
+            self.panes.note_anchor.now_alpha,
+            self.panes.no_key.now_alpha,
+            self.panes.backdrop.now_alpha,
+        ];
         for (pane, value) in [
-            (&mut self.panes.title, self.panes.title.now_alpha),
-            (&mut self.panes.note_frame, self.panes.note_frame.now_alpha),
-            (&mut self.panes.note_flag, self.panes.note_flag.now_alpha),
-            (&mut self.panes.note_anchor, self.panes.note_anchor.now_alpha),
-            (&mut self.panes.no_key, self.panes.no_key.now_alpha),
-            (&mut self.panes.backdrop, self.panes.backdrop.now_alpha),
+            (&mut self.panes.title, values[0]),
+            (&mut self.panes.note_frame, values[1]),
+            (&mut self.panes.note_flag, values[2]),
+            (&mut self.panes.note_anchor, values[3]),
+            (&mut self.panes.no_key, values[4]),
+            (&mut self.panes.backdrop, values[5]),
         ] {
             pane.now_alpha = (f32::from(value) * alpha_scale) as u8;
         }
@@ -1976,9 +1986,9 @@ impl OptionMenu {
         for lane in 0..3 {
             self.rng_seed[lane] = (self.rng_seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
         }
-        let sum = f32::from(self.rng_seed[0]) / RND_SCALE[0]
-            + f32::from(self.rng_seed[1]) / RND_SCALE[1]
-            + f32::from(self.rng_seed[2]) / RND_SCALE[2];
+        let sum = self.rng_seed[0] as f32 / RND_SCALE[0]
+            + self.rng_seed[1] as f32 / RND_SCALE[1]
+            + self.rng_seed[2] as f32 / RND_SCALE[2];
         (sum % 1.0).abs()
     }
 }
@@ -2038,8 +2048,8 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         0 => v * v,
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
-        4 => (v * 0x800 * 0.5).sin() * (v * 0x800 * 0.5).sin(),
-        5 => (v * 0xFFFF * 0.5).sin() * (v * 0xFFFF * 0.5).sin(),
+        4 => (v * (0x8000u32 as f32) * 0.5).sin() * (v * (0x8000u32 as f32) * 0.5).sin(),
+        5 => (v * (0xFFFFu32 as f32) * 0.5).sin() * (v * (0xFFFFu32 as f32) * 0.5).sin(),
         _ => v,
     }
 }
@@ -2053,11 +2063,9 @@ pub fn row_label(row: OptionRow) -> &'static str {
     }
 }
 
-pub fn option_entries() -> [OptionRow; 3] = [
-    OptionRow::Attention,
-    OptionRow::Vibration,
-    OptionRow::Sound,
-]
+pub fn option_entries() -> [OptionRow; 3] {
+    [OptionRow::Attention, OptionRow::Vibration, OptionRow::Sound]
+}
 
 pub fn option_messages(row: OptionRow) -> [u32; 3] {
     match row {

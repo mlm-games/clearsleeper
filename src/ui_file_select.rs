@@ -5,7 +5,7 @@ use crate::save::{SLOTS, SaveGame};
 use crate::sim::daynight::{DayNight, TIME_WRAP};
 use crate::ui_menu_option::value_increase;
 use crate::ui_menu_save::{
-    blank_save, Color, MemCard, Pane, Particles, SavePad as SavePadInput, StickControl,
+    blank_save, Color, MemCard, Pane, Particles, PadInput as SavePadInput, StickControl,
 };
 
 pub const SCREEN_LABEL: &str = "file_select.blo";
@@ -598,10 +598,9 @@ impl FileSelectPanes {
             bind_fixed(&mut self.slots.key[0][index], screen, &leak(&tag));
         }
         for index in 12..16 {
-            let mut tag = String::from("ak");
+            let mut tag = String::from("ak0");
             tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[0][index], screen, &leak(&tag));
-        }
         }
         for index in 2..12 {
             let mut tag = String::from("b00");
@@ -609,7 +608,7 @@ impl FileSelectPanes {
             bind_fixed(&mut self.slots.key[1][index], screen, &leak(&tag));
         }
         for index in 12..16 {
-            let mut tag = String::from("bk");
+            let mut tag = String::from("bk0");
             tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[1][index], screen, &leak(&tag));
         }
@@ -619,7 +618,7 @@ impl FileSelectPanes {
             bind_fixed(&mut self.slots.key[2][index], screen, &leak(&tag));
         }
         for index in 12..16 {
-            let mut tag = String::from("ck");
+            let mut tag = String::from("ck0");
             tag.push((b'0' + (index as u8 - 12)) as char);
             bind_fixed(&mut self.slots.key[2][index], screen, &leak(&tag));
         }
@@ -809,7 +808,7 @@ impl SlotSummary {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadInput {
     pub trig_a: bool,
     pub trig_b: bool,
@@ -821,6 +820,10 @@ pub struct PadInput {
     pub trig_z: bool,
     pub trig_z3: bool,
     pub trig_a2: bool,
+    pub trig_up: bool,
+    pub trig_down: bool,
+    pub trig_left: bool,
+    pub trig_right: bool,
     pub hold_up: bool,
     pub hold_down: bool,
     pub hold_b: bool,
@@ -842,6 +845,10 @@ impl From<&SavePadInput> for PadInput {
             trig_z: value.trig_z,
             trig_z3: false,
             trig_a2: false,
+            trig_up: false,
+            trig_down: false,
+            trig_left: false,
+            trig_right: false,
             hold_up: false,
             hold_down: false,
             hold_b: false,
@@ -1106,7 +1113,7 @@ impl FileSelect {
         self.panes.groups.message_text.set_string(&fill_info);
         self.message_clear(2);
 
-        let fill_slot = "A".repeat(TEXT_BUFFER_SLOT - 1);
+        let fill_slot = "A".repeat(crate::ui_menu_save::TEXT_BUFFER_A - 1);
         for slot in 0..3 {
             self.panes.slots.info[slot][1].set_string(&fill_slot);
             self.text_name[slot].clear();
@@ -1241,13 +1248,12 @@ impl FileSelect {
                             base.0 * IDX_54,
                             base.1 * IDX_54,
                         );
-                        self.panes.slots.info[index][1].pane_trans(
-                            self.panes.slots.info[index][1].pos_top_left_orig.x
-                                - self.panes.slots.info[index][1].pos_top_left.x,
-                            self.panes.slots.info[index][1].pos_top_left_orig.y
-                                - self.panes.slots.info[index][1].pos_top_left.y
-                                + IDX_58,
-                        );
+                        let trans_x = self.panes.slots.info[index][1].pos_top_left_orig.x
+                            - self.panes.slots.info[index][1].pos_top_left.x;
+                        let trans_y = self.panes.slots.info[index][1].pos_top_left_orig.y
+                            - self.panes.slots.info[index][1].pos_top_left.y
+                            + IDX_58;
+                        self.panes.slots.info[index][1].pane_trans(trans_x, trans_y);
                         self.text_name[index] = SLOT_NEW_NAME.to_string();
                         self.text_date[index].clear();
                         self.data_new[index] = 1;
@@ -1263,13 +1269,12 @@ impl FileSelect {
                     self.panes.slots.info[index][1].pane_scale_xy(IDX_54);
                     self.panes.slots.info[index][1]
                         .set_font_size(base.0 * 0.9, base.1 * IDX_54);
-                    self.panes.slots.info[index][1].pane_trans(
-                        self.panes.slots.info[index][1].pos_top_left_orig.x
-                            - self.panes.slots.info[index][1].pos_top_left.x,
-                        self.panes.slots.info[index][1].pos_top_left_orig.y
-                            - self.panes.slots.info[index][1].pos_top_left.y
-                            + IDX_58,
-                    );
+                    let trans_x = self.panes.slots.info[index][1].pos_top_left_orig.x
+                        - self.panes.slots.info[index][1].pos_top_left.x;
+                    let trans_y = self.panes.slots.info[index][1].pos_top_left_orig.y
+                        - self.panes.slots.info[index][1].pos_top_left.y
+                        + IDX_58;
+                    self.panes.slots.info[index][1].pane_trans(trans_x, trans_y);
                     self.text_name[index] = SLOT_BROKEN_NAME.to_string();
                     self.text_date[index].clear();
                     self.data_new[index] = 0;
@@ -1539,14 +1544,14 @@ impl FileSelect {
 
     pub fn close_err_erase(&mut self) -> bool {
         let temp1 = self.pane_trance_title(self.timer, IDX_08, 0.0, IDX_48 as f32, 0, 1);
-        let temp4 = self.message_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31, 0, 1);
+        let temp4 = self.message_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31 as i16, 0, 1);
         let (temp2, temp3) = self.rec_row_trance_out();
         temp1 && temp4 && temp2 && temp3
     }
 
     pub fn close_err_copy(&mut self) -> bool {
         let temp1 = self.pane_trance_title(self.timer, IDX_08, 0.0, IDX_48 as f32, 0, 1);
-        let temp2 = self.message_pane_move(0.0, 85.0, IDX_44 as f32, 85.0, IDX_31, 0, 1);
+        let temp2 = self.message_pane_move(0.0, 85.0, IDX_44 as f32, 85.0, IDX_31 as i16, 0, 1);
         let (temp3, temp4, temp5, temp6) = self.copy_pair_trance_out();
         temp1 && temp2 && temp3 && temp4 && temp5 && temp6
     }
@@ -1770,17 +1775,17 @@ impl FileSelect {
             match dispatch(self.proc) {
                 Proc::DataSelect => self.data_select(pad),
                 Proc::SelectTitle => self.select_title_anime(),
-                Proc::DataSelectPaneMove => self.data_select_pane_move,
+                Proc::DataSelectPaneMove => self.data_select_pane_move(),
                 Proc::MenuSelect => self.menu_select(pad),
                 Proc::ToCopy => self.to_copy_pane_move(),
-                Proc::ToErase => self.to_erase_pane_move,
+                Proc::ToErase => self.to_erase_pane_move(),
                 Proc::ToBack => self.to_back_pane_move(),
                 Proc::CopyDataToSelect => self.copy_data_to_select(pad),
                 Proc::CopyDataSelAnime => self.copy_data_sel_anime(),
                 Proc::CopyToSelBack => self.copy_to_sel_back(),
                 Proc::CopyToSelPaneMove => self.copy_to_sel_pane_move(),
                 Proc::YesNoSelect => self.yes_no_select(pad),
-                Proc::CmdExecPaneMove0 => self.cmd_exec_pane_move0,
+                Proc::CmdExecPaneMove0 => self.cmd_exec_pane_move0(),
                 Proc::CmdExecPaneMove2 => self.cmd_exec_pane_move2(),
                 Proc::CommandExec => self.command_exec(card),
                 Proc::DataEraseWait => self.data_erase_wait(card),
@@ -1789,7 +1794,7 @@ impl FileSelect {
                 Proc::CopyPaneMoveOk2 => self.copy_pane_move_ok2(),
                 Proc::ErasePaneMoveOk => self.erase_pane_move_ok(card),
                 Proc::ErasePaneMoveOk2 => self.erase_pane_move_ok2(),
-                Proc::ErrorMsgPaneMove => self.error_msg_pane_move,
+                Proc::ErrorMsgPaneMove => self.error_msg_pane_move(),
                 Proc::ErrorMsgPaneMove2 => self.error_msg_pane_move2(),
                 Proc::BackDatSelWait => self.back_dat_sel_wait(pad),
                 Proc::BackDatSelWait2 => self.back_dat_sel_wait2(pad),
@@ -1797,14 +1802,14 @@ impl FileSelect {
                 Proc::DataSelectEx => self.data_select_ex(pad),
                 Proc::ExSavePaneMove => self.ex_save_pane_move(),
                 Proc::YesNoSelectEx => self.yes_no_select_ex(pad, card),
-                Proc::ExSavePaneMove0 => self.ex_save_pane_move0,
+                Proc::ExSavePaneMove0 => self.ex_save_pane_move0(),
                 Proc::ExSavePaneMove1 => self.ex_save_pane_move1(),
                 Proc::ExDataSave => self.ex_data_save(card, current),
                 Proc::ExDataSaveWait => self.ex_data_save_wait(card),
                 Proc::ExBackDatSelPaneMove => self.ex_back_dat_sel_pane_move(),
                 Proc::ExDataSavePaneMoveOk => self.ex_data_save_pane_move_ok(card),
                 Proc::ExDataSavePaneMoveOk2 => self.ex_data_save_pane_move_ok2(),
-                Proc::ExErrorMsgPaneMove => self.ex_error_msg_pane_move,
+                Proc::ExErrorMsgPaneMove => self.ex_error_msg_pane_move(),
                 Proc::ExErrorMsgPaneMove2 => self.ex_error_msg_pane_move2(),
                 Proc::NextModeWait => {}
             }
@@ -2225,12 +2230,7 @@ impl FileSelect {
         let mut temp5 = false;
         let (temp2, temp3);
         if self.data_broken[self.select_num as usize] != 0 {
-            temp2 = self.message_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
+            temp2 = self.message_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, (IDX_30 as i16) + i16::from(self.flag_3920),
                 1,
                 0,
             );
@@ -2244,12 +2244,7 @@ impl FileSelect {
             temp4 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
             temp5 = true;
         } else {
-            temp2 = self.rec_info_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
+            temp2 = self.rec_info_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, (IDX_30 as i16) + i16::from(self.flag_3920),
                 1,
                 0,
             );
@@ -2428,7 +2423,7 @@ impl FileSelect {
     pub fn to_copy_pane_move(&mut self) {
         let temp1 = self.data_select_pane_copy_move(IDX_2b as i16, IDX_2c as i16);
         let temp2 = self.data_select_pane_copy_color_move(self.timer, IDX_0a, 1);
-        let temp3 = self.rec_info_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31, 0, 1);
+        let temp3 = self.rec_info_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31 as i16, 0, 1);
         let temp4 = self.menu_pane_move(0.0, IDX_42 as f32, IDX_36 as i16, 0, 1);
         let temp5 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
 
@@ -2465,7 +2460,7 @@ impl FileSelect {
 
     pub fn to_back_pane_move(&mut self) {
         let temp1 = self.data_select_pane_back_move(IDX_2b as i16, IDX_2c as i16, IDX_2e as i16);
-        let temp2 = self.rec_info_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31, 0, 1);
+        let temp2 = self.rec_info_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, IDX_31 as i16, 0, 1);
         let temp3 = self.menu_pane_move(0.0, IDX_42 as f32, IDX_36 as i16, 0, 1);
 
         self.timer += 1;
@@ -2634,25 +2629,9 @@ impl FileSelect {
     pub fn copy_to_sel_pane_move(&mut self) {
         let temp1 = self.data_select_pane_copy_move2(IDX_29 as i16, IDX_2a as i16);
         let temp2 = if self.data_broken[self.flag_3926 as usize] != 0 {
-            self.message_pane_move(
-                IDX_44 as f32,
-                85.0,
-                0.0,
-                85.0,
-                IDX_30 as i16,
-                1,
-                0,
-            )
+            self.message_pane_move(IDX_44 as f32, 85.0, 0.0, 85.0, IDX_30 as i16, 1, 0, )
         } else {
-            self.rec_info_pane_move(
-                IDX_44 as f32,
-                85.0,
-                0.0,
-                85.0,
-                IDX_30 as i16,
-                1,
-                0,
-            )
+            self.rec_info_pane_move(IDX_44 as f32, 85.0, 0.0, 85.0, IDX_30 as i16, 1, 0, )
         };
         let temp3 = self.yes_no_pane_move(IDX_42 as f32, 0.0, IDX_38 as i16, 1, 0);
         let temp4 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
@@ -2748,7 +2727,7 @@ impl FileSelect {
             }
         };
 
-        self.message_pane_move(0.0, 85.0, IDX_46 as f32, 85.0, IDX_3b, 0, 1);
+        self.message_pane_move(0.0, 85.0, IDX_46 as f32, 85.0, IDX_3b as i16, 0, 1);
         self.timer += 1;
 
         if temp {
@@ -2838,7 +2817,7 @@ impl FileSelect {
             }
         };
 
-        let temp4 = self.rec_info_pane_move(0.0, 0.0, 0.0, 85.0, IDX_3a, 1, 0);
+        let temp4 = self.rec_info_pane_move(0.0, 0.0, 0.0, 85.0, IDX_3a as i16, 1, 0);
         let temp5 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
         self.timer += 1;
 
@@ -3851,17 +3830,9 @@ impl FileSelect {
             self.flag_3926
         };
         let temp2 = if self.data_broken[usize::from(target)] != 0 {
-            self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31, 0, 1)
+            self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31 as i16, 0, 1)
         } else {
-            self.rec_info_pane_move(
-                0.0,
-                self.extra_text_y,
-                IDX_44 as f32,
-                self.extra_text_y,
-                IDX_31,
-                0,
-                1,
-            )
+            self.rec_info_pane_move(0.0, self.extra_text_y, IDX_44 as f32, self.extra_text_y, IDX_31 as i16, 0, 1, )
         };
 
         let temp3 = self.yes_no_pane_move(0.0, IDX_42 as f32, IDX_36 as i16, 0, 1);
@@ -3895,15 +3866,7 @@ impl FileSelect {
     }
 
     pub fn cmd_exec_pane_move2(&mut self) {
-        let temp1 = self.message_pane_move(
-            IDX_44 as f32,
-            self.extra_text_y,
-            0.0,
-            self.extra_text_y,
-            IDX_31,
-            1,
-            0,
-        );
+        let temp1 = self.message_pane_move(IDX_44 as f32, self.extra_text_y, 0.0, self.extra_text_y, IDX_31 as i16, 1, 0, );
         let temp2 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
         if temp1 && temp2 {
             self.flag_392d ^= 1;
@@ -4056,15 +4019,7 @@ impl FileSelect {
                 0,
             ),
         };
-        let temp2 = self.message_pane_move(
-            0.0,
-            0.0,
-            IDX_46 as f32,
-            0.0,
-            IDX_3b,
-            1,
-            1,
-        );
+        let temp2 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_3b as i16, 1, 1, );
         self.timer += 1;
 
         if temp1 && temp2 {
@@ -4074,15 +4029,7 @@ impl FileSelect {
     }
 
     pub fn error_msg_pane_move(&mut self) {
-        let temp1 = self.message_pane_move(
-            0.0,
-            self.extra_text_y,
-            IDX_46 as f32,
-            self.extra_text_y,
-            IDX_31,
-            0,
-            1,
-        );
+        let temp1 = self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31 as i16, 0, 1, );
         let temp2 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
         self.timer += 1;
         if temp1 && temp2 {
@@ -4102,15 +4049,7 @@ impl FileSelect {
     }
 
     pub fn error_msg_pane_move2(&mut self) {
-        let temp = self.message_pane_move(
-            IDX_44 as f32,
-            self.extra_text_y,
-            0.0,
-            self.extra_text_y,
-            IDX_31,
-            1,
-            0,
-        );
+        let temp = self.message_pane_move(IDX_44 as f32, self.extra_text_y, 0.0, self.extra_text_y, IDX_31 as i16, 1, 0, );
         self.timer += 1;
         if temp {
             self.timer = 0;
@@ -4127,7 +4066,7 @@ impl FileSelect {
             temp1 = self.data_select_pane_back_move(IDX_29 as i16, IDX_2a as i16, IDX_29 as i16);
 
             if self.flag_3929 == 1 {
-                temp2 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_31, 0, 1);
+                temp2 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_31 as i16, 0, 1);
             }
         } else if self.op == OP_COPY {
             temp1 = self.data_select_pane_copy_back_move(IDX_29 as i16, IDX_2a as i16);
@@ -4135,9 +4074,9 @@ impl FileSelect {
             if self.flag_3929 != 0xFF {
                 if self.flag_3929 != 0 {
                     temp2 =
-                        self.message_pane_move(0.0, 85.0, IDX_46 as f32, 85.0, IDX_31, 0, 1);
+                        self.message_pane_move(0.0, 85.0, IDX_46 as f32, 85.0, IDX_31 as i16, 0, 1);
                 } else {
-                    temp3 = self.rec_info_pane_move(0.0, 85.0, IDX_44 as f32, 85.0, IDX_31, 0, 1);
+                    temp3 = self.rec_info_pane_move(0.0, 85.0, IDX_44 as f32, 85.0, IDX_31 as i16, 0, 1);
                 }
             }
         }
@@ -4403,22 +4342,12 @@ impl FileSelect {
     pub fn ex_save_pane_move(&mut self) {
         let temp1 = self.rec_data_pane_move();
         let temp2 = if self.data_broken[self.select_num as usize] != 0 {
-            self.message_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
+            self.message_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, (IDX_30 as i16) + i16::from(self.flag_3920),
                 1,
                 0,
             )
         } else {
-            self.rec_info_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
+            self.rec_info_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, (IDX_30 as i16) + i16::from(self.flag_3920),
                 1,
                 0,
             )
@@ -4491,17 +4420,9 @@ impl FileSelect {
 
     pub fn ex_save_pane_move0(&mut self) {
         let temp1 = if self.data_broken[self.select_num as usize] != 0 {
-            self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31, 0, 1)
+            self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31 as i16, 0, 1)
         } else {
-            self.rec_info_pane_move(
-                0.0,
-                self.extra_text_y,
-                IDX_44 as f32,
-                self.extra_text_y,
-                IDX_31,
-                0,
-                1,
-            )
+            self.rec_info_pane_move(0.0, self.extra_text_y, IDX_44 as f32, self.extra_text_y, IDX_31 as i16, 0, 1, )
         };
         let temp2 = self.yes_no_pane_move(0.0, IDX_42 as f32, IDX_36 as i16, 0, 1);
         let temp3 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
@@ -4547,7 +4468,7 @@ impl FileSelect {
         let mut temp2 = true;
         let temp1 = self.data_select_pane_back_move(IDX_29 as i16, IDX_2a as i16, IDX_29 as i16);
         if self.flag_3929 == 1 {
-            temp2 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_31, 0, 1);
+            temp2 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_31 as i16, 0, 1);
         }
         let temp3 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
         self.timer += 1;
@@ -4562,15 +4483,7 @@ impl FileSelect {
     }
 
     pub fn ex_save_pane_move1(&mut self) {
-        let temp1 = self.message_pane_move(
-            IDX_44 as f32,
-            self.extra_text_y,
-            0.0,
-            self.extra_text_y,
-            IDX_31,
-            1,
-            0,
-        );
+        let temp1 = self.message_pane_move(IDX_44 as f32, self.extra_text_y, 0.0, self.extra_text_y, IDX_31 as i16, 1, 0, );
         let temp2 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
 
         if temp1 && temp2 {
@@ -4649,7 +4562,7 @@ impl FileSelect {
         };
 
         let temp2 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
-        let temp3 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_3b, 1, 1);
+        let temp3 = self.message_pane_move(0.0, 0.0, IDX_46 as f32, 0.0, IDX_3b as i16, 1, 1);
         self.timer += 1;
 
         if temp1 && temp2 && temp3 {
@@ -4694,15 +4607,7 @@ impl FileSelect {
             ),
         };
 
-        let temp2 = self.rec_info_pane_move(
-            IDX_44 as f32,
-            0.0,
-            0.0,
-            0.0,
-            IDX_30 as i16,
-            1,
-            0,
-        );
+        let temp2 = self.rec_info_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, IDX_30 as i16, 1, 0, );
         self.timer += 1;
 
         if temp1 && temp2 {
@@ -4712,15 +4617,7 @@ impl FileSelect {
     }
 
     pub fn ex_error_msg_pane_move(&mut self) {
-        let temp1 = self.message_pane_move(
-            0.0,
-            self.extra_text_y,
-            IDX_46 as f32,
-            self.extra_text_y,
-            IDX_31,
-            0,
-            1,
-        );
+        let temp1 = self.message_pane_move(0.0, self.extra_text_y, IDX_46 as f32, self.extra_text_y, IDX_31 as i16, 0, 1, );
         let temp2 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
         self.timer += 1;
 
@@ -4734,15 +4631,7 @@ impl FileSelect {
     }
 
     pub fn ex_error_msg_pane_move2(&mut self) {
-        let result = self.message_pane_move(
-            IDX_44 as f32,
-            self.extra_text_y,
-            0.0,
-            self.extra_text_y,
-            IDX_31,
-            1,
-            0,
-        );
+        let result = self.message_pane_move(IDX_44 as f32, self.extra_text_y, 0.0, self.extra_text_y, IDX_31 as i16, 1, 0, );
 
         self.timer += 1;
         if result {
@@ -5894,12 +5783,13 @@ impl Default for GameOver {
 impl GameOver {
     pub fn create(&mut self, screen: Screen) {
         self.screen = Some(screen);
+        let bound = self.screen.as_ref();
         for index in 0..GOVER_LETTER_COUNT {
-            if let Some(layout) = screen.find(GOVER_LETTER_TAGS[index]) {
+            if let Some(layout) = bound.and_then(|s| s.find(GOVER_LETTER_TAGS[index])) {
                 self.letter[index].parts_set_file(layout);
             }
         }
-        if let Some(layout) = screen.find("blak") {
+        if let Some(layout) = bound.and_then(|s| s.find("blak")) {
             self.backdrop.parts_set_file(layout);
             self.backdrop.init_alpha = 0xFF;
         }
@@ -5938,9 +5828,9 @@ impl GameOver {
         for lane in 0..3 {
             self.rng_seed[lane] = (self.rng_seed[lane] * 0xAB) % 0x763D;
         }
-        let sum = f32::from(self.rng_seed[0]) / 30269.0
-            + f32::from(self.rng_seed[1]) / 30307.0
-            + f32::from(self.rng_seed[2]) / 30323.0;
+        let sum = self.rng_seed[0] as f32 / 30269.0
+            + self.rng_seed[1] as f32 / 30307.0
+            + self.rng_seed[2] as f32 / 30323.0;
         (sum % 1.0).abs()
     }
 

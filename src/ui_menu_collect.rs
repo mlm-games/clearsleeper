@@ -276,6 +276,7 @@ pub const ITEM_MESSAGE: [i16; 256] = [
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
 
@@ -1090,7 +1091,7 @@ impl NoteIcon {
         }
     }
 
-    pub fn pull(&self, panes: &mut [Pane]) {
+    pub fn pull(&mut self, panes: &[Pane]) {
         if let Some(pane) = panes.get(self.pane) {
             self.pic.move_to(pane.pos_top_left.x, pane.pos_top_left.y);
             self.pic.resize(pane.size.x, pane.size.y);
@@ -1562,7 +1563,7 @@ impl PadInput {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CollectTune {
     pub input_hold: i16,
     pub warp_frames: i16,
@@ -1671,15 +1672,17 @@ impl CollectInput {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum SubScreen {
+    #[default]
     None,
     Option,
     Save,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum SubPhase {
+    #[default]
     Idle,
     Open,
     Move,
@@ -2426,7 +2429,7 @@ impl CollectScreen {
         self.panes[P_MSK0].init_alpha = 0x82;
 
         if self.select_flag != 0 {
-            let slot = usize::from(self.icon_slot);
+            let slot = self.icon_slot as usize;
             let x = self.panes[P_FT0 + slot].pos_center.x;
             let y = self.panes[P_FT0 + slot].pos_center.y;
             let width = self.panes[P_FT0 + slot].size.x;
@@ -4334,26 +4337,26 @@ impl CollectScreen {
             if icon_no == 0x14 {
                 if self.select_flag == 0 {
                     self.icon_slot = index as i16;
-                    self.panes[P_FT0 + index].user_area = 0;
+                    self.panes[P_FT0 + index as usize].user_area = 0;
                 }
-                let slot = usize::from(self.icon_slot);
+                let slot = self.icon_slot as usize;
                 self.panes[P_FT0 + slot].pos_center.x = self.note_proc.icon_pos_x[index] as f32;
                 self.panes[P_FT0 + slot].pos_center.y =
-                    half_line * (unused as f32 + f32::from(self.note_proc.icon_pos_y[index]) * 2.0);
+                    half_line * ((unused as f32) + (self.note_proc.icon_pos_y[index as usize] as f32) * 2.0);
                 self.select_flag = 1;
             } else if icon_no == 0x15 {
                 if self.select_flag == 0 {
                     self.select_flag = 1;
                     self.select_index = 0;
                     self.icon_slot = index as i16;
-                    self.panes[P_FT0 + index].user_area = 0;
+                    self.panes[P_FT0 + index as usize].user_area = 0;
                 } else {
                     self.select_index = 1;
                 }
-                let slot = usize::from(self.icon_slot);
+                let slot = self.icon_slot as usize;
                 self.panes[P_FT0 + slot].pos_top_left.x = self.note_proc.icon_pos_x[index] as f32;
                 self.panes[P_FT0 + slot].pos_top_left.y =
-                    half_line * (unused as f32 + f32::from(self.note_proc.icon_pos_y[index]) * 2.0);
+                    half_line * ((unused as f32) + (self.note_proc.icon_pos_y[index] as f32) * 2.0);
                 self.panes[P_FT0 + slot].blend_draw(SELECT_ARROW_TEX);
                 self.panes[P_FT0 + slot].set_blend_color_ratio(0.0, 1.0, 1.0, 1.0);
                 self.panes[P_FT0 + slot].set_blend_alpha_ratio(0.0, 1.0, 1.0, 1.0);
@@ -4370,7 +4373,7 @@ impl CollectScreen {
             } else if icon_no != 0x16 {
                 self.panes[P_FT0 + index].pos_top_left.x = self.note_proc.icon_pos_x[index] as f32;
                 self.panes[P_FT0 + index].pos_top_left.y =
-                    half_line * (unused as f32 + f32::from(self.note_proc.icon_pos_y[index]) * 2.0);
+                    half_line * ((unused as f32) + (self.note_proc.icon_pos_y[index] as f32) * 2.0);
                 self.panes[P_FT0 + index].pos_top_left_orig.y = f32::from(icon_no);
                 let mut timer = self.panes[P_FT0 + index].user_area;
                 fop_msgm_out_font_set1(&mut self.note[index].pic, &mut timer, icon_color, icon_no);
@@ -5270,7 +5273,7 @@ pub const CAPTURE_DONE: i32 = 6;
 pub const CAPTURE_CANCEL: i32 = -1;
 pub const PICTURE_FLAG_ALL: u8 = 0b111;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AlbumTune {
     pub shutter_time: i16,
     pub shutter_angle: f32,
@@ -6037,7 +6040,7 @@ impl AlbumBox {
         }
     }
 
-    pub fn shutter_change(&mut self, tune: &AlbumTune) {
+    pub fn shutter_change(&mut self, tune: &AlbumTune, out: &mut AlbumOutput) {
         let span = tune.shutter_time;
         let total = span << 1;
         let counter = self.shutter_counter;
@@ -6047,9 +6050,9 @@ impl AlbumBox {
         } else if counter == span {
             self.shutter_counter = counter + 1;
             if self.view_mode == MODE_CAMERA {
-                self.change_camera_to_browse();
+                self.change_camera_to_browse(out);
             } else {
-                self.change_browse_to_camera();
+                self.change_browse_to_camera(out);
             }
             1.0
         } else {
@@ -6418,7 +6421,7 @@ impl AlbumBox {
         let mut count = 0usize;
         for index in 0..SLOT_COUNT {
             self.sort_map[index] = SORT_EMPTY;
-            if self.get_pic_label_data(input, index) == 0 {
+            if self.get_pic_label_data(input, index as u8) == 0 {
                 self.sort_map[count] = index as u8;
                 count += 1;
             }
@@ -6526,12 +6529,12 @@ impl AlbumBox {
 
     pub fn message_set(&mut self, msg_no: u32, env: &mut MessageEnv<'_>) {
         let mut get = ItemMsgGet::default();
-        self.icon_main.hide();
-        self.icon_sub.hide();
-        self.select_arrow.hide();
-        self.icon_main.set_alpha(0);
-        self.icon_sub.set_alpha(0);
-        self.select_arrow.set_alpha(0);
+        self.icon_main.visible = false;
+        self.icon_sub.visible = false;
+        self.select_arrow.visible = false;
+        self.icon_main.alpha = 0;
+        self.icon_sub.alpha = 0;
+        self.select_arrow.alpha = 0;
         self.choice_arrow_idx = -1;
         self.icon_timer = -1;
         self.selected_choice = 0;
@@ -6584,7 +6587,7 @@ impl AlbumBox {
         self.msg_proc.line_count = 0;
 
         let half_line = self.panes[A_TX0].get_line_space() / 2.0;
-        let shift_y = (ALBUM_UNUSED_LINES - i32::from(self.line_count)) * half_line;
+        let shift_y = (ALBUM_UNUSED_LINES as f32 - self.line_count as f32) * half_line;
         for index in 0..MESSAGE_BUFFER_COUNT {
             self.panes[A_TX0 + index].shift_set(0.0, shift_y);
         }
@@ -6611,7 +6614,7 @@ impl AlbumBox {
                 self.choice_cursor_y =
                     base_y + (half_line * (ALBUM_UNUSED_LINES as f32 + pos_y as f32 * 2.0)) as i32;
                 self.select_arrow.show();
-                self.select_arrow.set_alpha(0xFF);
+                self.select_arrow.alpha = (0xFF);
                 self.choice_arrow_idx = index as i8;
                 if first_choice == 0 {
                     first_choice = 1;
@@ -6695,11 +6698,11 @@ impl AlbumBox {
         self.icon_main.blend_draw(OUT_FONT_TEX);
         self.icon_sub.blend_draw(OUT_FONT_TEX);
         self.select_arrow.blend_draw(SELECT_ARROW_TEX);
-        self.icon_main.hide();
-        self.icon_sub.hide();
-        self.select_arrow.hide();
-        self.icon_main.set_alpha(0);
-        self.icon_sub.set_alpha(0);
+        self.icon_main.visible = false;
+        self.icon_sub.visible = false;
+        self.select_arrow.visible = false;
+        self.icon_main.alpha = 0;
+        self.icon_sub.alpha = 0;
         self.select_arrow.set_alpha(0);
         self.icon_timer = -1;
 
@@ -6841,7 +6844,7 @@ impl AlbumBox {
                 self.move_browse(input, pad, out, tune);
             }
         } else {
-            self.shutter_change(tune);
+            self.shutter_change(tune, out);
         }
     }
 
@@ -6917,8 +6920,8 @@ impl AlbumBox {
                     + f32::from(self.selected_choice)
                         * (self.choice_cursor_x1 - self.choice_cursor_x0) as f32;
                 let y = self.choice_cursor_y as f32;
-                self.select_arrow
-                    .rotate(x / 2.0, y / 2.0, SELECT_ARROW_ANGLE);
+                let _ = (x, y);
+                self.select_arrow.rotate(SELECT_ARROW_ANGLE);
                 self.select_arrow
                     .resize(MSG_FONT_SIZE as f32, MSG_FONT_SIZE as f32);
                 self.arrow_anime();
