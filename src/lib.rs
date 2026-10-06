@@ -30,6 +30,19 @@ pub mod movie;
 pub mod save;
 pub mod sim;
 pub mod text;
+pub mod ui_file_select;
+pub mod ui_menu_collect;
+pub mod ui_menu_dmap;
+pub mod ui_menu_fmap;
+pub mod ui_menu_fmap2;
+pub mod ui_menu_item;
+pub mod ui_menu_option;
+pub mod ui_menu_save;
+pub mod ui_meter_gauges;
+pub mod ui_meter_vitals;
+pub mod ui_meter_widgets;
+pub mod ui_number;
+pub mod ui_overlay;
 pub mod view;
 
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
