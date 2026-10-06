@@ -29,120 +29,121 @@ pub fn is_tag_hint(name: &str) -> bool {
     TAG_HINT_ACTORS.contains(&name)
 }
 
-pub const TYPE_SHIFT: u32 = 0;
-pub const TYPE_MASK: u32 = 0x3F;
-pub const TYPE2_SHIFT: u32 = 6;
-pub const TYPE2_MASK: u32 = 0x3;
-pub const SWBIT_SHIFT: u32 = 8;
-pub const SWBIT2_SHIFT: u32 = 16;
-pub const EVENT_NO_SHIFT: u32 = 24;
-pub const FIELD_MASK: u32 = 0xFF;
+pub const TYPE_SHIFT: u32 = 0; // <- d_a_tag_hint.cpp:37
+pub const TYPE_MASK: u32 = 0x3F; // <- d_a_tag_hint.cpp:37
+pub const TYPE2_SHIFT: u32 = 6; // <- d_a_tag_hint.cpp:42
+pub const TYPE2_MASK: u32 = 0x3; // <- d_a_tag_hint.cpp:42
+pub const SWBIT_SHIFT: u32 = 8; // <- d_a_tag_hint.cpp:27
+pub const SWBIT2_SHIFT: u32 = 16; // <- d_a_tag_hint.cpp:32
+pub const EVENT_NO_SHIFT: u32 = 24; // <- d_a_tag_hint.cpp:22
+pub const FIELD_MASK: u32 = 0xFF; // <- d_a_tag_hint.cpp:22
 
-pub const NO_SWITCH: u8 = 0xFF;
-pub const NO_EVENT_FLAG: u16 = 0xFFFF;
-pub const MESSAGE_STATUS_NONE: u8 = 0xFF;
+pub const NO_SWITCH: u8 = 0xFF; // <- d_a_tag_hint.cpp:68
+pub const NO_EVENT_FLAG: u16 = 0xFFFF; // <- d_a_tag_hint.cpp:78
+pub const MESSAGE_STATUS_NONE: u8 = 0xFF; // <- d_a_tag_hint.cpp:497
 
-pub const FLAG_00000001: u16 = 0x0001;
+pub const FLAG_00000001: u16 = 0x0001; // <- d_a_tag_hint.cpp:543
 
-pub const EVENT_0401: u32 = 0x0401;
-pub const EVENT_0404: u32 = 0x0404;
-pub const EVENT_1801: u32 = 0x1801;
-pub const EVENT_2A10: u32 = 0x2A10;
-pub const EVENT_3C01: u32 = 0x3C01;
-pub const EVENT_3F20: u32 = 0x3F20;
-pub const EVENT_4020: u32 = 0x4020;
-pub const EVENT_A507: u32 = 0xA507;
-pub const EVENT_REG_PAGE: u8 = 0xA5;
-pub const EVENT_REG_MASK: u8 = 0x07;
+pub const EVENT_0401: u32 = 0x0401; // <- d_save_event_flag.inc:38
+pub const EVENT_0404: u32 = 0x0404; // <- d_save_event_flag.inc:36
+pub const EVENT_1801: u32 = 0x1801; // <- d_save_event_flag.inc:188
+pub const EVENT_2A10: u32 = 0x2A10; // <- d_save_event_flag.inc:321
+pub const EVENT_3C01: u32 = 0x3C01; // <- d_save_event_flag.inc:464
+pub const EVENT_3F20: u32 = 0x3F20; // <- d_save_event_flag.inc:482
+pub const EVENT_4020: u32 = 0x4020; // <- d_save_event_flag.inc:488
+pub const EVENT_A507: u32 = 0xA507; // <- d_save_event_flag.inc:542
+pub const EVENT_REG_PAGE: u8 = 0xA5; // <- d_save.cpp:1209 (UNK_A507 >> 8)
+pub const EVENT_REG_MASK: u8 = 0x07; // <- d_save.cpp:1209 (UNK_A507 & 0xFF)
 
-pub const TMP_0304: u32 = 0x0304;
-pub const TMP_0308: u32 = 0x0308;
-pub const TMP_BYTES: usize = 0x100;
+pub const TMP_0304: u32 = 0x0304; // <- d_save_event_tmp_flag.inc:30
+pub const TMP_0308: u32 = 0x0308; // <- d_save_event_tmp_flag.inc:29
+pub const TMP_BYTES: usize = 0x100; // <- d_save.h:722
 
-pub const ITEM_BOMB_10: u8 = 0x0C;
-pub const ITEM_POWER_BRACELETS: u8 = 0x28;
+pub const ITEM_BOMB_10: u8 = 0x0C; // <- d_item_data.h:19
+pub const ITEM_POWER_BRACELETS: u8 = 0x28; // <- d_item_data.h:47
 
-pub const SE_ITM_OMAMORI_BLINK: u32 = 0x0852;
-pub const SE_ITM_OMAMORI_ST_TALK: u32 = 0x0853;
-pub const SE_ITM_OMAMORI_TETLA: u32 = 0x0854;
-pub const SE_ITM_OMAMORI_ED_TALK: u32 = 0x0855;
-pub const VOICE_SURPRISE_INDEX: u32 = 0x1C;
+pub const SE_ITM_OMAMORI_BLINK: u32 = 0x0852; // <- JAZelAudio_SE.h:91
+pub const SE_ITM_OMAMORI_ST_TALK: u32 = 0x0853; // <- JAZelAudio_SE.h:92
+pub const SE_ITM_OMAMORI_TETLA: u32 = 0x0854; // <- JAZelAudio_SE.h:93
+pub const SE_ITM_OMAMORI_ED_TALK: u32 = 0x0855; // <- JAZelAudio_SE.h:94
+pub const VOICE_SURPRISE_INDEX: u32 = 0x1C; // <- d_a_tag_hint.cpp:560
 
-pub const STAFF_TAG_HINT: &str = "TAGHINT";
-pub const EVENT_HIRL_HINT: &str = "HIRL_HINT";
-pub const EVENT_DEFAULT_HINT2: &str = "DEFAULT_HINT2";
-pub const EVENT_DEFAULT_HINT: &str = "DEFAULT_HINT";
+pub const STAFF_TAG_HINT: &str = "TAGHINT"; // <- d_a_tag_hint.cpp:464
+pub const EVENT_HIRL_HINT: &str = "HIRL_HINT"; // <- d_a_tag_hint.cpp:324
+pub const EVENT_DEFAULT_HINT2: &str = "DEFAULT_HINT2"; // <- d_a_tag_hint.cpp:327
+pub const EVENT_DEFAULT_HINT: &str = "DEFAULT_HINT"; // <- d_a_tag_hint.cpp:330
 
 pub const ACTION_TABLE: [&str; 5] = [
+    // <- d_a_tag_hint.cpp:533-539
     "WAIT",
     "MESSAGE",
     "MESSAGE2",
     "SURPRIS",
     "MESSAGE3",
 ];
-pub const ACT_WAIT: i32 = 0;
-pub const ACT_MESSAGE: i32 = 1;
-pub const ACT_MESSAGE2: i32 = 2;
-pub const ACT_SURPRIS: i32 = 3;
-pub const ACT_MESSAGE3: i32 = 4;
+pub const ACT_WAIT: i32 = 0; // <- d_a_tag_hint.cpp:534
+pub const ACT_MESSAGE: i32 = 1; // <- d_a_tag_hint.cpp:535
+pub const ACT_MESSAGE2: i32 = 2; // <- d_a_tag_hint.cpp:536
+pub const ACT_SURPRIS: i32 = 3; // <- d_a_tag_hint.cpp:537
+pub const ACT_MESSAGE3: i32 = 4; // <- d_a_tag_hint.cpp:538
 
-pub const MSG_HINT_CONTINUED: u32 = 0x454;
+pub const MSG_HINT_CONTINUED: u32 = 0x454; // <- d_a_tag_hint.cpp:599
 
-pub const PROC_WAIT: u8 = 0;
-pub const PROC_LIGHT: u8 = 1;
-pub const PROC_ARRIVAL: u8 = 2;
-pub const PROC_HUNT: u8 = 3;
-pub const PROC_EVENT: u8 = 4;
+pub const PROC_WAIT: u8 = 0; // <- d_a_tag_hint.cpp:690
+pub const PROC_LIGHT: u8 = 1; // <- d_a_tag_hint.cpp:694
+pub const PROC_ARRIVAL: u8 = 2; // <- d_a_tag_hint.cpp:698
+pub const PROC_HUNT: u8 = 3; // <- d_a_tag_hint.cpp:702
+pub const PROC_EVENT: u8 = 4; // <- d_a_tag_hint.cpp:706
 
-pub const TALK_PHASE_INIT: i8 = 0;
-pub const TALK_PHASE_START: i8 = 1;
-pub const TALK_PHASE_OPEN: i8 = 2;
-pub const TALK_PHASE_DONE: i8 = -1;
+pub const TALK_PHASE_INIT: i8 = 0; // <- d_a_tag_hint.cpp:492
+pub const TALK_PHASE_START: i8 = 1; // <- d_a_tag_hint.cpp:501
+pub const TALK_PHASE_OPEN: i8 = 2; // <- d_a_tag_hint.cpp:511
+pub const TALK_PHASE_DONE: i8 = -1; // <- d_a_tag_hint.cpp:522
 
-pub const PRIORITY_SPEAK: i32 = 0x1EA;
-pub const PRIORITY_DEFAULT: i32 = 0x1FF;
-pub const EVENT_IDX_SPEAK: usize = 0x1EA;
+pub const PRIORITY_SPEAK: i32 = 0x1EA; // <- f_pc_draw_priority.h:515
+pub const PRIORITY_DEFAULT: i32 = 0x1FF; // <- f_pc_draw_priority.h:517
+pub const EVENT_IDX_SPEAK: usize = 0x1EA; // <- f_op_actor_mng.cpp:678
 
-pub const TIMER_TYPE_1: i16 = 600;
-pub const TIMER_TYPE_4: i16 = 0xE10;
-pub const TIMER_TYPE_8: i16 = 0xE10;
-pub const TIMER_TYPE_9: i16 = 600;
-pub const TIMER_TYPE_12: i16 = 0x708;
-pub const TIMER_TYPE_14: i16 = 0x708;
-pub const TIMER_TYPE_15: i16 = 900;
+pub const TIMER_TYPE_1: i16 = 600; // <- d_a_tag_hint.cpp:90
+pub const TIMER_TYPE_4: i16 = 0xE10; // <- d_a_tag_hint.cpp:93
+pub const TIMER_TYPE_8: i16 = 0xE10; // <- d_a_tag_hint.cpp:96
+pub const TIMER_TYPE_9: i16 = 600; // <- d_a_tag_hint.cpp:102
+pub const TIMER_TYPE_12: i16 = 0x708; // <- d_a_tag_hint.cpp:110
+pub const TIMER_TYPE_14: i16 = 0x708; // <- d_a_tag_hint.cpp:113
+pub const TIMER_TYPE_15: i16 = 900; // <- d_a_tag_hint.cpp:116
 
-pub const RANGE_SCALE: f32 = 100.0;
-pub const SEARCH_STEP: f32 = 120.0;
-pub const DARK_STEP: f32 = 0.05;
-pub const DARK_MIN: f32 = 0.15;
-pub const DARK_LOW: f32 = 0.2;
-pub const DARK_MAX: f32 = 0.95;
-pub const DARK_FULL: f32 = 1.0;
-pub const DARK_SCALE: f32 = 1.1764705;
-pub const DARK_BG_SCALE: f32 = 0.85;
-pub const DARK_FOG_NEAR: f32 = 300.0;
-pub const DARK_FOG_FAR: f32 = 2000.0;
-pub const DARK_FOG_MID: f32 = 3000.0;
-pub const DARK_FOG_MID_BASE: f32 = 500.0;
+pub const RANGE_SCALE: f32 = 100.0; // <- d_a_tag_hint.cpp:742-743
+pub const SEARCH_STEP: f32 = 120.0; // <- d_a_tag_hint.cpp:416
+pub const DARK_STEP: f32 = 0.05; // <- d_a_tag_hint.cpp:584
+pub const DARK_MIN: f32 = 0.15; // <- d_a_tag_hint.cpp:582
+pub const DARK_LOW: f32 = 0.2; // <- d_a_tag_hint.cpp:583
+pub const DARK_MAX: f32 = 0.95; // <- d_a_tag_hint.cpp:664
+pub const DARK_FULL: f32 = 1.0; // <- d_a_tag_hint.cpp:667
+pub const DARK_SCALE: f32 = 1.1764705; // <- d_a_tag_hint.cpp:433
+pub const DARK_BG_SCALE: f32 = 0.85; // <- d_a_tag_hint.cpp:438
+pub const DARK_FOG_NEAR: f32 = 300.0; // <- d_a_tag_hint.cpp:436
+pub const DARK_FOG_FAR: f32 = 2000.0; // <- d_a_tag_hint.cpp:436
+pub const DARK_FOG_MID: f32 = 3000.0; // <- d_a_tag_hint.cpp:439
+pub const DARK_FOG_MID_BASE: f32 = 500.0; // <- d_a_tag_hint.cpp:439
 
-pub const LIGHT_LIFT: f32 = 5.66;
-pub const LIGHT_X_COS: f32 = 10.25;
-pub const LIGHT_X_SIN: f32 = 11.13;
-pub const LIGHT_POWER: f32 = 139.7;
-pub const LIGHT_POWER_E: f32 = 270.7;
-pub const LIGHT_FLUCTUATION: f32 = 93.8;
-pub const LIGHT_COLOR_P: [u16; 3] = [0x5C, 0xAE, 0xFF];
-pub const LIGHT_COLOR_E: [u16; 3] = [0xBA, 0xFF, 0xFF];
+pub const LIGHT_LIFT: f32 = 5.66; // <- d_a_tag_hint.cpp:355
+pub const LIGHT_X_COS: f32 = 10.25; // <- d_a_tag_hint.cpp:356
+pub const LIGHT_X_SIN: f32 = 11.13; // <- d_a_tag_hint.cpp:356
+pub const LIGHT_POWER: f32 = 139.7; // <- d_a_tag_hint.cpp:340
+pub const LIGHT_POWER_E: f32 = 270.7; // <- d_a_tag_hint.cpp:345
+pub const LIGHT_FLUCTUATION: f32 = 93.8; // <- d_a_tag_hint.cpp:341
+pub const LIGHT_COLOR_P: [u16; 3] = [0x5C, 0xAE, 0xFF]; // <- d_a_tag_hint.cpp:337-339
+pub const LIGHT_COLOR_E: [u16; 3] = [0xBA, 0xFF, 0xFF]; // <- d_a_tag_hint.cpp:342-344
 
-pub const SEARCH_ANGLE_TABLE: [i16; 8] = [0x00, 0x2000, 0xE000, 0x4000, 0xC000, 0x6000, 0xA000, 0x7FFF];
+pub const SEARCH_ANGLE_TABLE: [i16; 8] = [0x00, 0x2000, 0xE000, 0x4000, 0xC000, 0x6000, 0xA000, 0x7FFF]; // <- d_a_tag_hint.cpp:399
 pub const SEARCH_ANGLE_TABLE_GRAB: [i16; 8] =
-    [0x4000, 0xC000, 0x6000, 0xA000, 0x7FFF, 0xE000, 0x2000, 0x00];
-pub const SEARCH_ANGLE_COUNT: usize = 8;
+    [0x4000, 0xC000, 0x6000, 0xA000, 0x7FFF, 0xE000, 0x2000, 0x00]; // <- d_a_tag_hint.cpp:400
+pub const SEARCH_ANGLE_COUNT: usize = 8; // <- d_a_tag_hint.cpp:407
 
-pub const CULL_MIN: [f32; 3] = [-150.0, 0.0, -150.0];
-pub const CULL_MAX: [f32; 3] = [150.0, 300.0, 150.0];
+pub const CULL_MIN: [f32; 3] = [-150.0, 0.0, -150.0]; // <- f_op_actor_mng.cpp:563
+pub const CULL_MAX: [f32; 3] = [150.0, 300.0, 150.0]; // <- f_op_actor_mng.cpp:563
 
-pub const EVT_CND_CANTALK: u16 = 0x0001;
+pub const EVT_CND_CANTALK: u16 = 0x0001; // <- f_op_actor.h:145
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TagHintTmp {
@@ -287,8 +288,6 @@ pub struct TagHintPlayerRoom {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct TagHint {
-    pub health: i32,
-    pub max_health: i32,
     pub event_no: u8,
     pub swbit: u8,
     pub swbit2: u8,
@@ -314,8 +313,6 @@ pub struct TagHint {
 impl TagHint {
     pub fn spawn(parameters: u32) -> Self {
         Self {
-            health: 0,
-            max_health: 0,
             event_no: ((parameters >> EVENT_NO_SHIFT) & FIELD_MASK) as u8,
             swbit: ((parameters >> SWBIT_SHIFT) & FIELD_MASK) as u8,
             swbit2: ((parameters >> SWBIT2_SHIFT) & FIELD_MASK) as u8,
@@ -352,6 +349,7 @@ impl TagHint {
     }
 
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
+        // fopAc_CULLBOX_6_e  <- d_a_tag_hint.cpp:795 -> f_op_actor_mng.cpp:563
         (CULL_MIN, CULL_MAX)
     }
 
