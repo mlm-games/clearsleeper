@@ -92,6 +92,7 @@ pub mod ivan;
 pub mod jump;
 pub mod kanban;
 pub mod kalle_demos;
+pub mod qtkhd;
 pub mod akabe;
 pub mod kamome;
 pub mod ktaruo;
@@ -915,6 +916,8 @@ let v = alldie::Alldie::spawn(source.parameters, world.resource::<flags::Switche
 world.spawn((actor, kaji::Kaji::spawn())).id()
     } else if touseki::is_touseki(&source.name) {
 world.spawn((actor, touseki::Touseki::spawn())).id()
+    } else if qtkhd::is_qtkhd(&source.name) {
+world.spawn((actor, qtkhd::Qtkhd::spawn(source.parameters))).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1226,6 +1229,7 @@ pub fn build(
                     .chain(),
                 (
                     ending::control.in_set(WwSimSet::Execute),
+                    qtkhd::control.in_set(WwSimSet::Execute),
                     touseki::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
