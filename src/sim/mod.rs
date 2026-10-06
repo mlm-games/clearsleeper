@@ -842,7 +842,12 @@ world.spawn((actor, vteng::Vteng::spawn())).id()
     } else if adnno::is_adnno(&source.name) {
 world.spawn((actor, adnno::Adnno::spawn())).id()
     } else if roten::is_roten(&source.name) {
-let v = roten::Roten::spawn(source.parameters, 0);
+        let reserve = world
+            .query_filtered::<&zunari::Zunari, bevy_ecs::query::With<zunari::Zunari>>()
+            .iter(world)
+            .next()
+            .map_or(0, |stall| stall.roten_reserve);
+        let v = roten::Roten::spawn(source.parameters, reserve);
         world.spawn((actor, v)).id()
     } else if kanban::is_kanban(&source.name) {
 let v = kanban::Kanban::spawn(source.parameters);

@@ -83,6 +83,8 @@ pub struct SaveGame {
     pub time: f32,
     #[serde(default)]
     pub date: u8,
+    #[serde(default)]
+    pub get_bag: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -193,6 +195,11 @@ impl App {
         let story = world.resource::<StoryBits>().bytes.to_vec();
         let arrivals = world.resource::<Arrivals>().bytes();
         let held = *world.resource::<Held>();
+        let get_bag = world
+            .query_filtered::<&crate::sim::zunari::Zunari, bevy_ecs::query::With<crate::sim::zunari::Zunari>>()
+            .iter(world)
+            .next()
+            .map_or(0, |stall| stall.roten_reserve);
         let clock = world.get_resource::<crate::sim::daynight::DayNight>().copied().unwrap_or_default();
         let stage = self
             .stage
@@ -218,6 +225,7 @@ impl App {
             held_count: held.count,
             time: clock.time,
             date: clock.date,
+            get_bag,
         }
     }
 
@@ -287,6 +295,11 @@ impl App {
         }
         let world = &mut self.sim.world;
         *world.resource_mut::<Area>() = save.area.clone().into();
+        let mut stalls =
+            world.query_filtered::<&mut crate::sim::zunari::Zunari, bevy_ecs::query::With<crate::sim::zunari::Zunari>>();
+        for mut stall in stalls.iter_mut(world) {
+            stall.roten_reserve = save.get_bag;
+        }
         let mut query = world.query::<&mut Player>();
         let mut player = query.iter_mut(world).next().expect("player exists at boot");
         *player = save.player.clone().into();
