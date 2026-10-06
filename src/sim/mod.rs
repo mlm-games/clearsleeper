@@ -29,6 +29,7 @@ pub mod bitem;
 pub mod bita;
 pub mod bmdhand;
 pub mod dr2;
+pub mod fgmahou;
 pub mod hole;
 pub mod bird;
 pub mod bwds;
@@ -610,6 +611,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if obj_eff::is_obj_eff(&source.name) {
         let a = obj_eff::ObjEff::spawn(source.parameters);
         world.spawn((actor, a)).id()
+    } else if fgmahou::is_fgmahou(&source.name) {
+        let orb = fgmahou::FgMahou::spawn(source.parameters);
+        world.spawn((actor, orb)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -2068,6 +2072,7 @@ pub fn build(
                 dr2::control.in_set(WwSimSet::Execute),
                 gohma::control.in_set(WwSimSet::Execute),
                 phantom_ganon::control.in_set(WwSimSet::Execute),
+                fgmahou::control.in_set(WwSimSet::Execute),
                 puppet_ganon::control.in_set(WwSimSet::Execute),
                 gntakis::control.in_set(WwSimSet::Execute),
                 xfuta::control.in_set(WwSimSet::Execute),

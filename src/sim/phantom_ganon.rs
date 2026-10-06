@@ -11,6 +11,7 @@ use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
 use super::events::{SimEvent, SimEvents};
+use super::fgmahou;
 use super::flags::{Collect, StoryBits, Switches, ZoneActors};
 use super::ground;
 use super::hammer;
@@ -2704,7 +2705,7 @@ pub fn control(
                 room,
                 ..Default::default()
             };
-            commands.spawn(actor);
+            commands.spawn((actor, fgmahou::FgMahou::spawn(orb as u32)));
         }
     }
     for (pos, yaw, room, parameters) in clones {
