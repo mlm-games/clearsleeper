@@ -94,6 +94,7 @@ pub mod events;
 pub mod fallrock;
 pub mod fan;
 pub mod ff;
+pub mod kamome2;
 pub mod obj_eff;
 pub mod obj_hha;
 pub mod obj_mmrr;
@@ -620,6 +621,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if obj_mmrr::is_obj_mmrr(&source.name) {
         let m = obj_mmrr::ObjMmrr::spawn(source.parameters);
         world.spawn((actor, m)).id()
+    } else if kamome2::is_kamome2(&source.name) {
+        let v = kamome2::Kamome2::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1592,6 +1596,8 @@ pub fn build(
     sim.world.insert_resource(shand::ShandStatic::default());
     sim.world.insert_resource(pirate_flag::PirateFlagHio::default());
     sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
+    sim.world.insert_resource(kamome2::Kamome2Hio::default());
+    sim.world.insert_resource(kamome2::Kamome2Cam::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1683,6 +1689,8 @@ pub fn build(
     sim.world.insert_resource(shand::ShandStatic::default());
     sim.world.insert_resource(pirate_flag::PirateFlagHio::default());
     sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
+    sim.world.insert_resource(kamome2::Kamome2Hio::default());
+    sim.world.insert_resource(kamome2::Kamome2Cam::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1964,6 +1972,7 @@ pub fn build(
                 pirate_flag::control.in_set(WwSimSet::Execute),
                 obj_eff::control.in_set(WwSimSet::Execute),
                 obj_mmrr::control.in_set(WwSimSet::Execute),
+                kamome2::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
