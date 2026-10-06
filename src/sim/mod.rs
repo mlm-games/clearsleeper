@@ -183,6 +183,7 @@ pub mod rectangle;
 pub mod rflw;
 pub mod rohat;
 pub mod redead;
+pub mod registry;
 pub mod retag;
 pub mod rockfall;
 pub mod roll;
@@ -1246,7 +1247,9 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
-                (daynight::control.in_set(WwSimSet::Execute),
+                (
+                    registry::control.in_set(WwSimSet::Execute),
+                    daynight::control.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
                 ssturu::control.in_set(WwSimSet::Execute),
                 evsw::control.in_set(WwSimSet::Execute),
