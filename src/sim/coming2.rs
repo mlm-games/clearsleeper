@@ -11,7 +11,7 @@
 //! `fopAcM_setCullSizeBox` nor `fopAcM_SetMin` / `SetMax` - grep confirms neither appears anywhere in
 //! `d_a_coming2.cpp`, and the `mDoMtx_stack_c` writes are not those functions. Under the crate's cull
 //! rule a CUSTOM profile with no box call means there is NO box, so this module deliberately exposes
-//! no `cull()` and no `actor_views` branch (the `coming3.rs:95-98` precedent).
+//! no `cull()` and no `actor_views` branch (the `coming3.rs` cull refusal).
 //!
 //! OMITTED - the barrel and buoy PLACEMENTS. `daComing2::Act_c::get_water_height` (`:154-190`) is
 //! the gate on every one of them, and its TAIL is a per-poly-group ground query:
@@ -24,7 +24,7 @@
 //! ```
 //!
 //! (`:180-188`) - a `dBgS_ObjGndChk` clearance test, the exact call `super::ground::surface` cannot
-//! answer (merged-DZB plane only) and that `coming3.rs:26-36` already declines for the sibling actor.
+//! answer (merged-DZB plane only) and that `coming3.rs` already declines for the sibling actor.
 //! So `make_coming_param` (`:226`), `coming_game_main`'s spawn (`:517`) and `coming_setF_main`'s two
 //! buoy spawns (`:445`) all lose their gate; assuming it passes would be the invented equivalent
 //! RULE 1 forbids. The three helpers that hang off those spawns - `no_ship_obstacle` (`:101-108`),

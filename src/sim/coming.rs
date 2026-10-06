@@ -678,7 +678,7 @@ impl Coming {
     /// DROPPED: `chk_make_pos_gnd` (`:287-318`) - the whole body is a per-poly-group
     /// `dComIfG_Bgsp()->GroundCross(&M_gnd_work)` sweep, which RULE 3b lists as absent;
     /// `super::ground::surface` is the merged-DZB plane query and is NOT a substitute (see the
-    /// `coming3.rs:26-36` refusal, which declines the identical call). Without it `chk_make_pos`
+    /// `coming3.rs`'s cull refusal, which declines the identical call). Without it `chk_make_pos`
     /// cannot be evaluated as a whole, so the ground half is reported rather than assumed to pass.
     fn barrel2_get_param(&mut self, ctx: &Ctx<'_>) -> Option<Barrel2> {
         // ```
