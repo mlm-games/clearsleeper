@@ -698,7 +698,7 @@ impl GyCtrl {
 
     /// The one `_execute` body, `daGy_Ctrl_c::_execute` (`:434-443`) with the `modeProc` dispatch
     /// of `:438` unrolled.
-    fn dispatch(&mut self, ctx: &mut Ctx<'_>, entity: Entity, room: i8) {
+    fn dispatch(&mut self, ctx: &mut Ctx<'_, '_, '_>, entity: Entity, room: i8) {
         match self.mode {
             // `modeSwWait` (:312-323)
             Mode::SwWait => self.mode_sw_wait(room, ctx.switches),
@@ -732,12 +732,12 @@ impl GyCtrl {
 }
 
 /// Everything `dispatch` needs beyond the component, in one bundle - the `hbrf1` / `tagetc` shape.
-struct Ctx<'a> {
+struct Ctx<'a, 'w, 's> {
     origin: Vec3,
     near: bool,
     solid: Option<&'a Collision>,
     switches: &'a Switches,
-    commands: &'a mut Commands,
+    commands: &'a mut Commands<'w, 's>,
 }
 
 /// `cLib_calcTimer` (`c_lib.h:85-91`) paired with its reload: decrement a nonzero timer and return
@@ -779,6 +779,22 @@ fn near_names() -> &'static [&'static str] {
 pub fn is_gy_ctrl(name: &str) -> bool {
     GY_CTRL_ACTORS.contains(&name)
 }
+
+pub fn spawn(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
+    let actor = Actor {
+        name: source.name.clone(),
+        parameters: source.parameters,
+        pos: Vec3::from_array(source.pos),
+        angle: source.angle,
+        set_id: source.set_id,
+        room: source.room,
+        ..Default::default()
+    };
+    let tag = GyCtrl::spawn(source.parameters);
+    world.spawn((actor, tag)).id()
+}
+
+pub fn init(_world: &mut World) {}
 
 pub fn control(
     mut tags: Query<(Entity, &mut Actor, &mut GyCtrl), With<GyCtrl>>,

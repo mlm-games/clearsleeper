@@ -60,7 +60,7 @@ const HIMO_YAW: [i16; 32] = [
 const HIMO_TILT: [i16; 32] = [
     0x0, 0x7D0, 0x7D0, 0xBB8, 0x7D0, 0x0, 0xBB8, 0xFA0, 0x7D0, 0x0, 0x0, 0x7D0, 0xBB8, 0x7D0, 0xFA0,
     0xFA0, 0x3E8, 0x7D0, 0x0, 0xFA0, 0x0, 0x7D0, 0x7D0, 0xFA0, 0xBB8, 0xFA0, 0xBB8, 0xFA0, 0xFA0,
-    0xFA0, 0xFA0,
+    0xFA0, 0xFA0, 0xFA0,
 ]; // <- d_a_kokiie.cpp:57-60
 /// `static s16 himo_off_yp[]` (`:61-64`) - the rope drop, NEGATED at `:88`.
 const HIMO_DROP: [i16; 32] = [
@@ -541,7 +541,7 @@ pub fn control(
     equipped: Res<Equipped>,
     mut houses: Query<(&mut Actor, &mut Kokiie), With<Kokiie>>,
 ) {
-    for (actor, mut house) in &mut houses {
+    for (mut actor, mut house) in &mut houses {
         if !house.entered {
             house.create_init(&mut *actor, &switches, &collect, &equipped);
         }

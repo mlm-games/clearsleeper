@@ -69,6 +69,7 @@ const WARP_TYPE_TOWER: u8 = 0;
 /// (`d_a_warpls.cpp:22`).
 const EVT_TYPE_TOWER_UP: u8 = 0;
 const EVT_TYPE_TOWER_DOWN: u8 = 1;
+const EVT_TYPE_DUNGEON: u8 = 2;
 
 /// `daWarpls_EvtState_e { EvtState_None, EvtState_Activation, EvtState_Warping }`
 /// (`d_a_warpls.cpp:23`).
@@ -415,7 +416,7 @@ pub fn is_warpls(name: &str) -> bool {
 
 pub fn control(
     stage: Res<StageName>,
-    player: Res<Player>,
+    players: Query<&Player>,
     switches: Res<Switches>,
     list: Res<EventList>,
     stage_events: Option<Res<StageEvents>>,
@@ -423,6 +424,9 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut lights: Query<(Entity, &mut Actor, &mut Warpls)>,
 ) {
+    let Some(player) = players.iter().next() else {
+        return;
+    };
     let stage_ref = stage_events.as_deref();
     for (entity, mut actor, mut light) in &mut lights {
         if !light.entered {
@@ -434,7 +438,7 @@ pub fn control(
                 &switches,
                 &list,
                 stage_ref,
-                &player,
+                player,
                 parameters,
             );
         }
@@ -446,7 +450,7 @@ pub fn control(
         }
         light.check_order(
             &actor,
-            &player,
+            player,
             &mut active,
             &mut events,
             switch_on,
@@ -454,7 +458,7 @@ pub fn control(
         );
         light.event_order(
             &actor,
-            &player,
+            player,
             &list,
             &mut active,
             entity,

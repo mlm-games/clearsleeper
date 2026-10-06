@@ -86,7 +86,7 @@ const STATE_DWELL: i16 = 20; // <- d_a_obj_ferris.cpp:359
 /// (`:415-428`) - the running wheel: a story bit, the same every-fourth-frame accel, and a speed
 /// cap that rises from `Attr_c::field_0x00` to 67 while the start cut plays.
 const RUN_MAX: i16 = 67; // <- d_a_obj_ferris.cpp:421
-const RUN_FLAG: u32 = 0x2104; // <- d_a_obj_ferris.cpp:416 (d_save_event_flag.inc:254)
+const RUN_FLAG: u16 = 0x2104;
 /// ```
 /// case 10: mRotSpeed = -5;
 ///        if (mRotAngle < 0x1800 || !now_event(mEventIdx_kanban_vive)) { mRotState = 0; mRotSpeed = 0; }
@@ -376,7 +376,7 @@ impl Ferris {
     /// `eventInfo.checkCommandDemoAccrpt()` is the per-actor `dEvtCmd_INDEMO_e` latch the sim does
     /// not carry; the house reduction is `Stage::Play | Stage::Close` on this actor's own slot
     /// (`hbrf1.rs:258`, `hole.rs:293`).
-    fn exe_event(&mut self, active: &ActiveEvent, entity: Entity, list: &EventList) {
+    fn exe_event(&mut self, active: &mut ActiveEvent, entity: Entity, list: &EventList) {
         match self.event_state {
             // `case 1:` (:306-313)
             1 => {

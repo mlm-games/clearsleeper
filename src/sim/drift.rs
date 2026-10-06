@@ -233,7 +233,7 @@ impl Drift {
     /// the euler triple.
     fn flower_transform(&self, actor: &Actor) -> (Vec3, [i16; 3]) {
         let mtx = Mat4::from_translation(actor.pos)
-            * Mat4::from_rotation_quat(tilt_quat(self.tilt))
+            * Mat4::from_quat(tilt_quat(self.tilt))
             * zxy(actor.shape_angle);
         (mtx.transform_point3(FLOWER_OFFSET), mtx_to_rot(&mtx))
     }
@@ -444,7 +444,7 @@ pub fn control(
     mut flowers: Query<&mut Actor, Without<Drift>>,
     mut drifts: Query<(&mut Actor, &mut Drift), With<Drift>>,
 ) {
-    for (actor, mut drift) in &mut drifts {
+    for (mut actor, mut drift) in &mut drifts {
         if !drift.entered {
             drift.create_init(&*actor, &mut commands);
         }

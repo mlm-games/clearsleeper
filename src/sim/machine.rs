@@ -148,8 +148,8 @@ fn add_calc(value: &mut f32, target: f32, scale: f32, max_step: f32, min_step: f
 
 /// `daMachine_c::_execute` (`d_a_machine.cpp:282-299`), minus the omitted halves.
 pub fn control(
-    windmills: Query<(With<Windmill>, Without<Machine>)>,
-    mut machines: Query<(With<Machine>, &mut Actor)>,
+    windmills: Query<(Entity, &Windmill), (With<Windmill>, Without<Machine>)>,
+    mut machines: Query<(Entity, &mut Actor), With<Machine>>,
     mut events: ResMut<SimEvents>,
 ) {
     let mill = windmills.iter().next().map(|(_, mill)| *mill);

@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
+use super::combat::HitPoints;
 use super::enemy::Enemy;
 use super::flags::Switches;
 

@@ -23,10 +23,6 @@ const LEAF_LIFT: f32 = 5000.0; // <- d_a_obj_ojtree.cpp:32
 /// `fopAcM_create` (`d_a_obj_ojtree.cpp:33`), i.e. `jbo_class::mType` (`d_a_jbo.h:20`).
 const JBO_TYPE_NORMAL: u32 = 0; // <- d_a_obj_ojtree.cpp:33 (daJbo_Type_NORMAL_e, d_a_jbo.h:10)
 
-/// `dStage_searchName("jbaba")` -> `OBJNAME("jbaba", fpcNm_JBO_e, 255, 33)` (`d_stage.cpp:697`) is
-/// the stage string `fpcNm_JBO_e` (`d_a_obj_ojtree.cpp:33`) creates.
-const super::jbaba::JBABA_ACTORS[0]: &str = "jbaba"; // <- d_stage.cpp:697 (fpcNm_JBO_e)
-
 /// The tall thin poles that lead up to the Deku Leaf in Forest Haven - `daObjOjtree::Act_c`
 /// (`d_a_obj_ojtree.h:8-23`), the actor behind the stage string `Ojtree`.
 ///
@@ -94,7 +90,7 @@ impl Ojtree {
         self.entered = true;
         commands.spawn((
             Actor {
-                name: super::jbaba::JBABA_ACTORS[0].to_owned(),
+                name: jbaba::JBABA_ACTORS[0].to_owned(),
                 parameters: JBO_TYPE_NORMAL,
                 pos: actor.pos + Vec3::new(0.0, LEAF_LIFT, 0.0),
                 angle: [0; 3],

@@ -1061,7 +1061,7 @@ pub fn control(
             bgn_mode = Some(BGN_MODE_FIGHT);
         } else if super::esa::is_esa(&other.name) {
             esa = Some(other.pos);
-        } else if KEETH_ACTORS.contains(&other.name.as_str()) {
+        } else if super::ki::is_ki(&other.name) {
             keeths += 1;
         }
     }

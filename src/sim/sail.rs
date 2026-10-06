@@ -183,6 +183,7 @@ impl Sail {
             override_flag: 0,
             // `l_HIO.m0C` likewise.
             override_furl: 0.0,
+            entered: false,
         }
     }
 

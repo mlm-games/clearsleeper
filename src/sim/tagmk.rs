@@ -178,14 +178,14 @@ pub struct Tagmk {
 
 /// The per-tick inputs `execute` reads, bundled so the ten action arms stay readable. Private:
 /// `control` is the only entry point.
-struct Ctx<'a> {
+struct Ctx<'a, 'w, 's> {
     list: &'a EventList,
     active: &'a mut ActiveEvent,
     switches: &'a Switches,
     flags: &'a mut EventFlags,
     day: &'a DayNight,
     player: Option<Player>,
-    commands: &'a mut Commands,
+    commands: &'a mut Commands<'w, 's>,
 }
 
 impl Tagmk {
@@ -325,14 +325,14 @@ impl Tagmk {
     /// `checkArea(f32 arg1, f32 arg2, f32 arg3)` (`:30-57`), called from `actionVilla` (`:329`).
     /// The `arg2` term is a squared dot product against [`Tagmk::facing`], so it is a corridor
     /// half-width rather than a radius, and the closing test demands the player be facing AWAY.
-    fn check_area(&self, actor: &Actor, player: Vec3, arg1: f32, arg2: f32, arg3: f32) -> bool {
+    fn check_area(&self, actor: &Actor, player: &Player, arg1: f32, arg2: f32, arg3: f32) -> bool {
         // ```
         // cXyz local_54 = player->current.pos - current.pos;
         // f32 abs1 = local_54.abs2XZ();
         // if (abs1 > arg3) { return FALSE; }
         // ```
         // (`:33-37`) - the comparison is against the already-SQUARED `arg3`.
-        let delta = player - actor.pos;
+        let delta = player.pos - actor.pos;
         let abs_xz = delta.x * delta.x + delta.z * delta.z;
         if abs_xz > arg3 {
             return false;
@@ -374,7 +374,7 @@ impl Tagmk {
     }
 
     /// `execute` (`:402-445`) - the ten-arm dispatch plus the `default` arm's `actionWait`.
-    fn execute(&mut self, ctx: &mut Ctx<'_>, entity: Entity, actor: &Actor) {
+    fn execute(&mut self, ctx: &mut Ctx<'_, '_, '_>, entity: Entity, actor: &Actor) {
         match self.action {
             // ```
             // if (dComIfGs_isEventBit(dSv_event_flag_c::UNK_1E04) && !dKy_daynight_check()) {
@@ -465,7 +465,7 @@ impl Tagmk {
                 if talk_command {
                     self.action = ACT_VILLATALK;
                 } else if let Some(player) = ctx.player
-                    && self.check_area(actor, player.pos, AREA_NEAR, AREA_FLANK, AREA_FAR)
+                    && self.check_area(actor, &player, AREA_NEAR, AREA_FLANK, AREA_FAR)
                 {
                     // `eventInfo.onCondition(dEvtCnd_CANTALK_e); eventInfo.onCondition(dEvtCnd_CANTALKITEM_e);`
                     // (`:330-331`) - omitted with the rest of the per-actor event info.
@@ -508,7 +508,7 @@ impl Tagmk {
     /// `actionDaichi` (`:358-399`) - the two-step switch-cascade that gates the Wind's Requiem BGM.
     /// Only the two `dComIfGs_isSwitch` arms and the timer drain survive; the four
     /// `dSv_event_tmp_flag_c` reads and the three audio calls that hang off them are omitted.
-    fn daichi(&mut self, ctx: &mut Ctx<'_>) {
+    fn daichi(&mut self, ctx: &mut Ctx<'_, '_, '_>) {
         match self.stage {
             // `if (dComIfGs_isTmpBit(dSv_event_tmp_flag_c::UNK_0440)) { m296++; mDoAud_bgmAllMute(30); }`
             // (`:362-365`) - the gate has no channel, so the arm is fed `false` and stages 0 and 10
@@ -549,7 +549,7 @@ impl Tagmk {
     }
 
     /// `demoProc` (`:217-256`), with `mStaffIdx` pinned to the compile-time [`STAFF_TAGMK`].
-    fn demo_proc(&mut self, ctx: &mut Ctx<'_>, actor: &Actor) {
+    fn demo_proc(&mut self, ctx: &mut Ctx<'_, '_, '_>, actor: &Actor) {
         // ```
         // s32 iVar1 = getNowEventAction();
         // if (dComIfGp_evmng_getIsAddvance(mStaffIdx)) { demoInitCom(); switch (iVar1) { ... } }
@@ -657,7 +657,7 @@ impl Tagmk {
     /// `fopAcM_orderOtherEventId(this, mEventIdx)` (`:288`, `:352`) - the one-argument overload. The
     /// `stage_of` guard is mandatory (bug class 5): re-ordering every tick resets `Stage::Order` and
     /// livelocks the demo.
-    fn order(&mut self, ctx: &mut Ctx<'_>, entity: Entity) {
+    fn order(&mut self, ctx: &mut Ctx<'_, '_, '_>, entity: Entity) {
         if let Some(index) = self.event_idx
             && ctx.active.stage_of(index).is_none()
         {
@@ -666,7 +666,7 @@ impl Tagmk {
     }
 }
 
-impl Ctx<'_> {
+impl Ctx<'_, '_, '_> {
     /// `dComIfGp_evmng_endCheck(mEventIdx)` (`:260`, `:295`, `:338`).
     fn ended(&self, index: Option<usize>) -> bool {
         index.is_some_and(|index| self.active.end_check(index))

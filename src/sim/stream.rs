@@ -46,6 +46,10 @@ pub fn sin_s(units: i16) -> f32 {
     walk::from_s16(units).sin()
 }
 
+pub fn sin_cos(units: i16) -> (f32, f32) {
+    (sin_s(units), cos_s(units))
+}
+
 pub fn resist(speed: Vec3, stream: Vec3, damp: f32, drag: f32) -> Vec3 {
     let delta = speed - stream;
     -(delta * damp + delta * delta.abs() * drag)

@@ -43,8 +43,7 @@ impl Bitem {
             set_id: ITEM_SET_ID,
             room: actor.room,
             ..Default::default()
-        },
-        ..Default::default()
+        }
     }
 }
 

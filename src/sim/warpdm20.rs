@@ -33,11 +33,11 @@ const CULL_MAX: [f32; 3] = [300.0, 500.0, 300.0]; // <- d_a_warpdm20.cpp:112
 const EV_TOHYRULE_WARP: &str = "TO_HYRULE_WARP"; // <- d_a_warpdm20.cpp:123
 /// `if (dComIfGs_isEventBit(dSv_event_flag_c::UNK_2D08))` (`:118`, `:188`) - set by `warphole.stb`
 /// in stage ADMumi per the decomp's own comment (`d_save_event_flag.inc:343`). Latches `m2CC` to 1.
-const FLAG_ACTIVE: u32 = 0x2D08; // <- d_a_warpdm20.cpp:118 (d_save_event_flag.inc:343)
+const FLAG_ACTIVE: u16 = 0x2D08;
 /// `if (dComIfGs_isEventBit(dSv_event_flag_c::ZELDA_AWAKENED)) { dComIfGs_onEventBit(UNK_1820); }`
 /// (`:125-127`) - `ZELDA_AWAKENED` is set by `awake_zelda.stb` in stage kenroom
 /// (`d_save_event_flag.inc:345`).
-const FLAG_ZELDA_AWAKENED: u32 = 0x2D02; // <- d_a_warpdm20.cpp:125 (d_save_event_flag.inc:345)
+const FLAG_ZELDA_AWAKENED: u16 = 0x2D02;
 const FLAG_WARP_USED: u32 = 0x1820; // <- d_a_warpdm20.cpp:126 (d_save_event_flag.inc:183)
 /// `const f32 daWarpdm20_c::m_warp_distance = 500.0f;` (`:40`), used at `:484` - how close the ship
 /// must be before `check_warp` fires.
