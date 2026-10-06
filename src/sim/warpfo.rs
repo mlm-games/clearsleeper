@@ -86,6 +86,16 @@ enum Step {
 /// `cPhs_COMPLEATE_e`, so nothing here refuses creation; `CreateInit` (`:32-34`) writes only
 /// `unknownInitFlag`, read nowhere in this translation unit, and `checkOrder` (`:53`) and
 /// `eventOrder` (`:56`) are both empty bodies, so `demo_proc` is the whole actor.
+///
+/// The profile is `fopAc_CULLBOX_CUSTOM_e` (`:233`) but this translation unit contains no
+/// `fopAcM_setCullSizeBox` call at all, so there is no custom box to port and no `cull()` here.
+/// `daWarpfout_Draw` (`:195-197`) returns TRUE with no draw call, so retail renders nothing for
+/// this actor either way. `IsDelete` (`:207-209`) is the bare TRUE of RULE 6b - an accepted
+/// delete request. The only real destruction is `actEnd`'s `fopAcM_delete(this)` (`:157`).
+///
+/// `demo_proc`'s action entry point is `dComIfGp_evmng_getMyActIdx(mStaffId, action_table, ...)`
+/// (`:63-64`), and this sim's `EventList::cut_name` supplies the cut name that table is matched
+/// against.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Warpfo {
     /// `mTimer` (`d_a_warpfout.h:35`).
@@ -97,7 +107,7 @@ impl Warpfo {
         Self { timer: 0 }
     }
 
-    /// `cLib_calcTimer` (`c_lib.h:84-90`), as `actWarp1`/`actWarp2`/`actWarp3` call it.
+    /// `cLib_calcTimer` (`c_lib.h:85-90`), as `actWarp1`/`actWarp2`/`actWarp3` call it.
     fn calc_timer(&mut self) -> bool {
         if self.timer != 0 {
             self.timer -= 1;

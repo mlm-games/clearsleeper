@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
+use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 use super::player::Player;
 use super::player_status::{PlayerStatus, STTS0_SHIP_RIDE, STTS1_WIND_WAKER_CONDUCT};
@@ -18,13 +19,17 @@ const ANSWER_MASK: u32 = 0xFF; // <- d_a_swtact.h:38
 const MODEL_SHIFT: u32 = 0x10; // <- d_a_swtact.h:39 (daSwTact_prm::getModel)
 const MODEL_MASK: u32 = 0x0F; // <- d_a_swtact.h:39
 const MODEL_MARK: u8 = 1; // <- d_a_swtact.cpp:51, :76, :174
+/// `daPy_lk_c::setTactZev`'s `seStartSystem(JA_SE_PRE_TAKT)` (`d_a_player_tact.inc:124`),
+/// reached whenever `fopAcM_GetID(this) != fpcM_ERROR_PROCESS_ID_e` (`:121`), which a live
+/// actor always satisfies.
+const SE_PRE_TAKT: u32 = 0x08A7; // <- JAZelAudio_SE.h:176 (JA_SE_PRE_TAKT)
 const RADIUS_MARK: f32 = 100.0; // <- d_a_swtact.cpp:56
 const RADIUS_FLOOR: f32 = 50.0; // <- d_a_swtact.cpp:58 (mDefaultR)
 const ANSWER_ANY: u8 = 0xFF; // <- d_a_swtact.cpp:108, :154
 const CULL_MIN: [f32; 3] = [-120.0, -10.0, -120.0]; // <- d_a_swtact.cpp:45
 const CULL_MAX: [f32; 3] = [120.0, 10.0, 120.0]; // <- d_a_swtact.cpp:46
 /// `daPy_lk_c::getTactMusic` returns -1 unless Link is in `daPyProc_TACT_PLAY_e` or
-/// `daPyProc_TACT_WAIT_e` (`d_a_player_tact.inc:150-158`). Neither player process is ported, so
+/// `daPyProc_TACT_WAIT_e` (`d_a_player_tact.inc:150-156`). Neither player process is ported, so
 /// this is the proven value - the same constant `kanban.rs:95` uses for the same call.
 const TACT_NONE: i32 = -1;
 
@@ -63,8 +68,12 @@ impl Swtact {
         }
     }
 
-    pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
-        (CULL_MIN, CULL_MAX)
+    pub fn cull(&self) -> Option<([f32; 3], [f32; 3])> {
+        if self.mark {
+            Some((CULL_MIN, CULL_MAX))
+        } else {
+            None
+        }
     }
 
     /// The `switch (mAnswer)` of `_execute` (`d_a_swtact.cpp:129-158`): which song the plate is
@@ -84,12 +93,14 @@ impl Swtact {
     }
 
     /// `_execute` (`d_a_swtact.cpp:115-170`) minus `set_mtx` (`:63-69`, model scale and
-    /// position) and minus `getAnswer()` (`:94-112`) together with the whole
-    /// `mPlayerStatus != stts1 && stts1 != 0` edge-detect (`:124-126`): that arm's only body is
-    /// the `player->setTactZev(fopAcM_GetID(this), getAnswer(), NULL)` handoff, which writes
-    /// `daPy_lk_c::mTactZevPartnerId`/`m34CC` (`d_a_player_tact.inc:117-127`), player state this
-    /// sim does not keep - so `player_status` is written by the trailing `mPlayerStatus = stts1`
-    /// (`:166`) and nothing else. `dist` is `cXyz::absXZ` (`c_xyz.h:126`), the XZ-only distance.
+    /// position) and minus `getAnswer()` (`:94-112`).
+    ///
+    /// `setTactZev` (`d_a_player_tact.inc:117-129`) keeps its `seStartSystem(JA_SE_PRE_TAKT)`
+    /// (`:121-125`) but drops the three stores it makes after it (`:126-128`,
+    /// `mTactZevPartnerId` / `m34CC` / `m3494`): that is the player's tact-partner state, which
+    /// this sim does not model, and `getAnswer()` only ever reached the sound's argument list, so
+    /// the permutation table has no reader here. `dist` is `cXyz::absXZ` (`c_xyz.h:126`), the
+    /// XZ-only distance.
     fn step(
         &mut self,
         actor: &Actor,
@@ -97,6 +108,7 @@ impl Swtact {
         status: &PlayerStatus,
         switches: &mut Switches,
         info: &MsgGameInfo,
+        events: &mut SimEvents,
     ) {
         let Some(player) = player else {
             return;
@@ -107,6 +119,9 @@ impl Swtact {
         let stts1 = u8::from(status.check1(STTS1_WIND_WAKER_CONDUCT));
         let offset = player.pos - actor.pos;
         if (offset.x * offset.x + offset.z * offset.z).sqrt() <= self.radius {
+            if self.player_status != stts1 && stts1 != 0 {
+                events.list.push(SimEvent::Se(SE_PRE_TAKT));
+            }
             if self.listening(TACT_NONE) {
                 self.trigger = true;
             }
@@ -127,11 +142,19 @@ pub fn control(
     status: Res<PlayerStatus>,
     info: Res<MsgGameInfo>,
     mut switches: ResMut<Switches>,
+    mut events: ResMut<SimEvents>,
     players: Query<&Player>,
     mut plates: Query<(&Actor, &mut Swtact)>,
 ) {
     let player = players.iter().next().copied();
     for (actor, mut plate) in &mut plates {
-        plate.step(actor, player.as_ref(), &status, &mut switches, &info);
+        plate.step(
+            actor,
+            player.as_ref(),
+            &status,
+            &mut switches,
+            &info,
+            &mut events,
+        );
     }
 }

@@ -33,7 +33,7 @@ const ACT_OPEN: u8 = 4; // <- d_a_atdoor.cpp:16 (ACT_OPEN_e)
 ///
 /// `getSwbit` (`:22-24`) is `(fopAcM_GetParam(this) >> 0) & 0xFF`. Retail reads it through
 /// `dComIfGs_isSwitch(swBit, fopAcM_GetRoomNo(this))` (`:77`, `:115`, `:137`), which is
-/// `dSv_info_c::isSwitch` (`d_save.cpp:1586-1601`): `-1` and `255` read false, `i_no < 0x80`
+/// `dSv_info_c::isSwitch` (`d_save.cpp:1586-1603`): `-1` and `255` read false, `i_no < 0x80`
 /// (`MEMORY_SWITCH`) reads the in-memory switch array, and anything at or above `0x80 + 0x40`
 /// reads the per-zone bit arrays instead. `super::flags::Switches` models only the in-memory
 /// array, so a `swBit` of `0x80` or above reads false here and the index is used as-is rather than

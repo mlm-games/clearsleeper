@@ -13,7 +13,7 @@ pub const NZG_ACTORS: [&str; 1] = ["nezuana"];
 const CHILD_PARAM_BIT: u32 = 0x100;
 /// `cM_rnd() < 0.5f` (`d_a_nzg.cpp:67`).
 const RANDOM_CHANCE: f32 = 0.5;
-/// `fpcM_ERROR_PROCESS_ID_e` (`d_a_nzg.cpp:89`, `:101`): the `m2D4` "no blocked actor" sentinel.
+/// `i_this->m2D0 = 400.0f` (`d_a_nzg.cpp:107`), rewritten every Execute.
 const SPAWN_DISTANCE: f32 = 400.0;
 /// `i_this->m2CC = i_this->m2B8 * 10.0f` (`d_a_nzg.cpp:177`).
 const NEAR_SCALE: f32 = 10.0;

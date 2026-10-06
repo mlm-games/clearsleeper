@@ -1129,7 +1129,9 @@ impl App {
                 if !plate.mark {
                     continue;
                 }
-                let (min, max) = plate.cull();
+                let Some((min, max)) = plate.cull() else {
+                    continue;
+                };
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::gaship::Gaship>() {

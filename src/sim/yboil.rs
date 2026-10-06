@@ -44,9 +44,10 @@ impl Yboil {
     /// `_execute` (`d_a_obj_Yboil.cpp:115-141`). `pos_reset` (`:48-55`) and `set_mtx`
     /// (`:77-83`) only write `mMdlPos`/`mMdlScale`, which `_draw` (`:173-186`) turns into a
     /// matrix, so both are renderer work. The `mMdlTimer[i] == 0` arm (`:117-130`) needs the
-    /// `Yboil00` BCK frame count: `mBckAnm[i].play()` runs `J3DFrameCtrl::update`
-    /// (`m_Do_ext.cpp:116-120`) and `isStop()` only goes true once the frame passes
-    /// `mpAnm->getFrameMax()` (`m_Do_ext.cpp:454`), and no BCK archive ships in this checkout.
+    /// `Yboil00` BCK frame count: `mBckAnm[i].play()` runs `mFrameCtrl->update()` and returns
+    /// `isStop()` (`m_Do_ext.cpp:116-120`), the loop bound comes from
+    /// `initPlay(mpAnm->getFrameMax(), ...)` in `mDoExt_bckAnm::init` (`m_Do_ext.cpp:454`), and
+    /// no BCK archive ships in this checkout.
     /// The seed `mMdlTimer[i] = 1 + (s32)cM_rndF(3.9999f)` is therefore omitted, which leaves
     /// every slot at the `0` `CreateInit` wrote (`:71`) and makes this loop inert - it is kept
     /// in the transcribed form so the decomp's shape and the switch gate survive, and it starts

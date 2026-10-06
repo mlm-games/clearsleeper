@@ -870,22 +870,22 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if ktaruo::is_ktaruo(&source.name) {
         world.spawn((actor, ktaruo::Ktaruo::spawn())).id()
     } else if kanat::is_kanat(&source.name) {
-let v = kanat::Kanat::spawn(source.parameters, world.resource::<flags::Switches>());
+        let v = kanat::Kanat::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if demodk::is_demodk(&source.name) {
-let v = demodk::DemoDk::spawn(actor.pos);
+        let v = demodk::DemoDk::spawn(actor.pos);
         world.spawn((actor, v)).id()
     } else if esekh::is_esekh(&source.name) {
-let v = esekh::Esekh::spawn(source.parameters);
+        let v = esekh::Esekh::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if kmon::is_kmon(&source.name) {
-world.spawn((actor, kmon::Kmon::spawn())).id()
+        world.spawn((actor, kmon::Kmon::spawn())).id()
     } else if table::is_table(&source.name) {
-world.spawn((actor, table::Table::spawn())).id()
+        world.spawn((actor, table::Table::spawn())).id()
     } else if vteng::is_vteng(&source.name) {
-world.spawn((actor, vteng::Vteng::spawn())).id()
+        world.spawn((actor, vteng::Vteng::spawn())).id()
     } else if adnno::is_adnno(&source.name) {
-world.spawn((actor, adnno::Adnno::spawn())).id()
+        world.spawn((actor, adnno::Adnno::spawn())).id()
     } else if roten::is_roten(&source.name) {
         let reserve = world
             .query_filtered::<&zunari::Zunari, bevy_ecs::query::With<zunari::Zunari>>()
@@ -895,111 +895,113 @@ world.spawn((actor, adnno::Adnno::spawn())).id()
         let v = roten::Roten::spawn(source.parameters, reserve);
         world.spawn((actor, v)).id()
     } else if kanban::is_kanban(&source.name) {
-let v = kanban::Kanban::spawn(source.parameters);
+        let v = kanban::Kanban::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if npc_ds1::is_npc_ds1(&source.name) {
-world.spawn((actor, npc_ds1::NpcDs1::spawn())).id()
+        world.spawn((actor, npc_ds1::NpcDs1::spawn())).id()
     } else if npc_ac1::is_npc_ac1(&source.name) {
-world.spawn((actor, npc_ac1::NpcAc1::spawn())).id()
+        world.spawn((actor, npc_ac1::NpcAc1::spawn())).id()
     } else if npc_uk::is_npc_uk(&source.name) {
-world.spawn((actor, npc_uk::NpcUk::spawn())).id()
+        world.spawn((actor, npc_uk::NpcUk::spawn())).id()
     } else if npc_gp1::is_npc_gp1(&source.name) {
-world.spawn((actor, npc_gp1::NpcGp1::spawn())).id()
+        world.spawn((actor, npc_gp1::NpcGp1::spawn())).id()
     } else if npc_pf1::is_npc_pf1(&source.name) {
-world.spawn((actor, npc_pf1::NpcPf1::spawn())).id()
+        world.spawn((actor, npc_pf1::NpcPf1::spawn())).id()
     } else if npc_co1::is_npc_co1(&source.name) {
-world.spawn((actor, npc_co1::NpcCo1::spawn())).id()
+        world.spawn((actor, npc_co1::NpcCo1::spawn())).id()
     } else if ikari::is_ikari(&source.name) {
-world.spawn((actor, ikari::Ikari::spawn(source.parameters))).id()
+        world.spawn((actor, ikari::Ikari::spawn(source.parameters))).id()
     } else if gbed::is_gbed(&source.name) {
-world.spawn((actor, gbed::Gbed::spawn())).id()
+        world.spawn((actor, gbed::Gbed::spawn())).id()
     } else if hami4::is_hami4(&source.name) {
-let v = hami4::Hami4::spawn(source.parameters, world.resource::<flags::Switches>());
+        let v = hami4::Hami4::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if vrbox::is_vrbox(&source.name) {
-world.spawn((actor, vrbox::Vrbox::spawn())).id()
+        world.spawn((actor, vrbox::Vrbox::spawn())).id()
     } else if tide::is_tide(&source.name) {
-let level = *world.resource::<wlvtag::WaterLevel>();
+        let level = *world.resource::<wlvtag::WaterLevel>();
         let mut flags = world.resource_mut::<flags::EventFlags>();
         let home = actor.pos;
         let v = tide::Tide::spawn(source.parameters, home, &level, &mut flags);
         world.spawn((actor, v)).id()
     } else if pscnchg::is_pscnchg(&source.name) {
-world.spawn((actor, pscnchg::PScnChg::spawn())).id()
+        world.spawn((actor, pscnchg::PScnChg::spawn())).id()
     } else if vdora::is_vdora(&source.name) {
-world.spawn((actor, vdora::Vdora::spawn())).id()
+        world.spawn((actor, vdora::Vdora::spawn())).id()
     } else if otble::is_otble(&source.name) {
-world.spawn((actor, otble::Otble::spawn(source.parameters))).id()
+        world.spawn((actor, otble::Otble::spawn(source.parameters))).id()
     } else if tenmado::is_tenmado(&source.name) {
-let mut sw = world.resource_mut::<flags::Switches>();
+        let mut sw = world.resource_mut::<flags::Switches>();
         let v = tenmado::Tenmado::spawn(source.parameters, &mut sw);
         world.spawn((actor, v)).id()
     } else if omensmk::is_omensmk(&source.name) {
-world.spawn((actor, omensmk::Omensmk::spawn())).id()
+        world.spawn((actor, omensmk::Omensmk::spawn())).id()
     } else if mmusic::is_mmusic(&source.name) {
-let v = mmusic::Mmusic::spawn(world.resource::<inventory::Equipped>(), world.resource::<flags::Collect>(), world.resource::<flags::EventFlags>());
+        let v = mmusic::Mmusic::spawn(world.resource::<inventory::Equipped>(), world.resource::<flags::Collect>(), world.resource::<flags::EventFlags>());
         world.spawn((actor, v)).id()
     } else if ygush::is_ygush(&source.name) {
-world.spawn((actor, ygush::Ygush::spawn(source.parameters))).id()
+        world.spawn((actor, ygush::Ygush::spawn(source.parameters))).id()
     } else if evsw::is_evsw(&source.name) {
         let bits = *world.resource::<flags::EventFlags>();
         let mut sw = world.resource_mut::<flags::Switches>();
         let v = evsw::Evsw::spawn(source.parameters, &bits, &mut sw);
         world.spawn((actor, v)).id()
     } else if kaji::is_kaji(&source.name) {
-world.spawn((actor, kaji::Kaji::spawn())).id()
+        world.spawn((actor, kaji::Kaji::spawn())).id()
     } else if touseki::is_touseki(&source.name) {
-world.spawn((actor, touseki::Touseki::spawn())).id()
+        world.spawn((actor, touseki::Touseki::spawn())).id()
     } else if qtkhd::is_qtkhd(&source.name) {
-world.spawn((actor, qtkhd::Qtkhd::spawn(source.parameters))).id()
+        world.spawn((actor, qtkhd::Qtkhd::spawn(source.parameters))).id()
     } else if ritem::is_ritem(&source.name) {
-world.spawn((actor, ritem::Ritem::spawn(source.parameters))).id()
+        world.spawn((actor, ritem::Ritem::spawn(source.parameters))).id()
     } else if steamtag::is_steamtag(&source.name) {
-world.spawn((actor, steamtag::Steamtag::spawn())).id()
+        world.spawn((actor, steamtag::Steamtag::spawn())).id()
     } else if wbird::is_wbird(&source.name) {
-world.spawn((actor, wbird::Wbird::spawn())).id()
+        world.spawn((actor, wbird::Wbird::spawn())).id()
     } else if plant::is_plant(&source.name) {
-world.spawn((actor, plant::Plant::spawn())).id()
+        world.spawn((actor, plant::Plant::spawn())).id()
     } else if quake::is_quake(&source.name) {
-let v = quake::Quake::spawn(source.parameters, world.resource::<flags::Collect>());
+        let v = quake::Quake::spawn(source.parameters, world.resource::<flags::Collect>());
         world.spawn((actor, v)).id()
     } else if amiprop::is_amiprop(&source.name) {
-let v = amiprop::Amiprop::spawn(source.parameters, actor.angle);
+        let v = amiprop::Amiprop::spawn(source.parameters, actor.angle);
         world.spawn((actor, v)).id()
     } else if msdansb::is_msdansb(&source.name) {
-let v = msdansb::Msdansb::spawn(source.parameters, actor.pos[1], world.resource::<flags::Switches>());
+        let v = msdansb::Msdansb::spawn(source.parameters, actor.pos[1], world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if daioeye::is_daioeye(&source.name) {
-world.spawn((actor, daioeye::DaioEye::spawn())).id()
+        world.spawn((actor, daioeye::DaioEye::spawn())).id()
     } else if ssturu::is_ss_turu(&source.name) {
-let v = ssturu::SsTuru::spawn(source.parameters, world.resource::<flags::Switches>());
+        let v = ssturu::SsTuru::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if warpt::is_warpt(&source.name) {
-let mut sw = world.resource_mut::<flags::Switches>();
-        let mut regs = world.resource_mut::<flags::StoryBits>();
+        let mut sw = *world.resource::<flags::Switches>();
+        let mut regs = *world.resource::<flags::StoryBits>();
         let v = warpt::Warpt::spawn(source.parameters, source.angle, &mut sw, &mut regs);
+        *world.resource_mut::<flags::Switches>() = sw;
+        *world.resource_mut::<flags::StoryBits>() = regs;
         world.spawn((actor, v)).id()
     } else if qdghd::is_qdghd(&source.name) {
-let v = qdghd::Qdghd::spawn(source.parameters, world.resource::<flags::Switches>());
+        let v = qdghd::Qdghd::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if syan::is_syan(&source.name) {
-world.spawn((actor, syan::Syan::spawn())).id()
+        world.spawn((actor, syan::Syan::spawn())).id()
     } else if yboil::is_yboil(&source.name) {
-let v = yboil::Yboil::spawn(source.parameters, world.resource::<flags::EventFlags>());
+        let v = yboil::Yboil::spawn(source.parameters, world.resource::<flags::EventFlags>());
         world.spawn((actor, v)).id()
     } else if lamp::is_lamp(&source.name) {
-world.spawn((actor, lamp::Lamp::spawn())).id()
+        world.spawn((actor, lamp::Lamp::spawn())).id()
     } else if rflw::is_rflw(&source.name) {
-world.spawn((actor, rflw::Rflw::spawn())).id()
+        world.spawn((actor, rflw::Rflw::spawn())).id()
     } else if gtaki::is_gtaki(&source.name) {
-world.spawn((actor, gtaki::Gtaki::spawn())).id()
+        world.spawn((actor, gtaki::Gtaki::spawn())).id()
     } else if swtact::is_swtact(&source.name) {
-let v = swtact::Swtact::spawn(source.parameters);
+        let v = swtact::Swtact::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if warpfo::is_warpfo(&source.name) {
-world.spawn((actor, warpfo::Warpfo::spawn())).id()
+        world.spawn((actor, warpfo::Warpfo::spawn())).id()
     } else if npc_km1::is_npc_km1(&source.name) {
-let v = npc_km1::NpcKm1::spawn(source.parameters);
+        let v = npc_km1::NpcKm1::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
@@ -1207,7 +1209,6 @@ pub fn build(
                     barrel::control.in_set(WwSimSet::Execute),
                     fallrock::control.in_set(WwSimSet::Execute),
                     windmill::control.in_set(WwSimSet::Execute),
-                    buoybarrel::control.in_set(WwSimSet::Execute),
                     ice::control.in_set(WwSimSet::Execute),
                     kytag04::control.in_set(WwSimSet::Execute),
                     kytag06::control.in_set(WwSimSet::Execute),
@@ -1217,9 +1218,7 @@ pub fn build(
                     kanat::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
-                    magma::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
-                    cafelmp::control.in_set(WwSimSet::Execute),
                     pbka::control.in_set(WwSimSet::Execute),
                     gntakie::control.in_set(WwSimSet::Execute),
                     vmsdz::control.in_set(WwSimSet::Execute),
@@ -1338,13 +1337,7 @@ pub fn build(
                     .chain(),
                 (
                     combat::control.in_set(WwSimSet::Execute),
-                    yboil::control.in_set(WwSimSet::Execute),
-                    lamp::control.in_set(WwSimSet::Execute),
-                    rflw::control.in_set(WwSimSet::Execute),
-                    gtaki::control.in_set(WwSimSet::Execute),
-                    swtact::control.in_set(WwSimSet::Execute),
-                    warpfo::control.in_set(WwSimSet::Execute),
-                    npc_km1::control.in_set(WwSimSet::Execute),                    tagba1::control.in_set(WwSimSet::Execute),
+                    tagba1::control.in_set(WwSimSet::Execute),
 
                     qdghd::control.in_set(WwSimSet::Execute),
                     syan::control.in_set(WwSimSet::Execute),
@@ -1400,16 +1393,11 @@ pub fn build(
                     switem::control.in_set(WwSimSet::Execute),
                     nh::control.in_set(WwSimSet::Execute),
                     pirateship::control.in_set(WwSimSet::Execute),
-                    molgera::control.in_set(WwSimSet::Execute),
-                    floormaster::control.in_set(WwSimSet::Execute),
                     helmaroc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
-                    gohdan::control.in_set(WwSimSet::Execute),                    gnbtaki::control.in_set(WwSimSet::Execute),
-                    acorn_leaf::control.in_set(WwSimSet::Execute),
-                    andsw0::control.in_set(WwSimSet::Execute),
-
+                    gohdan::control.in_set(WwSimSet::Execute),
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),
@@ -1426,8 +1414,6 @@ pub fn build(
                     bitem::control.in_set(WwSimSet::Execute),
                     kytag03::control.in_set(WwSimSet::Execute),
                     kytag05::control.in_set(WwSimSet::Execute),
-                    rforce::control.in_set(WwSimSet::Execute),
-                    wlvtag::control.in_set(WwSimSet::Execute),
 
                 )
                     .chain(),
@@ -1456,7 +1442,11 @@ pub fn build(
                 gtaki::control.in_set(WwSimSet::Execute),
                 swtact::control.in_set(WwSimSet::Execute),
                 warpfo::control.in_set(WwSimSet::Execute),
-                npc_km1::control.in_set(WwSimSet::Execute),
+                npc_km1::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
+                    floormaster::control.in_set(WwSimSet::Execute),
+                    andsw0::control.in_set(WwSimSet::Execute),
+                    gnbtaki::control.in_set(WwSimSet::Execute),
+
             )
                 .chain(),
         )

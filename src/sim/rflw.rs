@@ -70,13 +70,13 @@ impl Rflw {
     /// `mCyl.SetC(current.pos)` + `dComIfG_Ccsp()->Set(&mCyl)` + `ChkCoHit()`/`GetCoHitAc()`
     /// (`:143-146`). `l_cyl_src` is a cylinder but the bomb registers
     /// `d_a_bomb2.cpp::Act_c::M_sph_src`, a sphere, so the cross is `cM3d_Cross_CylSph`
-    /// (`c_m3d.cpp:1377-1414`). With `radius_sum = CYL_RADIUS + SPH_RADIUS` (`:1389`) it rejects
+    /// (`c_m3d.cpp:1377-1418`). With `radius_sum = CYL_RADIUS + SPH_RADIUS` (`:1389`) it rejects
     /// when `radius_sum < sqrt(dx^2 + dz^2)` (`:1390-1394`), then accepts only where the sphere
     /// straddles the tube's span: `sph.y + r >= cyl.y && sph.y - r <= cyl.y + h` (`:1396-1398`).
     /// So the tube stands on `current.pos` and reaches `CYL_HEIGHT` upward, not around it.
     ///
     /// The Co hit itself is real: the bomb's `SrcObjCo SPrm` carries `cCcD_CoSPrm_Set_e`
-    /// (`d_a_bomb2.cpp:309`) as does the pool's (`:22`), so `cCcS::SetCoCommonHitInf` runs
+    /// (`d_a_bomb2.cpp:310`) as does the pool's (`:22`), so `cCcS::SetCoCommonHitInf` runs
     /// `obj1->SetCoHit(obj2)` (`c_cc_s.cpp:237-242`) and `ChkCoHit()` fires for a bomb.
     fn co_hit(&self, actor: &Actor, blasts: &Blasts) -> Option<Vec3> {
         let reach = CYL_RADIUS + SPH_RADIUS;

@@ -1,11 +1,11 @@
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 
-use super::arrow::{Arrow, Phase};
+use super::arrow::{Arrow, Phase, TYPE_FIRE, TYPE_ICE, TYPE_LIGHT, TYPE_NORMAL};
 use super::barricade::AT_FIRE_ARROW;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
-use super::hmlif::ARROW_KIND_AT;
+use super::hmlif::{AT_ICE_ARROW, AT_LIGHT_ARROW, AT_NORMAL_ARROW};
 use super::walk;
 
 /// The stage string is `Qdghd` (`d_stage.cpp:965`, `fpcNm_Obj_Dragonhead_e`) and it is also the
@@ -39,6 +39,10 @@ const SE_ICEVERG_MELT: u32 = 0x69D0;
 /// no damage and cannot be damaged; its TG-only `SrcObjTg Type = AT_TYPE_FIRE_ARROW` (`:24`) is a
 /// switch trigger, not a health path. `daObjDragonhead_c` (`d_a_obj_dragonhead.h:9-31`) has no
 /// health field and the profile `Group` is `fopAc_ACTOR_e` (`:252`), not `fopAc_ENEMY_e`.
+///
+/// The profile `Cull Type` is `fopAc_CULLBOX_CUSTOM_e` (`d_a_obj_dragonhead.cpp:253`) but
+/// `CreateInit` only calls `fopAcM_setCullSizeFar(this, 1.0f)` (`:83`) - there is no
+/// `fopAcM_setCullSizeBox` in this file, so no cull box is derivable and none is invented.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Qdghd {
     /// `(fopAcM_GetParam(this) >> 8) & 0xFF` (`d_a_obj_dragonhead.cpp:52`).
@@ -113,6 +117,17 @@ impl Qdghd {
         }
     }
 
+    /// `hmlif::ARROW_KIND_AT` (`hmlif.rs:83-88`) - `Arrow::kind` to the arrow's real `AT_TYPE_*`.
+    fn arrow_at(kind: u8) -> Option<u32> {
+        match kind {
+            TYPE_NORMAL => Some(AT_NORMAL_ARROW),
+            TYPE_FIRE => Some(AT_FIRE_ARROW),
+            TYPE_ICE => Some(AT_ICE_ARROW),
+            TYPE_LIGHT => Some(AT_LIGHT_ARROW),
+            _ => None,
+        }
+    }
+
     /// `mSph.ChkTgHit()` then `at->ChkAtType(AT_TYPE_FIRE_ARROW)`
     /// (`d_a_obj_dragonhead.cpp:148-150`), against the sphere at `mSphCenter`
     /// (`d_a_obj_dragonhead.cpp:100-102`) with `sph_check_src`'s radius (`:42`).
@@ -121,7 +136,7 @@ impl Qdghd {
             if shaft.phase != Phase::Flying {
                 return false;
             }
-            let Some(at) = ARROW_KIND_AT.get(usize::from(shaft.kind)).copied() else {
+            let Some(at) = Self::arrow_at(shaft.kind) else {
                 return false;
             };
             if at & AT_FIRE_ARROW == 0 {
@@ -133,9 +148,6 @@ impl Qdghd {
     }
 }
 
-/// The profile is `fopAc_CULLBOX_CUSTOM_e` (`d_a_obj_dragonhead.cpp:253`) but `CreateInit` only
-/// calls `fopAcM_setCullSizeFar(this, 1.0f)` (`:83`) - there is no `fopAcM_setCullSizeBox` in this
-/// file, so no cull box is derivable and none is invented.
 pub fn is_qdghd(name: &str) -> bool {
     QDGHD_ACTORS.contains(&name)
 }

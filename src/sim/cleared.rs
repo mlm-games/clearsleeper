@@ -39,7 +39,7 @@ pub fn control(
         let living = room >= 0
             && foes
                 .iter()
-                .any(|(other, hp)| hp.is_some() && other.room == room);
+                .any(|(other, hp)| hp.is_some() && i32::from(other.room) == room);
         if living {
             marker.countdown = COUNTDOWN;
             continue;

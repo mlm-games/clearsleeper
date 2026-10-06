@@ -9,6 +9,11 @@ const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:558 (fo
 /// also `"Lamp"` (`d_a_lamp.cpp:124`), so `_arcname` and the STAGE string agree. The profile
 /// is `fopAc_CULLBOX_0_e` (`d_a_lamp.cpp:223`), not a custom box.
 ///
+/// `Create` (`:152`) calls `mStts.Init(0xff, 0xff, this)` and registers `sph_src` as the torch's
+/// only collider, and that `dCcD_SrcSph` has `SrcObjAt Type = 0` (`:158`) and
+/// `SrcObjAt Atp = 0` (`:159`) - no attack arm, and nothing at all registers against it - so the
+/// torch cannot be damaged. Its `SrcObjTg Type` (`:161`) is a target mask only.
+///
 /// `daLamp_Execute` (`:22-107`) keeps no observable state once the renderer's inputs are gone.
 /// `mCycleCtr` (`:23`) and `mLength` (`:27`, `:34`, `:36`) feed only `MtxRotX`/`MtxRotZ`
 /// (`:40-42`), and the `mOto` latch (`:30`) exists only to choose between those two
@@ -25,8 +30,9 @@ const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:558 (fo
 /// `Create` (`:141-199`) therefore contributes nothing but the profile's cull box: it seeds
 /// `mCycleCtr` with `cM_rndFX(0x8000)` (`:186`), runs `Execute` twice (`:188-190`) - the same
 /// two ticks the scheduler would have given it - and hands `mInf` to the light. There is no
-/// `fopAcM_setCullSizeBox` call and no AT/Tg arm of its own, so nothing here can be hurt and
-/// nothing here can act on the player.
+/// `fopAcM_setCullSizeBox` call anywhere in the translation unit, so the only geometry is the
+/// profile's own `fopAc_CULLBOX_0_e` entry. Nothing here can be hurt, and the Tg arm reacts
+/// only to emitters this sim does not port.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Lamp;
 
