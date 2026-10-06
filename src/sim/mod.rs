@@ -10,6 +10,7 @@ pub mod area;
 pub mod amos_knight;
 pub mod amiprop;
 pub mod armos;
+pub mod att;
 pub mod auzu;
 pub mod arrowice;
 pub mod aryll;
@@ -1598,6 +1599,8 @@ pub fn build(
     sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
     sim.world.insert_resource(kamome2::Kamome2Hio::default());
     sim.world.insert_resource(kamome2::Kamome2Cam::default());
+    sim.world.insert_resource(att::AttBoss::default());
+    sim.world.insert_resource(att::AttNonPos::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1691,6 +1694,8 @@ pub fn build(
     sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
     sim.world.insert_resource(kamome2::Kamome2Hio::default());
     sim.world.insert_resource(kamome2::Kamome2Cam::default());
+    sim.world.insert_resource(att::AttBoss::default());
+    sim.world.insert_resource(att::AttNonPos::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -2141,6 +2146,8 @@ pub fn build(
                 health::apply_damage.in_set(WwSimSet::Execute),
                 death::check.in_set(WwSimSet::Execute),
                 cleared::control.in_set(WwSimSet::Execute),
+                (att::control.in_set(WwSimSet::Execute)
+                    .before(contact_run::run),),
                 contact_run::run.in_set(WwSimSet::Execute),
                 frame::advance.in_set(WwSimSet::After),
             )
