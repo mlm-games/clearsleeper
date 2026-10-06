@@ -789,7 +789,7 @@ pub fn control(
     let hammer_kind = watch.hammer.kind;
     let rolling = watch.roll.active;
     let rolling_crash = false;
-    let spinning = matches!(watch.combat.kind, CutKind::EA | CutKind::EB) || watch.combat.soup;
+    let spinning = watch.combat.soup;
     let swimming = watch.swim.active;
     let hooked = blow.hookshot_shot;
     let shielded = false;

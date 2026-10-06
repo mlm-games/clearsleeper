@@ -69,7 +69,7 @@ pub const FLOWER_OFFSET: Vec3 = Vec3::new(-489.35, 600.0, 0.0); // <- d_a_obj_dr
 /// `d_a_obj_drift.cpp:175`), which `d_stage.cpp:697-698` binds to these two stage names. The
 /// comparison is case-sensitive (RULE: do not case-fold actor names), and `jbaba` is already owned
 /// by `src/sim/jbaba.rs` while `bbaba` is claimed by nothing.
-pub const FLOWER_ACTORS: [&str; 2] = ["jbaba", "bbaba"]; // <- d_stage.cpp:697, :698
+pub const FLOWER_NAMES: [&str; 2] = ["jbaba", "bbaba"]; // <- d_stage.cpp:697, :698
 /// `mWavePhaseX = cM_rndFX(0x8000);` and the `.Y` / `.Z` twins (`d_a_obj_drift.cpp:129-131`) - the
 /// span of `cM_rndFX`, whose result is truncated into an `s16`.
 pub const WAVE_PHASE_SEED: f32 = 0x8000 as f32; // <- d_a_obj_drift.cpp:129
@@ -209,7 +209,7 @@ impl Drift {
             let (pos, angle) = self.flower_transform(actor);
             let entity = commands
                 .spawn(Actor {
-                    name: FLOWER_ACTORS[usize::from(self.kind)].to_owned(),
+                    name: FLOWER_NAMES[usize::from(self.kind)].to_owned(),
                     parameters: 0,
                     pos,
                     angle,
