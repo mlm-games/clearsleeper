@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::contact::{
-    self, AT_SPRM_GRP_ALL, AT_SPRM_SET, AtTgHit, CO_SPRM_I_GRP_ALL, CO_SPRM_SET,
+    self, AT_SPRM_GRP_ALL, AT_SPRM_SET, AtTgHit, CO_SPRM_I_GRP_ALL, CO_SPRM_NO_CRR, CO_SPRM_SET,
     CO_SPRM_VS_GRP_ALL, CcSystem, CoHit, DivideInfo, GObjInf, GSTTS_NO_ACTOR, GStts, ObjEntry,
     ObjSet, Stts, TG_SPRM_GRP_ALL, TG_SPRM_SET,
 };
@@ -88,11 +88,16 @@ impl ContactObj {
     /// `dCcD_Stts::Init` (`d_cc_d.cpp:67-84`) read as the pipeline's one [`ObjEntry`]: the weight
     /// is the owner's, the process id is the owner's, and an entity the registry does not know is
     /// the error id with the no-actor flag raised, which is what the reference derives from a null
-    /// actor pointer.
-    fn entry(&self, shape: usize, weight_uc: u8, owner: Option<u32>) -> ObjEntry {
+    /// actor pointer. `no_crr` is the owner's own `cCcD_CoSPrm_NoCrr_e`, which
+    /// `cCcD_ObjCo::OnCoSPrmBit` sets on the collider rather than on the status, so it rides on
+    /// the object's `co_sprm` and `cCcD_ObjCo::ChkNoCrr` (`c_cc_d.h:493`) answers it from there.
+    fn entry(&self, shape: usize, weight_uc: u8, no_crr: bool, owner: Option<u32>) -> ObjEntry {
         ObjEntry {
             shape: Some(shape),
-            set: self.set,
+            set: ObjSet {
+                co_sprm: self.set.co_sprm | if no_crr { CO_SPRM_NO_CRR } else { 0 },
+                ..self.set
+            },
             stts: Some(Stts {
                 weight_uc,
                 apid: owner.unwrap_or(ERROR_PROC_ID),
@@ -205,6 +210,7 @@ impl ContactResults {
         entity: Entity,
         bodies: &ContactBodies,
         weight_uc: u8,
+        no_crr: bool,
         owner: Option<u32>,
     ) {
         if bodies.objs.is_empty() || bodies.objs.len() > bodies.shapes.bodies.len() {
@@ -216,7 +222,7 @@ impl ContactResults {
             let index = self.system.objs.len();
             self.system
                 .objs
-                .push(obj.entry(base + body, weight_uc, owner));
+                .push(obj.entry(base + body, weight_uc, no_crr, owner));
             if obj.set.chk_at_set() {
                 self.system.at.push(index);
             }
@@ -330,7 +336,13 @@ pub fn run(
     let state = &mut *results;
     state.begin();
     for (entity, actor, contact) in &mut bodies {
-        state.register(entity, &*contact, actor.weight_uc, registry.proc_id(entity));
+        state.register(
+            entity,
+            &*contact,
+            actor.weight_uc,
+            actor.no_crr,
+            registry.proc_id(entity),
+        );
     }
     contact::calc_area(&state.flat, &mut state.system);
     let at_tg = contact::chk_at_tg(&state.flat, &mut state.system);

@@ -40,9 +40,14 @@ pub struct Actor {
     /// `cCcD_Stts::GetWeightUc`, the collision weight byte `GetRank` buckets and `rank_tbl`
     /// indexes with, set at the reference's `cCcD_Stts::Init` first argument. `0` and `0xFF` are
     /// the two a correction pair early-outs on, and the reference's own player and boat take 120
-    /// and 0xF0. The per-process values are not ported, so this stands at 100, a mid-ladder weight
-    /// whose `rank_tbl` diagonal is an even split: two such actors push each other apart equally.
+    /// and 0xF0. `super::weight` holds the per-process values this starts from.
     pub weight_uc: u8,
+    /// `cCcD_ObjCo::ChkNoCrr` (`c_cc_d.h:493`) reading `cCcD_CoSPrm_NoCrr_e` (`c_cc_d.h:57`) on the
+    /// process's own collision body, which `dCcS::SetPosCorrect` (`d_cc_s.cpp:237`) returns on for
+    /// either side of the pair, before any weight is read. `super::weight` names the processes
+    /// whose body carries it from the start; the player raises it only while its in-ship mode
+    /// flag is up, so the player's module owns this one.
+    pub no_crr: bool,
 }
 
 impl Default for Actor {
@@ -66,6 +71,7 @@ impl Default for Actor {
             steal_item_bit_no: 0,
             steal_item_left: 0,
             weight_uc: 100,
+            no_crr: false,
         }
     }
 }

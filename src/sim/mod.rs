@@ -271,6 +271,7 @@ pub mod schedule;
 pub mod andsw0;
 pub mod andsw2;
 pub mod obj_nest;
+pub mod obj_hha;
 pub mod ohatch;
 pub mod obj_paper;
 pub mod obj_rcloud;
@@ -351,6 +352,7 @@ pub mod vmsdz;
 pub mod warpfo;
 pub mod warpgn;
 pub mod walk;
+pub mod weight;
 pub mod wall;
 pub mod wlvtag;
 pub mod wind;
@@ -1649,6 +1651,7 @@ pub fn build(
         sim.world.insert_resource(sea::Sea::new(sea_tables));
     }
     if let Some(tables) = tables {
+        weight::init(&mut sim.world);
         spawn_actors(&mut sim.world, tables);
     }
     let spawn = area.spawn;
