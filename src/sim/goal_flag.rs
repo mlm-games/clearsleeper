@@ -192,7 +192,7 @@ impl RacePaths {
     }
 }
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GoalFlagProc {
     None,
     RaceStart,
@@ -358,7 +358,7 @@ impl GoalFlag {
     pub fn create_heap(&mut self) -> bool {
         let mut needed = 0u32;
         for i in 0..self.num_ropes.clamp(0, ROPE_COUNT as i32) as usize {
-            let segments = (self.num_rope_buoys[i].max(0) << 2) + 1;
+            let segments = (self.num_rope_buoys[i].clamp(0, ROPE_MAX_BUOYS) << 2) + 1;
             let bytes = u32::try_from(segments).unwrap_or(u32::MAX);
             needed = needed.saturating_add(bytes.saturating_mul(ROPE_BYTES_PER_SEGMENT));
         }
@@ -370,7 +370,7 @@ impl GoalFlag {
         let down_offset = ROPE_DOWN_OFFSET;
         for i in 0..self.num_ropes.clamp(0, ROPE_COUNT as i32) as usize {
             let start = self.rope_pos(i, 0);
-            let buoys = self.num_rope_buoys[i].max(0);
+            let buoys = self.num_rope_buoys[i].clamp(0, ROPE_MAX_BUOYS);
             self.set_rope_pos(i, buoys as usize, start);
             for j in 0..(buoys << 2) {
                 let interpolated_point = j & 3;
@@ -402,7 +402,7 @@ impl GoalFlag {
         out: &mut Vec<BuoyRaceSpawn>,
     ) {
         for i in 0..self.num_ropes.clamp(0, ROPE_COUNT as i32) as usize {
-            let buoys = self.num_rope_buoys[i].max(0);
+            let buoys = self.num_rope_buoys[i].clamp(0, ROPE_MAX_BUOYS);
             let points: Vec<Vec3> = match paths.get(self.rope_path_ids[i], room) {
                 Some(path) => path.points.clone(),
                 None => Vec::new(),
@@ -738,11 +738,11 @@ fn sub_factor(dst: &mut Vec3, pos: Vec3, other: Vec3, ideal: f32, stiffness: f32
 }
 
 fn ssin(angle: i32) -> f32 {
-    (angle as f32 * RAD_PER_UNIT).sin()
+    ((angle as i16) as f32 * RAD_PER_UNIT).sin()
 }
 
 fn scos(angle: i32) -> f32 {
-    (angle as f32 * RAD_PER_UNIT).cos()
+    ((angle as i16) as f32 * RAD_PER_UNIT).cos()
 }
 
 fn norm_zp(v: Vec3) -> Vec3 {
@@ -786,7 +786,6 @@ pub const MGAME_STATUS_START_CHECK_TRUE: u8 = 2;
 pub const MGAME_STATUS_START_CHECK_FALSE: u8 = 3;
 
 pub const MGAME_TERM_PARAM_1: i16 = 0;
-pub const MGAME_TERM_PARAM_2: i16 = 0;
 
 pub const BGM_SEA_GAME: u32 = 0x8000_000B;
 pub const BGM_SEA_GOAL: u32 = 0x8000_000C;
@@ -1148,7 +1147,6 @@ impl GoalFlag {
         procs: &mut MsgProcs,
         manager: &mut EventManager,
         timer: &mut IsleTimer,
-        mini: &mut MiniGame,
         next: &mut NextStage,
         hio: &Statics,
         trig_a: bool,
@@ -1174,7 +1172,6 @@ impl GoalFlag {
             EVENT_RACE_GOAL_CAM
         };
         let end_chk = manager.end_check_old(event_name);
-        let _ = mini;
 
         if end_chk
             || (i32::from(self.cam_frames_passed) > hio.end_cam_early_frame
@@ -1238,7 +1235,6 @@ impl GoalFlag {
                     procs,
                     manager,
                     timer,
-                    mini,
                     next,
                     hio,
                     trig_a,

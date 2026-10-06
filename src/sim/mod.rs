@@ -30,10 +30,10 @@ pub mod canon;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
+pub mod chest;
 pub mod carry;
 pub mod chuchu;
 pub mod cleared;
-pub mod chest;
 pub mod clock;
 pub mod collision;
 pub mod combat;
@@ -65,6 +65,7 @@ pub mod flags;
 pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
+pub mod goal_flag;
 pub mod majuu_flag;
 pub mod npc_nz;
 pub mod toripost;
@@ -174,10 +175,6 @@ pub mod npc_pf1;
 pub mod npc_p1;
 pub mod npc_uk;
 pub mod npc_tc;
-pub mod tagetc;
-pub mod dekuitem;
-pub mod ospbox;
-pub mod bwd;
 pub mod npc_ho;
 pub mod npc_hi1;
 pub mod npc_fa1;
@@ -552,20 +549,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if npc_fa1::is_npc_fa1(&source.name) {
         let v = npc_fa1::NpcFa1::spawn(source.parameters);
         world.spawn((actor, v)).id()
-    } else if tagetc::is_tagetc(&source.name) {
-        let v = tagetc::TagEtc::spawn(source.parameters);
-        world.spawn((actor, v)).id()
-    } else if dekuitem::is_dekuitem(&source.name) {
-        let v = dekuitem::DekuItem::spawn(source.parameters, world.resource::<flags::EventFlags>());
-        world.spawn((actor, v)).id()
-    } else if ospbox::is_ospbox(&source.name) {
-        let v = ospbox::Ospbox::spawn(source.parameters);
-        world.spawn((actor, v)).id()
     } else if toripost::is_toripost(&source.name) {
         let v = toripost::Toripost::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if majuu_flag::is_majuu_flag(&source.name) {
         let v = majuu_flag::MajuuFlag::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if goal_flag::is_goal_flag(&source.name) {
+        let v = goal_flag::GoalFlag::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
@@ -594,6 +585,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == tingle::TINGLE_ACTOR {
         let home = actor.pos;
         world.spawn((actor, tingle::Tingle::spawn(home))).id()
+    } else if chest::is_chest(&source.name) {
+        let box_ = chest::Chest::spawn(source.parameters, source.angle[2], source.room);
+        world.spawn((actor, box_)).id()
     } else if stone::is_stone(&source.name) {
         let rock = stone::Stone::spawn(source.parameters);
         world.spawn((actor, rock, carry::Carryable::Stone)).id()
@@ -1221,6 +1215,11 @@ pub fn build(
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
+    sim.world.insert_resource(goal_flag::Statics::default());
+    sim.world.insert_resource(goal_flag::RacePaths::default());
+    sim.world.insert_resource(goal_flag::StartStagePoint::default());
+    sim.world.insert_resource(goal_flag::MiniGame::default());
+    sim.world.insert_resource(goal_flag::SaraceShip::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1273,6 +1272,11 @@ pub fn build(
     });
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
+    sim.world.insert_resource(goal_flag::Statics::default());
+    sim.world.insert_resource(goal_flag::RacePaths::default());
+    sim.world.insert_resource(goal_flag::StartStagePoint::default());
+    sim.world.insert_resource(goal_flag::MiniGame::default());
+    sim.world.insert_resource(goal_flag::SaraceShip::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1509,6 +1513,7 @@ pub fn build(
                 npc_fa1::control.in_set(WwSimSet::Execute),
                 toripost::control.in_set(WwSimSet::Execute),
                 majuu_flag::control.in_set(WwSimSet::Execute),
+                goal_flag::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -1568,7 +1573,6 @@ pub fn build(
                 wind::control.in_set(WwSimSet::Execute),
                 homen::control.in_set(WwSimSet::Execute),
                 leaves::control.in_set(WwSimSet::Execute),
-                ospbox::control.in_set(WwSimSet::Execute),
                 swpush::control.in_set(WwSimSet::Execute),
                 mflft::control.in_set(WwSimSet::Execute),
                 hmlif::control.in_set(WwSimSet::Execute),
@@ -1679,8 +1683,6 @@ pub fn build(
                 vfan::control.in_set(WwSimSet::Execute),
                 htobi3::control.in_set(WwSimSet::Execute),
                 branch::control.in_set(WwSimSet::Execute),
-                tagetc::control.in_set(WwSimSet::Execute),
-                dekuitem::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (hami3::control.in_set(WwSimSet::Execute),
@@ -1696,4 +1698,3 @@ pub fn build(
 }
 
 pub mod auction;
-pub mod goal_flag;
