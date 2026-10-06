@@ -88,6 +88,7 @@ pub mod ganon_form3;
 pub mod goal_flag;
 pub mod majuu_flag;
 pub mod npc_nz;
+pub mod obj_doguu;
 pub mod toripost;
 pub mod touseki;
 pub mod toge;
@@ -554,6 +555,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if bmdhand::is_bmdhand(&source.name) {
         let t = bmdhand::Bmdhand::spawn(source.parameters);
         world.spawn((actor, t)).id()
+    } else if obj_doguu::is_obj_doguu(&source.name) {
+        let v = obj_doguu::ObjDoguu::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1456,6 +1460,10 @@ pub fn build(
     sim.world.insert_resource(dr2::Dr2Hio::default());
     sim.world.insert_resource(bmdhand::BmdhandHio::default());
     sim.world.insert_resource(bmdhand::BmdhandStatics::default());
+    sim.world.insert_resource(obj_doguu::PointLights::default());
+    sim.world.insert_resource(obj_doguu::AllColRatio::default());
+    sim.world.insert_resource(obj_doguu::ParticleSets::default());
+    sim.world.insert_resource(obj_doguu::LightInfluence::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1524,6 +1532,10 @@ pub fn build(
     sim.world.insert_resource(dr2::Dr2Hio::default());
     sim.world.insert_resource(bmdhand::BmdhandHio::default());
     sim.world.insert_resource(bmdhand::BmdhandStatics::default());
+    sim.world.insert_resource(obj_doguu::PointLights::default());
+    sim.world.insert_resource(obj_doguu::AllColRatio::default());
+    sim.world.insert_resource(obj_doguu::ParticleSets::default());
+    sim.world.insert_resource(obj_doguu::LightInfluence::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1785,6 +1797,7 @@ pub fn build(
                 toripost::control.in_set(WwSimSet::Execute),
                 majuu_flag::control.in_set(WwSimSet::Execute),
                 goal_flag::control.in_set(WwSimSet::Execute),
+                obj_doguu::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
