@@ -20,7 +20,6 @@ pub fn is_obj_hha(name: &str) -> bool {
     OBJ_HHA_ACTORS.contains(&name)
 }
 
-pub const ARC: &str = "Hha";
 
 pub const EVENT_HHA_CLOSE: &str = "hha_close";
 pub const EVENT_INFO_NONE: u8 = 0xFF;
@@ -126,10 +125,6 @@ pub const BTL_MODE_LOOP: u32 = 0;
 pub const BTL_MODE_NONE: u32 = 1;
 pub const BTK_MODE_TABLE: [u32; 2] = [BTL_MODE_LOOP, BTL_MODE_NONE];
 pub const BTL_FRAME_STEP: f32 = 1.0;
-pub const YGUSH_FRAME_STEP: f32 = 1.0;
-pub const BTL_MAX_FRAME_TABLE: [f32; 2] = [672.0, 672.0];
-pub const YGUSH_BTK_FRAME_MAX: f32 = 800.0;
-pub const YGUSH_BCK_FRAME_MAX: f32 = 512.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BgwVolume {
@@ -195,22 +190,7 @@ impl BgwSets {
         }
     }
 
-    pub fn pos_of(&self, entity: Entity, slot: usize) -> Option<Vec3> {
-        self.slot_of(entity, slot)
-            .map(|index| self.live[index].pos)
-    }
-
-    pub fn contains(&self, point: Vec3) -> bool {
-        self.live.iter().any(|volume| {
-            volume.used
-                && (point - volume.pos).length() <= BGWW_RADIUS
-                && (point.y - volume.pos.y).abs() <= BGWW_HALF_HEIGHT
-        })
-    }
 }
-
-pub const BGWW_RADIUS: f32 = 570.0;
-pub const BGWW_HALF_HEIGHT: f32 = 50.0;
 
 #[derive(Resource, Debug, Default)]
 pub struct SplashSets {
@@ -727,8 +707,6 @@ pub struct HhaYgush {
     pub scale: Vec3,
     pub rot: [i16; 3],
     pub visible: bool,
-    pub btk_frame: f32,
-    pub bck_frame: f32,
 }
 
 impl Default for HhaYgush {
@@ -739,8 +717,6 @@ impl Default for HhaYgush {
             scale: Vec3::ONE,
             rot: [0; 3],
             visible: false,
-            btk_frame: 0.0,
-            bck_frame: 0.0,
         }
     }
 }
@@ -760,8 +736,6 @@ impl HhaYgush {
         self.rot = p_angle;
         self.scale = p_scale;
         self.visible = is_visible != 0;
-        self.btk_frame = 0.0;
-        self.bck_frame = 0.0;
     }
 
     pub fn check_draw(&self) -> bool {
@@ -786,18 +760,6 @@ impl HhaYgush {
 
     pub fn anm_play(&mut self, pos: Vec3) {
         self.set_pos(pos);
-        self.btk_frame += YGUSH_FRAME_STEP;
-        self.bck_frame += YGUSH_FRAME_STEP;
-        self.wrap();
-    }
-
-    pub fn wrap(&mut self) {
-        if self.btk_frame > YGUSH_BTK_FRAME_MAX {
-            self.btk_frame = 0.0;
-        }
-        if self.bck_frame > YGUSH_BCK_FRAME_MAX {
-            self.bck_frame = 0.0;
-        }
     }
 
     pub fn model_translation(&self) -> Vec3 {
@@ -912,8 +874,6 @@ pub struct ObjHha {
     pub btk: [BtlAnm; 2],
     pub cyl: HhaCyl,
     pub sph: HhaSph,
-    pub health: i32,
-    pub max_health: i32,
 }
 
 impl ObjHha {
@@ -945,8 +905,6 @@ impl ObjHha {
             btk: [BtlAnm::default(); 2],
             cyl: HhaCyl::SRC,
             sph: HhaSph::SRC,
-            health: 0,
-            max_health: 0,
         }
     }
 
@@ -1021,9 +979,11 @@ impl ObjHha {
         }
         for index in 0..self.btk.len() {
             let mode = BTK_MODE_TABLE.get(index).copied().unwrap_or(BTL_MODE_LOOP);
-            let max_frame = BTL_MAX_FRAME_TABLE.get(index).copied().unwrap_or(0.0);
+            // `mBtkA[i].play()` (`d_a_obj_hha.cpp:563`) reads `getFrameMax()` from the BTK
+            // archive, which is not in this checkout, so every max frame is 0.0 and
+            // `BtlAnm::play`'s `max_frame <= 0.0` guard never advances the frame.
             if let Some(btk) = self.btk.get_mut(index) {
-                btk.init(mode, max_frame);
+                btk.init(mode, 0.0);
             }
         }
         self.part_timer = PART_TIMER_IDLE;
