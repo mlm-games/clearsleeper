@@ -65,6 +65,7 @@ pub mod flags;
 pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
+pub mod npc_nz;
 pub mod touseki;
 pub mod gaship;
 pub mod gbed;
@@ -529,6 +530,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if bwds::is_bwds(&source.name) {
         let v = bwds::Bwds::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_nz::is_npc_nz(&source.name) {
+        let v = npc_nz::NpcNz::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
@@ -1189,6 +1193,7 @@ pub fn build(
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
     sim.world.insert_resource(bwds::Statics::default());
+    sim.world.insert_resource(npc_nz::Statics::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -1464,6 +1469,7 @@ pub fn build(
                 zunari::control.in_set(WwSimSet::Execute),
                 grammarian::control.in_set(WwSimSet::Execute),
                 apzl::control.in_set(WwSimSet::Execute),
+                npc_nz::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
