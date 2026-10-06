@@ -929,11 +929,11 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
         4 => {
-            let s = (v * 0x8000_f32 * 0.5).sin();
+            let s = (v * 0x8000_u16 as f32 * 0.5).sin();
             s * s
         }
         5 => {
-            let s = (v * 0xFFFF_f32 * 0.5).sin();
+            let s = (v * 0xFFFF_u16 as f32 * 0.5).sin();
             s * s
         }
         _ => v,
@@ -1485,30 +1485,30 @@ pub struct WarpEmitter {
 }
 
 macro_rules! push_mut {
-    ($list:ident, $($field:ident),* $(,)?) => {
-        $( $list.push(&mut self.$field); )*
+    ($base:tt, $list:ident, $($field:ident),* $(,)?) => {
+        $( $list.push(&mut $base.$field); )*
     };
 }
 
 macro_rules! extend_mut {
-    ($list:ident, $($field:ident),* $(,)?) => {
-        $( $list.extend(self.$field.iter_mut()); )*
+    ($base:tt, $list:ident, $($field:ident),* $(,)?) => {
+        $( $list.extend($base.$field.iter_mut()); )*
     };
 }
 
 macro_rules! push_ref {
-    ($list:ident, $($field:ident),* $(,)?) => {
-        $( $list.push(&self.$field); )*
+    ($base:tt, $list:ident, $($field:ident),* $(,)?) => {
+        $( $list.push(&$base.$field); )*
     };
 }
 
 macro_rules! extend_ref {
-    ($list:ident, $($field:ident),* $(,)?) => {
-        $( $list.extend(self.$field.iter()); )*
+    ($base:tt, $list:ident, $($field:ident),* $(,)?) => {
+        $( $list.extend($base.$field.iter()); )*
     };
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct MapPanes {
     pub fddm: MapPane,
     pub cl: MapPane,
@@ -1569,6 +1569,72 @@ pub struct MapPanes {
     pub wt0: MapPane,
     pub wt1: MapPane,
     pub gs: [MapPane; 7],
+}
+
+impl Default for MapPanes {
+    fn default() -> Self {
+        Self {
+            fddm: MapPane::default(),
+            cl: MapPane::default(),
+            area: MapPane::default(),
+            ci22: MapPane::default(),
+            ci21: MapPane::default(),
+            ci32: MapPane::default(),
+            ci31: MapPane::default(),
+            gti: std::array::from_fn(|_| MapPane::default()),
+            kk1: std::array::from_fn(|_| MapPane::default()),
+            kk3: std::array::from_fn(|_| MapPane::default()),
+            kkdm: MapPane::default(),
+            smsk: MapPane::default(),
+            lnk1: MapPane::default(),
+            spi1: MapPane::default(),
+            lnk2: MapPane::default(),
+            spi2: MapPane::default(),
+            lnk3: MapPane::default(),
+            spi3: MapPane::default(),
+            sc1: std::array::from_fn(|_| MapPane::default()),
+            sc2: std::array::from_fn(|_| MapPane::default()),
+            fmx: std::array::from_fn(|_| MapPane::default()),
+            fmn: std::array::from_fn(|_| MapPane::default()),
+            tsw1: MapPane::default(),
+            r01b: MapPane::default(),
+            r01g: MapPane::default(),
+            stm1: MapPane::default(),
+            stl1: MapPane::default(),
+            stx: std::array::from_fn(|_| MapPane::default()),
+            mr01: MapPane::default(),
+            ktx1: MapPane::default(),
+            ktx2: MapPane::default(),
+            clb: MapPane::default(),
+            clb2: MapPane::default(),
+            clg: MapPane::default(),
+            ck1: std::array::from_fn(|_| MapPane::default()),
+            ck2: std::array::from_fn(|_| MapPane::default()),
+            ck3: std::array::from_fn(|_| MapPane::default()),
+            kr0: std::array::from_fn(|_| MapPane::default()),
+            r0x: std::array::from_fn(|_| MapPane::default()),
+            wnd1: MapPane::default(),
+            wnd2: MapPane::default(),
+            area_txt: std::array::from_fn(|_| MapPane::default()),
+            bt00: MapPane::default(),
+            bt01: MapPane::default(),
+            bt02: MapPane::default(),
+            wts1: MapPane::default(),
+            cc01: MapPane::default(),
+            ys01: MapPane::default(),
+            ys00: MapPane::default(),
+            ysk0: MapPane::default(),
+            yes: MapPane::default(),
+            no01: MapPane::default(),
+            no00: MapPane::default(),
+            nok0: MapPane::default(),
+            no: MapPane::default(),
+            cur1: MapPane::default(),
+            wt0: MapPane::default(),
+            wt1: MapPane::default(),
+            gs: std::array::from_fn(|_| MapPane::default()),
+        }
+    }
 }
 
 impl MapPanes {
@@ -1675,6 +1741,7 @@ impl MapPanes {
     pub fn all_mut(&mut self) -> Vec<&mut MapPane> {
         let mut list: Vec<&mut MapPane> = Vec::new();
         push_mut!(
+            self,
             list,
             fddm,
             cl,
@@ -1721,14 +1788,15 @@ impl MapPanes {
             wt0,
             wt1,
         );
-        extend_mut!(list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
-        extend_mut!(list, area_txt, gs);
+        extend_mut!(self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
+        extend_mut!(self, list, area_txt, gs);
         list
     }
 
     pub fn all(&self) -> Vec<&MapPane> {
         let mut list: Vec<&MapPane> = Vec::new();
         push_ref!(
+            self,
             list,
             fddm,
             cl,
@@ -1775,8 +1843,8 @@ impl MapPanes {
             wt0,
             wt1,
         );
-        extend_ref!(list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
-        extend_ref!(list, area_txt, gs);
+        extend_ref!(self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
+        extend_ref!(self, list, area_txt, gs);
         list
     }
 
@@ -2148,7 +2216,6 @@ pub struct MapTearDown {
     pub release_tuning: bool,
 }
 
-#[derive(Clone, Debug)]
 pub struct SeaMapScreen {
     pub tuning: Tuning,
     pub save: SaveState,
@@ -2760,7 +2827,7 @@ impl SeaMapScreen {
                         self.tuning.korok_mark_white,
                     );
                 }
-                self.panes.kr0[index].change_texture(KOROG_STATS[usize::from(stat)]);
+                self.panes.kr0[index].change_texture(KOROK_STATS[usize::from(stat)]);
                 self.panes.kr0[index].show();
                 if ctx.flags.has_bottle(ITEM_FOREST_WATER) {
                     self.panes.kr0[index].init_alpha = 0xC0;
@@ -2929,7 +2996,7 @@ impl SeaMapScreen {
     pub fn salvage_get_item_chg(&mut self) {
         if self.salv_itm_changing {
             let alpha = self.pane_alpha_selvage_item(
-                i32::from(self.salv_itm_timer),
+                i16::from(self.salv_itm_timer),
                 self.tuning.area_text_alpha_frame,
             );
             self.salv_itm_timer = self.salv_itm_timer.wrapping_add(1);

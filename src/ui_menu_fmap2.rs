@@ -627,8 +627,8 @@ pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
         0 => v * v,
         1 => v.sqrt(),
         3 => (v * 2.0 - 1.0) * 2.0 - 1.0,
-        4 => (v * 0x8000_f32 * 0.5).sin() * (v * 0x8000_f32 * 0.5).sin(),
-        5 => (v * 0xFFFF_f32 * 0.5).sin() * (v * 0xFFFF_f32 * 0.5).sin(),
+        4 => (v * 0x8000_u16 as f32 * 0.5).sin() * (v * 0x8000_u16 as f32 * 0.5).sin(),
+        5 => (v * 0xFFFF_u16 as f32 * 0.5).sin() * (v * 0xFFFF_u16 as f32 * 0.5).sin(),
         _ => v,
     }
 }

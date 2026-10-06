@@ -213,7 +213,7 @@ pub const BOSS_DOOR_NAME_B: &str = "door12";
 pub const BOSS_DOOR_Z_ANGLE_A: i16 = 12;
 pub const BOSS_DOOR_Z_ANGLE_B: i16 = 9;
 
-pub const S2DEG_CONSTANT: f32 = 180.0 / 0x8000;
+pub const S2DEG_CONSTANT: f32 = 180.0 / 0x8000_u16 as f32;
 pub const DEG2S_CONSTANT: f32 = 32768.0 / 180.0;
 
 pub const STICK_FIRST: i16 = 5;
@@ -469,7 +469,7 @@ pub fn is_boss_door(name: &str, angle: [i16; 3]) -> bool {
         return true;
     }
     if name == BOSS_DOOR_NAME_B {
-        match ((u32::from(angle[2]) >> 8) & 0xFF) as i16 {
+        match ((u32::from(angle[2] as u16) >> 8) & 0xFF) as i16 {
             BOSS_DOOR_Z_ANGLE_A | BOSS_DOOR_Z_ANGLE_B => return true,
             _ => {}
         }
@@ -534,10 +534,10 @@ pub fn message_name_walk(
             let width = font_char_width(font, slot, code);
             if !first {
                 str_width =
-                    scale * (f32::from(width) + f32::from(font_char_offset(font, slot, code)));
+                    scale * (width as f32 + font_char_offset(font, slot, code) as f32);
                 first = true;
             } else {
-                str_width += f32::from(width) * scale;
+                str_width += width as f32 * scale;
             }
         }
     }
@@ -589,7 +589,7 @@ pub struct ContentsColor {
     pub br: [u8; 4],
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DrawItem {
     pub tag: &'static str,
     pub kind: Kind,
@@ -604,6 +604,26 @@ pub struct DrawItem {
     pub color: [u8; 4],
     pub color_black: [u8; 4],
     pub blend: [f32; 4],
+}
+
+impl Default for DrawItem {
+    fn default() -> Self {
+        Self {
+            tag: "",
+            kind: Kind::Picture,
+            visible: false,
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+            alpha: 0,
+            rotation: 0,
+            texture: None,
+            color: [0, 0, 0, 0],
+            color_black: [0, 0, 0, 0],
+            blend: [0.0, 0.0, 0.0, 0.0],
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2043,7 +2063,7 @@ impl DungeonMap {
         self.panes.boss.user_area = 100;
         self.panes.bos2.user_area = (self.rng.rnd_f(200.0) + 300.0) as i16;
         self.boss_eye_state = 0;
-        self.boss_eye_timer = ((self.rng.rnd_f(18.0) + 40.0) as i32) << 1;
+        self.boss_eye_timer = (((self.rng.rnd_f(18.0) + 40.0) as i32) << 1) as i16;
 
         let it_w = self.panes.it[0].size_orig.x;
         let it_h = self.panes.it[0].size_orig.y;
@@ -2184,7 +2204,7 @@ impl DungeonMap {
             let floor = env.floors.floor_no(dentry.base.position[1]);
             let room_a = i32::from(dentry.base.angle[0]) & DOOR_ROOM_MASK;
             let room_b =
-                (u32::from(dentry.base.angle[0]) >> DOOR_ROOM_SHIFT) as i32 & DOOR_ROOM_MASK;
+                (u32::from(dentry.base.angle[0] as u16) >> DOOR_ROOM_SHIFT) as i32 & DOOR_ROOM_MASK;
             if self.cur_floor == floor {
                 if env.has_map() || env.is_visited_room(room_a) || env.is_visited_room(room_b) {
                     self.place_door(origin_x, origin_z, scale, dentry);
@@ -3076,8 +3096,8 @@ impl DungeonMap {
         self.dummy_buf[1] = msg.out[3].clone().unwrap_or_default();
         self.msg = msg;
 
-        self.panes.st00.set_string(self.note_buf[0].clone());
-        self.panes.str0.set_string(self.note_buf[1].clone());
+        self.panes.st00.set_string(&self.note_buf[0]);
+        self.panes.str0.set_string(&self.note_buf[1]);
 
         let half_space = self.panes.st00.get_line_space() / 2.0;
         for i in 0..OUT_FONT_COUNT {
@@ -3099,7 +3119,7 @@ impl DungeonMap {
                 self.msg.icon_pos_x.get(i).copied().unwrap_or(0) as f32;
             self.panes.ft[i].pos_top_left.y = half_space
                 * (unused_lines as f32
-                    + f32::from(self.msg.icon_pos_y.get(i).copied().unwrap_or(0)) * 2.0);
+                    + (self.msg.icon_pos_y.get(i).copied().unwrap_or(0) as f32) * 2.0);
             self.panes.ft[i].pos_top_left_orig.y = f32::from(icon_no);
 
             let slot = out_font_slot(icon_no);
