@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 
+use super::cam_follow::{self, CamSetup, Follow, FollowInput, SAngle, ViewCache};
 use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
 use super::cam_type::{TYPE_FIELD, TYPES, type_index};
 
@@ -102,6 +103,19 @@ impl View {
         self.refresh();
     }
 
+    /// The aim `dCamera_c` publishes after its engine runs: `mCenter`, `mEye`, `mUp` and
+    /// `mBank` for the look-at, `mFovy` converted from the degrees `mViewCache` keeps.
+    pub fn aim_rolled(&mut self, eye: Vec3, center: Vec3, up: Vec3, fovy: f32, bank: f32) {
+        let forward = (center - eye).normalize_or_zero();
+        self.lookat = LookAt {
+            eye,
+            center,
+            up: up.normalize_or_zero().rotate_axis(forward, bank),
+        };
+        self.fovy = fovy;
+        self.refresh();
+    }
+
     pub fn set_fovy(&mut self, fovy: f32) {
         self.fovy = fovy;
         self.refresh();
@@ -134,6 +148,25 @@ pub struct Camera {
     pub forced_type: Option<usize>,
     /// `dCamera_c::m528`, the actor a forced type is aimed at.
     pub forced_owner: Option<Entity>,
+    /// `dCamera_c::mViewCache`: the eye, the point it looks at and the globe joining them.
+    pub view_cache: ViewCache,
+    /// `dCamera_c::mWork.follow`, the follow engine's cross-frame placement state.
+    pub follow: Follow,
+    /// `dCamera_c::mCamSetup`, narrowed to what the engines read.
+    pub setup: CamSetup,
+    /// `dCamera_c::m108`, the frames since the placement was last restarted.
+    pub age: u32,
+    /// `dCamera_c::m100` with `m101` and `m102`, which `followCamera` always writes together.
+    pub settled: bool,
+    /// `dCamera_c::mAngleY`, the camera's own yaw channel, `d_camera.cpp:857-862`.
+    pub angle_y: SAngle,
+    /// This port's own free yaw, staged for this frame only: the debug orbit's movement and the
+    /// sub-stick's. The follow engine adds it to the placement's own longitude and clears it.
+    /// Retail reaches its free yaw through `mAngleY`, which `d_camera.cpp:861` derives from the
+    /// direction itself, so whatever steered it from outside is not in the readable text.
+    pub yaw_trim: SAngle,
+    /// The orbit yaw last folded into [`Camera::yaw_trim`], so only its movement counts.
+    pub orbit_yaw: f32,
 }
 
 impl Default for Camera {
@@ -148,6 +181,14 @@ impl Default for Camera {
             current_style: cam_style::NONE,
             forced_type: None,
             forced_owner: None,
+            view_cache: ViewCache::default(),
+            follow: Follow::default(),
+            setup: CamSetup::default(),
+            age: 0,
+            settled: false,
+            angle_y: SAngle::ZERO,
+            yaw_trim: SAngle::ZERO,
+            orbit_yaw: 0.0,
         };
         camera.set_style(TYPE_FIELD, 0);
         camera
@@ -218,6 +259,7 @@ impl Camera {
         if base == cam_style::PARAM_UNSET {
             return;
         }
+        self.view_cache.fovy = base;
         if let Some(view) = self.view_mut() {
             view.set_fovy(base.to_radians());
         }
@@ -304,26 +346,47 @@ fn row(m: &Mat4, index: usize, v: Vec3) -> f32 {
     let r = m.to_cols_array();
     r[index * 4] * v.x + r[index * 4 + 1] * v.y + r[index * 4 + 2] * v.z + r[index * 4 + 3]
 }
+
+/// The sub-stick's contribution to the free yaw, in degrees at full deflection, and the gate
+/// below which it counts as centred. Retail routes the pad into `mAngleY`, which
+/// `d_camera.cpp:851-862` feeds from a camera flag the sim does not carry, so this trim and its
+/// rate are this port's own.
+const C_STICK_YAW: f32 = 3.0;
+const C_STICK_GATE: f32 = 0.2;
+
 /// Retail's camera trails the player along `mLookat`, so the projection the scope and the
 /// `pos2camera` reads depend on where the view is actually aimed. Scheduled ahead of the
 /// actor systems so every same-tick read sees this tick's view.
+///
+/// The active style drives the placement: its own radii, latitude, blend rates and field of
+/// view, smoothed the way `dCamera_c::followCamera` smooths them. The debug orbit and the
+/// sub-stick fold a free yaw in on top of that, which retail's pull chase then pulls back
+/// onto the player's back.
 pub fn track(
-    yaw: Res<super::intent::CameraYaw>,
+    orbit: Res<super::intent::CameraYaw>,
+    sub: Res<super::intent::CStick>,
+    main: Res<super::intent::MoveIntent>,
+    status: Res<super::player_status::PlayerStatus>,
     players: Query<&super::player::Player>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
         return;
     };
-    let Some(view) = camera.view_mut() else {
-        return;
+    let orbit_delta = (orbit.0 - camera.orbit_yaw).to_degrees();
+    camera.orbit_yaw = orbit.0;
+    let turn = if sub.value() > C_STICK_GATE {
+        sub.axis.x * C_STICK_YAW
+    } else {
+        0.0
     };
-    let yaw = yaw.0;
-    let back = Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) * DIST_BACK;
-    let eye = player.pos + Vec3::new(0.0, HEIGHT_EYE, 0.0) + back;
-    view.aim(eye, player.pos + Vec3::new(0.0, HEIGHT_CENTER, 0.0), Vec3::Y);
+    camera.yaw_trim += SAngle::from_degrees(orbit_delta + turn);
+    cam_follow::follow(
+        &mut camera,
+        player,
+        &FollowInput {
+            main: main.axis,
+            status: &status,
+        },
+    );
 }
-
-const DIST_BACK: f32 = 300.0;
-const HEIGHT_EYE: f32 = 120.0;
-const HEIGHT_CENTER: f32 = 40.0;
