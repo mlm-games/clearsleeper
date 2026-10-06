@@ -1,4 +1,6 @@
 use bevy_ecs::prelude::*;
+
+use super::ki;
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
@@ -3296,7 +3298,6 @@ pub struct Watch<'w, 's> {
     others: Query<'w, 's, (Entity, &'static Actor), Without<PuppetGanon>>,
 }
 
-pub const KEESE_ACTORS: [&str; 2] = ["keeth", "Fkeeth"];
 pub const KEESE_SPAWN_NAME: &str = "keeth";
 pub const KEESE_SPAWN_PARAMETERS: u32 = 0xFFFF_0003;
 pub const BODY_2_ACTOR: &str = "Bgn2";
@@ -3359,7 +3360,7 @@ pub fn control(
     let mut anchor = Anchor::ZERO;
     let mut follow = Vec3::ZERO;
     for (_, other) in watch.others.iter() {
-        if KEESE_ACTORS.contains(&other.name.as_str()) {
+        if super::ki::is_ki(&other.name) {
             live += 1;
         } else if other.name == BODY_2_ACTOR {
             anchor.x = other.pos.x;
@@ -3422,7 +3423,7 @@ pub fn control(
     }
     if wipe_keese {
         for (entity, other) in watch.others.iter() {
-            if KEESE_ACTORS.contains(&other.name.as_str()) {
+            if super::ki::is_ki(&other.name) {
                 pending.push(entity);
             }
         }

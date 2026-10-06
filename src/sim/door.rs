@@ -433,16 +433,14 @@ impl Door {
         self.bit() != NO_SWITCH && switches.test(self.bit())
     }
 
+    /// `chkStopOpen` re-arms `m2A1` to `0x41` on every failure path
+    /// (`d_a_door12.cpp:174`, and again in `CreateInit` at `:556`) and only
+    /// counts it down when the room is displayed and holds no enemy
+    /// (`:163-165`). There is no `getArg1()` value anywhere in the door family
+    /// (`d_a_door10.cpp:486-509`, `d_a_door12.cpp:40,89,143,197,385,408`) that
+    /// skips the countdown, so the re-arm delay is unconditional.
     pub fn reopen_delay(&self) -> u8 {
-        if self.instant() {
-            0
-        } else {
-            DELAY_FRAMES
-        }
-    }
-
-    pub fn instant(&self) -> bool {
-        self.arg1 == INSTANT_ARG
+        DELAY_FRAMES
     }
 }
 

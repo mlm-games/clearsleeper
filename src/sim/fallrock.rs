@@ -50,22 +50,19 @@ const CYL_RADIUS: f32 = 90.0; // <- d_a_fallrock.cpp:205 (scale.x * 90.0f, scale
 const HEAVY_SCALE: f32 = 1.3; // <- d_a_fallrock.cpp:124, :145
 
 const SE_BREAK_ROCK: u32 = 0x692C; // <- d_a_fallrock.cpp:117 (JA_SE_OBJ_BREAK_ROCK)
-const SE_FALL_WATER_M: u32 = 0x6919; // <- d_a_fallrock.cpp:125 (JA_SE_OBJ_FALL_WATER_M)
-const SE_FALL_WATER_L: u32 = 0x691A; // <- d_a_fallrock.cpp:127 (JA_SE_OBJ_FALL_WATER_L)
 const SE_FALL_MAGMA_M: u32 = 0x691C; // <- d_a_fallrock.cpp:146 (JA_SE_OBJ_FALL_MAGMA_M)
 const SE_FALL_MAGMA_L: u32 = 0x691D; // <- d_a_fallrock.cpp:148 (JA_SE_OBJ_FALL_MAGMA_L)
 
 /// `fopAc_CULLBOX_0_e` (`d_a_fallrock.cpp:314`) resolves through `l_cullSizeBox[0]`
-/// (`f_op_actor_mng.cpp:559`).
-const CULL_MIN: [f32; 3] = [-40.0, 0.0, -40.0]; // <- f_op_actor_mng.cpp:559 (fopAc_CULLBOX_0_e)
-const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:559 (fopAc_CULLBOX_0_e)
+/// (`f_op_actor_mng.cpp:559`), i.e. `(-40, 0, -40)..(40, 125, 40)`. The existing `src/lib.rs`
+/// `actor_views` branch sizes the rock from `mCyl` instead, which is why there is no `cull()` here.
 
-/// The three impacts `execute` can report. Each maps to one `fopAcM_seStart` site and one
-/// `setParticle` arm.
+/// The impacts `execute` can report. Each maps to one `fopAcM_seStart` site and one
+/// `setParticle` arm. The water impact (`:123-133`) is OMITTED - see the module docs - so
+/// `JA_SE_OBJ_FALL_WATER_M` (`:125`, `0x6919`) and `_L` (`:127`, `0x691A`) have no arm here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Impact {
     Ground,
-    Water,
     Magma,
 }
 
@@ -74,14 +71,12 @@ pub struct FallRock {
     /// `field_0x610` (`d_a_fallrock.h:36`), the `fabs(speed.y)` accumulator compared against
     /// `m_falllen` at `:109`.
     budget: f32,
-    /// `field_0x614` (`d_a_fallrock.h:37`), incremented once per `execute` at `:103` and read by
-    /// nothing in this translation unit, so only `Create`/`Delete` lifetime is implied by it.
-    frames: u32,
     /// `shape_angle.x`, chased by `cLib_chaseAngleS` at `:158`.
     tilt: i16,
     /// `deleted` (`:102`), the local that makes the four `fopAcM_delete` calls at `:111`, `:119`,
-    /// `:131` and `:154` mutually exclusive.
-    gone: bool,
+    /// `:131` and `:154` mutually exclusive. Read by the existing `src/lib.rs` `actor_views`
+    /// branch to hide a spent rock.
+    pub gone: bool,
     /// `scale.x`. RULE 2 fixes this at 1.0 for a stage-placed actor; it is kept because
     /// `hit_radius` / `hit_height` and the sound pair are all expressed through it.
     scale: f32,
@@ -97,7 +92,6 @@ impl FallRock {
     pub fn spawn(scale: f32) -> Self {
         Self {
             budget: 0.0,
-            frames: 0,
             tilt: 0,
             gone: false,
             scale,
@@ -125,21 +119,9 @@ impl FallRock {
     pub fn sound(&self, impact: Impact) -> u32 {
         match (impact, self.light()) {
             (Impact::Ground, _) => SE_BREAK_ROCK,
-            (Impact::Water, true) => SE_FALL_WATER_M,
-            (Impact::Water, false) => SE_FALL_WATER_L,
             (Impact::Magma, true) => SE_FALL_MAGMA_M,
             (Impact::Magma, false) => SE_FALL_MAGMA_L,
         }
-    }
-
-    pub fn gone(&self) -> bool {
-        self.gone
-    }
-
-    /// `fopAc_CULLBOX_0_e` (`d_a_fallrock.cpp:314`) -> `l_cullSizeBox[0]`
-    /// (`f_op_actor_mng.cpp:559`).
-    pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
-        (CULL_MIN, CULL_MAX)
     }
 
     /// `fopAcM_posMoveF(this, mStts.GetCCMoveP())` (`:105`) = `fopAcM_calcSpeed` +
@@ -197,7 +179,6 @@ pub fn control(
         if rock.gone {
             continue;
         }
-        rock.frames += 1;
         let before = actor.pos;
         let step = rock.integrate(actor.angle[1]);
         actor.pos += step;

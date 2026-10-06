@@ -8,6 +8,7 @@ pub mod area;
 pub mod amos_knight;
 pub mod amiprop;
 pub mod armos;
+pub mod arrowice;
 pub mod aryll;
 pub mod arrow;
 pub mod atttag;
@@ -61,6 +62,7 @@ pub mod event_manager;
 pub mod evsw;
 pub mod events;
 pub mod fallrock;
+pub mod fan;
 pub mod fire;
 pub mod figure;
 pub mod flags;
@@ -120,7 +122,6 @@ pub mod npc_ah;
 pub mod kalle_demos;
 pub mod quake;
 pub mod qtkhd;
-pub mod akabe;
 pub mod kamome;
 pub mod ktaruo;
 pub mod lamp;
@@ -128,6 +129,7 @@ pub mod kmon;
 pub mod kaji;
 pub mod kita;
 pub mod kn;
+pub mod ki;
 pub mod komore;
 pub mod kytag02;
 pub mod kytag00;
@@ -233,6 +235,7 @@ pub mod shop;
 pub mod sea;
 pub mod servant;
 pub mod ship;
+pub mod shelf;
 pub mod shmrgrd;
 pub mod stage_data;
 pub mod stalfos;
@@ -571,6 +574,23 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if hbrf1::is_hbrf1(&source.name) {
         let lift = hbrf1::Hbrf1::spawn(source.parameters, actor.pos);
         world.spawn((actor, lift)).id()
+    } else if fan::is_fan(&source.name) {
+        let v = fan::Fan::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if shelf::is_shelf(&source.name) {
+        let v = shelf::Shelf::spawn(source.parameters, actor.pos, actor.angle);
+        world.spawn((actor, v)).id()
+    } else if arrowice::is_arrowice(&source.name) {
+        let v = arrowice::ArrowIce::spawn();
+        world.spawn((actor, v)).id()
+    } else if knob00::is_knob00(&source.name) {
+        let v = knob00::Knob00::spawn(source.parameters, actor.angle);
+        world.spawn((actor, v)).id()
+    } else if ki::is_ki(&source.name) {
+        let v = ki::Ki::spawn(source.parameters, actor.pos);
+        world
+            .spawn((actor, v, combat::HitPoints(1), enemy::Hurt::default()))
+            .id()
     } else if toripost::is_toripost(&source.name) {
         let v = toripost::Toripost::spawn(source.parameters);
         world.spawn((actor, v)).id()
@@ -1459,7 +1479,10 @@ pub fn build(
                 canon::control.in_set(WwSimSet::Execute),
                 mbdoor::control.in_set(WwSimSet::Execute),
                 iceisland::control.in_set(WwSimSet::Execute),
+                fan::control.in_set(WwSimSet::Execute),
                 hbrf1::control.in_set(WwSimSet::Execute),
+                shelf::control.in_set(WwSimSet::Execute),
+                knob00::control.in_set(WwSimSet::Execute),
                 demokmm::control.in_set(WwSimSet::Execute),
                 komore::control.in_set(WwSimSet::Execute),
                 npc_pf1::control.in_set(WwSimSet::Execute),
@@ -1564,6 +1587,7 @@ pub fn build(
                 hop::control.in_set(WwSimSet::Execute),
                 schedule::control.in_set(WwSimSet::Execute),
                 esa::control.in_set(WwSimSet::Execute),
+                ki::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (combat::control.in_set(WwSimSet::Execute),
