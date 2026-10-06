@@ -20,6 +20,8 @@ pub mod balloon;
 pub mod barrier;
 pub mod barrel;
 pub mod bemos;
+pub mod bgn;
+pub mod bwd;
 pub mod bg;
 pub mod barricade;
 pub mod bgn3;
@@ -258,6 +260,7 @@ pub mod salvage;
 pub mod salvage_tbox;
 pub mod sage;
 pub mod scenery;
+pub mod sbox;
 pub mod scenechange;
 pub mod steamtag;
 pub mod schedule;
@@ -309,6 +312,7 @@ pub mod swpush;
 pub mod swpropeller;
 pub mod tag;
 pub mod tagba1;
+pub mod tagetc;
 pub mod tagmk;
 pub mod tagkb;
 pub mod tag_volcano;
@@ -341,6 +345,7 @@ pub mod vibration;
 pub mod vteng;
 pub mod vmsdz;
 pub mod warpfo;
+pub mod warpgn;
 pub mod walk;
 pub mod wall;
 pub mod wlvtag;
@@ -766,7 +771,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if eskban::is_eskban(&source.name) {
         let v = eskban::Eskban::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
-        } else if machine::is_machine(&source.name) {
+        } else if bwd::is_bwd(&source.name) {
+        world.spawn((actor, bwd::Bwd::spawn())).id()
+    } else if sbox::is_sbox(&source.name) {
+        world.spawn((actor, sbox::Sbox::spawn())).id()
+    } else if tagetc::is_tagetc(&source.name) {
+        world.spawn((actor, tagetc::Tagetc::spawn(source.parameters))).id()
+    } else if warpgn::is_warpgn(&source.name) {
+        world.spawn((actor, warpgn::Warpgn::spawn(source.parameters))).id()
+    } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
     } else if drift::is_drift(&source.name) {
         world.spawn((actor, drift::Drift::spawn(source.parameters))).id()
@@ -2048,6 +2061,12 @@ pub fn build(
                 stair::control.in_set(WwSimSet::Execute),
                 sail::control.in_set(WwSimSet::Execute),
                 ferris::control.in_set(WwSimSet::Execute),
+                bwd::control.in_set(WwSimSet::Execute),
+                sbox::control.in_set(WwSimSet::Execute),
+                tagetc::control.in_set(WwSimSet::Execute),
+                warpgn::control.in_set(WwSimSet::Execute),
+                canon2::control.in_set(WwSimSet::Execute),
+                ep::control.in_set(WwSimSet::Execute),
                 )
                 .chain(),
             (
@@ -2091,3 +2110,4 @@ pub mod warpdm20;
 pub mod ferris;
 pub mod sail;
 pub mod kui;
+pub mod tag_hint;
