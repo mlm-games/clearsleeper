@@ -1097,6 +1097,18 @@ impl App {
                 let (min, max) = doc.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::plant::Plant>() {
+                let (min, max) = sim::plant::Plant::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::amiprop::Amiprop>() {
+                let (min, max) = sim::amiprop::Amiprop::spawn(0, [0i16; 3]).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::msdansb::Msdansb>() {
+                let (min, max) = sim::msdansb::Msdansb::spawn(0, 0.0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];

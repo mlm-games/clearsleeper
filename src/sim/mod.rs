@@ -174,6 +174,15 @@ pub mod scenery;
 pub mod scenechange;
 pub mod steamtag;
 pub mod schedule;
+pub mod andsw0;
+pub mod andsw2;
+pub mod obj_nest;
+pub mod obj_paper;
+pub mod obj_rcloud;
+pub mod qdghd;
+pub mod sie_flag;
+pub mod syan;
+pub mod tori_flag;
 pub mod seatag;
 pub mod select;
 pub mod medli;
@@ -294,6 +303,20 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         set_id: source.set_id,
         room: source.room,
     };
+    } else if andsw0::is_andsw0(&source.name) {
+        andsw0::spawn(world, source)
+    } else if andsw2::is_andsw2(&source.name) {
+        andsw2::spawn(world, source)
+    } else if obj_nest::is_obj_nest(&source.name) {
+        obj_nest::spawn(world, source)
+    } else if obj_paper::is_obj_paper(&source.name) {
+        obj_paper::spawn(world, source)
+    } else if obj_rcloud::is_obj_rcloud(&source.name) {
+        obj_rcloud::spawn(world, source)
+    } else if sie_flag::is_sie_flag(&source.name) {
+        sie_flag::spawn(world, source)
+    } else if tori_flag::is_tori_flag(&source.name) {
+        tori_flag::spawn(world, source)
     if source.name == ship::SHIP_ACTOR {
         world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
     } else if source.name == enemy::ENEMY_ACTOR {
@@ -949,6 +972,11 @@ let mut sw = world.resource_mut::<flags::Switches>();
         let mut regs = world.resource_mut::<flags::StoryBits>();
         let v = warpt::Warpt::spawn(source.parameters, source.angle, &mut sw, &mut regs);
         world.spawn((actor, v)).id()
+    } else if qdghd::is_qdghd(&source.name) {
+let v = qdghd::Qdghd::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if syan::is_syan(&source.name) {
+world.spawn((actor, syan::Syan::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1126,13 +1154,14 @@ pub fn build(
                     ajav::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    death::freeze.in_set(WwSimSet::Execute),carry::control.in_set(WwSimSet::Execute),
+                (death::freeze.in_set(WwSimSet::Execute),
+                    carry::control.in_set(WwSimSet::Execute),
                     tsubo::control.in_set(WwSimSet::Execute),
                     koisi::control.in_set(WwSimSet::Execute),
                     bomb::control.in_set(WwSimSet::Execute),
                     bombflower::flower_control.in_set(WwSimSet::Execute),
-                    bombflower::crawler_control.in_set(WwSimSet::Execute),ladder::control.in_set(WwSimSet::Execute),
+                    bombflower::crawler_control.in_set(WwSimSet::Execute),
+                    ladder::control.in_set(WwSimSet::Execute),
                     arrow::control.in_set(WwSimSet::Execute),
                     hookshot::control.in_set(WwSimSet::Execute),
                     barrier::control.in_set(WwSimSet::Execute),
@@ -1173,6 +1202,13 @@ pub fn build(
                     acorn_leaf::control.in_set(WwSimSet::Execute),
                     tag_volcano::control.in_set(WwSimSet::Execute),
                     event_manager::control.in_set(WwSimSet::Execute),
+                    andsw0::control.in_set(WwSimSet::Execute),
+                    andsw2::control.in_set(WwSimSet::Execute),
+                    obj_nest::control.in_set(WwSimSet::Execute),
+                    obj_paper::control.in_set(WwSimSet::Execute),
+                    obj_rcloud::control.in_set(WwSimSet::Execute),
+                    sie_flag::control.in_set(WwSimSet::Execute),
+                    tori_flag::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
@@ -1186,8 +1222,7 @@ pub fn build(
                     hotfloor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    door::control.in_set(WwSimSet::Execute),
+                (door::control.in_set(WwSimSet::Execute),
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
@@ -1231,13 +1266,13 @@ pub fn build(
                     ganon_form3::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (talk::control.in_set(WwSimSet::Execute),
+                (talk::control.in_set(WwSimSet::Execute),                    msdan2::control.in_set(WwSimSet::Execute),
+
                     flags::control.in_set(WwSimSet::Execute),
                     tbox::control.in_set(WwSimSet::Execute),
                     clock::control.in_set(WwSimSet::Execute),
                     ghostship::control.in_set(WwSimSet::Execute),
                     volcano::control.in_set(WwSimSet::Execute),
-                    msdan2::control.in_set(WwSimSet::Execute),
                     event::control.in_set(WwSimSet::Execute),
                     msg::control.in_set(WwSimSet::Execute),
                     sage::control.in_set(WwSimSet::Execute),
@@ -1265,7 +1300,8 @@ pub fn build(
                     qtkhd::control.in_set(WwSimSet::Execute),
                     touseki::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
-                    water::water_probe.in_set(WwSimSet::Execute),swim::control.in_set(WwSimSet::Execute),
+                    water::water_probe.in_set(WwSimSet::Execute),
+                    swim::control.in_set(WwSimSet::Execute),
                     lock::control.in_set(WwSimSet::Execute),
                     jump::control.in_set(WwSimSet::Execute),
                     roll::control.in_set(WwSimSet::Execute),
@@ -1273,7 +1309,10 @@ pub fn build(
                     schedule::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (combat::control.in_set(WwSimSet::Execute),
+                (combat::control.in_set(WwSimSet::Execute),                    tagba1::control.in_set(WwSimSet::Execute),
+
+                    qdghd::control.in_set(WwSimSet::Execute),
+                    syan::control.in_set(WwSimSet::Execute),
                     item::control.in_set(WwSimSet::Execute),
                     boomerang::control.in_set(WwSimSet::Execute),
                     enemy::control.in_set(WwSimSet::Execute),
@@ -1346,7 +1385,6 @@ pub fn build(
                     kytag05::control.in_set(WwSimSet::Execute),
                     rforce::control.in_set(WwSimSet::Execute),
                     wlvtag::control.in_set(WwSimSet::Execute),
-                    tagba1::control.in_set(WwSimSet::Execute),
 
 
 
@@ -1354,20 +1392,19 @@ pub fn build(
                     .chain(),
             )
                 .chain(),
-            (
-                pickup::control.in_set(WwSimSet::Execute),
-                collision::remember_move_from.in_set(WwSimSet::Execute),
-                walk::walk.in_set(WwSimSet::Execute),
-                swim::surface.in_set(WwSimSet::Execute),
-                ship::control.in_set(WwSimSet::Execute),
-                area::clamp_to_area.in_set(WwSimSet::Execute),
-                transition::check.in_set(WwSimSet::Execute),
-                sea::sea_tick.in_set(WwSimSet::Execute),
-                warship::control.in_set(WwSimSet::Execute),
-                health::apply_damage.in_set(WwSimSet::Execute),
-                death::check.in_set(WwSimSet::Execute),
-                cleared::control.in_set(WwSimSet::Execute),
-                frame::advance.in_set(WwSimSet::After),
+            (pickup::control.in_set(WwSimSet::Execute),
+                    collision::remember_move_from.in_set(WwSimSet::Execute),
+                    walk::walk.in_set(WwSimSet::Execute),
+                    swim::surface.in_set(WwSimSet::Execute),
+                    ship::control.in_set(WwSimSet::Execute),
+                    area::clamp_to_area.in_set(WwSimSet::Execute),
+                    transition::check.in_set(WwSimSet::Execute),
+                    sea::sea_tick.in_set(WwSimSet::Execute),
+                    warship::control.in_set(WwSimSet::Execute),
+                    health::apply_damage.in_set(WwSimSet::Execute),
+                    death::check.in_set(WwSimSet::Execute),
+                    cleared::control.in_set(WwSimSet::Execute),
+                    frame::advance.in_set(WwSimSet::After),
             )
                 .chain(),
         )

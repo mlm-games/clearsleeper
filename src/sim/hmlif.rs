@@ -80,7 +80,7 @@ const TYPE_SHIFT: u32 = 27;
 const TYPE_MASK: u32 = 0xF;
 const ANGLE_Z_MASK: i16 = 0xFF;
 
-const ARROW_KIND_AT: [u32; 4] = [
+pub const ARROW_KIND_AT: [u32; 4] = [
     AT_NORMAL_ARROW,
     AT_FIRE_ARROW,
     AT_ICE_ARROW,

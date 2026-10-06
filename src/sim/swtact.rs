@@ -1,5 +1,4 @@
 use bevy_ecs::prelude::*;
-use glam::Vec3;
 
 use super::actor::Actor;
 use super::flags::Switches;
@@ -25,21 +24,23 @@ const ANSWER_ANY: u8 = 0xFF; // <- d_a_swtact.cpp:108, :154
 const CULL_MIN: [f32; 3] = [-120.0, -10.0, -120.0]; // <- d_a_swtact.cpp:45
 const CULL_MAX: [f32; 3] = [120.0, 10.0, 120.0]; // <- d_a_swtact.cpp:46
 /// `daPy_lk_c::getTactMusic` returns -1 unless Link is in `daPyProc_TACT_PLAY_e` or
-/// `daPyProc_TACT_WAIT_e` (`d_a_player_tact.inc:150-158`); neither player process is ported, so
-/// this is the proven value, the same constant `kanban.rs:95` uses.
+/// `daPyProc_TACT_WAIT_e` (`d_a_player_tact.inc:150-158`). Neither player process is ported, so
+/// this is the proven value - the same constant `kanban.rs:95` uses for the same call.
 const TACT_NONE: i32 = -1;
 
-/// A Wind's Requiem answer plate. `mRadius` is `mRadius * scale.x` at use time
-/// (`d_a_swtact.h:10`) and stage-placed actors are scale 1.0 (RULE 2), so `getR()` is the field.
-/// `_draw` (`:173-181`) returns early for the floor variant, and so does the cull box: only
-/// `getModel() == 1` terms call `fopAcM_setCullSizeBox` (`:55`), the floor variant has none.
+/// A Wind's Requiem answer plate. `getR()` is `mRadius * scale.x` (`d_a_swtact.h:10`) and
+/// stage-placed actors are scale 1.0 (RULE 2), so the field is the radius as used.
+/// `CreateInit` (`d_a_swtact.cpp:43-60`) only calls `fopAcM_setCullSizeBox` for the marked
+/// variant (`:55`), and `_draw` (`:174-175`) only draws it, so `cull()` returns the marked box
+/// and the floor variant has none. `_create` (`:72-91`) has no branch that refuses creation,
+/// and `IsDelete` (`:204-207`) is the bare "accepts a delete request" form of RULE 6b.
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Swtact {
-    /// `mSwitchNo` (`d_a_swtact.h:30`), the switch `fopAcM_onSwitch` turns on.
+    /// `mSwitchNo` (`d_a_swtact.h:30`), the switch `fopAcM_onSwitch` (`:162`) turns on.
     pub switch_no: u8,
     /// `mAnswer` (`d_a_swtact.h:31`), the raw answer byte.
     pub answer: u8,
-    /// `getModel(this) == 1`: the marked variant.
+    /// `daSwTact_prm::getModel(this) == 1`: the marked, drawn variant.
     pub mark: bool,
     /// `mRadius` (`d_a_swtact.h:29`).
     pub radius: f32,
@@ -50,9 +51,6 @@ pub struct Swtact {
 }
 
 impl Swtact {
-    /// `CreateInit` (`d_a_swtact.cpp:43-60`): the marked variant takes `mRadius = 100.0f` (`:56`)
-    /// and a scaled cull box, everything else `mRadius = 50.0f` (`:58`). `_create` (`:72-91`)
-    /// only loads `m_arcname` for the marked variant and has no branch that refuses creation.
     pub fn spawn(parameters: u32) -> Self {
         let mark = ((parameters >> MODEL_SHIFT) & MODEL_MASK) as u8 == MODEL_MARK;
         Self {
@@ -69,38 +67,29 @@ impl Swtact {
         (CULL_MIN, CULL_MAX)
     }
 
-    /// `getAnswer()` (`:94-112`), the permuted table the tact handoff is handed.
-    fn answer_of(&self) -> i32 {
+    /// The `switch (mAnswer)` of `_execute` (`d_a_swtact.cpp:129-158`): which song the plate is
+    /// listening for, against `getTactMusic()`. Answers outside 0..=5 and `0xFF` fall through
+    /// the decomp's switch and trigger nothing.
+    fn listening(&self, music: i32) -> bool {
         match self.answer {
-            0 => 0,
-            1 => 1,
-            2 => 5,
-            3 => 2,
-            4 => 3,
-            5 => 4,
-            _ => -1,
-        }
-    }
-
-    /// The `switch (mAnswer)` of `_execute` (`:129-158`): which song the plate is listening for,
-    /// against `getTactMusic()`. Cases outside 0..=5 and 0xFF fall through and trigger nothing.
-    fn listening(&self) -> bool {
-        match self.answer {
-            0 => TACT_NONE == 0,
-            1 => TACT_NONE == 1,
-            2 => TACT_NONE == 5,
-            3 => TACT_NONE == 2,
-            4 => TACT_NONE == 3,
-            5 => TACT_NONE == 4,
-            ANSWER_ANY => matches!(TACT_NONE, 0..=5),
+            0 => music == 0,
+            1 => music == 1,
+            2 => music == 5,
+            3 => music == 2,
+            4 => music == 3,
+            5 => music == 4,
+            ANSWER_ANY => matches!(music, 0..=5),
             _ => false,
         }
     }
 
-    /// `_execute` (`:115-170`) minus `set_mtx` (`:63-69`, model scale and position). The
-    /// `player->setTactZev(fopAcM_GetID(this), getAnswer(), NULL)` handoff (`:125`) writes
+    /// `_execute` (`d_a_swtact.cpp:115-170`) minus `set_mtx` (`:63-69`, model scale and
+    /// position) and minus `getAnswer()` (`:94-112`) together with the whole
+    /// `mPlayerStatus != stts1 && stts1 != 0` edge-detect (`:124-126`): that arm's only body is
+    /// the `player->setTactZev(fopAcM_GetID(this), getAnswer(), NULL)` handoff, which writes
     /// `daPy_lk_c::mTactZevPartnerId`/`m34CC` (`d_a_player_tact.inc:117-127`), player state this
-    /// sim does not keep, so only the arm's guard survives.
+    /// sim does not keep - so `player_status` is written by the trailing `mPlayerStatus = stts1`
+    /// (`:166`) and nothing else. `dist` is `cXyz::absXZ` (`c_xyz.h:126`), the XZ-only distance.
     fn step(
         &mut self,
         actor: &Actor,
@@ -117,12 +106,8 @@ impl Swtact {
         }
         let stts1 = u8::from(status.check1(STTS1_WIND_WAKER_CONDUCT));
         let offset = player.pos - actor.pos;
-        let dist = (offset.x * offset.x + offset.z * offset.z).sqrt();
-        if dist <= self.radius {
-            if self.player_status != stts1 && stts1 != 0 {
-                let _ = self.answer_of();
-            }
-            if self.listening() {
+        if (offset.x * offset.x + offset.z * offset.z).sqrt() <= self.radius {
+            if self.listening(TACT_NONE) {
                 self.trigger = true;
             }
         }
@@ -149,11 +134,4 @@ pub fn control(
     for (actor, mut plate) in &mut plates {
         plate.step(actor, player.as_ref(), &status, &mut switches, &info);
     }
-}
-
-/// `cXyz::absXZ` (`c_xyz.h:126`) is `sqrtf(dx^2 + dz^2)`, kept nameable so the plate's reach
-/// test reads the way the decomp does.
-#[allow(dead_code)]
-fn abs_xz(delta: Vec3) -> f32 {
-    (delta.x * delta.x + delta.z * delta.z).sqrt()
 }

@@ -47,9 +47,12 @@ impl Yboil {
     /// `Yboil00` BCK frame count: `mBckAnm[i].play()` runs `J3DFrameCtrl::update`
     /// (`m_Do_ext.cpp:116-120`) and `isStop()` only goes true once the frame passes
     /// `mpAnm->getFrameMax()` (`m_Do_ext.cpp:454`), and no BCK archive ships in this checkout.
-    /// So the timer seed of `1 + (s32)cM_rndF(3.9999f)` is omitted, every slot stays at the `0`
-    /// `CreateInit` wrote (`:71`), and only the `else` arm can ever run - which is why this
-    /// transcription keeps the guard instead of dropping the loop.
+    /// The seed `mMdlTimer[i] = 1 + (s32)cM_rndF(3.9999f)` is therefore omitted, which leaves
+    /// every slot at the `0` `CreateInit` wrote (`:71`) and makes this loop inert - it is kept
+    /// in the transcribed form so the decomp's shape and the switch gate survive, and it starts
+    /// running the day the BCK frame count becomes known. `fopAcM_isSwitch` uses the raw
+    /// `prm_get_swSave` index (`:132`); a `swSave` of 0x80 or above reads false here because
+    /// `Switches` only models the in-memory 0..128 array (RULE 11b).
     fn step(&mut self, switches: &Switches) {
         for index in 0..MODEL_COUNT {
             if self.timer[index] == 0 {

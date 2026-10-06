@@ -65,8 +65,9 @@ impl Rflw {
     }
 
     /// `mCyl.SetC(current.pos)` + `dComIfG_Ccsp()->Set(&mCyl)` + `ChkCoHit()`/`GetCoHitAc()`
-    /// (`:143-146`). `cM3d_Cross_CylCyl` (`c_m3d.cpp:1571-1583`) tests
-    /// `dx^2 + dz^2 <= (r1 + r2)^2` and then `c.y + h >= other.y && c.y <= other.y + h`, so
+    /// (`:143-146`). `cM3d_Cross_CylSph` (`c_m3d.cpp:1389-1398`) - the bomb side is a sphere -
+    /// needs `radius_sum >= dist` and then `sph.y + r >= cyl.y && sph.y - r <= cyl.y + h`
+    /// (`cM3d_Cross_CylCyl` at `:1571-1583` is the same convention for a cylinder partner), so
     /// the tube stands on `current.pos` and reaches `CYL_HEIGHT` upward, not around it.
     fn co_hit(&self, actor: &Actor, blasts: &Blasts) -> Option<Vec3> {
         blasts.list.iter().copied().find(|origin| {
