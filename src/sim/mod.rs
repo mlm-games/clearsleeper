@@ -95,6 +95,7 @@ pub mod nzg;
 pub mod gntakie;
 pub mod gntakis;
 pub mod gohdan;
+pub mod dr2;
 pub mod gohma;
 pub mod ground;
 pub mod grammarian;
@@ -1018,9 +1019,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             Some(stick) => world.spawn((actor, stick)).id(),
             None => world.spawn(actor).id(),
         }
-    } else if source.name == door::JAIL_ACTOR {
-        let cell = door::JailDoor::spawn(source.parameters, world.resource::<flags::Switches>().test((source.parameters & 0xFF) as u8));
-        world.spawn((actor, cell)).id()
     } else if sage::is_sage(&source.name) {
         world.spawn((actor, sage::Sage::spawn(source.parameters))).id()
     } else if servant::is_servant(&source.name) {
@@ -1675,7 +1673,6 @@ pub fn build(
                 (door::control.in_set(WwSimSet::Execute),
                 tag_volcano::control.in_set(WwSimSet::Execute),
                 andsw2::control.in_set(WwSimSet::Execute),
-                door::jail_control.in_set(WwSimSet::Execute),
                 bird::control.in_set(WwSimSet::Execute),
                 tingle::control.in_set(WwSimSet::Execute),
                 select::control.in_set(WwSimSet::Execute),
@@ -1975,6 +1972,8 @@ pub fn build(
                 hlift::control.in_set(WwSimSet::Execute),
                 lstair::control.in_set(WwSimSet::Execute),
                 buoyrace::control.in_set(WwSimSet::Execute),
+                scenery::control.in_set(WwSimSet::Execute),
+                arrowice::control.in_set(WwSimSet::Execute),
                 drift::control.in_set(WwSimSet::Execute),
                 bg::control.in_set(WwSimSet::Execute),
                 leaflift::control.in_set(WwSimSet::Execute),
