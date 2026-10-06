@@ -26,7 +26,8 @@ use crate::text::{
     STATUS_TYPING, STATUS_SCOPE_WAIT, STATUS_UNK0,
 };
 
-pub const ARYLL_ACTOR: &str = "Ls1";
+const PROJECT_LIFT: f32 = 2000.0;
+const ARYLL_ACTOR: &str = "Ls1";
 pub const PARTNER_ACTOR: &str = "Bm1";
 
 pub const EVENT_NAMES: [&str; 4] = ["zelda_fly", "omedeto", "get_telescope", "eTalk"];
@@ -2190,9 +2191,7 @@ fn cam_set_flag_focus(&mut self) {
                 return;
             }
             SCOPE_PHASE_END => {
-                let target = ctx.project_high.map(|point| {
-                    Vec3::new(point.x, point.y + SCOPE_FOCUS_LIFT, point.z)
-                });
+                let target = ctx.project_high;
                 let hit = self.chk_telescope(target, ctx.fov_y, TELESCOPE_X_TOL, TELESCOPE_Z_MIN);
                 let mut broken = false;
                 if hit {
@@ -2839,11 +2838,13 @@ pub struct Msg<'w, 's> {
     pub text_flags: Res<'w, TextFlags>,
     pub archive: Option<Res<'w, MsgArchives>>,
     pub players: Query<'w, 's, &'static Player>,
+    pub attention: Res<'w, super::lock::Lock>,
 }
 
 pub fn control(
     mut world: World,
     mut msg: Msg,
+    camera: Res<super::camera::Camera>,
     others: Query<(Entity, &Actor), Without<Aryll>>,
     mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
 ) {
@@ -2865,6 +2866,9 @@ pub fn control(
                 .as_deref()
                 .map(|archive| archive as &dyn MsgArchive),
         };
+        let ctx_project = camera.project(aryll.attn_pos);
+        let ctx_project_high = camera.project(aryll.attn_pos + Vec3::Y * PROJECT_LIFT);
+        let fov_y = camera.fovy();
         let mut ctx = Ctx {
             entity,
             pos: actor.pos,
@@ -2873,7 +2877,7 @@ pub fn control(
             collect0: Some(world.collect.check(0)),
             select_item: [ITEM_NONE; ITEM_BUTTON_COUNT],
             frame,
-            attention: false,
+            attention: msg.attention.chk_attention(entity),
             demo_accept: false,
             talk_command: false,
             talk_xy: false,
@@ -2887,9 +2891,9 @@ pub fn control(
             camera_running: true,
             ground_hit: false,
             reverb: 0,
-            project: None,
-            project_high: None,
-            fov_y: None,
+            project: ctx_project.map(|hit| Vec3::new(hit.x, hit.z, 0.0)),
+            project_high: ctx_project_high,
+            fov_y,
             proc_eye: None,
             cut_action: None,
             cut_advance: false,

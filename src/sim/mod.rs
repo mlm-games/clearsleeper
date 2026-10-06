@@ -19,6 +19,7 @@ pub mod balloon;
 pub mod barrier;
 pub mod barrel;
 pub mod bemos;
+pub mod bg;
 pub mod barricade;
 pub mod bgn3;
 pub mod bitem;
@@ -58,6 +59,7 @@ pub mod demodk;
 pub mod adnno;
 pub mod door;
 pub mod dragon;
+pub mod drift;
 pub mod dmgroom;
 pub mod demokmm;
 pub mod dummy;
@@ -142,10 +144,12 @@ pub mod quake;
 pub mod qtkhd;
 pub mod kamome;
 pub mod ktaruo;
+pub mod kokiie;
 pub mod lamp;
 pub mod kmon;
 pub mod kaji;
 pub mod kita;
+pub mod kantera;
 pub mod kn;
 pub mod ki;
 pub mod komore;
@@ -170,10 +174,12 @@ pub mod leaflift;
 pub mod lstair;
 pub mod lock;
 pub mod magma;
+pub mod machine;
 pub mod makar;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
+pub mod mdoor;
 pub mod mjdoor;
 pub mod mmusic;
 pub mod morth;
@@ -289,6 +295,7 @@ pub mod swpush;
 pub mod swpropeller;
 pub mod tag;
 pub mod tagba1;
+pub mod tagmk;
 pub mod tagkb;
 pub mod tag_volcano;
 pub mod tag_msg;
@@ -700,6 +707,37 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if vmc::is_vmc(&source.name) {
         let v = vmc::Vmc::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
+    } else if machine::is_machine(&source.name) {
+        world.spawn((actor, machine::Machine::spawn())).id()
+    } else if drift::is_drift(&source.name) {
+        world.spawn((actor, drift::Drift::spawn(source.parameters))).id()
+    } else if bg::is_bg(&source.name) {
+        world.spawn((actor, bg::Bg::spawn())).id()
+    } else if kokiie::is_kokiie(&source.name) {
+        world.spawn((actor, kokiie::Kokiie::spawn(source.parameters))).id()
+    } else if mdoor::is_mdoor(&source.name) {
+        let cage = mdoor::Mdoor::spawn(
+            source.parameters,
+            world.resource::<event::EventList>(),
+            world.resource::<flags::EventFlags>(),
+            world.resource::<flags::Switches>(),
+        );
+        // `case 1`'s else arm MUTATES the save at create time:
+        // `dComIfGs_offEventBit(dSv_event_flag_c::UNK_1140)` (d_a_mdoor.cpp:141).
+        if cage.kind == 1 && !world.resource::<flags::EventFlags>().test(mdoor::EVENT_UNK_1101) {
+            world.resource_mut::<flags::EventFlags>().clear(mdoor::EVENT_UNK_1140);
+        }
+        world.spawn((actor, cage)).id()
+    } else if kantera::is_kantera(&source.name) {
+        let brazier = kantera::Kantera::spawn(source.parameters);
+        world.spawn((actor, brazier)).id()
+    } else if tagmk::is_tagmk(&source.name) {
+        let sign = tagmk::Tagmk::spawn(
+            source.parameters,
+            world.resource::<flags::EventFlags>(),
+            world.resource::<flags::Switches>(),
+        );
+        world.spawn((actor, sign)).id()
     } else if hsh::is_hsh(&source.name) {
         let arg = i8::from(source.name != "Hsh");
         world.spawn((actor, hsh::Hsh::spawn(source.parameters, arg))).id()
@@ -1641,6 +1679,8 @@ pub fn build(
                 select::control.in_set(WwSimSet::Execute),
                 canon::control.in_set(WwSimSet::Execute),
                 mbdoor::control.in_set(WwSimSet::Execute),
+                machine::control.in_set(WwSimSet::Execute),
+                mdoor::control.in_set(WwSimSet::Execute),
                 iceisland::control.in_set(WwSimSet::Execute),
                 fan::control.in_set(WwSimSet::Execute),
                 hbrf1::control.in_set(WwSimSet::Execute),
@@ -1707,6 +1747,9 @@ pub fn build(
                 merchant::control.in_set(WwSimSet::Execute),
                 pedestal::control.in_set(WwSimSet::Execute),
                 warphr::control.in_set(WwSimSet::Execute),
+                tagmk::control.in_set(WwSimSet::Execute),
+                kokiie::control.in_set(WwSimSet::Execute),
+                kantera::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1929,6 +1972,8 @@ pub fn build(
                 hlift::control.in_set(WwSimSet::Execute),
                 lstair::control.in_set(WwSimSet::Execute),
                 buoyrace::control.in_set(WwSimSet::Execute),
+                drift::control.in_set(WwSimSet::Execute),
+                bg::control.in_set(WwSimSet::Execute),
                 leaflift::control.in_set(WwSimSet::Execute),
                 mtest::control.in_set(WwSimSet::Execute),
                 dai::control.in_set(WwSimSet::Execute),
@@ -1943,3 +1988,4 @@ pub mod auction;
 
 pub mod knob00;
 pub mod bridge;
+pub mod ks;

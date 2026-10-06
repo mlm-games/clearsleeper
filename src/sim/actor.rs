@@ -28,6 +28,8 @@ pub struct Actor {
     pub scale: Vec3,
     pub speed: Vec3,
     pub speed_f: f32,
+    pub gravity: f32,
+    pub max_fall_speed: f32,
     pub eye: Vec3,
 }
 
@@ -45,6 +47,8 @@ impl Default for Actor {
             scale: Vec3::ONE,
             speed: Vec3::ZERO,
             speed_f: 0.0,
+            gravity: 0.0,
+            max_fall_speed: 0.0,
             eye: Vec3::ZERO,
         }
     }
@@ -72,8 +76,12 @@ impl Actor {
         self.pos += self.speed;
     }
 
-    pub fn fall(&mut self, gravity: f32, max_fall_speed: f32) {
-        self.speed.y = (self.speed.y - gravity).max(-max_fall_speed);
+    /// `speed.y += gravity`, clamped by `maxFallSpeed`.
+    pub fn fall(&mut self) {
+        self.speed.y += self.gravity;
+        if self.max_fall_speed > 0.0 {
+            self.speed.y = self.speed.y.max(-self.max_fall_speed);
+        }
     }
 
     /// `actor->current.angle.x = -cM_atan2s(speed.y, speed.absXZ())`.
@@ -91,4 +99,12 @@ impl Actor {
 /// `cM_atan2s`: angle in the fixed-point 0..0xFFFF circle scaled from radians.
 pub fn atan2s(y: f32, x: f32) -> i16 {
     (y.atan2(x) * (32768.0 / core::f32::consts::PI)).round() as i16
+}
+
+/// `fopAc_Execute` snapshots every actor before the step's actor methods run, so `old`
+/// holds the transform each method starts from.
+pub fn snapshot(mut actors: Query<&mut Actor>) {
+    for mut actor in &mut actors {
+        actor.snapshot();
+    }
 }

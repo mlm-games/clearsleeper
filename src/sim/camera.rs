@@ -1,0 +1,235 @@
+use bevy_ecs::prelude::*;
+use glam::{Mat4, Vec3};
+
+const DEFAULT_FOVY: f32 = 0.7853982;
+const DEFAULT_ASPECT: f32 = 4.0 / 3.0;
+const DEFAULT_NEAR: f32 = 0.1;
+const DEFAULT_FAR: f32 = 100000.0;
+const WIDE_X: f32 = 640.0;
+const WIDE_Y: f32 = 480.0;
+const BASE_X: f32 = 320.0;
+const BASE_Y: f32 = 240.0;
+const DEPTH_CLAMP: f32 = 500000.0;
+
+/// `view_port_class` from `f_op_view.h`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewPort {
+    pub x_orig: f32,
+    pub y_orig: f32,
+    pub width: f32,
+    pub height: f32,
+    pub near_z: f32,
+    pub far_z: f32,
+}
+
+impl Default for ViewPort {
+    fn default() -> Self {
+        Self {
+            x_orig: 0.0,
+            y_orig: 0.0,
+            width: WIDE_X,
+            height: WIDE_Y,
+            near_z: DEFAULT_NEAR,
+            far_z: DEFAULT_FAR,
+        }
+    }
+}
+
+/// `lookat_class` from `f_op_view.h`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LookAt {
+    pub eye: Vec3,
+    pub center: Vec3,
+    pub up: Vec3,
+}
+
+impl Default for LookAt {
+    fn default() -> Self {
+        Self {
+            eye: Vec3::new(0.0, 100.0, 200.0),
+            center: Vec3::ZERO,
+            up: Vec3::Y,
+        }
+    }
+}
+
+/// `view_class` from `f_op_view.h`, narrowed to the fields the sim reads back.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct View {
+    pub near: f32,
+    pub far: f32,
+    pub fovy: f32,
+    pub aspect: f32,
+    pub lookat: LookAt,
+    pub proj: Mat4,
+    pub view: Mat4,
+    pub inv_view: Mat4,
+    pub proj_view: Mat4,
+    pub view_no_trans: Mat4,
+}
+
+impl Default for View {
+    fn default() -> Self {
+        Self {
+            near: DEFAULT_NEAR,
+            far: DEFAULT_FAR,
+            fovy: DEFAULT_FOVY,
+            aspect: DEFAULT_ASPECT,
+            lookat: LookAt::default(),
+            proj: Mat4::ZERO,
+            view: Mat4::ZERO,
+            inv_view: Mat4::ZERO,
+            proj_view: Mat4::ZERO,
+            view_no_trans: Mat4::ZERO,
+        }
+    }
+}
+
+impl View {
+    fn refresh(&mut self) {
+        self.view = glam::camera::rh::view::look_at_mat4(self.lookat.eye, self.lookat.center, self.lookat.up);
+        self.view_no_trans = self.view;
+        self.proj = glam::camera::rh::proj::opengl::perspective(self.fovy, self.aspect, self.near, self.far);
+        self.inv_view = self.view.inverse();
+        self.proj_view = self.proj * self.view;
+    }
+
+    pub fn aim(&mut self, eye: Vec3, center: Vec3, up: Vec3) {
+        self.lookat = LookAt { eye, center, up };
+        self.refresh();
+    }
+
+    pub fn set_fovy(&mut self, fovy: f32) {
+        self.fovy = fovy;
+        self.refresh();
+    }
+
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
+        self.refresh();
+    }
+
+    /// `mDoLib_pos2camera`: the world point through the view matrix only.
+    pub fn pos2camera(&self, src: Vec3) -> Vec3 {
+        self.view.transform_point3(src)
+    }
+}
+
+/// `dComIfGd_getView()` and `dComIfGd_getViewport()`, which `mDoLib_project` needs. The view is
+/// absent until the camera is first aimed, matching `dComIfGd_getView() == NULL`.
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub struct Camera {
+    pub view: Option<View>,
+    pub port: ViewPort,
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        let mut view = View::default();
+        view.refresh();
+        Self {
+            view: Some(view),
+            port: ViewPort::default(),
+        }
+    }
+}
+
+impl Camera {
+    pub fn view(&self) -> Option<&View> {
+        self.view.as_ref()
+    }
+
+    pub fn view_mut(&mut self) -> Option<&mut View> {
+        self.view.as_mut()
+    }
+
+    pub fn fovy(&self) -> Option<f32> {
+        self.view.as_ref().map(|view| view.fovy)
+    }
+
+    /// `mDoLib_project__FP3VecP3Vec`.
+    pub fn project(&self, src: Vec3) -> Option<Vec3> {
+        self.view
+            .as_ref()
+            .map(|view| project_with(&view.proj_view, &self.port, src))
+    }
+
+    pub fn pos2camera(&self, src: Vec3) -> Option<Vec3> {
+        self.view.as_ref().map(|view| view.pos2camera(src))
+    }
+}
+
+/// `mDoLib_project__FP3VecP3Vec` against an explicit projection-view matrix and viewport.
+/// Returns `None` for the no-view case, where the original writes a zero vector.
+pub fn project(proj_view: &Mat4, port: &ViewPort, src: Vec3) -> Vec3 {
+    project_with(proj_view, port, src)
+}
+
+fn project_with(proj_view: &Mat4, port: &ViewPort, src: Vec3) -> Vec3 {
+    let m = proj_view.to_cols_array();
+    let clip = Vec3::new(
+        m[0] * src.x + m[1] * src.y + m[2] * src.z + m[3],
+        m[4] * src.x + m[5] * src.y + m[6] * src.z + m[7],
+        m[8] * src.x + m[9] * src.y + m[10] * src.z + m[11],
+    );
+    let w = src.x * m[12] + src.y * m[13] + src.z * m[14] + m[15];
+    let mut z = clip.z;
+    if z >= 0.0 {
+        z = 0.0;
+    }
+    let scale = if w <= 0.0 {
+        if w == 0.0 {
+            z *= DEPTH_CLAMP;
+        } else {
+            z *= 0.5 / w;
+        }
+        DEPTH_CLAMP
+    } else {
+        let scale = 0.5 / w;
+        z *= scale;
+        scale
+    };
+    let (x_offset, x_size) = if port.x_orig != 0.0 {
+        (0.5 * ((2.0 * port.x_orig) + port.width) - BASE_X, WIDE_X)
+    } else {
+        (port.x_orig, port.width)
+    };
+    let (y_offset, y_size) = if port.y_orig != 0.0 {
+        (0.5 * ((2.0 * port.y_orig) + port.height) - BASE_Y, WIDE_Y)
+    } else {
+        (port.y_orig, port.height)
+    };
+    Vec3::new(
+        (0.5 + (clip.x * scale)) * x_size + x_offset,
+        (0.5 + (clip.y * -scale)) * y_size + y_offset,
+        z,
+    )
+}
+
+fn row(m: &Mat4, index: usize, v: Vec3) -> f32 {
+    let r = m.to_cols_array();
+    r[index * 4] * v.x + r[index * 4 + 1] * v.y + r[index * 4 + 2] * v.z + r[index * 4 + 3]
+}
+/// Retail's camera trails the player along `mLookat`, so the projection the scope and the
+/// `pos2camera` reads depend on where the view is actually aimed. Scheduled ahead of the
+/// actor systems so every same-tick read sees this tick's view.
+pub fn track(
+    yaw: Res<super::intent::CameraYaw>,
+    players: Query<&super::player::Player>,
+    mut camera: ResMut<Camera>,
+) {
+    let Some(player) = players.iter().next() else {
+        return;
+    };
+    let Some(view) = camera.view_mut() else {
+        return;
+    };
+    let yaw = yaw.0;
+    let back = Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) * DIST_BACK;
+    let eye = player.pos + Vec3::new(0.0, HEIGHT_EYE, 0.0) + back;
+    view.aim(eye, player.pos + Vec3::new(0.0, HEIGHT_CENTER, 0.0), Vec3::Y);
+}
+
+const DIST_BACK: f32 = 300.0;
+const HEIGHT_EYE: f32 = 120.0;
+const HEIGHT_CENTER: f32 = 40.0;

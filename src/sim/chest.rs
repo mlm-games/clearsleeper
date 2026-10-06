@@ -18,6 +18,12 @@ pub const NO_ROOM: i8 = -1;
 pub const ROOM_MASK: i8 = 0x3F;
 pub const GRAB_RANGE: f32 = 60.0;
 
+pub const CHEST_ACTORS: [&str; 19] = ["takara", "takara2", "takara3", "takara4", "takara5", "takara6", "takara7", "takara8", "takaraK", "takaraI", "takaraM", "tkrASw", "tkrAGc", "tkrAKd", "tkrAIk", "tkrBMs", "tkrCTf", "tkrAOc", "tkrAOs"];
+
+pub fn is_chest(name: &str) -> bool {
+    CHEST_ACTORS.contains(&name)
+}
+
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Chests {
     pub opened: [bool; 32],

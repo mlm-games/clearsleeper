@@ -8,7 +8,7 @@ use super::damage;
 use super::enemy::Hurt;
 use super::ground;
 use super::ship::Ship;
-use super::walk::swept;
+use super::walk::{swept, to_s16};
 
 pub const ARROW_ACTOR: &str = "Arrow";
 
@@ -56,6 +56,7 @@ pub struct Arrow {
     pub frames: i32,
     pub reflected: bool,
     pub visible: bool,
+    pub hit_joint: Option<i32>,
 }
 
 impl Arrow {
@@ -72,6 +73,7 @@ impl Arrow {
             frames: 0,
             reflected: false,
             visible: true,
+            hit_joint: None,
         }
     }
 
@@ -124,7 +126,16 @@ pub fn control(
     collision: Option<Res<super::collision::Collision>>,
     wet: Option<Res<super::water::Water>>,
     mut arrows: Query<(Entity, &mut Arrow)>,
-    mut foes: Query<(&Actor, &mut HitPoints, Option<&mut Hurt>), Without<Ship>>,
+    mut foes: Query<
+        (
+            Entity,
+            &Actor,
+            Option<&super::jnt_hit::JntHit>,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+        ),
+        Without<Ship>,
+    >,
     mut flags: ResMut<super::flags::ZoneActors>,
     mut commands: Commands,
 ) {
@@ -140,32 +151,47 @@ pub fn control(
                 let step = arrow.speed;
                 arrow.pos += step;
                 let tip = arrow.pos + step * CAPSULE_STRETCH;
-                let mut struck = false;
-                for (foe, mut hp, mut hurt) in &mut foes {
-                    if !swept(from, tip, foe.pos, CAPSULE_RADIUS + BODY_HALF) {
+                let mut struck: Option<(Entity, Option<i32>, i8, u16)> = None;
+                let mut nearest = f32::INFINITY;
+                for (foe, actor, colliders, _, _) in &foes {
+                    if !swept(from, tip, actor.pos, CAPSULE_RADIUS + BODY_HALF) {
                         continue;
                     }
+                    let distance = (actor.pos - arrow.pos).length();
+                    if distance >= nearest {
+                        continue;
+                    }
+                    // `_atHit` ignores any actor without a JntHit, then `procMove` refines
+                    // the strike through `searchJntHitPosAngleOffset` to pick the joint.
+                    let angle = [to_s16(arrow.pitch), to_s16(arrow.yaw), 0];
+                    let joint = colliders.and_then(|colliders| {
+                        let (joint, _) = colliders.search(angle, actor, arrow.pos);
+                        (joint >= 0).then_some(joint)
+                    });
+                    nearest = distance;
+                    struck = Some((foe, joint, actor.room, actor.set_id));
+                }
+                let Some((foe, joint, room, set_id)) = struck else {
+                    if soaked && arrow.kind != TYPE_LIGHT {
+                        arrow.drown();
+                        continue;
+                    }
+                    if ground::surface(solid, arrow.pos).is_some_and(|floor| arrow.pos.y <= floor) {
+                        arrow.stick(Phase::StuckGround);
+                    }
+                    continue;
+                };
+                if let Ok((_, _, _, mut hp, mut hurt)) = foes.get_mut(foe) {
                     hp.0 -= POWER;
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = FLINCH;
                     }
                     if hp.0 <= 0 {
-                        slain.push((foe.room, foe.set_id));
+                        slain.push((room, set_id));
                     }
-                    struck = true;
-                    break;
                 }
-                if struck {
-                    arrow.stick(Phase::StuckActor);
-                    continue;
-                }
-                if soaked && arrow.kind != TYPE_LIGHT {
-                    arrow.drown();
-                    continue;
-                }
-                if ground::surface(solid, arrow.pos).is_some_and(|floor| arrow.pos.y <= floor) {
-                    arrow.stick(Phase::StuckGround);
-                }
+                arrow.hit_joint = joint;
+                arrow.stick(Phase::StuckActor);
             }
             Phase::StuckActor | Phase::StuckGround => {
                 arrow.frames -= 1;

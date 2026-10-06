@@ -23,12 +23,26 @@ pub struct Carry {
     held_press: bool,
 }
 
+/// `fopAcStts_CARRY_e` actors the player can pick up. The `Boss` arm is the hookshot-only
+/// latch, retail's `fopAcStts_UNK80000_e`: bosses never join the carry stack, but the
+/// hookshot bit-pins them and they read `fopAcStts_HOOK_CARRY_e` while pinned.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Carryable {
     Tsubo,
     Stone,
     Pig,
     Barrel,
+    Boss,
+}
+
+impl Carryable {
+    pub fn lifts(self) -> bool {
+        !matches!(self, Carryable::Boss)
+    }
+
+    pub fn hook_latches(self) -> bool {
+        true
+    }
 }
 
 pub fn is_carryable(name: &str) -> bool {
@@ -36,6 +50,12 @@ pub fn is_carryable(name: &str) -> bool {
         || super::koisi::is_koisi(name)
         || super::barrel::is_barrel(name)
         || name == PIG_ACTOR
+}
+
+/// Retail create tables that set `fopAcStts_UNK80000_e` and are not already `Carryable`.
+/// The wind boss is the one that reads the bit back through `hook_on`/`damage_check`.
+pub fn is_boss_hook_latch(name: &str) -> bool {
+    super::bwds::is_bwds(name) || super::balloon::BALLOON_ACTOR == name
 }
 
 fn chain_from<D: bevy_ecs::query::QueryFilter>(
@@ -130,6 +150,7 @@ pub fn control(
             }
             let nearest = carryables
                 .iter()
+                .filter(|(_, _, kind)| kind.lifts())
                 .min_by(|(_, a, _), (_, b, _)| {
                     reach(a.pos, player.pos).total_cmp(&reach(b.pos, player.pos))
                 })
@@ -139,7 +160,7 @@ pub fn control(
                     return;
                 }
                 let liftable = match casks.get_mut(entity) {
-                    Ok(mut cask) => cask.liftable(true),
+                    Ok(cask) => cask.liftable(true),
                     Err(_) => true,
                 };
                 if !liftable {

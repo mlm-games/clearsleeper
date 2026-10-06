@@ -19,6 +19,7 @@ use super::iball;
 use super::item::Held;
 use super::jump;
 use super::player::Player;
+use super::ship::Ship;
 use super::roll;
 use super::stream;
 use super::tsubo;
@@ -91,7 +92,12 @@ const HIO_0E0: f32 = 150.0;
 const HIO_0E4: f32 = 500.0;
 const HIO_0E8: f32 = 800.0;
 const HIO_0EC: f32 = 30.0;
+const HIO_0F0: f32 = 25.0;
+const HIO_0F4: f32 = 9.0;
+const HIO_0F8: f32 = -2.5;
 const HIO_0FC: f32 = 16.0;
+const DROP_SCALE: f32 = 1000.0;
+const TSKU_DROP_KINDS: [u8; 6] = [0, 1, 2, 4, 5, 6];
 const HIO_09C: i16 = 5;
 const HIO_100: i16 = 0x1e;
 const HIO_110: f32 = 20.0;
@@ -876,6 +882,7 @@ pub struct Floormaster {
     pub target_flag: u8,
     pub target_sub: u8,
     pub spawn_item: Option<Entity>,
+    pub release: Option<Release>,
     pub player_busy: bool,
     pub retreat_timer: i32,
     pub mode_timer: i32,
@@ -967,6 +974,7 @@ impl Floormaster {
             target_flag: NO_TARGET,
             target_sub: 0,
             spawn_item: None,
+            release: None,
             player_busy: false,
             retreat_timer: 0,
             mode_timer: 0,
@@ -1053,6 +1061,7 @@ impl Floormaster {
             self.area_radius = RADIUS_FIXED;
         }
         actor.angle = [0, home_y, 0];
+        actor.shape_angle[1] = home_y;
     }
 
     pub fn is_body_appear(&self) -> bool {
@@ -1192,7 +1201,7 @@ impl Floormaster {
     fn mode_appear_init(&mut self, actor: &mut Actor) {
         self.set_anm(2, false);
         self.move_dest = actor.pos;
-        actor.angle[1] = self.base_angle;
+        actor.shape_angle[1] = self.base_angle;
         self.mode_timer = 30;
     }
 
@@ -1305,7 +1314,12 @@ impl Floormaster {
     }
 
     fn turn_to_base_target(&mut self, actor: &mut Actor) {
-        stream::add_calc_angle_s2(&mut actor.angle[1], self.base_angle, TURN_DIV, TURN_CAP);
+        stream::add_calc_angle_s2(
+            &mut actor.shape_angle[1],
+            self.base_angle,
+            TURN_DIV,
+            TURN_CAP,
+        );
     }
 
     fn check_height_actor(&self, pos: Vec3) -> bool {
@@ -1334,7 +1348,7 @@ impl Floormaster {
                 break;
             };
             let probe = turned(
-                actor.angle[1].wrapping_add(AREA_STEP.wrapping_mul(index as i16)),
+                actor.shape_angle[1].wrapping_add(AREA_STEP.wrapping_mul(index as i16)),
                 [HIO_0E0, AREA_DOWN, 0.0],
             ) + actor.pos;
             if self.kind != 2 {
@@ -1410,7 +1424,9 @@ impl Floormaster {
         if (self.grab_pos.y - actor.pos.y).abs() > HIO_0A8 {
             return false;
         }
-        if distance_angle_s(actor.angle[1], bearing(actor.pos, self.grab_pos)) > i32::from(HIO_098) {
+        if distance_angle_s(actor.shape_angle[1], bearing(actor.pos, self.grab_pos))
+            > i32::from(HIO_098)
+        {
             return false;
         }
         if self.kind == 0 && flat(self.home_pos, self.grab_pos) > self.area_radius {
@@ -1464,7 +1480,7 @@ impl Floormaster {
                 + self.rnd_f(WANDER_SPAN_A) * WANDER_SCALE_A) as i32 as i16;
             self.wander_yaw = self.wander_yaw.wrapping_add(add);
         } else {
-            let value = (actor.angle[1]) as f32
+            let value = f32::from(actor.shape_angle[1])
                 + (WANDER_TURN) as f32
                 + self.rnd_f(WANDER_SPAN_B) * WANDER_SCALE_A;
             self.wander_yaw = value as i32 as i16;
@@ -1882,8 +1898,8 @@ impl Floormaster {
         mut commands: &mut Commands,
     ) {
         self.player_busy = ctx.busy;
-        self.hand = actor.pos + turned(actor.angle[1], HIO_HAND_OFFSET);
-        self.tip = self.hand + turned(actor.angle[1], HIO_TIP_OFFSET);
+        self.hand = actor.pos + turned(actor.shape_angle[1], HIO_HAND_OFFSET);
+        self.tip = self.hand + turned(actor.shape_angle[1], HIO_TIP_OFFSET);
         if self.is_hole_appear() {
             ctx.se(SE_SPOT);
         }
@@ -2122,14 +2138,19 @@ impl Floormaster {
             return;
         }
         self.search_target(actor, ctx);
-        let facing = distance_angle_s(actor.angle[1], self.base_angle);
+        let facing = distance_angle_s(actor.shape_angle[1], self.base_angle);
         if self.target_flag != NO_TARGET {
             if self.base_dist > HIO_0E0 {
                 let aim = bearing(actor.pos, self.grab_pos);
                 if self.is_npc() || self.is_link() {
-                    stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV_SLOW, TURN_CAP_SLOW);
+                    stream::add_calc_angle_s2(
+                        &mut actor.shape_angle[1],
+                        aim,
+                        TURN_DIV_SLOW,
+                        TURN_CAP_SLOW,
+                    );
                 } else {
-                    stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV, TURN_CAP);
+                    stream::add_calc_angle_s2(&mut actor.shape_angle[1], aim, TURN_DIV, TURN_CAP);
                 }
             }
             self.set_grab_pos(ctx);
@@ -2151,7 +2172,7 @@ impl Floormaster {
             }
         } else if facing > i32::from(HIO_09A) {
             stream::add_calc_angle_s2(
-                &mut actor.angle[1],
+                &mut actor.shape_angle[1],
                 self.base_angle,
                 TURN_DIV_FACE,
                 TURN_CAP_FACE,
@@ -2199,8 +2220,8 @@ impl Floormaster {
             return;
         }
         let aim = bearing(actor.pos, ctx.target_pos);
-        if distance_angle_s(actor.angle[1], aim) > i32::from(HIO_09A) {
-            stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV, HIO_096);
+        if distance_angle_s(actor.shape_angle[1], aim) > i32::from(HIO_09A) {
+            stream::add_calc_angle_s2(&mut actor.shape_angle[1], aim, TURN_DIV, HIO_096);
         }
         if self.in_area == 0 {
             self.mode_proc_init(Phase::Disappear, actor, ctx.player);
@@ -2287,7 +2308,7 @@ impl Floormaster {
         }
         if self.kind != 2 || !self.is_npc() {
             stream::add_calc_angle_s2(
-                &mut actor.angle[1],
+                &mut actor.shape_angle[1],
                 bearing(actor.pos, ctx.player.pos),
                 TURN_DIV,
                 TURN_CAP,
@@ -2296,10 +2317,25 @@ impl Floormaster {
         if self.morph.frame == HIO_0FC {
             self.carry_kind = CARRY_NONE;
             self.grab_pos = actor.pos;
+            self.release(actor);
         }
         if self.anm_prm == 11 && self.morph.is_stop() {
             self.mode_timer = THROW_SETTLE;
         }
+    }
+
+    fn release(&mut self, actor: &Actor) {
+        let Some(target) = self.target else {
+            return;
+        };
+        let dropspeed = ((self.base_dist / DROP_SCALE).clamp(0.0, 1.0)) * HIO_0F4;
+        self.release = Some(Release {
+            target,
+            yaw: actor.shape_angle[1],
+            speed_f: HIO_0F0,
+            dropspeed,
+            gravity: HIO_0F8,
+        });
     }
 
     fn mode_damage(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
@@ -2364,8 +2400,13 @@ impl Floormaster {
         }
         if self.is_link() {
             let aim = bearing(actor.pos, self.grab_pos);
-            if distance_angle_s(actor.angle[1], aim) > i32::from(HIO_09A) {
-                stream::add_calc_angle_s2(&mut actor.angle[1], aim, TURN_DIV, TURN_CAP_NPC);
+            if distance_angle_s(actor.shape_angle[1], aim) > i32::from(HIO_09A) {
+                stream::add_calc_angle_s2(
+                    &mut actor.shape_angle[1],
+                    aim,
+                    TURN_DIV,
+                    TURN_CAP_NPC,
+                );
             }
             self.set_grab_pos(ctx);
             if self.player_grab_bomb(ctx) {
@@ -2398,7 +2439,9 @@ impl Floormaster {
                     } else {
                         bearing(actor.pos, ctx.player.pos)
                     };
-                    if distance_angle_s(actor.angle[1], aim) < NPC_FACE_GATE && reach < HIO_0C4 {
+                    if distance_angle_s(actor.shape_angle[1], aim) < NPC_FACE_GATE
+                        && reach < HIO_0C4
+                    {
                         self.mode_proc_init(Phase::Throw, actor, ctx.player);
                         return;
                     }
@@ -2522,7 +2565,7 @@ impl Floormaster {
                     name: IBALL_ACTOR.to_owned(),
                     parameters: 0,
                     pos: actor.pos,
-                    angle: actor.angle,
+                    angle: [0; 3],
                     set_id: 0,
                     room: actor.room,
                     ..Default::default()
@@ -2546,7 +2589,7 @@ impl Floormaster {
                             name: TSUBO_ACTOR.to_owned(),
                             parameters: SKULL_PARAM,
                             pos: self.hand,
-                            angle: actor.angle,
+                            angle: [0; 3],
                             set_id: 0,
                             room: actor.room,
                             ..Default::default()
@@ -2578,6 +2621,15 @@ struct Loot {
     flag: u8,
     sub: u8,
     is_actor: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Release {
+    target: Entity,
+    yaw: i16,
+    speed_f: f32,
+    dropspeed: f32,
+    gravity: f32,
 }
 
 struct Ctx<'a, 'b> {
@@ -2683,6 +2735,8 @@ pub fn control(
         (Entity, &mut Actor, &mut Floormaster),
         (With<Floormaster>, Without<Player>),
     >,
+    mut loot_actors: Query<&mut Actor, (Without<Floormaster>, Without<Player>, Without<Ship>)>,
+    mut pots: Query<&mut tsubo::Tsubo, Without<Floormaster>>,
     mut commands: Commands,
 ) {
     let solid = watch.collision.as_deref();
@@ -2821,6 +2875,20 @@ pub fn control(
             self_entity: entity,
         };
         boss.execute(actor, ctx, &mut commands);
+        if let Some(release) = boss.release.take() {
+            if let Ok(mut pot) = pots.get_mut(release.target) {
+                if TSKU_DROP_KINDS.contains(&pot.kind) {
+                    pot.speed_y = release.dropspeed;
+                }
+            }
+            if let Ok(mut item) = loot_actors.get_mut(release.target) {
+                item.angle[1] = release.yaw;
+                item.shape_angle[1] = release.yaw;
+                item.speed_f = release.speed_f;
+                item.speed.y = release.dropspeed;
+                item.gravity = release.gravity;
+            }
+        }
         if boss.doomed {
             spent.push((entity, actor.room, actor.set_id));
         }

@@ -1446,6 +1446,22 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::machine::Machine>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::drift::Drift>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::mdoor::Mdoor>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kokiie::Kokiie>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::mkiek::Mkiek>() {
                 let (min, max) = x.cull();
                 lift = min[1];

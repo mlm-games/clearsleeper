@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
@@ -16,6 +17,7 @@ const LAST_RUPEE: u8 = 0x06;
 const SILVER_RUPEE: u8 = 0x0F;
 const HEART_PIECE: u8 = 0x07;
 const HEART_CONTAINER: u8 = 0x08;
+const TRIPLE_HEART: u8 = 0x1E;
 const RUPEE_VALUES: [u32; LAST_RUPEE as usize - FIRST_RUPEE as usize + 1] = [1, 5, 10, 20, 50, 100];
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -23,10 +25,13 @@ pub struct Rupees {
     pub count: u32,
 }
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Pickup {
     pub item: u8,
     pub timer: u8,
+    pub speed_f: f32,
+    pub speed_y: f32,
+    pub gravity: f32,
 }
 
 pub fn is_pickup(name: &str) -> bool {
@@ -38,7 +43,28 @@ impl Pickup {
         Self {
             item: (parameters & 0xFF) as u8,
             timer: 0,
+            speed_f: 0.0,
+            speed_y: 0.0,
+            gravity: 0.0,
         }
+    }
+
+    /// `fopAcM_fastCreateItem`: the item's forward speed, vertical launch speed and gravity.
+    /// Hearts double the forward speed before the create.
+    pub fn thrown(parameters: u32, speed_f: f32, speed_y: f32, gravity: f32) -> Self {
+        let item = (parameters & 0xFF) as u8;
+        let speed_f = if is_heart(item) { 2.0 * speed_f } else { speed_f };
+        Self {
+            item,
+            timer: 0,
+            speed_f,
+            speed_y,
+            gravity,
+        }
+    }
+
+    pub fn launch(&self) -> Vec3 {
+        Vec3::new(self.speed_f.sin(), self.speed_y, self.speed_f.cos())
     }
 
     fn radius(&self) -> f32 {
@@ -70,6 +96,10 @@ impl Pickup {
                 | BOOMERANG
         ) || super::inventory::slot_of(self.item).is_some()
     }
+}
+
+fn is_heart(item: u8) -> bool {
+    matches!(item, HEART_ITEMS | TRIPLE_HEART)
 }
 
 fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {

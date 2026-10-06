@@ -4,6 +4,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::carry::Carryable;
+use super::registry::ActorRegistry;
 use super::collision::Collision;
 use super::ground;
 use super::player::Player;
@@ -143,6 +144,7 @@ pub fn is_hookshot(name: &str) -> bool {
 
 pub fn control(
     collision: Option<Res<Collision>>,
+    registry: Option<ResMut<ActorRegistry>>,
     mut hooks: Query<(Entity, &mut Hookshot)>,
     carryables: Query<(Entity, &Actor, &Carryable)>,
     targets: Query<(Entity, &Actor)>,
@@ -156,6 +158,8 @@ pub fn control(
     let root = player.pos + Vec3::new(0.0, 40.0, 0.0);
     let mut spent: Vec<Entity> = Vec::new();
     let mut haul = Vec3::ZERO;
+    let mut latched: Option<Entity> = None;
+    let mut released: Vec<Entity> = Vec::new();
     for (entity, mut hook) in &mut hooks {
         hook.root = root;
         match hook.phase {
@@ -177,6 +181,7 @@ pub fn control(
                     Some((target, pos)) => {
                         let offset = pos - hook.pos;
                         hook.hooked(target, offset);
+                        latched = Some(target);
                     }
                     None if hook.over_extended() || hook.beyond_reach() => hook.reel(),
                     None => {
@@ -218,10 +223,25 @@ pub fn control(
             }
         }
         if hook.spent() {
+            if let Some(pin) = hook.carry {
+                released.push(pin);
+            }
             spent.push(entity);
         }
     }
     player.pos += haul;
+    if let Some(mut registry) = registry {
+        if let Some(target) = latched
+            && let Some(proc_id) = registry.proc_id(target)
+        {
+            registry.set_hook_carry_now(proc_id);
+        }
+        for target in released {
+            if let Some(proc_id) = registry.proc_id(target) {
+                registry.cancel_hook_carry_now(proc_id);
+            }
+        }
+    }
     for entity in spent {
         let _ = commands.entity(entity).despawn();
     }

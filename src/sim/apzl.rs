@@ -99,6 +99,9 @@ const REWARD_TIMER_GATE: i32 = 2;
 const REWARD_GATE_MASK: i32 = 0;
 const REWARD_BEAM: i32 = 6;
 const RUPEE_MAX: usize = 30;
+const RUPEE_SPEED_RANGE: f32 = 15.0;
+const RUPEE_SPEED_BASE: f32 = 5.0;
+const RUPEE_GRAVITY: f32 = -2.1;
 const PUZZLE_MAX: u8 = 0x10;
 
 const SHUFFLE_ROUNDS: i32 = 10000;
@@ -824,6 +827,8 @@ struct Rupee {
     angle: [i16; 3],
     room: i8,
     set_id: u16,
+    speed_f: f32,
+    speed_y: f32,
 }
 
 struct Env<'a> {
@@ -1039,6 +1044,8 @@ impl Apzl {
             angle,
             room: env.room,
             set_id: env.set_id,
+            speed_f: self.rnd_f(RUPEE_SPEED_RANGE) + RUPEE_SPEED_BASE,
+            speed_y: self.rnd_f(RUPEE_SPEED_RANGE) + RUPEE_SPEED_BASE,
         });
 
         self.given_rupee_count += 1;
@@ -1221,7 +1228,7 @@ pub fn control(
         *board = fresh;
     }
 
-    for (entity, actor, board) in &mut boards {
+    for (entity, actor, mut board) in &mut boards {
         let angle = actor.angle;
         let room = actor.room;
         let set_id = actor.set_id;
@@ -1261,6 +1268,8 @@ pub fn control(
     let mut born: Vec<(Entity, usize, Entity)> = Vec::new();
     for rupee in spawns {
         let parameters = rupee.parameters;
+        let launch = rupee.angle[1];
+        let pickup = Pickup::thrown(parameters, rupee.speed_f, rupee.speed_y, RUPEE_GRAVITY);
         let item = commands
             .spawn((
                 Actor {
@@ -1270,9 +1279,16 @@ pub fn control(
                     angle: rupee.angle,
                     set_id: rupee.set_id,
                     room: rupee.room,
+                    speed_f: rupee.speed_f,
+                    speed: Vec3::new(
+                        rupee.speed_f * from_s16(launch).sin(),
+                        rupee.speed_y,
+                        rupee.speed_f * from_s16(launch).cos(),
+                    ),
+                    gravity: RUPEE_GRAVITY,
                     ..Default::default()
                 },
-                Pickup::spawn(parameters),
+                pickup,
             ))
             .id();
         born.push((rupee.owner, rupee.slot, item));
