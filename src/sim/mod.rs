@@ -47,6 +47,7 @@ pub mod esekh;
 pub mod ending;
 pub mod enemy;
 pub mod event;
+pub mod evsw;
 pub mod events;
 pub mod fallrock;
 pub mod fire;
@@ -55,6 +56,7 @@ pub mod flags;
 pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
+pub mod touseki;
 pub mod gaship;
 pub mod gbed;
 pub mod gaship2;
@@ -94,6 +96,7 @@ pub mod akabe;
 pub mod kamome;
 pub mod ktaruo;
 pub mod kmon;
+pub mod kaji;
 pub mod kita;
 pub mod kn;
 pub mod komore;
@@ -195,6 +198,8 @@ pub mod tagkk1;
 pub mod taglight;
 pub mod trapdoor;
 pub mod table;
+pub mod tagso;
+pub mod alldie;
 pub mod talk;
 pub mod tama;
 pub mod tenmado;
@@ -896,6 +901,20 @@ let v = mmusic::Mmusic::spawn(world.resource::<inventory::Equipped>(), world.res
         world.spawn((actor, v)).id()
     } else if ygush::is_ygush(&source.name) {
 world.spawn((actor, ygush::Ygush::spawn(source.parameters))).id()
+    } else if evsw::is_evsw(&source.name) {
+let f = world.resource::<flags::EventFlags>();
+        let mut sw = world.resource_mut::<flags::Switches>();
+        let v = evsw::Evsw::spawn(source.parameters, f, &mut sw);
+        world.spawn((actor, v)).id()
+    } else if tagso::is_tagso(&source.name) {
+world.spawn((actor, tagso::Tagso::spawn())).id()
+    } else if alldie::is_alldie(&source.name) {
+let v = alldie::Alldie::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if kaji::is_kaji(&source.name) {
+world.spawn((actor, kaji::Kaji::spawn())).id()
+    } else if touseki::is_touseki(&source.name) {
+world.spawn((actor, touseki::Touseki::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1052,6 +1071,10 @@ pub fn build(
             (
                 (
                     daynight::control.in_set(WwSimSet::Execute),
+                    evsw::control.in_set(WwSimSet::Execute),
+                    tagso::control.in_set(WwSimSet::Execute),
+                    alldie::control.in_set(WwSimSet::Execute),
+                    kaji::control.in_set(WwSimSet::Execute),
                     ikari::control.in_set(WwSimSet::Execute),
                     gbed::control.in_set(WwSimSet::Execute),
                     hami4::control.in_set(WwSimSet::Execute),
@@ -1203,6 +1226,7 @@ pub fn build(
                     .chain(),
                 (
                     ending::control.in_set(WwSimSet::Execute),
+                    touseki::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),
                     water::water_probe.in_set(WwSimSet::Execute),
                     swim::control.in_set(WwSimSet::Execute),
