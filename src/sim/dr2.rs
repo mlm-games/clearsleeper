@@ -185,6 +185,7 @@ pub struct Dr2 {
     pub max_health: i32,
     pub tick: i16,
     pub fragments: [Hahen; COUNT_HAHEN],
+    pub hane_l2: Vec3,
     pub wave_y: [i16; COUNT_JOINT],
     pub wave_z: [i16; COUNT_JOINT],
     pub tilt_y: f32,
@@ -229,6 +230,7 @@ impl Dr2 {
             max_health: MAX_HEALTH,
             tick: 0,
             fragments: [Hahen::SRC; COUNT_HAHEN],
+            hane_l2: Vec3::ZERO,
             wave_y: [0; COUNT_JOINT],
             wave_z: [0; COUNT_JOINT],
             tilt_y: 0.0,
@@ -353,7 +355,6 @@ pub struct Watch<'w, 's> {
 }
 
 struct BtdProbe {
-    pos: Vec3,
     angle: i16,
     ground: Vec3,
     far: Vec3,
@@ -385,7 +386,6 @@ pub fn control(
             None => (Vec3::ZERO, [0; 3], [0; 3]),
         };
         let btd = gohmas.iter_mut().next().map(|(_, bactor, boss)| BtdProbe {
-            pos: bactor.pos,
             angle: bactor.angle[ANGLE_Y],
             ground: Vec3::from(boss.m02fc[3]),
             far: Vec3::from(boss.m02fc[4]),
@@ -426,15 +426,18 @@ impl Dr2 {
         self.home_angle = actor.angle[ANGLE_Y];
         self.rock_pos = Vec3::new(actor.pos.x, actor.pos.y + REG0_F7 - TOP_OFFSET, actor.pos.z);
         self.kui_parameters = KUI_PARAMETERS;
-        commands.spawn(Actor {
-            name: KUI_ACTOR.to_owned(),
-            parameters: KUI_PARAMETERS,
-            pos: actor.pos,
-            angle: actor.angle,
-            set_id: 0,
-            room: actor.room,
-            ..Default::default()
-        });
+        commands.spawn((
+            Actor {
+                name: KUI_ACTOR.to_owned(),
+                parameters: KUI_PARAMETERS,
+                pos: actor.pos,
+                angle: actor.angle,
+                set_id: 0,
+                room: actor.room,
+                ..Default::default()
+            },
+            super::kui::Kui::spawn(KUI_PARAMETERS),
+        ));
     }
 
     fn execute(
@@ -528,6 +531,7 @@ impl Dr2 {
                     }
                     self.tilt_y = self.amp * self.phase_y.sin();
                     self.tilt_z = self.amp * self.phase_z.sin();
+                    self.hane_l2 = self.hane_l2_at_hinge(env.player_shape[ANGLE_Y]);
                     if kui.map(|(_, health)| health) == Some(1) {
                         add_calc2(&mut self.amp, 0.0, SWAY_TILT_SCALE, SWAY_EPS);
                         self.spin_timer = HOLD_TICKS;
@@ -703,6 +707,17 @@ impl Dr2 {
 
     fn has_emitter(&self) -> bool {
         self.emit_mode != EMIT_NONE
+    }
+
+    fn hane_l2_at_hinge(&mut self, shape_y: i16) -> Vec3 {
+        let rad = from_s16(shape_y.wrapping_neg());
+        let (sin, cos) = rad.sin_cos();
+        let local = Vec3::new(215.0, 0.0, -5.0);
+        Vec3::new(
+            local.x * cos + local.z * sin,
+            local.y,
+            -local.x * sin + local.z * cos,
+        )
     }
 
     fn state_shatter_done(&mut self) {
