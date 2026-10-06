@@ -199,12 +199,12 @@ pub const MENU_LR_STEP_X: f32 = 20.0;
 pub const MENU_LR_INIT_R: i16 = 10;
 pub const MENU_LR_L_HOLD: i16 = 1;
 pub const MENU_PLUS_FADE_FRAMES: i16 = 5;
-pub const MENU_PLUS_SHIFT_X: f32 = 0x52;
+pub const MENU_PLUS_SHIFT_X: f32 = 0x52 as f32;
 pub const MENU_PLUS_COMPASS_OFF_X: f32 = 7.0;
 pub const MENU_PLUS_COMPASS_OFF_Y: f32 = 9.0;
-pub const MENU_MAP_OFF_X: f32 = 0x19;
-pub const MENU_MAP_OFF_Y: f32 = 0x152;
-pub const MENU_DEG_PER_TURN: f32 = 180.0 / 0x8000;
+pub const MENU_MAP_OFF_X: f32 = 0x19 as f32;
+pub const MENU_MAP_OFF_Y: f32 = 0x152 as f32;
+pub const MENU_DEG_PER_TURN: f32 = 180.0 / 0x8000 as f32;
 pub const MENU_DEG_BIAS: f32 = -180.0;
 
 pub const MINIGAME_1: u8 = 1;
@@ -217,7 +217,7 @@ pub const ICON_ARCHIVE_MENU: usize = 1;
 pub const ICON_TEX_SLOT: usize = 2;
 pub const ICON_TEX_BYTES: usize = 0xC00;
 
-pub const ACTION_TEX_TABLE: [(u8, Option<&'static str>); 64] = [
+pub const ACTION_TEX_TABLE: [(u8, Option<&'static str>); 63] = [
     (ACT_BLANK, Some("ba_shiraberu.bti")),
     (ACT_LOOK, Some("ba_miru.bti")),
     (ACT_SPEAK, Some("ba_syaberu.bti")),
@@ -273,7 +273,7 @@ pub const ACTION_TEX_TABLE: [(u8, Option<&'static str>); 64] = [
     (ACT_SAVE_DUPE_34, Some("ba_save.bti")),
     (ACT_SWORD_01, Some("sword_01.bti")),
     (ACT_DEFEND, Some("ba_husegu.bti")),
-    (ACT_CLUB_37, None),
+    (ACT_CLUB_37, Some("boko_stick.bti")),
     (ACT_HATCHET, Some("hatchet.bti")),
     (ACT_IRON_CLUB, Some("iron_club.bti")),
     (ACT_LONGSWORD, Some("longsword.bti")),
@@ -571,7 +571,7 @@ impl GaugePane {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct GaugeQuad {
     pub tag: String,
     pub kind: Kind,
@@ -615,13 +615,13 @@ impl Default for MeterTuning {
             wind_arrow_y: 0,
             menu_gauge_x: 0,
             menu_gauge_y: 0,
-            icon_slide_x: 0xfffa,
+            icon_slide_x: 0xfffa_u16 as i16,
             icon_slide_y: 0,
-            icon_choose_x: 0xfffa,
+            icon_choose_x: 0xfffa_u16 as i16,
             icon_choose_y: 0,
             icon_default_x: 0,
             icon_default_y: 0,
-            icon_hold_x: 0xff9e,
+            icon_hold_x: 0xff9e_u16 as i16,
             icon_hold_y: 7,
             menu_lr_half_width: 7,
         }
@@ -727,7 +727,7 @@ pub struct GaugeEnv {
     pub push_menu_button: u8,
     pub collect_mode: u8,
     pub auction_flag: bool,
-    pub event_hind: u8,
+    pub event_hind: u16,
     pub event_running: bool,
     pub overlap_request: bool,
     pub demo_start: bool,
@@ -1058,7 +1058,7 @@ pub fn boss_gauge_collect(collect: &Collect) -> bool {
     collect.test(4, 1)
 }
 
-pub fn icon_init(g: &mut MeterGauges, env: &mut GaugeEnv, out: &mut GaugeOutput) {
+pub fn icon_init(g: &mut MeterGauges, env: &mut GaugeEnv) {
     g.icon.note.user_area = 0;
     g.icon.base.user_area = 0;
     g.icon.status_cache = 0;
@@ -1068,7 +1068,6 @@ pub fn icon_init(g: &mut MeterGauges, env: &mut GaugeEnv, out: &mut GaugeOutput)
     g.icon.texture_bytes = ICON_TEX_BYTES;
     let name = action_texture_name(ACT_BLANK);
     g.icon.base.change_texture(name);
-    let _ = out;
 }
 
 pub fn icon_move(g: &mut MeterGauges, env: &mut GaugeEnv, tuning: &MeterTuning) {
@@ -1787,7 +1786,7 @@ pub fn magic_gauge_move(g: &mut MeterGauges, env: &mut GaugeEnv, out: &mut Gauge
 }
 
 pub fn fly_gauge_move(g: &mut MeterGauges, env: &GaugeEnv, fly: FlyGauge) {
-    let mut fade;
+    let fade;
     if fly.flying != 0 {
         let span = fly.timer as f32 / fly.max_timer as f32 * MAGIC_FLY_UNITS * MAGIC_FLY_SPAN;
         magic_init_trans(g, env.max_life);
@@ -2540,6 +2539,16 @@ pub fn draw(g: &mut MeterGauges) -> Vec<GaugeQuad> {
     push(&g.icon.tag_pane);
     push(&g.icon.note);
     quads
+}
+
+pub fn create(g: &mut MeterGauges, env: &mut GaugeEnv, out: &mut GaugeOutput) {
+    out.reset();
+    icon_init(g, env);
+    enemy_init(g);
+    magic_init(g, env);
+    menu_init(g, env);
+    wind_init(g, env, out);
+    metronome_init(g);
 }
 
 pub fn init(world: &mut World) {
