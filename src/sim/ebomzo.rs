@@ -15,9 +15,12 @@ pub const EBOMZO_ACTORS: [&str; 1] = ["Ebomzo"];
 /// `daObj::PrmAbstract(this, PRM_SWSAVE_W = 8, PRM_SWSAVE_S = 0)` (`d_a_obj_ebomzo.h:17`,
 /// `d_a_obj.h:14`) - `((1 << 8) - 1) & (param >> 0)`.
 const SWSAVE_MASK: u32 = 0xFF;
+/// `mXRotRate = 0` (`d_a_obj_ebomzo.cpp:70`).
+const SPIN_INIT: i16 = 0;
 /// `sph_check_src` `cM3dGSphS.Radius` (`d_a_obj_ebomzo.cpp:47`).
 const SPH_RADIUS: f32 = 10.0;
-/// `offset.x = cM_ssin(current.angle.y) * 50.0f` (`d_a_obj_ebomzo.cpp:178`).
+/// `offset.x = cM_ssin(current.angle.y) * 50.0f` (`d_a_obj_ebomzo.cpp:178`) and
+/// `offset.z = cM_scos(current.angle.y) * 50.0f` (`:180`).
 const OFFSET_RADIUS: f32 = 50.0;
 /// `offset.y = 320.0f` (`d_a_obj_ebomzo.cpp:179`).
 const OFFSET_Y: f32 = 320.0;
@@ -74,7 +77,7 @@ pub struct Ebomzo {
     pub switch_no: u8,
     /// `mMode` (`d_a_obj_ebomzo.h:44`).
     pub mode: Mode,
-    /// `mXRotRate` (`d_a_obj_ebomzo.h:45`), `mXRotRate = 0` in `Create` (`:70`).
+    /// `mXRotRate` (`d_a_obj_ebomzo.h:45`), seeded to 0 by `Create` (`:70`).
     pub spin_rate: i16,
     /// `current.angle.x = 0x4000` (`d_a_obj_ebomzo.cpp:75`), a `Create`-time write to
     /// `current.angle.x`. Carried to the first tick because `spawn` cannot mutate `Actor`.
@@ -92,7 +95,7 @@ impl Ebomzo {
         Self {
             switch_no,
             mode: if fallen { Mode::Fall } else { Mode::Check },
-            spin_rate: 0,
+            spin_rate: SPIN_INIT,
             pending_cap: fallen,
         }
     }
@@ -117,7 +120,8 @@ impl Ebomzo {
 
     /// `mCollider.ChkTgHit()` against a `SrcObjTg Type = AT_TYPE_BOMB` sphere
     /// (`d_a_obj_ebomzo.cpp:29`, `:47`, `:125`). Blast origins come from `bombflower::Blasts`,
-    /// the shared AT_BOMB channel; a blast anywhere in the sphere reaches `GetTgHitAc()`.
+    /// the shared AT_BOMB channel, whose entry is the exploding bomb's `Actor.pos`
+    /// (`bomb.rs:166`) - that is exactly the `acActor->current.pos` of `:128`.
     fn bomb_hit(&self, centre: Vec3, blasts: &Blasts) -> Option<Vec3> {
         blasts
             .list

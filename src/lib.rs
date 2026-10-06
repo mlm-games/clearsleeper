@@ -1134,6 +1134,26 @@ impl App {
                 };
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::nzg::Nzg>() {
+                let (min, max) = sim::nzg::Nzg::spawn(0).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::hys::Hys>() {
+                let (min, max) = sim::hys::Hys::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::smtoge::Smtoge>() {
+                let (min, max) = sim::smtoge::Smtoge::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::ygawa::Ygawa>() {
+                let (min, max) = sim::ygawa::Ygawa::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::syan::Syan>() {
+                let (min, max) = sim::syan::Syan::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];

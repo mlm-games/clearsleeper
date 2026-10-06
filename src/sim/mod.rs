@@ -10,6 +10,7 @@ pub mod armos;
 pub mod aryll;
 pub mod arrow;
 pub mod atttag;
+pub mod atdoor;
 pub mod balloon;
 pub mod barrier;
 pub mod barrel;
@@ -64,6 +65,7 @@ pub mod gaship;
 pub mod gbed;
 pub mod gaship2;
 pub mod ghostship;
+pub mod nzg;
 pub mod gntakie;
 pub mod gntakis;
 pub mod gohdan;
@@ -82,6 +84,7 @@ pub mod health;
 pub mod helmaroc;
 pub mod hhyu;
 pub mod hotfloor;
+pub mod hys;
 pub mod hmlif;
 pub mod homen;
 pub mod hookshot;
@@ -208,6 +211,7 @@ pub mod spcitem;
 pub mod swc00;
 pub mod swhammer;
 pub mod swatk;
+pub mod smtoge;
 pub mod swlight;
 pub mod switem;
 pub mod swtdoor;
@@ -255,7 +259,9 @@ pub mod warship;
 pub mod wbird;
 pub mod water;
 pub mod woodbox;
+pub mod ygcwp;
 pub mod yboil;
+pub mod ygawa;
 pub mod ylzou;
 pub mod zelda;
 pub mod zunari;
@@ -1000,9 +1006,27 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if warpfo::is_warpfo(&source.name) {
         world.spawn((actor, warpfo::Warpfo::spawn())).id()
+    } else if atdoor::is_atdoor(&source.name) {
+        let v = atdoor::Atdoor::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if npc_km1::is_npc_km1(&source.name) {
         let v = npc_km1::NpcKm1::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if nzg::is_nzg(&source.name) {
+let v = nzg::Nzg::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if hys::is_hys(&source.name) {
+let v = hys::Hys::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if smtoge::is_smtoge(&source.name) {
+let v = smtoge::Smtoge::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if ygcwp::is_ygcwp(&source.name) {
+let mut f = world.resource_mut::<flags::EventFlags>();
+        let v = ygcwp::Ygcwp::spawn(&mut f);
+        world.spawn((actor, v)).id()
+    } else if ygawa::is_ygawa(&source.name) {
+world.spawn((actor, ygawa::Ygawa::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1219,6 +1243,8 @@ pub fn build(
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
                     woodbox::control.in_set(WwSimSet::Execute),
+                    cafelmp::control.in_set(WwSimSet::Execute),
+
                     pbka::control.in_set(WwSimSet::Execute),
                     gntakie::control.in_set(WwSimSet::Execute),
                     vmsdz::control.in_set(WwSimSet::Execute),
@@ -1383,7 +1409,8 @@ pub fn build(
                     redead::control.in_set(WwSimSet::Execute),
                     iball::control.in_set(WwSimSet::Execute),
                     tama::control.in_set(WwSimSet::Execute),
-                    swatk::control.in_set(WwSimSet::Execute),
+                    swatk::control.in_set(WwSimSet::Execute),                    rforce::control.in_set(WwSimSet::Execute),
+
                     mjdoor::control.in_set(WwSimSet::Execute),
                     vmsms::control.in_set(WwSimSet::Execute),
                     objtime::control.in_set(WwSimSet::Execute),
@@ -1421,6 +1448,11 @@ pub fn build(
                 .chain(),
             (
                 pickup::control.in_set(WwSimSet::Execute),
+                    nzg::control.in_set(WwSimSet::Execute),
+                    hys::control.in_set(WwSimSet::Execute),
+                    smtoge::control.in_set(WwSimSet::Execute),
+                    ygcwp::control.in_set(WwSimSet::Execute),
+                    ygawa::control.in_set(WwSimSet::Execute),
                     collision::remember_move_from.in_set(WwSimSet::Execute),
                     walk::walk.in_set(WwSimSet::Execute),
                     swim::surface.in_set(WwSimSet::Execute),
@@ -1442,6 +1474,7 @@ pub fn build(
                 gtaki::control.in_set(WwSimSet::Execute),
                 swtact::control.in_set(WwSimSet::Execute),
                 warpfo::control.in_set(WwSimSet::Execute),
+                atdoor::control.in_set(WwSimSet::Execute),
                 npc_km1::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                     andsw0::control.in_set(WwSimSet::Execute),

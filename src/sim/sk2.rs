@@ -17,12 +17,14 @@ pub const CULL_MAX: [f32; 3] = [500.0, 1000.0, 1000.0]; // <- d_a_sk2.cpp:228 (f
 /// `fpcNm_SK_e`) and `d_a_sk.cpp`; the two share no state and neither `is_sk2` nor `is_turu`
 /// matches the other's stage string.
 ///
-/// Its base class is `fopEn_enemy_c` (`d_a_sk2.h:11`), but the profile's `Group` is
-/// `fopAc_ACTOR_e` (`d_a_sk2.cpp:259`), so `fopAcM_myRoomSearchEnemy`'s `group == fopAc_ENEMY_e`
-/// test (`f_op_actor_mng.cpp:1282-1296`) never finds it, and `attention_info.flags = 0`
-/// (`:229`) disables attention. No `dCcD` AT or Tg collider is ever registered - the only
-/// registration is the deform background `dComIfG_Bgsp()->Regist(mpBgW, ...)` (`:231`) - so this
-/// actor cannot be hit at all and takes no `HitPoints`/`Hurt`.
+/// `sk2_class` holds a `fopEn_enemy_c actor` member (`d_a_sk2.h:11`) - composition, not
+/// inheritance, which is why the decomp reaches `i_this->actor.current` (`:106-109`) and
+/// `i_this->actor.heap` (`:131`). The profile's `Group` is nevertheless `fopAc_ACTOR_e`
+/// (`d_a_sk2.cpp:259`), so `fopAcM_myRoomSearchEnemy`'s `group == fopAc_ENEMY_e` test
+/// (`f_op_actor_mng.cpp:1282-1296`) never finds it, and `attention_info.flags = 0` (`:229`)
+/// disables attention. No `dCcD` AT or Tg collider is ever registered - the only registration is
+/// the deform background `dComIfG_Bgsp()->Regist(mpBgW, ...)` (`:231`) - so this actor cannot be
+/// hit at all and takes no `HitPoints`/`Hurt`.
 ///
 /// `dousa_move` (`:53-98`) is the only non-renderer code left after the resources are accounted
 /// for, and its mode machine is not decidable here: `case 1` (`:61-65`) is gated on
@@ -46,6 +48,12 @@ impl Sk2 {
     /// BMD/BCK/DZB selector, `m2B5` (`:194`) becomes `m2C4` (`:201-204`, clamped to
     /// `START_FRAME_MAX = 35.0f` at `:202`), and both are read nowhere but `useHeapInit`
     /// (`:143-180`) and `setFrame` (`:57`); `m2B6` (`:207`) is the refusal switch.
+    ///
+    /// `fopAcM_isSwitch(a_this, m2B6)` is `dComIfGs_isSwitch(i_no, roomNo)`, so a `m2B6` of
+    /// `0x80` or more reads the per-zone `dSv_zoneBit_c` array rather than the in-memory one
+    /// (`d_save.h:982`, `d_save.cpp:1585-1601`). `flags::Switches` models only the 0..128 array, so
+    /// under RULE 11b such a placement reads false here and this branch is taken - that is the
+    /// save model's gap, not a workaround.
     pub fn spawn(parameters: u32, switches: &Switches) -> Self {
         let switch_no = ((parameters >> SWITCH_SHIFT) & BYTE_MASK) as u8;
         Self {

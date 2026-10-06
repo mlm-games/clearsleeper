@@ -3,8 +3,6 @@ use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::daynight::{DayNight, TIME_NIGHT};
-use super::event::ActiveEvent;
 use super::flags::EventFlags;
 use super::intent::DoIntent;
 use super::player::Player;
@@ -89,8 +87,7 @@ const JNT_MIN_STEP: i32 = 1; // <- d_npc.cpp dNpc_JntCtrl_c::move
 const CULL_MIN: [f32; 3] = [-70.0, -100.0, -80.0]; // <- f_op_actor_mng.cpp:570 (CULLBOX_12)
 const CULL_MAX: [f32; 3] = [70.0, 240.0, 100.0]; // <- :570
 
-const ANM_LOOP_MODE_NONE: u8 = 1; // <- J3DFrameCtrl::EMode_NONE, d_a_npc_tt_anm.inc:86
-const ANM_MORF: f32 = 8.0; // <- :84
+const ANM_MORF: f32 = 8.0; // <- d_a_npc_tt_anm.inc:84
 const ANM_MORF_POSE: f32 = 7.0; // <- :87
 const ANM_POSE_LO: i32 = 7; // <- newAnmIdx >= 7, :87
 const ANM_POSE_HI: i32 = 31; // <- :87
@@ -370,7 +367,6 @@ pub struct NpcTt {
     pub msg_no: u32,
     pub msg_id: u32,
     pub msg_bound: bool,
-    pub melody_num: u8,
     pub morf: Morf,
     pub jnt: JntCtrl,
 }
@@ -401,7 +397,6 @@ impl NpcTt {
             msg_no: 0,
             msg_id: FPC_M_ERROR_PROCESS_ID,
             msg_bound: false,
-            melody_num: 0,
             morf: Morf::create(),
             jnt: JntCtrl::create(),
         }
@@ -588,7 +583,7 @@ impl NpcTt {
         } else {
             let msg_no = self.msg_no;
             if msg_no == MSG_5B3 {
-                self.melody_num = MELODY_5;
+                ctx.text.set_melody_num(MELODY_5);
             }
             msg_no
         }
@@ -846,6 +841,11 @@ impl Text<'_> {
         self.info.message_send_on();
     }
 
+    /// `dComIfGp_setMelodyNum`.
+    pub fn set_melody_num(&mut self, melody: u8) {
+        self.one.tact.melody_num = melody;
+    }
+
     pub fn message_set(&mut self, msg_no: u32) -> u32 {
         let Some(archive) = self.archive else {
             return FPC_M_ERROR_PROCESS_ID;
@@ -869,7 +869,6 @@ pub struct Ctx<'a> {
     pub talk_command: bool,
     pub demo_accept: bool,
     pub mesg_send_button: bool,
-    pub night: bool,
     pub text: &'a mut Text<'a>,
 }
 
@@ -877,7 +876,6 @@ pub struct Ctx<'a> {
 pub struct Env<'w> {
     pub text_flags: Res<'w, TextFlags>,
     pub flags: ResMut<'w, EventFlags>,
-    pub daynight: Res<'w, DayNight>,
     pub archive: Option<Res<'w, MsgArchives>>,
 }
 
@@ -893,21 +891,18 @@ pub struct Msg<'w, 's> {
 pub fn control(
     mut world: Env,
     mut msg: Msg,
-    active: Res<ActiveEvent>,
     do_intent: Res<DoIntent>,
     mut actors: Query<(&mut Actor, &mut NpcTt)>,
 ) {
     let player = msg.players.iter().next().copied();
     let clear_count = world.text_flags.clear_count;
     let demo_accept = msg.info.event_run_check();
-    let night = world.daynight.daynight() == TIME_NIGHT;
     let send_button = msg.one.m116a != 0;
     let do_now = do_intent.0;
     let archive = world
         .archive
         .as_deref()
         .map(|held| held as &dyn MsgArchive);
-    let _ = ActiveEvent::staff_cut(&active, &EventList::default(), STAFF_TT);
     for (mut actor, mut tt) in &mut actors {
         let tap = do_now && !tt.prev_do;
         tt.prev_do = do_now;
@@ -932,7 +927,6 @@ pub fn control(
             talk_command: tap,
             demo_accept,
             mesg_send_button: send_button,
-            night,
             text: &mut text,
         };
         if !tt.entered {

@@ -50,8 +50,8 @@ impl RoHat {
     /// `mCyl.SetStts`, `fopAcM_SetMtx`, `fopAcM_setCullSizeBox` and `setMtx`. `mHatNo` is dropped
     /// under RULE 7: `getPrmHatNo` (`:181-183`) is its only writer and its only readers are the
     /// model/BCK selectors `l_bmd_ix_tbl` (`:15`) and `l_bck_ix_tbl` (`:16-17`) inside
-    /// `createHeap` (`:80-87`).
-    pub fn spawn(_parameters: u32) -> Self {
+    /// `createHeap` (`:80-87`), so the whole u32 parameter is unread.
+    pub fn spawn() -> Self {
         Self {
             move_norm: Vec3::ZERO,
             speed_f: 0.0,
@@ -74,7 +74,11 @@ impl RoHat {
     /// `mAcchCir.SetWall(30.0f, 30.0f)` (`:94`); `Collision::slide` uses the crate-wide
     /// `ACTOR_HEIGHT`, the same reduction `kanban.rs` and `iball.rs` already make.
     fn execute(&mut self, actor: &mut Actor, solid: Option<&Collision>) {
-        self.execute_normal();
+        // `(this->*moveProc[mState])()` (`d_a_obj_hat.cpp:148`).
+        match self.state {
+            STATE_NORMAL => self.execute_normal(),
+            _ => {}
+        }
 
         let xspeed = self.move_norm.x * self.speed_f;
         let mut yspeed = self.speed.y + self.gravity;
@@ -120,7 +124,8 @@ pub fn control(
     collision: Option<Res<Collision>>,
     mut hats: Query<(&mut Actor, &mut RoHat)>,
 ) {
-    for (actor, mut hat) in &mut hats {
+    for (mut actor, mut hat) in &mut hats {
+        let actor = &mut *actor;
         hat.execute(actor, collision.as_deref());
     }
 }

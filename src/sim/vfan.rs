@@ -180,7 +180,7 @@ impl Vfan {
         let base = actor.pos;
         let axis = (base, base + Vec3::new(0.0, CYL_HEIGHT, 0.0));
         swords.iter().any(|stick| {
-            stick.kind == BOKO_SWORD
+            stick.kind == BOKO_SWORD as u8
                 && seg_distance((stick.root, stick.top), axis) < CYL_RADIUS + CPS_R_PGANON_SWORD
         })
     }

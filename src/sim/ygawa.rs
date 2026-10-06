@@ -26,6 +26,9 @@ const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
 /// `cM_rnd` reciprocals (`c_math.cpp:181`).
 const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
+/// `l_HIO.field_0x08 * scale.x` (`d_a_yougan.cpp:101`) - folded per RULE 2b and RULE 3:
+/// `field_0x08` is `1250.0f` (`:41`) and stage-placed actors are scale exactly 1.0.
+const SPREAD_XZ: f32 = 1250.0;
 
 /// `field_0x298[i].field_0x00` (`d_a_yougan.h:12`), the `switch` at `d_a_yougan.cpp:96-136`.
 /// `useHeapInit` (`:184`) seeds every entry to 0 and only 0, 1 and 2 are ever assigned, so the
@@ -93,6 +96,11 @@ fn rnd_f(seed: &mut [i32; 3], f: f32) -> f32 {
     rnd(seed) * f
 }
 
+/// `cM_rndFX(f)` (`c_math.cpp:189-192`): `f * (cM_rnd() - 0.5f) * 2.0f`.
+fn rnd_fx(seed: &mut [i32; 3], f: f32) -> f32 {
+    f * (rnd(seed) - 0.5) * 2.0
+}
+
 impl Ygawa {
     /// `useHeapInit` (`d_a_yougan.cpp:182-192`) is the only setup this actor does: it zeroes every
     /// `field_0x298[i].field_0x00` (`:184`). `l_HIO` (`:37-49`) is built once for the whole
@@ -116,6 +124,13 @@ impl Ygawa {
             Phase::Idle => {
                 let rate = RISE_BASE + rnd_f(&mut self.seed, RISE_SPREAD);
                 let limit = SIZE_BASE + rnd_f(&mut self.seed, SIZE_SPREAD);
+                // `cM_rndFX(fVar4)` and `cM_rndFX(fVar4 - std::fabsf(fVar5))`
+                // (`d_a_yougan.cpp:102-103`). Their results feed only `field_0x2C` (`:105-107`),
+                // which is consumed by `mDoMtx_stack_c::transS` (`:142`) and `mDoLib_clipper::clip`
+                // (`:61`) - renderer state. The two draws are kept so this actor's `cM_rnd` lane
+                // state advances exactly as retail does and later resets draw the same values.
+                let spread = rnd_fx(&mut self.seed, SPREAD_XZ);
+                let _ = rnd_fx(&mut self.seed, SPREAD_XZ - spread.abs());
                 let bubble = &mut self.bubbles[index];
                 bubble.rise = 0.0;
                 bubble.rate = rate;
@@ -136,9 +151,8 @@ impl Ygawa {
 
     /// `daYougan_c::_daYougan_execute` (`d_a_yougan.cpp:92-146`) minus `case 2`'s
     /// `setPlaySpeed`/`play()` body (`:121-131`, which needs the BCK/BTK frame counts), the
-    /// `field_0x2C` placement block (`:101-107`, and with it the two `cM_rndFX` draws on
-    /// `l_HIO.field_0x08 * scale.x` = `1250.0f`, `:101-104`, and `current.pos`) and the model matrix
-    /// loop (`:138-144`).
+    /// `field_0x2C` assignment itself (`:105-107`, and with it `current.pos`) and the model matrix
+    /// loop (`:138-144`). The two `cM_rndFX` draws that place it are kept - see `bubble`.
     fn step(&mut self) {
         for index in 0..AWA_NUM {
             self.bubble(index);

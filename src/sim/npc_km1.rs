@@ -17,10 +17,7 @@ use crate::text::msgproc::{
     FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
     fop_msgm_message_set_actor,
 };
-use crate::text::{
-    STATUS_BOX_CLOSED, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_MSG_TYPING,
-};
+use crate::text::{STATUS_BOX_CLOSED, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS};
 
 pub const NPC_KM1_ACTORS: [&str; 1] = ["Km1"];
 

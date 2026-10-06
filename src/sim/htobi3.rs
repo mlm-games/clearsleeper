@@ -320,16 +320,17 @@ pub fn control(
     switches: Res<Switches>,
     mut ev_flags: ResMut<EventFlags>,
     mut events: ResMut<SimEvents>,
-    foes: Query<(&Actor, With<Enemy>)>,
+    foes: Query<&Actor, With<Enemy>>,
     mut shutters: Query<(Entity, &mut Actor, &mut Htobi3)>,
 ) {
     let mut enemies: Vec<i8> = Vec::new();
-    for (actor, _) in &foes {
+    for actor in &foes {
         if !enemies.contains(&actor.room) {
             enemies.push(actor.room);
         }
     }
-    for (entity, actor, mut shutter) in &mut shutters {
+    for (entity, mut actor, mut shutter) in &mut shutters {
+        let actor = &mut *actor;
         if !shutter.entered {
             shutter.entered = true;
             shutter.create_init(actor, &list, &switches, &enemies);
