@@ -89,6 +89,7 @@ pub mod events;
 pub mod fallrock;
 pub mod fan;
 pub mod ff;
+pub mod obj_hha;
 pub mod tag_hint;
 pub mod tag_md_cb;
 pub mod zouk;
@@ -271,7 +272,6 @@ pub mod schedule;
 pub mod andsw0;
 pub mod andsw2;
 pub mod obj_nest;
-pub mod obj_hha;
 pub mod ohatch;
 pub mod obj_paper;
 pub mod obj_rcloud;
@@ -587,6 +587,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if tag_md_cb::is_tag_md_cb(&source.name) {
         let v = tag_md_cb::TagMdCb::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if obj_hha::is_obj_hha(&source.name) {
+        let a = obj_hha::ObjHha::spawn(source.parameters);
+        world.spawn((actor, a)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1552,6 +1555,8 @@ pub fn build(
     sim.world.insert_resource(tag_md_cb::TagMdCbMsg::default());
     sim.world.insert_resource(tag_md_cb::TagMdCbGlobal::default());
     sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
+    sim.world.insert_resource(obj_hha::BgwSets::default());
+    sim.world.insert_resource(obj_hha::SplashSets::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1636,6 +1641,8 @@ pub fn build(
     sim.world.insert_resource(tag_md_cb::TagMdCbMsg::default());
     sim.world.insert_resource(tag_md_cb::TagMdCbGlobal::default());
     sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
+    sim.world.insert_resource(obj_hha::BgwSets::default());
+    sim.world.insert_resource(obj_hha::SplashSets::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1911,6 +1918,7 @@ pub fn build(
                 tag_md_cb::control.in_set(WwSimSet::Execute),
                 shop::control.in_set(WwSimSet::Execute),
                 zelda::control.in_set(WwSimSet::Execute),
+                obj_hha::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),

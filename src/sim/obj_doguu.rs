@@ -361,9 +361,9 @@ fn rotate_y(angle_y: i16, point: Vec3) -> Vec3 {
     let rad = walk::from_s16(angle_y);
     let (sin, cos) = rad.sin_cos();
     Vec3::new(
-        point.x * cos - point.z * sin,
+        point.x * cos + point.z * sin,
         point.y,
-        point.x * sin + point.z * cos,
+        point.z * cos - point.x * sin,
     )
 }
 
