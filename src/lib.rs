@@ -456,8 +456,8 @@ impl App {
         std::mem::take(&mut self.sim.world.resource_mut::<sim::events::SimEvents>().list)
     }
 
-    /// The particles `cc_at_check` queued this frame. Nothing draws them yet: the port has no
-    /// particle renderer, so this is the seam one would take its spawns from.
+    /// The particles `cc_at_check` queued this frame. `pump_damage_fx` turns each
+    /// one into emitters before the view reads them.
     pub fn particles(&self) -> &[sim::damage_fx::DamageParticle] {
         &self.sim
             .world
@@ -470,7 +470,7 @@ impl App {
         self.audio.update(dt.as_secs_f32());
         self.audio.take_finished();
         self.pump_hit_audio();
-        self.pump_damage_fx();
+        self.pump_damage_fx(dt);
         for event in self.drain_events() {
             let cue = match event {
                 sim::events::SimEvent::Footstep => Some(audio::FOOTSTEP_CUE),
@@ -538,8 +538,11 @@ impl App {
     }
 
     /// Split the frame's damage effects: the particles replace the view layer's one-frame list,
-    /// and the steal-item creates become events for the item layer.
-    fn pump_damage_fx(&mut self) {
+    /// and the steal-item creates become events for the item layer. The list then becomes the
+    /// pool's spawns and the pool advances by the frame, which is where an emitter ages, moves
+    /// and finally retires. Retail's particle manager also advances once per frame rather than
+    /// on the fixed step, so this rides the frame `dt` and not a tick.
+    fn pump_damage_fx(&mut self, dt: Duration) {
         let mut particles = std::mem::take(
             self.sim
                 .world
@@ -551,6 +554,16 @@ impl App {
             .world
             .resource_mut::<sim::damage_fx::DamageFxQueue>()
             .drain(&mut particles);
+        {
+            let mut emitters = self
+                .sim
+                .world
+                .get_resource_or_insert_with(sim::particle::Particles::default);
+            for spawn in &particles.items {
+                emitters.spawn(spawn);
+            }
+            emitters.step(dt.as_secs_f32());
+        }
         *self
             .sim
             .world
@@ -610,7 +623,27 @@ impl App {
                 .unwrap_or(view::SKY),
             sea: self.sea_view(),
             actors: self.actor_views(),
+            particles: self.particle_views(),
         }
+    }
+
+    /// Every emitter still inside its lifetime, as the draw layer reads them.
+    fn particle_views(&self) -> Vec<view::ParticleView> {
+        self.sim
+            .world
+            .get_resource::<sim::particle::Particles>()
+            .map(|pool| {
+                pool.live()
+                    .map(|emitter| view::ParticleView {
+                        pos: emitter.pos,
+                        half: emitter.half(),
+                        color: emitter.color,
+                        alpha: emitter.alpha(),
+                        roll: emitter.roll,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn actor_views(&self) -> Vec<view::ActorView> {

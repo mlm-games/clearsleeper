@@ -24,6 +24,7 @@ fn golden_snapshot_builds_world_frame() {
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -107,6 +108,7 @@ fn room_mesh_replaces_placeholder_ground() {
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let room = RoomMesh {
         groups: vec![RoomGroup {
@@ -160,6 +162,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
     let normals = vec![[0.0, 1.0, 0.0]; 3];
@@ -262,6 +265,7 @@ fn room_group_applies_texture_animation_to_uvs() {
         sky: [0.44, 0.70, 0.94, 1.0],
         sea: None,
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let room = RoomMesh {
         groups: vec![
@@ -328,6 +332,7 @@ fn golden_sea_view_builds_wave_mesh() {
             color: [0.5, 0.6, 0.7],
         }),
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -379,6 +384,7 @@ fn sea_group_culls_beyond_the_far_plane() {
             color: [0.5, 0.6, 0.7],
         }),
         actors: Vec::new(),
+        particles: Vec::new(),
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
@@ -422,6 +428,7 @@ fn golden_actor_layer_draws_every_kind() {
                 half: 44.0,
             },
         ],
+        particles: Vec::new(),
     };
 
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);

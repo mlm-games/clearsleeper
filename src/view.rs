@@ -54,6 +54,25 @@ pub struct SceneSnapshot {
     pub sky: [f32; 4],
     pub sea: Option<SeaView>,
     pub actors: Vec<ActorView>,
+    pub particles: Vec<ParticleView>,
+}
+
+/// One live emitter as the draw layer needs it: where it is, how big, what
+/// colour it has faded to and how far it has rolled.
+///
+/// `repame-view3d` has no billboard or sprite primitive — its mesh vocabulary
+/// is indexed triangles, one texture page and one group alpha — so this is the
+/// render seam. The quad below is built from these fields and the camera eye;
+/// nothing here pretends to be the retail sprite, which is a `J2DParticle`
+/// textured quad whose texel this port has no page for.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParticleView {
+    pub pos: Vec3,
+    /// Half-extents in the quad's own plane, x across and y up.
+    pub half: Vec3,
+    pub color: Rgb,
+    pub alpha: f32,
+    pub roll: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -128,7 +147,51 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
     if !snapshot.actors.is_empty() {
         frame.push(actors_group(snapshot, eye));
     }
+    for particle in particle_groups(snapshot, eye) {
+        frame.push(particle);
+    }
     frame
+}
+
+/// One camera-facing quad per live emitter.
+///
+/// `repame-view3d` exposes no billboard or sprite primitive, so the quad is
+/// built here from the emitter's half-extents and the camera eye: the right
+/// vector is the world up crossed with the view ray, the up vector closes the
+/// frame, and the roll turns the pair in the quad's own plane. Each group is
+/// its own alpha blend so one emitter's fade never dims another's, which is
+/// also what makes the batch sort them back to front.
+fn particle_groups(snapshot: &SceneSnapshot, eye: Vec3) -> Vec<MeshGroup> {
+    let mut groups = Vec::with_capacity(snapshot.particles.len());
+    for particle in &snapshot.particles {
+        let ray = eye - particle.pos;
+        let forward = ray.normalize_or(Vec3::Z);
+        let mut right = Vec3::Y.cross(forward);
+        if right.length_squared() < 1e-8 {
+            right = Vec3::X.cross(forward);
+        }
+        let right = right.normalize();
+        let up = forward.cross(right);
+        let (sin, cos) = particle.roll.sin_cos();
+        let across = right * cos - up * sin;
+        let above = right * sin + up * cos;
+        let (rx, ry) = (across * particle.half.x, above * particle.half.y);
+        let mut group = MeshGroup {
+            transparent: true,
+            alpha: particle.alpha.clamp(0.0, 1.0),
+            depth_test: true,
+            ..MeshGroup::default()
+        };
+        group.push_quad(
+            (particle.pos - rx - ry).into(),
+            (particle.pos + rx - ry).into(),
+            (particle.pos + rx + ry).into(),
+            (particle.pos - rx + ry).into(),
+            particle.color,
+        );
+        groups.push(group);
+    }
+    groups
 }
 
 const ENEMY: Rgb = [0.55, 0.26, 0.16];
