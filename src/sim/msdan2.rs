@@ -7,7 +7,6 @@ use super::flags::Switches;
 use super::walk;
 
 pub const MSDAN2_ACTORS: [&str; 1] = ["Msdan2"];
-pub const MSDAN_SUB2_ACTOR: &str = "MsdanS2"; // <- d_stage.cpp:956
 
 pub const SWSAVE_MASK: u32 = 0xFF; // <- d_a_obj_msdan2.h:11 (PRM_SWSAVE_W)
 pub const SWSAVE_SHIFT: u32 = 0x00; // <- d_a_obj_msdan2.h:12 (PRM_SWSAVE_S)
@@ -61,7 +60,7 @@ impl Msdan2 {
             let parameters = (slot << SLOT_SHIFT) + u32::from(self.switch_no);
             commands.spawn((
                 Actor {
-                    name: MSDAN_SUB2_ACTOR.to_owned(),
+                    name: super::msdansub2::MSDANSUB2_ACTORS[0].to_owned(),
                     parameters,
                     pos,
                     angle,

@@ -56,12 +56,6 @@ pub const ROCK_FALL_MIN: f32 = 0.3; // <- d_a_kddoor.cpp:462 (maxStep)
 pub const ROCK_OPEN_GATE: f32 = 0.1; // <- d_a_kddoor.cpp:393, :407 (openProc `> 0.1f`)
 pub const ROCK_CLOSE_GATE: f32 = 0.9; // <- d_a_kddoor.cpp:438, :461 (closeProc `< 0.9f`)
 
-/// `fpcNm_ATDOOR_e` is `d_a_atdoor.cpp` (`d_stage.cpp:458`), not this translation unit, and
-/// `src/sim/atdoor.rs` already owns it with citations. `JailDoor` below is a second, uncited copy
-/// of that actor kept only because `src/sim/mod.rs` and `src/lib.rs` still construct and read it;
-/// the wiring owner should collapse it onto `atdoor::Atdoor`.
-pub const JAIL_ACTOR: &str = "ATdoor"; // <- d_stage.cpp:458
-
 pub const NO_SWITCH: u8 = 0xFF; // <- d_a_door12.cpp:61, :92 (the `0xFF` "no switch" arm)
 pub const BOSS_SWITCH_FLOOR: u8 = 0x80; // <- d_a_door12.cpp:66 (`getSwbit() >= 0x80`)
 
@@ -622,9 +616,15 @@ pub fn solid(door: &Door) -> bool {
     door.bars_y < BAR_HEIGHT
 }
 
+/// `JAIL_HEIGHT` is only read by the `src/lib.rs` actor-view branch for `JailDoor`, which this
+/// module no longer spawns. Both are dead once the duplicate `ATdoor` claim below is dropped:
+/// `fpcNm_ATDOOR_e` is `d_a_atdoor.cpp` (`d_stage.cpp:458`) and `src/sim/atdoor.rs` owns it with
+/// citations. `JailDoor`, `Jail`, `jail_control` and this constant survive only until the
+/// `src/lib.rs` branch at line 1528 is removed.
+pub const JAIL_HEIGHT: f32 = 150.0;
+
 pub const JAIL_OPEN: i16 = 0x4000;
 pub const JAIL_STEP: i16 = 0x400;
-pub const JAIL_HEIGHT: f32 = 150.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Jail {

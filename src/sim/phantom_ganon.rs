@@ -26,7 +26,6 @@ use super::walk::{from_s16, to_s16};
 
 pub const PHANTOM_GANON_ACTOR: &str = "Fganon";
 pub const ORB_ACTOR: &str = "Fgmahou";
-pub const BOKO_ACTOR: &str = "Boko";
 pub const BOKO_SWORD: u32 = 5;
 
 pub fn is_phantom_ganon(name: &str) -> bool {
@@ -2722,7 +2721,7 @@ pub fn control(
     }
     for (pos, dropped, room, set_id) in swords {
         let actor = Actor {
-            name: BOKO_ACTOR.to_owned(),
+            name: boko::BOKO_ACTORS[0].to_owned(),
             parameters: BOKO_SWORD,
             pos,
             angle: [0; 3],

@@ -332,8 +332,6 @@ const ITEM_ARROW_10: u8 = 0x10;
 const ITEM_BOMB_5: u8 = 0x0B;
 const ITEM_HEART_CONTAINER: u8 = 0x08;
 const ITEM_NO_NONE: i32 = -35;
-const ITEM_ACTOR: &str = "item";
-const WARP_ACTOR: &str = "Warpf";
 
 const BOMB_REST_TIME: i16 = 200;
 const BOMB_MOUTH_LIFT: f32 = 90.0;
@@ -811,7 +809,7 @@ impl Sink<'_> {
 
     fn spawn_item(&mut self, parameters: u32, pos: Vec3, angle: [i16; 3], room: i8, set_id: u16) {
         self.spawns.push(Spawn {
-            name: ITEM_ACTOR,
+            name: super::pickup::ITEM_ACTORS[0],
             parameters,
             pos,
             angle,
@@ -823,7 +821,7 @@ impl Sink<'_> {
 
     fn spawn_warp(&mut self, pos: Vec3, angle: [i16; 3], room: i8, set_id: u16) {
         self.spawns.push(Spawn {
-            name: WARP_ACTOR,
+            name: super::warpf::WARP_ACTORS[0],
             parameters: 0,
             pos,
             angle,

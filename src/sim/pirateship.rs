@@ -8,7 +8,6 @@ use super::flags::EventFlags;
 use super::walk::from_s16;
 
 pub const PIRATE_ACTORS: [&str; 1] = ["Pirates"];
-pub const TOUSEKI_ACTOR: &str = "Touseki";
 
 pub const UMIKZ_STAGE: &str = "A_umikz";
 pub const SE_CRUISE: u32 = 0x7034;
@@ -86,7 +85,7 @@ pub fn control(
     for (entity, actor, mut pirate) in &mut ships {
         if pirate.catapult.is_none() && pirate.kind != KIND_ARRIVAL {
             let child = Actor {
-                name: TOUSEKI_ACTOR.to_owned(),
+                name: super::touseki::TOUSEKI_ACTORS[0].to_owned(),
                 parameters: 0,
                 pos: actor.pos + mounted(actor.angle),
                 angle: actor.angle,

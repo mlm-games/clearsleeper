@@ -13,9 +13,12 @@ use super::stream::{add_calc_angle_s2, cos_s, sin_s};
 use super::walk::{from_s16, to_s16};
 use super::water::Water;
 
-pub const GANON_FORM3_ACTOR: &str = "Bgn3";
-pub const BGN_ACTOR: &str = "Bgn";
-pub const ESA_ACTOR: &str = "Esa";
+/// `"Bgn3"` has NO row in the `OBJNAME` table (`d_stage.cpp`, 823 rows) - `fpcNm_BGN3_e` is only
+/// ever brought into being at runtime by `fopAcM_create(fpcNm_BGN3_e, 0, ...)`
+/// (`d_a_bgn.cpp:3674`), never placed by a stage. So it cannot be a stage claim. This module
+/// borrows the single crate-wide declaration from `puppet_ganon`, which owns the matching
+/// `fpcNm_BGN2_e`/`fpcNm_BGN3_e` search pair (`d_a_bgn.cpp:931`, `:940`).
+pub const GANON_FORM3_ACTOR: &str = super::puppet_ganon::BODY_3_ACTOR;
 pub const KEETH_SPAWN_NAME: &str = "keeth";
 pub const KEETH_SPAWN_PARAMETERS: u32 = 0xFFFF_0003;
 pub const BGN_CS_MODE_DEATH: i8 = 20;
@@ -1054,9 +1057,9 @@ pub fn control(
     let mut esa = None;
     let mut keeths = 0i32;
     for other in watch.others.iter() {
-        if other.name == BGN_ACTOR {
+        if super::puppet_ganon::is_puppet_ganon(&other.name) {
             bgn_mode = Some(BGN_MODE_FIGHT);
-        } else if other.name == ESA_ACTOR {
+        } else if super::esa::is_esa(&other.name) {
             esa = Some(other.pos);
         } else if KEETH_ACTORS.contains(&other.name.as_str()) {
             keeths += 1;

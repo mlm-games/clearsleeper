@@ -25,7 +25,6 @@ use crate::text::{
 };
 
 pub const GRAMMARIAN_ACTOR: &str = "Ba1";
-pub const PARTNER_ACTOR: &str = "Sfairy";
 pub const ARC_NAME: &str = "Ba";
 
 pub const EVENT_NAMES: [&str; 6] = [
@@ -1841,7 +1840,7 @@ impl Grammarian {
         self.partner = None;
         let found = others
             .iter()
-            .find(|entry| entry.1.name == PARTNER_ACTOR)
+            .find(|entry| super::npc_fa1::is_npc_fa1(&entry.1.name))
             .map(|entry| entry.0);
         self.partner = found;
         found.is_some()

@@ -8,7 +8,10 @@ use super::player::Player;
 use super::stream::{add_calc_angle_s2, cos_s, sin_s};
 use super::walk::{from_s16, to_s16};
 
-const MOLGERA_ACTOR: &str = "Bwd";
+/// `d_a_bwd.cpp:2598` declares `fpcNm_BWD_e`, whose stage string is `OBJNAME("Bwd", fpcNm_BWD_e,
+/// 255, 0)` (`d_stage.cpp:1191`). This module is that TU (its header reads "Boss - Molgera"), so
+/// it owns the name; `src/sim/bwd.rs` borrows it to find the boss.
+pub const MOLGERA_ACTOR: &str = "Bwd";
 
 const HIO_HOVER: f32 = -400.0;
 const HIO_PUSH: f32 = 6.0;

@@ -12,10 +12,9 @@ use super::walk;
 /// (`d_a_obj_msdan_sub2.cpp:10`), which is the archive `OBJNAME("Msdan", fpcNm_Obj_Msdan_e, ...)`
 /// (`d_stage.cpp:953`) resolves to a DIFFERENT process - the same trap as `Lwood`/`lwood`.
 ///
-/// `src/sim/msdan2.rs` already carries `MSDAN_SUB2_ACTOR: &str = "MsdanS2"` (`:10`), but that is
-/// the *name it stamps on the ring children it spawns* (`:58`), not a stage claim: that module has
-/// no `*_ACTORS` array, no `is_*` predicate and no `spawn_actor` branch, so nothing dispatches
-/// `MsdanS2` today. This module is that dispatch. The string is not claimed twice.
+/// `src/sim/msdan2.rs` spawns its ring children under this string (`fopAcM_create(fpcNm_Obj_
+/// MsdanSub2_e, ...)` per `d_a_obj_msdan2.cpp:20`) and now names them through this array rather
+/// than repeating the literal, so `"MsdanS2"` is declared exactly once in the crate.
 pub const MSDANSUB2_ACTORS: [&str; 1] = ["MsdanS2"];
 
 /// `enum Prm_e { PRM_SWSAVE_W = 8, PRM_SWSAVE_S = 0, PRM_OBJNO_W = 8, PRM_OBJNO_S = 8 }`

@@ -34,7 +34,6 @@ pub fn is_ivan(name: &str) -> bool {
 
 pub const STAFF_NAMES: [&str; 2] = ["Mk", "Mk2"];
 pub const UM2_ACTOR: &str = "Um2";
-pub const PRESENT_ACTOR: &str = "PresentItem";
 
 pub const CULL_MIN: [f32; 3] = [-35.0, -10.0, -35.0];
 pub const CULL_MAX: [f32; 3] = [35.0, 100.0, 35.0];
@@ -2856,7 +2855,7 @@ pub fn control(
             let room = actor.room;
             let _ = commands.spawn((
                 Actor {
-                    name: PRESENT_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: u32::from(item),
                     pos,
                     angle: [0; 3],

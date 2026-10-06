@@ -40,7 +40,6 @@ const MSG_CLEAR_COUNT: u8 = 0;
 const NO_EVENT: i16 = -1;
 const NO_MSG: u32 = 0;
 const TALK_IDLE: u8 = 0xFF;
-const DEMO_ITEM_ACTOR: &str = "PresentItem";
 
 const BIT_ENABLED: u16 = 0x1108;
 const BIT_MAP_TAKEN: u16 = 0x3E04;
@@ -1087,7 +1086,7 @@ impl Merchant {
         let entity = commands
             .spawn((
                 Actor {
-                    name: DEMO_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: 0,
                     pos: Vec3::ZERO,
                     angle: [0; 3],
@@ -1136,7 +1135,7 @@ impl Merchant {
         let entity = commands
             .spawn((
                 Actor {
-                    name: DEMO_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: 0,
                     pos: self.eye,
                     angle: [0; 3],

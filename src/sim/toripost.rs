@@ -236,7 +236,6 @@ const TALK_PARAM_NO_GET_MSG: u8 = 0;
 const TALK_PARAM_GET_MSG: u8 = 1;
 const TALK_MODE_LETTER_EYE: u8 = 5;
 
-const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 const PRESENT_ITEM_SET_ID: u16 = 0;
 const PRESENT_ITEM_ROOM: i8 = -1;
 
@@ -1721,7 +1720,7 @@ impl Ctx<'_, '_, '_> {
             .commands
             .spawn((
                 Actor {
-                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: 0,
                     pos,
                     angle: [0; 3],

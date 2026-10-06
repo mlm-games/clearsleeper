@@ -135,8 +135,6 @@ const NEXT_STAGE: &str = "sea";
 const NEXT_STAGE_ROOM: u8 = 11;
 const NEXT_STAGE_START: u8 = 3;
 
-const SHOP_ITEM_ACTOR: &str = "Sitem";
-const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 
 const ITEM_ROOM: i8 = -1;
 const ITEM_SET_ID: u16 = 0xFFFF;
@@ -1106,7 +1104,7 @@ impl Auction {
         self.item_entity = Some(
             ctx.commands
                 .spawn(Actor {
-                    name: SHOP_ITEM_ACTOR.to_owned(),
+                    name: super::sitem::SITEM_ACTORS[0].to_owned(),
                     parameters: u32::from(data.item),
                     pos: ctx.actor_pos,
                     angle: [0; 3],
@@ -1550,7 +1548,7 @@ impl Auction {
             .commands
             .spawn((
                 Actor {
-                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: 0,
                     pos: ctx.actor_pos,
                     angle: [0; 3],

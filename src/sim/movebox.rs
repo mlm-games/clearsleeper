@@ -13,8 +13,6 @@ use super::stream;
 use super::walk::{from_s16, to_s16};
 use super::water;
 
-pub const MOVEBOX_ACTOR: &str = "DBLK0";
-
 pub const MOVEBOX_ACTORS: [&str; 15] = [
     "osiBLK0",
     "osiBLK1",
@@ -109,7 +107,6 @@ const NO_SWITCH: i32 = 0xFF;
 const NO_PATH_ID: i32 = 0xFF;
 const NO_ITEM_SAVE: i32 = 0x7F;
 const ITEM_MAX_BIT: i32 = 79;
-const ITEM_ACTOR: &str = "item";
 const G_CM3D_F_INF: f32 = -3.4028235e38;
 const FLOAT_MAX: f32 = 3.4028235e38;
 const MAX_FALL: f32 = -100.0;
@@ -1656,7 +1653,7 @@ pub fn control(
     }
     for spawn in spawns {
         let actor = Actor {
-            name: ITEM_ACTOR.to_owned(),
+            name: super::pickup::ITEM_ACTORS[0].to_owned(),
             parameters: spawn.parameters,
             pos: spawn.pos,
             angle: spawn.angle,

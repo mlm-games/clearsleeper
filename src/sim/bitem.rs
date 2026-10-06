@@ -6,7 +6,6 @@ use super::pickup::Pickup;
 
 pub const BITEM_ACTORS: [&str; 1] = ["Bitem"];
 
-const ITEM_ACTOR: &str = "item"; // <- d_stage.cpp:647 (OBJNAME("item", fpcNm_ITEM_e))
 const ITEM_PARAMETERS: u32 = 0x33FF_FF08; // <- f_op_actor_mng.cpp:31-32 MAKE_ITEM_PARAMS(0x08, -1, -1, 3, 12)
 const ITEM_SWITCH_ANGLE: i16 = 0xFF; // <- f_op_actor_mng.cpp:978-979 (prmAngle.z = switchNo)
 const ITEM_SET_ID: u16 = 0xFFFF; // <- d_stage.cpp:1476
@@ -37,7 +36,7 @@ impl Bitem {
     /// daItemAct_BOSS_e, NULL)` (`f_op_actor_mng.cpp:958-959`).
     fn reward_item(&self, actor: &Actor) -> Actor {
         Actor {
-            name: ITEM_ACTOR.to_owned(),
+            name: super::pickup::ITEM_ACTORS[0].to_owned(),
             parameters: ITEM_PARAMETERS,
             pos: actor.pos,
             angle: [actor.angle[0], actor.angle[1], ITEM_SWITCH_ANGLE],

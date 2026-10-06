@@ -31,7 +31,6 @@ const PF_NAME: [&str; 8] = [
     "Ospbox", // <- d_a_obj_ospbox.cpp:131
 ];
 /// `fpcNm_KB_e`'s stage string, `OBJNAME("Pig", fpcNm_KB_e, 255, 0)` (`d_stage.cpp:798`).
-const PIG_ACTOR: &str = "Pig"; // <- d_stage.cpp:798 (fpcNm_KB_e)
 
 /// `make_item`'s `static const u32 prm[]` (`d_a_obj_ospbox.cpp:133-138`). The table has four
 /// entries and `prm[prm_index]` (`:151`) is only reached when `pf_name[prm_index] != fpcNm_Obj_
@@ -170,7 +169,7 @@ impl Ospbox {
         };
         commands.spawn((
             Actor {
-                name: PIG_ACTOR.to_owned(),
+                name: super::carry::PIG_ACTOR.to_owned(),
                 parameters: *parameters,
                 pos: actor.pos,
                 angle: actor.angle,

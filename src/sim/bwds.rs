@@ -110,7 +110,6 @@ const REACH_HAMMER: f32 = 50.0;
 const REACH_HOOKSHOT: f32 = 5.0;
 const REACH_BOOMERANG: f32 = 90.0;
 const HEART_PARAM: u32 = 0;
-const ITEM_ACTOR: &str = "item";
 
 const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -524,7 +523,7 @@ pub fn control(
     }
     for spawn in spawns {
         let actor = Actor {
-            name: ITEM_ACTOR.to_owned(),
+            name: super::pickup::ITEM_ACTORS[0].to_owned(),
             parameters: spawn.parameters,
             pos: spawn.pos,
             angle: spawn.angle,

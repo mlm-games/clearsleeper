@@ -304,7 +304,11 @@ pub struct ItemPartner {
     pub demo_landed: bool,
 }
 
-const PRESENT_ACTOR: &str = "PresentItem";
+/// The spawned actor's name. Five spawn sites (`ivan.rs`, `medli.rs`, `npc_mt.rs`, `npc_tc.rs`,
+/// `zunari.rs`) all stood their own copy of this literal, so the crate declared `"PresentItem"`
+/// five times. The entity is identified everywhere by the `PresentItem` component, never by this
+/// string - it is not an OBJNAME row and `d_stage.cpp` never places it. One declaration only.
+pub const PRESENT_ACTOR: &str = "PresentItem";
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PresentItem {
@@ -1628,7 +1632,7 @@ fn treasure_cut(
     };
     if matches!(cut.name.as_str(), "OPEN" | "OPEN_SHORT") {
         let targets = staff_targets(list, run.staff, actors, owner, |name| {
-            super::chest::CHEST_ACTORS.contains(&name)
+            super::tbox::TBOX_ACTORS.contains(&name)
         });
         for target in targets {
             commands.entity(target).insert(ChestOpen);

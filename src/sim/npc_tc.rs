@@ -34,9 +34,6 @@ pub fn is_npc_tc(name: &str) -> bool {
 }
 
 pub const STAFF_NAME: &str = "Tc";
-pub const STOOL_ACTOR: &str = "Ostool";
-pub const PRESENT_ACTOR: &str = "PresentItem";
-pub const TOWER_ACTOR: &str = "Qtkhd";
 
 pub const TYPE_MASK: u32 = 0xF;
 pub const TYPE_FALLBACK: u8 = 0xF;
@@ -2972,14 +2969,15 @@ pub fn control(
     let stool: Option<Vec3> = world
         .others
         .iter()
-        .filter(|other| other.name == STOOL_ACTOR)
+        .filter(|other| super::tsubo::is_tsubo(&other.name))
         .map(|other| other.pos)
         .last();
     let towers: Vec<(Vec3, [i16; 3])> = world
         .others
         .iter()
         .filter(|other| {
-            other.name == TOWER_ACTOR && ((other.parameters >> PRM_TYPE_SHIFT) & PRM_TYPE_MASK) == 0
+            super::qtkhd::is_qtkhd(&other.name)
+                && ((other.parameters >> PRM_TYPE_SHIFT) & PRM_TYPE_MASK) == 0
         })
         .map(|other| (other.pos, other.angle))
         .collect();
@@ -3037,7 +3035,7 @@ pub fn control(
         if let Some((pos, item)) = ctx.give_item {
             let _ = commands.spawn((
                 Actor {
-                    name: PRESENT_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: u32::from(item),
                     pos,
                     angle: [0; 3],

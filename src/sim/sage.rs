@@ -24,7 +24,6 @@ use crate::text::{
 
 pub const SAGE_ACTORS: [&str; 2] = ["Hr", "Hr2"];
 
-const TORNADO_ACTOR: &str = "Ytrnd00";
 const STAFF_HR: &str = "Hr";
 const STAFF_HR2: &str = "Hr2";
 const EVENT_TACT_HT: &str = "TACT_HT";
@@ -871,7 +870,7 @@ pub fn control(
     let player_face = player.map_or(0, |link| to_s16(link.face));
     let tornado = actors
         .iter()
-        .find(|(_, actor, _)| actor.name == TORNADO_ACTOR)
+        .find(|(_, actor, _)| actor.name == super::tornado::TORNADO_ACTORS[0])
         .map(|(found, _, _)| found);
     let shown_item = if equipped.item(WAKER_SLOT) == ITEM_WIND_WAKER {
         ITEM_WIND_WAKER

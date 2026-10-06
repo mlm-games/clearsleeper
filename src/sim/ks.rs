@@ -233,7 +233,6 @@ const PAUSE_TIMER: i16 = 2;
 const STEAL_BIT: u8 = 1;
 
 const STAGE_GANONK: &str = "GanonK";
-const PICKUP_ACTOR: &str = "item";
 
 const CULL_MIN: [f32; 3] = [-20.0, -20.0, -20.0];
 const CULL_MAX: [f32; 3] = [20.0, 20.0, 20.0];
@@ -872,7 +871,7 @@ pub fn control(
     for (pos, item, room) in loot {
         commands.spawn((
             Actor {
-                name: PICKUP_ACTOR.to_owned(),
+                name: super::pickup::ITEM_ACTORS[0].to_owned(),
                 parameters: u32::from(item),
                 pos,
                 angle: [0; 3],

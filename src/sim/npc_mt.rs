@@ -28,7 +28,6 @@ pub const NPC_MT_ACTORS: [&str; 1] = ["Mt"];
 pub const ARC_NAME: &str = "Niten";
 pub const STAFF_NAME: &str = "Mt";
 pub const EVENT_GET_ITEM: &str = "MT_GET_ITEM";
-pub const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 pub const CUT_MES_SET: &str = "MES_SET";
 pub const CUT_GET_ITEM: &str = "GET_ITEM";
 
@@ -1816,7 +1815,7 @@ pub fn control(
         if let Some((pos, item)) = ctx.give_item {
             let _ = commands.spawn((
                 Actor {
-                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: u32::from(item),
                     pos,
                     angle: [0; 3],

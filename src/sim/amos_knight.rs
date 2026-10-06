@@ -24,8 +24,6 @@ use super::walk;
 
 pub const AMOS_KNIGHT_ACTORS: [&str; 1] = ["amos"];
 
-pub const AMOS_KNIGHT_ACTOR: &str = "amos";
-
 const BYTE_MASK: u32 = 0xFF;
 const TYPE_SHIFT: u32 = 0x00;
 const AREA_SHIFT: u32 = 0x08;

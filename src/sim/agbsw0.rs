@@ -254,7 +254,6 @@ const GBA_LINK: bool = false;
 const AGB_PRESENT: bool = false;
 const NO_SET_ID: u16 = 0xFFFF;
 
-const SPAWN_ITEM_ACTOR: &str = "item";
 
 static MAIL_WORD: AtomicU64 = AtomicU64::new(0);
 static MAIL_SE: AtomicU32 = AtomicU32::new(0);
@@ -2906,7 +2905,7 @@ pub fn control(
 
     for spawn in &spawns {
         let item = super::actor::Actor {
-            name: String::from(SPAWN_ITEM_ACTOR),
+            name: String::from(super::pickup::ITEM_ACTORS[0]),
             parameters: u32::from(spawn.item),
             pos: spawn.pos,
             angle: [0; 3],

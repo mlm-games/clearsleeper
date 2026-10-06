@@ -38,7 +38,6 @@ pub const MEDLI_ACTOR: &str = "Md1";
 pub const ARC_NAME: &str = "Md";
 pub const ARC_NAME_SHIP: &str = "Md_ship";
 pub const STAFF_NAME: &str = "Md1";
-pub const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 
 pub const TALK_TYPE_SHIFT: u32 = 0x08;
 pub const TALK_TYPE_MASK: u32 = 0xFF;
@@ -5801,7 +5800,7 @@ pub fn control(
         if let Some((pos, item)) = ctx.give_item {
             let _ = commands.spawn((
                 Actor {
-                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: u32::from(item),
                     pos,
                     angle: [0; 3],

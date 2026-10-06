@@ -287,9 +287,6 @@ const ITEM_HEART_CONTAINER: u8 = 0x08;
 const ITEM_FOREST_WATER: u8 = 0x59;
 const BOTTLE_SLOT_0: usize = 14;
 const BOTTLE_SLOTS: usize = 4;
-const ITEM_ACTOR: &str = "item";
-const WARP_ACTOR: &str = "Warpf";
-const MAKAR_ACTOR: &str = "Cb1";
 const HAND_ACTOR: &str = "Bmdhand";
 const FOOT_ACTOR: &str = "Bmdfoot";
 const NO_SET_ID: u16 = 0xFFFF;
@@ -715,7 +712,7 @@ impl Sink<'_> {
 
     fn spawn_item(&mut self, parameters: u32, pos: Vec3, angle: [i16; 3], room: i8, set_id: u16) {
         self.spawns.push(Spawn {
-            name: ITEM_ACTOR,
+            name: super::pickup::ITEM_ACTORS[0],
             parameters,
             pos,
             angle,
@@ -727,7 +724,7 @@ impl Sink<'_> {
 
     fn spawn_warp(&mut self, pos: Vec3, angle: [i16; 3], room: i8, set_id: u16) {
         self.spawns.push(Spawn {
-            name: WARP_ACTOR,
+            name: super::warpf::WARP_ACTORS[0],
             parameters: 0,
             pos,
             angle,
@@ -2382,7 +2379,7 @@ impl KalleDemos {
                     self.brk_on = 1;
                     self.makar_mode = MAKAR_OFF;
                     let angle = self.shape_angle[ANGLE_Y].wrapping_add(0x8BB8_u16 as i16);
-                    sink.spawn_actor(MAKAR_ACTOR, 0, self.makar_pos, angle, self.room);
+                    sink.spawn_actor(super::makar::MAKAR_ACTOR, 0, self.makar_pos, angle, self.room);
                 }
                 DEMO_ORBIT => {
                     let rate = sn(self.cam_zoom * 22384.0);
@@ -2574,7 +2571,7 @@ impl KalleDemos {
         if env.stage_boss_enemy && !env.stage_x {
             if !env.farore_pearl || REG0_S6 != 0 {
                 sink.spawn_actor(
-                    MAKAR_ACTOR,
+                    super::makar::MAKAR_ACTOR,
                     0,
                     Vec3::new(100.0, 0.0, 800.0),
                     0,

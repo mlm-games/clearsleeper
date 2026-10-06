@@ -14,7 +14,6 @@ use super::walk::{chase_f, from_s16, swept, to_s16};
 pub const BEMOS_ACTORS: [&str; 3] = ["Hmos1", "Hmos2", "Hmos3"];
 
 const BEAM_ACTOR: &str = "Ylesr00";
-const ITEM_ACTOR: &str = "item";
 
 const BYTE_MASK: u32 = 0xFF;
 const SWAY_SHIFT: u32 = 8;
@@ -225,7 +224,7 @@ fn shatter(actor: &Actor, beamos: &Bemos, events: &mut SimEvents, commands: &mut
     events.list.push(SimEvent::Se(SE_BREAK));
     commands.spawn((
         Actor {
-            name: ITEM_ACTOR.to_owned(),
+            name: super::pickup::ITEM_ACTORS[0].to_owned(),
             parameters: u32::from(beamos.item),
             pos,
             angle: [beamos.pitch, yaw, 0],

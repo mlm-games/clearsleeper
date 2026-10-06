@@ -11,7 +11,10 @@ use super::ground::grounded;
 use super::player::Player;
 use super::water::Water;
 
-pub const BOMB_ACTORS: [&str; 2] = ["Bomb", "Bomb2"];
+/// `"Bomb2"` is `fpcNm_Bomb2_e` (`d_stage.cpp:1246`) - a DIFFERENT process from the `fpcNm_BOMB_e`
+/// `"Bomb"` this module ports (`d_a_bomb3.inc:1524`). No `d_a_bomb2.cpp` port exists; the bomb
+/// flower spawns it (`d_a_bflower.cpp:350`), which `bombflower.rs` already names. Not claimed here.
+pub const BOMB_ACTORS: [&str; 1] = ["Bomb"];
 
 pub const START_INSTANT: u8 = 0;
 pub const START_INTERVAL: u8 = 1;

@@ -2,9 +2,10 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 
-/// `fpcNm_BWD_e`'s stage string: `OBJNAME("Bwd", fpcNm_BWD_e, 255, 0)` (`d_stage.cpp:1191`), which
-/// is what `boss_a_d_sub`'s name test (`:160`) matches on.
-const BWD_ACTOR: &str = "Bwd"; // <- d_stage.cpp:1191
+/// `boss_a_d_sub` (`:160`) hunts for `fpcNm_BWD_e` - Molgera herself, `d_a_bwd.cpp:2598`, the TU
+/// `src/sim/molgera.rs` ports. This module only models the `Bwdg` sand mesh, so it BORROWS the
+/// actor name from that module's single declaration instead of repeating the literal.
+const BWD_ACTOR: &str = super::molgera::MOLGERA_ACTOR;
 
 /// The arena's sand-wave ground mesh - `bwdg_class` (`d_a_bwdg.h:17-45`), which `d_a_bwd.cpp:2172`
 /// creates under the boss.

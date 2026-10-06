@@ -62,7 +62,6 @@ const PIYO_LAST: i32 = 0x3C;
 const NPC_FACE_GATE: i32 = 0x500;
 const THROW_SETTLE: i32 = 0x3c;
 const CHASE_STEP: f32 = 5.0;
-const IBALL_ACTOR: &str = "Iball";
 const TSUBO_ACTOR: &str = "Tsubo";
 
 const HIO_0A8: f32 = 600.0;
@@ -2562,7 +2561,7 @@ impl Floormaster {
         if self.anm_prm == 8 && self.set_hole_scale(HIO_120, HOLE_SCALE, HIO_128) {
             commands.spawn((
                 Actor {
-                    name: IBALL_ACTOR.to_owned(),
+                    name: super::iball::IBALL_ACTORS[0].to_owned(),
                     parameters: 0,
                     pos: actor.pos,
                     angle: [0; 3],

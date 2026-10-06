@@ -1,6 +1,7 @@
 pub mod acorn_leaf;
 pub mod actor;
 pub mod agbsw0;
+pub mod arrowlight;
 pub mod agb;
 pub mod ajavw;
 pub mod ajav;
@@ -50,6 +51,7 @@ pub mod combat;
 pub mod daioeye;
 pub mod daiocta;
 pub mod dai;
+pub mod dk;
 pub mod damage;
 pub mod daynight;
 pub mod death;
@@ -65,6 +67,7 @@ pub mod demokmm;
 pub mod dummy;
 pub mod eayogn;
 pub mod esekh;
+pub mod eskban;
 pub mod esa;
 pub mod ending;
 pub mod enemy;
@@ -177,6 +180,7 @@ pub mod lock;
 pub mod magma;
 pub mod machine;
 pub mod makar;
+pub mod mshokki;
 pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
@@ -330,7 +334,9 @@ pub mod vmsdz;
 pub mod warpfo;
 pub mod walk;
 pub mod wall;
+pub mod warpls;
 pub mod wlvtag;
+pub mod zouk;
 pub mod wind;
 pub mod ygush;
 pub mod xtower;
@@ -710,6 +716,19 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, coming3::Coming3::spawn())).id()
     } else if vmc::is_vmc(&source.name) {
         let v = vmc::Vmc::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if zouk::is_zouk(&source.name) {
+        world.spawn((actor, zouk::Zouk::spawn(source.parameters))).id()
+    } else if warpls::is_warpls(&source.name) {
+        world.spawn((actor, warpls::Warpls::spawn(source.parameters))).id()
+    } else if mshokki::is_mshokki(&source.name) {
+        world.spawn((actor, mshokki::Mshokki::spawn(source.parameters))).id()
+    } else if dk::is_dk(&source.name) {
+        world.spawn((actor, dk::Dk::spawn(source.parameters))).id()
+    } else if arrowlight::is_arrowlight(&source.name) {
+        world.spawn((actor, arrowlight::ArrowLight::spawn(source.parameters))).id()
+    } else if eskban::is_eskban(&source.name) {
+        let v = eskban::Eskban::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
     } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
@@ -1728,6 +1747,12 @@ pub fn build(
                 npc_gp1::control.in_set(WwSimSet::Execute),
                 demodk::control.in_set(WwSimSet::Execute),
                 kmon::control.in_set(WwSimSet::Execute),
+                dk::control.in_set(WwSimSet::Execute),
+                zouk::control.in_set(WwSimSet::Execute),
+                warpls::control.in_set(WwSimSet::Execute),
+                mshokki::control.in_set(WwSimSet::Execute),
+                arrowlight::control.in_set(WwSimSet::Execute),
+                eskban::control.in_set(WwSimSet::Execute),
                 amos_knight::control.in_set(WwSimSet::Execute),
                 ganon_form3::control.in_set(WwSimSet::Execute),
                 )

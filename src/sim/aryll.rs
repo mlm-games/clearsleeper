@@ -28,7 +28,10 @@ use crate::text::{
 
 const PROJECT_LIFT: f32 = 2000.0;
 const ARYLL_ACTOR: &str = "Ls1";
-pub const PARTNER_ACTOR: &str = "Bm1";
+/// `d_a_npc_ls1.cpp:218-225` `searchActor_Bm1` compares against `fpcNm_NPC_BM1_e`, so this
+/// module only ever *finds* the partner - it does not place it. `"Bm1"` is declared once, by
+/// `src/sim/bird.rs`, and borrowed here.
+pub const PARTNER_ACTOR: &str = super::bird::BIRD_ACTOR;
 
 pub const EVENT_NAMES: [&str; 4] = ["zelda_fly", "omedeto", "get_telescope", "eTalk"];
 pub const EVENT_ZELDA_FLY: usize = 0;
@@ -1257,7 +1260,7 @@ impl Aryll {
     pub fn partner_search_sub(&mut self, others: &Query<(Entity, &Actor), Without<Aryll>>) -> bool {
         self.partner = others
             .iter()
-            .find(|entry| entry.1.name == PARTNER_ACTOR)
+            .find(|entry| entry.1.name == super::bird::BIRD_ACTOR)
             .map(|entry| entry.0);
         self.partner.is_some()
     }

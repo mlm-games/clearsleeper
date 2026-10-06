@@ -16,10 +16,11 @@ use super::puppet_ganon::PuppetGanon;
 use super::stream::add_calc_angle_s2;
 use super::walk;
 
+/// Empty on purpose: `"Bgn3"` has no `OBJNAME` row in `d_stage.cpp` (823 rows), so
+/// `fpcNm_BGN3_e` is never stage-placed - `d_a_bgn.cpp:3674` `fopAcM_create`s it at runtime. A
+/// module with no stage rows must not claim a stage string. The name is declared once, by
+/// `src/sim/puppet_ganon.rs` (`d_a_bgn.cpp:940`), and borrowed by `ganon_form3.rs`.
 pub const BGN3_ACTORS: [&str; 0] = [];
-
-pub const BGN3_ACTOR: &str = "Bgn3";
-
 
 pub fn is_bgn3(name: &str) -> bool {
     BGN3_ACTORS.contains(&name)

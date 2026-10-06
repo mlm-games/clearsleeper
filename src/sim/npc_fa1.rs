@@ -17,7 +17,7 @@ pub fn is_npc_fa1(name: &str) -> bool {
     NPC_FA1_ACTORS.contains(&name)
 }
 
-const BA1_ACTOR: &str = "Ba1"; // <- fopAcM_SearchByName(fpcNm_NPC_BA1_e), :733
+const super::grammarian::GRAMMARIAN_ACTOR: &str = "Ba1"; // <- fopAcM_SearchByName(fpcNm_NPC_BA1_e), :733
 
 // daNpc_Fa1_c::Type_e - d_a_npc_fa1.h:33-41
 const TYPE_NORMAL: i8 = 0; // <- :34
@@ -1019,7 +1019,7 @@ pub fn control(
     let player = msg.players.iter().next().copied();
     let ba1 = others
         .iter()
-        .find(|(_, actor)| actor.name == BA1_ACTOR)
+        .find(|(_, actor)| actor.name == super::grammarian::GRAMMARIAN_ACTOR)
         .map(|(_, actor)| actor.pos);
     let collision = world.collision.as_deref();
     for (entity, mut actor, mut fa1) in &mut actors {

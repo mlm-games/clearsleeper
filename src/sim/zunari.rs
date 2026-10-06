@@ -30,7 +30,6 @@ pub const ARC_NAME: &str = "Rsh";
 pub const STAFF_NAME: &str = "Rsh1";
 pub const EVENT_GET_DEMO: &str = "RSH_GET_DEMO";
 pub const EVENT_SHOP_OUT: &str = "RSH_SHOP_OUT";
-pub const PRESENT_ITEM_ACTOR: &str = "PresentItem";
 pub const TALK_RANGE: f32 = HIO_MAX_ATTN_DIST_XZ;
 
 pub const VARIANT_SHIFT: u32 = 0x14;
@@ -1799,7 +1798,7 @@ pub fn control(
             ctx.events.list.push(SimEvent::Collect);
             let _ = commands.spawn((
                 Actor {
-                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    name: super::event::PRESENT_ACTOR.to_owned(),
                     parameters: u32::from(item),
                     pos,
                     angle: [0; 3],

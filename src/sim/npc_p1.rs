@@ -32,8 +32,6 @@ pub fn is_npc_p1(name: &str) -> bool {
 }
 
 pub const ARC_NAME: &str = "P1";
-pub const PIRATESHIP_ACTOR: &str = "Pirates";
-pub const KAJI_ACTOR: &str = "Kaji";
 pub const STAGE_SEA: &str = "sea";
 pub const NEXT_STAGE: &str = "Ocean";
 pub const NEXT_STAGE_POINT: u8 = 1;
@@ -1943,7 +1941,7 @@ pub fn control(
     let kaji = start_point.kaji;
     let pirate = others
         .iter_mut()
-        .find(|(_, other)| other.name == PIRATESHIP_ACTOR)
+        .find(|(_, other)| super::pirateship::is_pirateship(&other.name))
         .map(|(found, other)| (found, other.pos, other.angle[1]));
     let mut moved = Vec::new();
     let mut cuts = Vec::new();
