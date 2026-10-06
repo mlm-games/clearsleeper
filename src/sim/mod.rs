@@ -1,3 +1,4 @@
+pub mod acorn_leaf;
 pub mod actor;
 pub mod agbsw0;
 pub mod ajavw;
@@ -167,6 +168,7 @@ pub mod swpush;
 pub mod tag;
 pub mod tagba1;
 pub mod tagkb;
+pub mod tag_volcano;
 pub mod tag_msg;
 pub mod tagkk1;
 pub mod taglight;
@@ -363,6 +365,10 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
+    } else if acorn_leaf::is_acorn_leaf(&source.name) {
+        acorn_leaf::spawn(world, source)
+    } else if tag_volcano::is_tag_volcano(&source.name) {
+        tag_volcano::spawn(world, source)
     } else if obj_akabe::is_akabe(&source.name) {
         obj_akabe::spawn(world, source)
     } else if gy_ctrl::is_gy_ctrl(&source.name) {
@@ -999,6 +1005,8 @@ pub fn build(
                     salvage::control.in_set(WwSimSet::Execute),
                     gy_ctrl::control.in_set(WwSimSet::Execute),
                     obj_akabe::control.in_set(WwSimSet::Execute),
+                    acorn_leaf::control.in_set(WwSimSet::Execute),
+                    tag_volcano::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
                     usovmc::control.in_set(WwSimSet::Execute),
@@ -1141,7 +1149,13 @@ pub fn build(
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),                    gaship2::control.in_set(WwSimSet::Execute),                    eayogn::control.in_set(WwSimSet::Execute),
-                    doguud::control.in_set(WwSimSet::Execute),                    ktaruo::control.in_set(WwSimSet::Execute),
+                    doguud::control.in_set(WwSimSet::Execute),                    kanat::control.in_set(WwSimSet::Execute),
+                    demodk::control.in_set(WwSimSet::Execute),
+                    esekh::control.in_set(WwSimSet::Execute),
+                    kmon::control.in_set(WwSimSet::Execute),
+                    table::control.in_set(WwSimSet::Execute),
+                    vteng::control.in_set(WwSimSet::Execute),
+                    ktaruo::control.in_set(WwSimSet::Execute),
                     gaship::control.in_set(WwSimSet::Execute),
                     hhyu::control.in_set(WwSimSet::Execute),
                     xtower::control.in_set(WwSimSet::Execute),
