@@ -1154,6 +1154,38 @@ impl App {
                 let (min, max) = sim::syan::Syan::spawn().cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::ebomzo::Ebomzo>() {
+                let (min, max) = sim::ebomzo::Ebomzo::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::sk2::Sk2>() {
+                let (min, max) = sim::sk2::Sk2::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::rohat::RoHat>() {
+                let (min, max) = sim::rohat::RoHat::spawn(0).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::vfan::Vfan>() {
+                let (min, max) = sim::vfan::Vfan::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::htobi3::Htobi3>() {
+                let (min, max) = sim::htobi3::Htobi3::spawn(0).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::branch::Branch>() {
+                let (min, max) = sim::branch::Branch::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::hami3::Hami3>() {
+                let (min, max) = sim::hami3::Hami3::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::atdoor::Atdoor>() {
+                let (min, max) = sim::atdoor::Atdoor::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];

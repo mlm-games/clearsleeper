@@ -437,7 +437,7 @@ impl Kanban {
     }
 
     pub fn drawn(&self) -> bool {
-        self.status & STTS_CULL == 0
+        (self.status & STTS_CULL) == 0
     }
 
     pub fn link(&self) -> Link {
@@ -454,10 +454,9 @@ impl Kanban {
         self.spawn_pos = actor.pos;
         self.home_angle = actor.angle;
         self.home_pos = actor.pos;
-        self.whole = true;
+        self.whole = self.parts == 0;
 
-        if self.parts == 0 {
-            self.whole = false;
+        if self.whole {
             self.status = (self.status & !STTS_MAP_MASK) | STTS_SHOWMAP | STTS_MAP_BOARD;
             self.cc_height = CC_REST_HEIGHT;
             self.cc_radius = CC_REST_RADIUS;
@@ -672,6 +671,7 @@ impl Sink<'_> {
         &mut self,
         entity: Entity,
         home: Vec3,
+        home_angle: [i16; 3],
         angle: [i16; 3],
         parameters: u32,
         pos: Vec3,
@@ -685,7 +685,7 @@ impl Sink<'_> {
             room: self.room,
         };
         let mut board = Kanban::spawn(parameters);
-        if !board.create(&mut actor, Some((entity, home, [0, 0, 0]))) {
+        if !board.create(&mut actor, Some((entity, home, home_angle))) {
             return;
         }
         self.spawns.push(Spawn { actor, board });
@@ -809,7 +809,7 @@ pub fn control(
             dropped.push(entity);
             continue;
         };
-        let Some((_, live)) = links.iter().find(|(id, _)| *id == parent) else {
+        let Some(live) = links.iter().find(|entry| entry.0 == parent) else {
             dropped.push(entity);
             continue;
         };
@@ -824,7 +824,7 @@ pub fn control(
             set_id: actor.set_id,
             room: actor.room,
         };
-        let next = board.execute_part(actor, &env, &mut sink, live);
+        let next = board.execute_part(actor, &env, &mut sink, &live.1);
         writes.push((parent, next));
         if board.doomed {
             dropped.push(entity);
@@ -835,10 +835,10 @@ pub fn control(
         if board.doomed || !board.whole {
             continue;
         }
-        if let Some((_, link)) = writes.iter().find(|(id, _)| *id == entity) {
-            board.parts = link.parts;
-            board.hammer_mode = link.hammer_mode;
-            board.parent_state = link.parent_state;
+        if let Some(link) = writes.iter().find(|entry| entry.0 == entity) {
+            board.parts = link.1.parts;
+            board.hammer_mode = link.1.hammer_mode;
+            board.parent_state = link.1.parent_state;
         }
     }
 
@@ -1188,7 +1188,7 @@ impl Kanban {
             return;
         }
         self.cut_seen |= 1i16.wrapping_shl(shift as u32);
-        if self.parts & PART_BASE != 0 {
+        if (self.parts & PART_BASE) != 0 {
             self.parts = PARTS_ALL;
             self.parent_state = PARENT_NONE;
         }
@@ -1209,7 +1209,9 @@ impl Kanban {
         actor.angle[2] = shift as i16;
         let pos = actor.pos;
         let angle = actor.angle;
-        sink.child(entity, self.home_pos, angle, parameters, pos);
+        let home = self.home_pos;
+        let home_angle = self.home_angle;
+        sink.child(entity, home, home_angle, angle, parameters, pos);
         sink.se(SE_BREAK_BOARD);
         self.parts = carried >> PART_ARG_SHIFT;
         if shift == 1 {
@@ -1274,7 +1276,7 @@ impl Kanban {
                 actor.angle[1] = env.player_angle.wrapping_add(TOSS_TURN);
                 self.shape_angle[1] = actor.angle[1];
                 self.steps = 0;
-                if self.parts & PART_EDGE != 0 {
+                if (self.parts & PART_EDGE) != 0 {
                     self.speed_f = TOSS_FAST;
                     self.speed.y = TOSS_RISE;
                     self.gravity = WATER_GRAVITY;
@@ -1510,7 +1512,7 @@ impl Kanban {
                 } else {
                     self.shape_angle[1] = actor.angle[1];
                     self.steps = 0;
-                    if self.parts & PART_EDGE != 0 {
+                    if (self.parts & PART_EDGE) != 0 {
                         self.speed_f = TOSS_FAST;
                         self.speed.y = TOSS_RISE;
                         self.gravity = WATER_GRAVITY;

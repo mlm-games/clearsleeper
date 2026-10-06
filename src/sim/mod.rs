@@ -18,6 +18,8 @@ pub mod bemos;
 pub mod barricade;
 pub mod bitem;
 pub mod bird;
+pub mod ebomzo;
+pub mod branch;
 pub mod boko;
 pub mod cafelmp;
 pub mod bscurtain;
@@ -78,11 +80,13 @@ pub mod gtaki;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
+pub mod hami3;
 pub mod hami4;
 pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
 pub mod hhyu;
+pub mod htobi3;
 pub mod hotfloor;
 pub mod hys;
 pub mod hmlif;
@@ -171,6 +175,7 @@ pub mod roten;
 pub mod raft;
 pub mod rectangle;
 pub mod rflw;
+pub mod rohat;
 pub mod redead;
 pub mod retag;
 pub mod rockfall;
@@ -207,6 +212,7 @@ pub mod stone;
 pub mod stream;
 pub mod swim;
 pub mod ssturu;
+pub mod sk2;
 pub mod spcitem;
 pub mod swc00;
 pub mod swhammer;
@@ -237,6 +243,7 @@ pub mod torch;
 pub mod tpota;
 pub mod transition;
 pub mod tsubo;
+pub mod vfan;
 pub mod vdora;
 pub mod usovmc;
 pub mod vrbox;
@@ -1027,6 +1034,25 @@ let mut f = world.resource_mut::<flags::EventFlags>();
         world.spawn((actor, v)).id()
     } else if ygawa::is_ygawa(&source.name) {
 world.spawn((actor, ygawa::Ygawa::spawn())).id()
+    } else if ebomzo::is_ebomzo(&source.name) {
+let v = ebomzo::Ebomzo::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if sk2::is_sk2(&source.name) {
+let v = sk2::Sk2::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if rohat::is_rohat(&source.name) {
+world.spawn((actor, rohat::RoHat::spawn())).id()
+    } else if vfan::is_vfan(&source.name) {
+let v = vfan::Vfan::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if htobi3::is_htobi3(&source.name) {
+let v = htobi3::Htobi3::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if branch::is_branch(&source.name) {
+world.spawn((actor, branch::Branch::spawn())).id()
+    } else if hami3::is_hami3(&source.name) {
+let v = hami3::Hami3::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1105,6 +1131,7 @@ pub fn build(
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
+    sim.world.insert_resource(kanban::Statics::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -1448,6 +1475,9 @@ pub fn build(
                 .chain(),
             (
                 pickup::control.in_set(WwSimSet::Execute),
+                    ebomzo::control.in_set(WwSimSet::Execute),
+                    sk2::control.in_set(WwSimSet::Execute),
+                    rohat::control.in_set(WwSimSet::Execute),
                     nzg::control.in_set(WwSimSet::Execute),
                     hys::control.in_set(WwSimSet::Execute),
                     smtoge::control.in_set(WwSimSet::Execute),
@@ -1475,7 +1505,12 @@ pub fn build(
                 swtact::control.in_set(WwSimSet::Execute),
                 warpfo::control.in_set(WwSimSet::Execute),
                 atdoor::control.in_set(WwSimSet::Execute),
-                npc_km1::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
+                npc_km1::control.in_set(WwSimSet::Execute),
+                wlvtag::control.in_set(WwSimSet::Execute),
+                vfan::control.in_set(WwSimSet::Execute),
+                htobi3::control.in_set(WwSimSet::Execute),
+                branch::control.in_set(WwSimSet::Execute),
+                hami3::control.in_set(WwSimSet::Execute),                    wlvtag::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                     andsw0::control.in_set(WwSimSet::Execute),
                     gnbtaki::control.in_set(WwSimSet::Execute),

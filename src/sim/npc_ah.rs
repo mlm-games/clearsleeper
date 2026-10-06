@@ -20,7 +20,7 @@ use crate::text::msgproc::{
 };
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
-    STATUS_MSG_ENDS, STATUS_MSG_TYPING,
+    STATUS_MSG_ENDS, STATUS_TYPING,
 };
 
 pub const NPC_AH_ACTORS: [&str; 1] = ["Ah"];
@@ -206,7 +206,7 @@ impl JntCtrl {
         let orig = out.wrapping_sub(target);
         let mut diff = orig;
         add_calc_angle_s2(&mut diff, 0, speed, max_vel);
-        if i32::from(diff).unsigned_abs() > i32::from(speed) {
+        if i32::from(diff).abs() > i32::from(speed) {
             *out = out.wrapping_add(diff.wrapping_sub(orig));
         } else {
             *out = target;
@@ -265,7 +265,7 @@ impl JntCtrl {
         }
         let mut done = 0;
         for row in 0..2 {
-            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).unsigned_abs()
+            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).abs()
                 <= i32::from(self.max_turn_step[row][axis] / 2)
             {
                 done += 1;
@@ -517,8 +517,12 @@ impl NpcAh {
     /// `daNpcAh_c::setAnmFromMsgTag` (`:654-664`).
     fn set_anm_from_msg_tag(&mut self, attr: u8) {
         match attr {
-            0 => self.set_anm_tbl(ANM_AH_WAIT),
-            1 => self.set_anm_tbl(ANM_AH_WAIT2),
+            0 => {
+                self.set_anm_tbl(ANM_AH_WAIT);
+            }
+            1 => {
+                self.set_anm_tbl(ANM_AH_WAIT2);
+            }
             _ => {}
         }
     }
@@ -556,7 +560,7 @@ impl NpcAh {
                 self.sticky_attn = 1;
             }
         } else {
-            let Some(player) = ctx.player_pos else {
+            let (Some(player), Some(eye)) = (ctx.player_pos, ctx.player_eye) else {
                 self.target_angle = DAT_ATTN_ANGLE;
                 return;
             };
@@ -569,8 +573,8 @@ impl NpcAh {
                 max_angle += ATTN_ANGLE_EXTEND;
             }
             let angle = to_s16(delta.x.atan2(delta.z)).wrapping_sub(self.shape_angle);
-            if max_dist > dist_xz && max_angle > i32::from(angle).unsigned_abs() {
-                self.eye_pos = ctx.player_eye;
+            if max_dist > dist_xz && max_angle > i32::from(angle).abs() {
+                self.eye_pos = eye;
                 self.attn_mode = ATTN_PLAYER;
                 self.head_only_follow = self.sticky_attn == 0;
                 if self.return_yaw == 0 {
@@ -588,7 +592,7 @@ impl NpcAh {
                     self.timer_return = DAT_RETURN_TIMER;
                 }
                 if DAT_ATTN_DIST_NEAR > dist_xz {
-                    self.eye_pos = ctx.player_eye;
+                    self.eye_pos = eye;
                     self.attn_mode = ATTN_PLAYER;
                     self.head_only_follow = self.sticky_attn == 0;
                     if self.return_yaw == 0 {
@@ -707,7 +711,7 @@ impl NpcAh {
                         ctx.text.message_set(no);
                     }
                 }
-                STATUS_MSG_TYPING => {
+                STATUS_TYPING => {
                     if self.prev_msg_status == STATUS_MSG_CONTINUES as u16 {
                         self.chk_msg();
                     }

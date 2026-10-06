@@ -137,7 +137,7 @@ impl JntCtrl {
         let orig = out.wrapping_sub(target);
         let mut diff = orig;
         add_calc_angle_s2(&mut diff, 0, speed, max_vel);
-        if i32::from(diff).unsigned_abs() > i32::from(speed) {
+        if i32::from(diff).abs() > i32::from(speed) {
             *out = out.wrapping_add(diff.wrapping_sub(orig));
         } else {
             *out = target;
@@ -196,7 +196,7 @@ impl JntCtrl {
         }
         let mut done = 0;
         for row in 0..2 {
-            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).unsigned_abs()
+            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).abs()
                 <= i32::from(self.max_turn_step[row][axis] / 2)
             {
                 done += 1;

@@ -14,7 +14,8 @@ use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgget::MsgArchive;
 use crate::text::msgproc::{
-    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs, fop_msgm_message_set,
+    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgFlags, MsgGameInfo, MsgProcs,
+    fop_msgm_message_set,
 };
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
@@ -215,7 +216,7 @@ impl JntCtrl {
         let orig = out.wrapping_sub(target);
         let mut diff = orig;
         add_calc_angle_s2(&mut diff, 0, speed, max_vel);
-        if i32::from(diff).unsigned_abs() > i32::from(speed) {
+        if i32::from(diff).abs() > i32::from(speed) {
             *out = out.wrapping_add(diff.wrapping_sub(orig));
         } else {
             *out = target;
@@ -274,7 +275,7 @@ impl JntCtrl {
         }
         let mut done = 0;
         for row in 0..2 {
-            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).unsigned_abs()
+            if i32::from(reached[row].wrapping_sub(self.angles[row][axis])).abs()
                 <= i32::from(self.max_turn_step[row][axis] / 2)
             {
                 done += 1;
@@ -367,6 +368,7 @@ pub struct NpcTt {
     pub msg_no: u32,
     pub msg_id: u32,
     pub msg_bound: bool,
+    pub melody_num: u8,
     pub morf: Morf,
     pub jnt: JntCtrl,
 }
@@ -397,6 +399,7 @@ impl NpcTt {
             msg_no: 0,
             msg_id: FPC_M_ERROR_PROCESS_ID,
             msg_bound: false,
+            melody_num: 0,
             morf: Morf::create(),
             jnt: JntCtrl::create(),
         }
@@ -583,7 +586,7 @@ impl NpcTt {
         } else {
             let msg_no = self.msg_no;
             if msg_no == MSG_5B3 {
-                ctx.text.set_melody_num(MELODY_5);
+                self.melody_num = MELODY_5;
             }
             msg_no
         }
@@ -799,6 +802,7 @@ impl NpcTt {
 pub struct Text<'a> {
     pub procs: &'a mut MsgProcs,
     pub info: &'a mut MsgGameInfo,
+    pub flags: &'a mut MsgFlags,
     pub clear_count: u8,
     pub one: &'a mut Msg1Box,
     pub two: &'a mut Msg2Box,
@@ -838,12 +842,7 @@ impl Text<'_> {
 
     /// `fopMsgM_messageSendOn`.
     pub fn message_send_on(&mut self) {
-        self.info.message_send_on();
-    }
-
-    /// `dComIfGp_setMelodyNum`.
-    pub fn set_melody_num(&mut self, melody: u8) {
-        self.one.tact.melody_num = melody;
+        self.flags.message_send_on();
     }
 
     pub fn message_set(&mut self, msg_no: u32) -> u32 {
@@ -883,6 +882,7 @@ pub struct Env<'w> {
 pub struct Msg<'w, 's> {
     pub procs: ResMut<'w, MsgProcs>,
     pub info: ResMut<'w, MsgGameInfo>,
+    pub flags: ResMut<'w, MsgFlags>,
     pub one: ResMut<'w, Msg1Box>,
     pub two: ResMut<'w, Msg2Box>,
     pub players: Query<'w, 's, &'static Player>,
@@ -909,6 +909,7 @@ pub fn control(
         let mut text = Text {
             procs: &mut msg.procs,
             info: &mut msg.info,
+            flags: &mut msg.flags,
             clear_count,
             one: &mut msg.one,
             two: &mut msg.two,

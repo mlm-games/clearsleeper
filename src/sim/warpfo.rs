@@ -150,11 +150,11 @@ pub fn control(
     mut commands: Commands,
 ) {
     for (entity, mut fade) in &mut fades {
-        // `dComIfGp_event_runCheck() && mStaffId != -1` (d_a_warpfout.cpp:62): a live staff slot
+        // `dComIfGp_event_runCheck() && mStaffId != -1` (`d_a_warpfout.cpp:62`): a live staff slot
         // only exists while an event is playing, so `staff_cut` returning `Some` is both halves
-        // at once. `MsgGameInfo::event_run_check` is not used here because nothing in this crate
+        // at once. `MsgGameInfo::event_run_check` is not consulted because nothing in this crate
         // ever raises `MsgGameInfo::event_mode` off `DA_EVT_MODE_NONE`, which would leave the
-        // gate permanently shut; `swtact.rs:114` does use it because there the test is negated.
+        // gate permanently shut; `swtact.rs:129` does use it because there the test is negated.
         let Some((cut, advance)) = active.staff_cut(&list, STAFF) else {
             continue;
         };
