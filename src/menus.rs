@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
 use repose_core::input::PhysicalKey;
-use repose_core::{AlignItems, Color, JustifyContent, Modifier, Sp, UnitExt, View};
-use repose_ui::{Center, Column, Row, Spacer, Text, TextStyle, ViewExt};
+use repose_core::{Color, Modifier, Sp, UnitExt, View};
+use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
 
+use crate::config::Settings;
 use crate::hud;
 use crate::save::{SLOTS, SaveGame};
 use crate::sim::health::Health;
@@ -16,12 +17,27 @@ const PANEL_HEX: &str = "#0B1522";
 const PANEL_ALPHA: u8 = 170;
 const SLOT_HEART_SIZE: f32 = 18.0;
 
+pub const TITLE_ITEMS: [&str; 3] = ["Play", "Settings", "Quit"];
+pub const QUIT_ITEMS: [&str; 2] = ["Cancel", "Quit"];
+pub const SETTINGS_ITEMS: [&str; 4] = ["Attention", "Ruby", "Vibration", "Sound"];
+
+const SETTING_VALUES: [&[&str]; 4] = [
+    &["Off", "On"],
+    &["Off", "On"],
+    &["Off", "On"],
+    &["Mono", "Stereo", "Surround"],
+];
+
+const SETTING_LABEL_WIDTH: usize = 10;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Title,
     FileSelect,
     Playing,
     GameOver,
+    Settings,
+    QuitConfirm,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +46,8 @@ pub enum Cmd {
     Back,
     Up,
     Down,
+    Left,
+    Right,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +66,7 @@ pub enum Action {
     Load(usize),
     New(usize),
     GameOver(GameOverChoice),
+    Quit,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +74,10 @@ pub struct Menu {
     pub screen: Screen,
     pub slot: usize,
     pub slots: Vec<SlotInfo>,
+    pub title_index: usize,
+    pub quit_index: usize,
+    pub settings_index: usize,
+    pub settings: Settings,
 }
 
 impl Default for Menu {
@@ -69,13 +92,61 @@ impl Menu {
             screen: Screen::Title,
             slot: 0,
             slots: vec![SlotInfo::Empty; SLOTS],
+            title_index: 0,
+            quit_index: 0,
+            settings_index: 0,
+            settings: Settings::defaults(),
         }
     }
 
     pub fn step(&mut self, cmds: &[Cmd]) -> Option<Action> {
         for cmd in cmds {
             match (self.screen, cmd) {
-                (Screen::Title, Cmd::Confirm) => self.screen = Screen::FileSelect,
+                (Screen::Title, Cmd::Up) => self.title_index = self.title_index.saturating_sub(1),
+                (Screen::Title, Cmd::Down) => {
+                    let last = TITLE_ITEMS.len().saturating_sub(1);
+                    self.title_index = (self.title_index + 1).min(last);
+                }
+                (Screen::Title, Cmd::Confirm) => match self.title_index {
+                    0 => self.screen = Screen::FileSelect,
+                    1 => {
+                        self.settings = Settings::load();
+                        self.settings_index = 0;
+                        self.screen = Screen::Settings;
+                    }
+                    2 => {
+                        self.quit_index = 0;
+                        self.screen = Screen::QuitConfirm;
+                    }
+                    _ => {}
+                },
+                (Screen::Settings, Cmd::Up) => {
+                    self.settings_index = self.settings_index.saturating_sub(1);
+                }
+                (Screen::Settings, Cmd::Down) => {
+                    let last = Settings::row_count().saturating_sub(1);
+                    self.settings_index = (self.settings_index + 1).min(last);
+                }
+                (Screen::Settings, Cmd::Left) => self.shift_setting(-1),
+                (Screen::Settings, Cmd::Right) => self.shift_setting(1),
+                (Screen::Settings, Cmd::Back) => {
+                    self.settings.save();
+                    self.screen = Screen::Title;
+                }
+                (Screen::QuitConfirm, Cmd::Up) => {
+                    self.quit_index = self.quit_index.saturating_sub(1);
+                }
+                (Screen::QuitConfirm, Cmd::Down) => {
+                    let last = QUIT_ITEMS.len().saturating_sub(1);
+                    self.quit_index = (self.quit_index + 1).min(last);
+                }
+                (Screen::QuitConfirm, Cmd::Confirm) => {
+                    if self.quit_index == 1 {
+                        return Some(Action::Quit);
+                    }
+                    self.screen = Screen::Title;
+                }
+                (Screen::QuitConfirm, Cmd::Back) => self.screen = Screen::Title,
                 (Screen::FileSelect, Cmd::Up) => self.slot = self.slot.saturating_sub(1),
                 (Screen::FileSelect, Cmd::Down) => {
                     self.slot = (self.slot + 1).min(SLOTS - 1);
@@ -103,6 +174,23 @@ impl Menu {
         }
         None
     }
+
+    fn shift_setting(&mut self, delta: i16) {
+        let row = self.settings_index;
+        let Some((value, range, _)) = self.settings.row(row) else {
+            return;
+        };
+        let shifted = if delta < 0 {
+            value.saturating_sub(1)
+        } else {
+            value.saturating_add(1).min(range)
+        };
+        if shifted == value {
+            return;
+        }
+        self.settings.set_row(row, shifted);
+        self.settings.save();
+    }
 }
 
 impl SlotInfo {
@@ -125,6 +213,12 @@ pub fn cmds_from(held: &HashSet<PhysicalKey>, prev: &HashSet<PhysicalKey>) -> Ve
     if pressed(PhysicalKey::ArrowDown) || pressed(PhysicalKey::KeyS) {
         cmds.push(Cmd::Down);
     }
+    if pressed(PhysicalKey::ArrowLeft) || pressed(PhysicalKey::KeyA) {
+        cmds.push(Cmd::Left);
+    }
+    if pressed(PhysicalKey::ArrowRight) || pressed(PhysicalKey::KeyD) {
+        cmds.push(Cmd::Right);
+    }
     if pressed(PhysicalKey::Space) || pressed(PhysicalKey::Enter) {
         cmds.push(Cmd::Confirm);
     }
@@ -139,21 +233,43 @@ pub fn play_time(tick: u64) -> String {
     format!("{}:{:02}", seconds / 3600, (seconds / 60) % 60)
 }
 
-pub fn title_view() -> View {
-    Column(
-        Modifier::new()
-            .fill_max_size()
-            .justify_content(JustifyContent::SPACE_BETWEEN)
-            .align_items(AlignItems::CENTER)
-            .padding(28.dp())
-            .hit_passthrough(),
-    )
-    .child([
-        Spacer(),
-        Text("Press Space")
-            .size(Sp(18.0))
-            .color(Color::from_hex(DIM_HEX)),
-    ])
+pub fn title_view(menu: &Menu) -> View {
+    let mut children = vec![
+        Text("ClearSleeper")
+            .size(Sp(48.0))
+            .color(Color::from_hex(TITLE_HEX)),
+    ];
+    for (index, label) in TITLE_ITEMS.iter().enumerate() {
+        children.push(menu_item(index == menu.title_index, *label));
+    }
+    children.push(hint("Up/Down: move    Space: choose"));
+    overlay(children)
+}
+
+pub fn settings_view(menu: &Menu) -> View {
+    let mut children = vec![
+        Text("Settings")
+            .size(Sp(40.0))
+            .color(Color::from_hex(TITLE_HEX)),
+    ];
+    for row in 0..Settings::row_count() {
+        children.push(settings_row(menu, row));
+    }
+    children.push(hint("Up/Down: move    Left/Right: change    Esc: back"));
+    panel(children)
+}
+
+pub fn quit_confirm_view(menu: &Menu) -> View {
+    let mut children = vec![
+        Text("Quit?")
+            .size(Sp(40.0))
+            .color(Color::from_hex(TITLE_HEX)),
+    ];
+    for (index, label) in QUIT_ITEMS.iter().enumerate() {
+        children.push(menu_item(index == menu.quit_index, *label));
+    }
+    children.push(hint("Up/Down: move    Space: choose    Esc: cancel"));
+    panel(children)
 }
 
 pub fn file_select_view(menu: &Menu) -> View {
@@ -213,6 +329,74 @@ pub fn game_over_view(menu: &Menu) -> View {
         )
         .child(children),
     )
+}
+
+fn panel(children: Vec<View>) -> View {
+    Center(Modifier::new().fill_max_size().hit_passthrough()).child(
+        Column(
+            Modifier::new()
+                .gap(14.dp())
+                .padding(28.dp())
+                .background(Color::from_hex(PANEL_HEX).with_alpha(PANEL_ALPHA))
+                .hit_passthrough(),
+        )
+        .child(children),
+    )
+}
+
+fn hint(text: &str) -> View {
+    Text(text).size(Sp(15.0)).color(Color::from_hex(DIM_HEX))
+}
+
+fn overlay(children: Vec<View>) -> View {
+    Center(Modifier::new().fill_max_size().hit_passthrough()).child(
+        Column(
+            Modifier::new()
+                .gap(14.dp())
+                .padding(28.dp())
+                .hit_passthrough(),
+        )
+        .child(children),
+    )
+}
+
+fn menu_item(cursor: bool, label: &str) -> View {
+    let marker = if cursor { "> " } else { "  " };
+    let color = if cursor {
+        Color::from_hex(CURSOR_HEX)
+    } else {
+        Color::from_hex(TITLE_HEX)
+    };
+    Text(format!("{marker}{label}")).size(Sp(24.0)).color(color)
+}
+
+fn settings_row(menu: &Menu, row: usize) -> View {
+    let name = SETTINGS_ITEMS.get(row).copied().unwrap_or_default();
+    let (value, _, _) = menu.settings.row(row).unwrap_or((0, 0, 0));
+    let active = menu.settings_index == row;
+    let marker = if active { "> " } else { "  " };
+    let blank = " ".repeat(SETTING_LABEL_WIDTH.saturating_sub(name.len()));
+    let shown = setting_value_text(row, value);
+    let cell = if active {
+        format!("< {shown} >")
+    } else {
+        shown
+    };
+    let color = if active {
+        Color::from_hex(CURSOR_HEX)
+    } else {
+        Color::from_hex(TITLE_HEX)
+    };
+    Text(format!("{marker}{name}{blank}{cell}"))
+        .size(Sp(24.0))
+        .color(color)
+}
+
+fn setting_value_text(row: usize, value: u8) -> String {
+    SETTING_VALUES
+        .get(row)
+        .and_then(|names| names.get(usize::from(value)))
+        .map_or_else(|| value.to_string(), |name| (*name).to_string())
 }
 
 fn slot_row(cursor: bool, info: &SlotInfo) -> View {

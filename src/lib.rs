@@ -20,6 +20,7 @@ pub mod assets;
 pub mod audio;
 pub mod bdl;
 pub mod btk;
+pub mod config;
 pub mod dzs;
 pub mod hud;
 pub mod input;
@@ -27,6 +28,7 @@ pub mod intro;
 pub mod j2d;
 pub mod menus;
 pub mod movie;
+pub mod quit;
 pub mod save;
 pub mod sim;
 pub mod text;
@@ -74,6 +76,7 @@ pub struct App {
     movie_done: bool,
     pub intro: Option<IntroStage>,
     pending_slot: Option<usize>,
+    quit: quit::Quit,
 }
 
 pub struct IntroStage {
@@ -130,6 +133,7 @@ impl App {
             movie_done: false,
             intro: None,
             pending_slot: None,
+            quit: quit::Quit::default(),
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.reset_world();
@@ -210,15 +214,11 @@ impl App {
             self.stage_use(false);
             self.stage_pad_menu();
         }
-        let mut cmds = if window_focused {
+        let cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
         } else {
             Vec::new()
         };
-        if self.intro.is_none() && self.menu.screen == menus::Screen::Title && self.movie_done {
-            cmds.push(menus::Cmd::Confirm);
-            self.movie_done = false;
-        }
         self.menu_prev.clone_from(held);
         if self.menu.screen == menus::Screen::Playing || cmds.is_empty() {
             return;
@@ -253,6 +253,7 @@ impl App {
                     _ => menus::Screen::Playing,
                 };
             }
+            Some(menus::Action::Quit) => self.quit.request(),
             None => {}
         }
     }
@@ -1854,6 +1855,7 @@ impl App {
         self.room_actors.clear();
         self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
+        sim::weight::init(&mut self.sim.world);
         sim::spawn_actors(&mut self.sim.world, &tables);
         Self::install_tag_events(&mut self.sim.world, tables.actors());
         if !rooms.is_empty() {
@@ -2066,6 +2068,9 @@ pub fn root_view(
     _sched: &mut repose_core::runtime::Scheduler,
     ctx: &repose_core::RenderContext,
 ) -> repose_core::View {
+    if app.quit.latched() {
+        return quit::Quit::parked();
+    }
     let frame = view::build_frame(&app.snapshot(), app.cam.get(), app.room.as_ref());
     let cam = app.cam.clone();
     let viewport = Viewport3d(
@@ -2091,10 +2096,12 @@ pub fn root_view(
         menus::Screen::Title => match app.intro.as_ref() {
             Some(_) => intro_view(app, ctx),
             None => ZStack(Modifier::new().fill_max_size())
-                .child([title_movie(app, ctx), menus::title_view()]),
+                .child([title_movie(app, ctx), menus::title_view(&app.menu)]),
         },
         menus::Screen::FileSelect => menus::file_select_view(&app.menu),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
+        menus::Screen::Settings => menus::settings_view(&app.menu),
+        menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
     };
     if app.intro.is_some() {
         return intro_view(app, ctx);
