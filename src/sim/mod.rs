@@ -647,6 +647,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if goal_flag::is_goal_flag(&source.name) {
         let v = goal_flag::GoalFlag::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if bridge::is_bridge(&source.name) {
+        let v = bridge::Bridge::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -1309,6 +1312,8 @@ pub fn build(
     sim.world.insert_resource(goal_flag::StartStagePoint::default());
     sim.world.insert_resource(goal_flag::MiniGame::default());
     sim.world.insert_resource(goal_flag::SaraceShip::default());
+    sim.world.insert_resource(bridge::BridgeWeather::default());
+    sim.world.insert_resource(bridge::BridgeCamera::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1366,6 +1371,8 @@ pub fn build(
     sim.world.insert_resource(goal_flag::StartStagePoint::default());
     sim.world.insert_resource(goal_flag::MiniGame::default());
     sim.world.insert_resource(goal_flag::SaraceShip::default());
+    sim.world.insert_resource(bridge::BridgeWeather::default());
+    sim.world.insert_resource(bridge::BridgeCamera::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1797,6 +1804,7 @@ pub fn build(
                 hole::control.in_set(WwSimSet::Execute),
                 toge::control.in_set(WwSimSet::Execute),
                 lbridge::control.in_set(WwSimSet::Execute),
+                bridge::control.in_set(WwSimSet::Execute),
                 tornado::control.in_set(WwSimSet::Execute),
                 stair::control.in_set(WwSimSet::Execute),
                 vrbox2::control.in_set(WwSimSet::Execute),
@@ -1809,3 +1817,4 @@ pub fn build(
 pub mod auction;
 
 pub mod knob00;
+pub mod bridge;
