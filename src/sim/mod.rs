@@ -91,6 +91,7 @@ pub mod events;
 pub mod fallrock;
 pub mod fan;
 pub mod ff;
+pub mod obj_eff;
 pub mod obj_hha;
 pub mod pirate_flag;
 pub mod shand;
@@ -246,6 +247,7 @@ pub mod pause;
 pub mod pbco;
 pub mod pbka;
 pub mod pedestal;
+pub mod particle;
 pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
@@ -605,6 +607,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if pirate_flag::is_pirate_flag(&source.name) {
         let v = pirate_flag::PirateFlag::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if obj_eff::is_obj_eff(&source.name) {
+        let a = obj_eff::ObjEff::spawn(source.parameters);
+        world.spawn((actor, a)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1947,6 +1952,7 @@ pub fn build(
                 title::control.in_set(WwSimSet::Execute),
                 shand::control.in_set(WwSimSet::Execute),
                 pirate_flag::control.in_set(WwSimSet::Execute),
+                obj_eff::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
