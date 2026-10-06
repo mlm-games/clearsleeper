@@ -18,6 +18,7 @@ use super::talk::Talk;
 use super::transition::{NextStage, Target};
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 use super::water;
+use super::zelda::Zelda;
 
 pub const EVENT_LIST_ENTRY: &str = "dat/event_list.dat";
 
@@ -168,6 +169,10 @@ pub const LINK_ANIM_STEMS: &[&str] = &[
 ];
 const GET_ENTERED: u8 = 0x01;
 const GET_DONE: u8 = 0x04;
+
+const ZL1_MAJYU_POS: Vec3 = Vec3::new(-37927.0, 2200.0, 7852.0); // <- d_a_npc_zl1.cpp:1526
+const ZL1_MAJYU_AIM: Vec3 = Vec3::new(-37978.0, 400.0, 7766.0); // <- field_0x758, :1527
+const ZL1_JMP_HALF_TURN: i16 = 0x4000; // <- current.angle.y += (s16)0x4000, :1614
 
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct StageEvents(pub Vec<String>);
@@ -739,6 +744,7 @@ pub fn control(
     mut ships: Query<&mut Ship>,
     mut talks: Query<&mut Talk>,
     mut presents: Query<&mut PresentItem>,
+    mut zeldas: Query<&mut Zelda>,
     mut commands: Commands,
 ) {
     let (list, table) = data;
@@ -804,6 +810,7 @@ pub fn control(
                 &mut partner,
                 &anms,
                 &mut presents,
+                &mut zeldas,
                 &mut commands,
             );
         }
@@ -825,6 +832,7 @@ fn staff_cut(
     partner: &mut ItemPartner,
     anms: &LinkAnms,
     presents: &mut Query<&mut PresentItem>,
+    zeldas: &mut Query<&mut Zelda>,
     commands: &mut Commands,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
@@ -915,7 +923,7 @@ fn staff_cut(
     } else if staff.name == "Auction" {
         auction_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Zl1" {
-        zl1_cut(run, list, flags);
+        zl1_cut(run, list, flags, owner, actors, zeldas);
     } else if staff.name == "Tc" {
         tc_cut(run, list, flags);
     } else if staff.name == "Mk" {
@@ -1180,6 +1188,10 @@ fn tpost_cut(
     }
 }
 
+/// `daNpc_Bs1_c::privateCut` — `d_a_npc_bs1.cpp:1933-2012`. Retail splits it in
+/// two: an `if (dComIfGp_evmng_getIsAddvance(staffId))` init switch (`:1964-1991`)
+/// and a move switch whose only non-`TRUE` arms are `evn_talk` (`:1997`) and
+/// `evn_wait` (`:2000`); `default: end = TRUE` (`:2002`) ends the cut.
 fn bs1_cut(
     run: &mut StaffRun,
     list: &EventList,
@@ -1194,16 +1206,55 @@ fn bs1_cut(
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
+    if run.advance > 0 {
+        bs1_init(cut.name.as_str(), run, list);
+    }
     match cut.name.as_str() {
         "TALKMSG" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
         "CONTINUE_TALK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, true, "MsgNo"),
-        "WAIT" => {
-            if run.advance > 0 {
-                wait_start(run, list);
-            }
-            wait_proc(run, list, flags);
-        }
-        _ => cut_end(run, list, flags),
+        "WAIT" => wait_proc(run, list, flags), // <- evn_wait, d_a_npc_bs1.cpp:2000
+        _ => cut_end(run, list, flags),        // <- default: end = TRUE, :2003
+    }
+}
+
+/// The init switch — `:1965-1990`. `evn_talk_init` (`:1793-1809`) and
+/// `evn_continue_talk_init` (`:1811-1820`) are folded into the `talk_cut` calls
+/// above, which take the same advance tick and read the same `MsgNo` /
+/// `EndMsgNo` integers.
+fn bs1_init(action: &str, run: &mut StaffRun, list: &EventList) {
+    match action {
+        "WAIT" => wait_start(run, list), // <- evn_wait_init, d_a_npc_bs1.cpp:1976
+        // `evn_jnt_lock_init` — `:1854-1881`. `prm` selects one of four
+        // head/backbone lock pairs on `mJntCtrl`, a `dNpc_JntCtrl_c`
+        // (`d_a_npc_bs1.h:122`). `sim::shop` carries no joint controller and
+        // RULE 3b classes joint matrices as absent, so the request has no
+        // destination here and is not faked.
+        "JNTLOCK" => {} // <- d_a_npc_bs1.cpp:1973
+        // `evn_set_anm_init` — `:1900-1910`. `setAnm(anmNo)` indexes a morph and
+        // a BCK archive that do not exist in this checkout.
+        "SETANM" => {} // <- d_a_npc_bs1.cpp:1979
+        // `evn_praise_init` — `:1913-1917`. `dComIfGp_setItemLifeCount(maxLife -
+        // life)` (`:1915`) accumulates a pending count the heart meter reads
+        // (`d_meter.cpp:1423-1429`); no meter resource and no pending-count
+        // field exist here. Not folded into a heal: retail does not change the
+        // saved life here.
+        "PRAISE" => {} // <- d_a_npc_bs1.cpp:1982
+        // `evn_mantan_init` — `:1920-1930`. The same pending-count channel over
+        // life, magic, bombs and arrows (`:1925-1928`), each read only by the
+        // meter (`d_meter.cpp:1423-1429`, `:2874-2896`, `:4096-4097`).
+        "MANTAN" => {} // <- d_a_npc_bs1.cpp:1985
+        // `dComIfGs_setReserveItemEmpty()` — `:1988`, the Bazaar ticket the
+        // player hands over. It reaches
+        // `dSv_player_bag_item_c::setReserveItemEmpty()` (`d_save.cpp:629`),
+        // which forwards `dItemNo_NONE_e` to `setReserveItemChange` (`:630`).
+        // That reads `dComIfGp_event_getTalkXYBtn()` (`d_save.cpp:584`) to pick
+        // the button and then clears the one item button holding a
+        // `dInvSlot_ReserveFirst_e .. dInvSlot_ReserveLast_e` slot
+        // (`d_save.cpp:597`, `:600`). The presenting-event channel behind
+        // `getTalkXYBtn` (`d_com_inf_game.h:3501`) is RULE 3b absent, so WHICH
+        // button to clear is unknown; RULE 1 forbids choosing one.
+        "GETTICKET" => {} // <- d_a_npc_bs1.cpp:1988
+        _ => {}
     }
 }
 
@@ -1254,14 +1305,125 @@ fn ji1_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     cut_end(run, list, flags);
 }
 
-fn zl1_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+/// `daNpc_Zl1_c::privateCut` — `d_a_npc_zl1.cpp:1682-1824`. Retail's
+/// `if (dComIfGp_evmng_getIsAddvance(i_staffIdx))` init switch is `:1726-1770`
+/// and its move switch is `:1773-1818`, where `default: temp = TRUE` (`:1815`)
+/// ends the cut. `Zelda` is the actor that owns this staff, so the init writes
+/// go to `running.actor`.
+fn zl1_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    zeldas: &mut Query<&mut Zelda>,
+) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
-    if matches!(cut.name.as_str(), "OKIRU" | "OKIRU_2" | "JMP_OFF") {
-        return;
+    if run.advance > 0 {
+        zl1_init(cut.name.as_str(), run, list, owner, actors, zeldas);
     }
-    cut_end(run, list, flags);
+    // `MAJYU_END` is `a_cut_tbl[6]` (`:1690`) but has no case in either switch,
+    // so it reaches `default: temp = TRUE` (`:1815`) with no init.
+    match cut.name.as_str() {
+        "OKIRU" | "OKIRU_2" | "JMP_OFF" => {} // <- :1793, :1796, :1805
+        _ => cut_end(run, list, flags),        // <- default: temp = TRUE, :1815
+    }
+}
+
+/// The init switch — `:1727-1769`.
+fn zl1_init(
+    action: &str,
+    run: &StaffRun,
+    list: &EventList,
+    owner: Entity,
+    actors: &mut Query<(Entity, &mut Actor)>,
+    zeldas: &mut Query<&mut Zelda>,
+) {
+    match action {
+        // `cut_init_LOK_PLYER` — `:1426-1444`. `prm_0 == 1` locks the head onto
+        // the player, anything else releases the lock and calls `m_jnt.setTrn()`.
+        // `field_0x7D8` is `Zelda::look_lock` (`d_a_npc_zl1.cpp:1212` reads it
+        // as `lookBack`'s `param_6`).
+        "LOK_PLYER" => {
+            if let Ok(mut zelda) = zeldas.get_mut(owner) {
+                zelda.look_lock = list.cut_number(run.cut as usize, "prm_0") == Some(1);
+            }
+        } // <- cut_init_LOK_PLYER, d_a_npc_zl1.cpp:1729
+        // `cut_init_LOK_PARTNER` — `:1451-1475`. The `prm_0` decode is
+        // identical to `cut_init_LOK_PLYER`'s, but both it and `field_0x84D = 4`
+        // sit inside `if (searchByID(mProcId1, ...))` (`:1456`) and `mProcId1`
+        // comes from `partner_search`'s `fpcM_Search` sweep (`:1142-1145`), an
+        // actor registry this sim does not model — so the gate cannot be read
+        // and neither write is transcribed.
+        "LOK_PARTNER" => {} // <- cut_init_LOK_PARTNER, d_a_npc_zl1.cpp:1732
+        // `cut_init_MAJYU_START` — `:1524-1532`. `field_0x84D = 2` and
+        // `field_0x7D0 = true` (`:1530-1531`) are look-only state; the position
+        // and the aim-derived yaw are the two that move her.
+        "MAJYU_START" => {
+            let Ok((_, mut actor)) = actors.get_mut(owner) else {
+                return;
+            };
+            actor.pos = ZL1_MAJYU_POS;
+            actor.angle[1] = target_angle_y(actor.pos, ZL1_MAJYU_AIM);
+        } // <- cut_init_MAJYU_START, d_a_npc_zl1.cpp:1744
+        // `cut_init_DRW_ONOFF` — `:1566-1573`. `field_0x7D4` is `Zelda::draw_off`.
+        // With no `OnOff` integer the field is left alone (`:1569`).
+        "DRW_ONOFF" => {
+            let Some(on_off) = list.cut_number(run.cut as usize, "OnOff") else {
+                return;
+            };
+            if let Ok(mut zelda) = zeldas.get_mut(owner) {
+                zelda.draw_off = on_off == 0;
+            }
+        } // <- cut_init_DRW_ONOFF, d_a_npc_zl1.cpp:1753
+        // `cut_init_JMP_OFF` — `:1600-1629`. `Speed` / `Spd_y` / `Grvty` are read
+        // through `get_prmFloat(p, 0.0f)` (`:1605-1607`, `:1344-1350`), so a
+        // missing parameter is zero — retail's own default, not a guess.
+        // `onPlayerNoDraw()` (`:1618`) and `m_jnt.offBackBoneLock()` (`:1627`)
+        // have no channel here either; `field_0x84D = 0` (`:1624`) is look state.
+        "JMP_OFF" => {
+            let Ok((_, mut actor)) = actors.get_mut(owner) else {
+                return;
+            };
+            let speed_f = list.cut_float(run.cut as usize, "Speed").unwrap_or(0.0);
+            let speed_y = list.cut_float(run.cut as usize, "Spd_y").unwrap_or(0.0);
+            let gravity = list.cut_float(run.cut as usize, "Grvty").unwrap_or(0.0);
+            actor.angle[1] = actor.angle[1].wrapping_add(ZL1_JMP_HALF_TURN);
+            actor.speed.y = speed_y;
+            actor.speed_f = speed_f;
+            actor.gravity = gravity;
+            if let Ok(mut zelda) = zeldas.get_mut(owner) {
+                // `field_0x7D3 = false` — `:1619`.
+                zelda.demo_wait = false;
+            }
+        } // <- cut_init_JMP_OFF, d_a_npc_zl1.cpp:1759
+        // `cut_init_CHG_ANM_ATR` — `:1482-1489`. `AtrNo` selects a morph and a
+        // BCK index that do not exist in this checkout.
+        "CHG_ANM_ATR" => {} // <- cut_init_CHG_ANM_ATR, d_a_npc_zl1.cpp:1735
+        // `cut_init_OKIRU` — `:1539-1543` and `cut_init_OKIRU_2` — `:1550-1553`.
+        // Both only start a morph and set `field_0x7C3`, the flag
+        // `cut_move_OKIRU` (`:1547`) and `cut_move_OKIRU_2` (`:1557`) poll to hold
+        // the cut. Without the BCK there is no frame source for that flag, so the
+        // hold stays on and the morph cannot be transcribed.
+        "OKIRU" | "OKIRU_2" => {} // <- cut_init_OKIRU/_2, d_a_npc_zl1.cpp:1747, :1750
+        // `cut_init_PLYER_TRN_PARTNER` — `:1496-1506` — needs `mProcId1`, the
+        // `fpcM_Search` sweep result. `cut_init_PLYER_TRN_TETRA` — `:1513-1517` —
+        // reaches `daPy_py_c::changeDemoMoveAngle` (`d_a_player.h:518`), a demo
+        // angle with no destination outside a `demo_stick` move the event never
+        // raises here.
+        "PLYER_TRN_PARTNER" | "PLYER_TRN_TETRA" => {} // <- :1738, :1741
+        // `cut_init_PLYER_DRW_ONOFF` — `:1580-1593` — calls
+        // `onPlayerNoDraw` / `offPlayerNoDraw` (`d_a_player.h:540-541`), a per-
+        // frame flag on Link's own class. `cut_init_OMAMORI_ONOFF` —
+        // `:1639-1661` — moves the two light influences and the fog ratio, all
+        // RULE 3b absent. `cut_init_SURPRISED` — `:1669-1673`, `#if VERSION >
+        // VERSION_DEMO` and therefore live on NTSC-U — raises a sound and a
+        // shock. None of the three has a channel in this file.
+        "PLYER_DRW_ONOFF" | "OMAMORI_ONOFF" | "SURPRISED" => {} // <- :1756, :1762, :1766
+        _ => {}
+    }
 }
 
 fn tc_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
