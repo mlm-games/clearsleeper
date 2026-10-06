@@ -2045,6 +2045,7 @@ pub fn build(
                 .chain(),
             (pickup::control.in_set(WwSimSet::Execute),
                 npc_ah::control.in_set(WwSimSet::Execute),
+                marlon::control.in_set(WwSimSet::Execute),
                 npc_btsw2::control.in_set(WwSimSet::Execute),
                 npc_jb1::control.in_set(WwSimSet::Execute),
                 npc_tt::control.in_set(WwSimSet::Execute),

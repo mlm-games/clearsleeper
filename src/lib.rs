@@ -712,8 +712,11 @@ impl App {
                 (view::ActorKind::Balloon, 0, 36.0, 18.0)
             } else if entity.contains::<sim::gull::Gull>() || entity.contains::<sim::bird::Bird>() {
                 (view::ActorKind::Gull, 0, 12.0, 8.0)
-            } else if entity.contains::<sim::marlon::Marlon>()
-                || entity.contains::<sim::shop::Shop>()
+            } else if let Some(x) = entity.get::<sim::marlon::Marlon>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::shop::Shop>()
                 || entity.contains::<sim::lenzo::Lenzo>()
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
