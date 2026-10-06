@@ -29,6 +29,7 @@ pub mod bgn3;
 pub mod bitem;
 pub mod bita;
 pub mod bmdhand;
+pub mod bwdg;
 pub mod dr2;
 pub mod fgmahou;
 pub mod hole;
@@ -1601,6 +1602,7 @@ pub fn build(
     sim.world.insert_resource(kamome2::Kamome2Cam::default());
     sim.world.insert_resource(att::AttBoss::default());
     sim.world.insert_resource(att::AttNonPos::default());
+    sim.world.insert_resource(bwdg::BwdgStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1696,6 +1698,7 @@ pub fn build(
     sim.world.insert_resource(kamome2::Kamome2Cam::default());
     sim.world.insert_resource(att::AttBoss::default());
     sim.world.insert_resource(att::AttNonPos::default());
+    sim.world.insert_resource(bwdg::BwdgStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -2100,6 +2103,7 @@ pub fn build(
                 gaship2::control.in_set(WwSimSet::Execute),
                 eayogn::control.in_set(WwSimSet::Execute),
                 bwds::control.in_set(WwSimSet::Execute),
+                bwdg::control.in_set(WwSimSet::Execute),
                 doguud::control.in_set(WwSimSet::Execute),
                 ktaruo::control.in_set(WwSimSet::Execute),
                 gaship::control.in_set(WwSimSet::Execute),
