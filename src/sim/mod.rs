@@ -124,10 +124,16 @@ pub mod msg;
 pub mod nh;
 pub mod obj_akabe;
 pub mod objtime;
+pub mod npc_ds1;
+pub mod npc_ac1;
 pub mod npc_bmsw;
+pub mod npc_co1;
 pub mod npc_btsw;
+pub mod npc_gp1;
 pub mod npc_mt;
+pub mod npc_pf1;
 pub mod npc_p1;
+pub mod npc_uk;
 pub mod npc_tc;
 pub mod pbco;
 pub mod pbka;
@@ -829,6 +835,18 @@ let v = roten::Roten::spawn(source.parameters, 0);
     } else if kanban::is_kanban(&source.name) {
 let v = kanban::Kanban::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if npc_ds1::is_npc_ds1(&source.name) {
+world.spawn((actor, npc_ds1::NpcDs1::spawn())).id()
+    } else if npc_ac1::is_npc_ac1(&source.name) {
+world.spawn((actor, npc_ac1::NpcAc1::spawn())).id()
+    } else if npc_uk::is_npc_uk(&source.name) {
+world.spawn((actor, npc_uk::NpcUk::spawn())).id()
+    } else if npc_gp1::is_npc_gp1(&source.name) {
+world.spawn((actor, npc_gp1::NpcGp1::spawn())).id()
+    } else if npc_pf1::is_npc_pf1(&source.name) {
+world.spawn((actor, npc_pf1::NpcPf1::spawn())).id()
+    } else if npc_co1::is_npc_co1(&source.name) {
+world.spawn((actor, npc_co1::NpcCo1::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1064,6 +1082,8 @@ pub fn build(
                     canon::control.in_set(WwSimSet::Execute),
                     mbdoor::control.in_set(WwSimSet::Execute),                    demokmm::control.in_set(WwSimSet::Execute),
                     komore::control.in_set(WwSimSet::Execute),
+                    npc_pf1::control.in_set(WwSimSet::Execute),
+                    npc_co1::control.in_set(WwSimSet::Execute),
                     adnno::control.in_set(WwSimSet::Execute),
                     roten::control.in_set(WwSimSet::Execute),
                     kanban::control.in_set(WwSimSet::Execute),
@@ -1088,6 +1108,10 @@ pub fn build(
                     kamome::control.in_set(WwSimSet::Execute),
                     npc_mt::control.in_set(WwSimSet::Execute),
                     npc_p1::control.in_set(WwSimSet::Execute),
+                    npc_ds1::control.in_set(WwSimSet::Execute),
+                    npc_ac1::control.in_set(WwSimSet::Execute),
+                    npc_uk::control.in_set(WwSimSet::Execute),
+                    npc_gp1::control.in_set(WwSimSet::Execute),
                     demodk::control.in_set(WwSimSet::Execute),
                     kmon::control.in_set(WwSimSet::Execute),
                     amos_knight::control.in_set(WwSimSet::Execute),
