@@ -1156,7 +1156,8 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
-                (daynight::control.in_set(WwSimSet::Execute),
+                (
+                    daynight::control.in_set(WwSimSet::Execute),
                     daioeye::control.in_set(WwSimSet::Execute),
                     ssturu::control.in_set(WwSimSet::Execute),
                     evsw::control.in_set(WwSimSet::Execute),
@@ -1178,7 +1179,8 @@ pub fn build(
                     ajav::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (death::freeze.in_set(WwSimSet::Execute),                    gy_ctrl::control.in_set(WwSimSet::Execute),
+                (
+                    death::freeze.in_set(WwSimSet::Execute),                    gy_ctrl::control.in_set(WwSimSet::Execute),
                     obj_rcloud::control.in_set(WwSimSet::Execute),
                     tori_flag::control.in_set(WwSimSet::Execute),
 
@@ -1197,7 +1199,8 @@ pub fn build(
                     trapdoor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (torch::control.in_set(WwSimSet::Execute),                    usovmc::control.in_set(WwSimSet::Execute),
+                (
+                    torch::control.in_set(WwSimSet::Execute),                    usovmc::control.in_set(WwSimSet::Execute),
                     obj_akabe::control.in_set(WwSimSet::Execute),
                     sie_flag::control.in_set(WwSimSet::Execute),
 
@@ -1223,7 +1226,8 @@ pub fn build(
 
                 )
                     .chain(),
-                (kytag07::control.in_set(WwSimSet::Execute),
+                (
+                    kytag07::control.in_set(WwSimSet::Execute),
                     kytag00::control.in_set(WwSimSet::Execute),
                     tag_msg::control.in_set(WwSimSet::Execute),
                     event_manager::control.in_set(WwSimSet::Execute),
@@ -1239,7 +1243,8 @@ pub fn build(
                     hotfloor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (door::control.in_set(WwSimSet::Execute),                    tag_volcano::control.in_set(WwSimSet::Execute),
+                (
+                    door::control.in_set(WwSimSet::Execute),                    tag_volcano::control.in_set(WwSimSet::Execute),
                     andsw2::control.in_set(WwSimSet::Execute),
 
                     door::jail_control.in_set(WwSimSet::Execute),
@@ -1263,7 +1268,8 @@ pub fn build(
 
                 )
                     .chain(),
-                (ivan::control.in_set(WwSimSet::Execute),
+                (
+                    ivan::control.in_set(WwSimSet::Execute),
                     morth::control.in_set(WwSimSet::Execute),
                     kalle_demos::control.in_set(WwSimSet::Execute),
                     agbsw0::control.in_set(WwSimSet::Execute),
@@ -1285,7 +1291,8 @@ pub fn build(
                     ganon_form3::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (talk::control.in_set(WwSimSet::Execute),                    msdan2::control.in_set(WwSimSet::Execute),
+                (
+                    talk::control.in_set(WwSimSet::Execute),                    msdan2::control.in_set(WwSimSet::Execute),
 
                     flags::control.in_set(WwSimSet::Execute),
                     tbox::control.in_set(WwSimSet::Execute),
@@ -1306,7 +1313,8 @@ pub fn build(
                     crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (ending::control.in_set(WwSimSet::Execute),
+                (
+                    ending::control.in_set(WwSimSet::Execute),
                     tagkk1::control.in_set(WwSimSet::Execute),
                     steamtag::control.in_set(WwSimSet::Execute),
                     warpt::control.in_set(WwSimSet::Execute),
@@ -1328,7 +1336,8 @@ pub fn build(
                     schedule::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (combat::control.in_set(WwSimSet::Execute),
+                (
+                    combat::control.in_set(WwSimSet::Execute),
                     yboil::control.in_set(WwSimSet::Execute),
                     lamp::control.in_set(WwSimSet::Execute),
                     rflw::control.in_set(WwSimSet::Execute),
@@ -1350,7 +1359,8 @@ pub fn build(
                     bemos::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (swhammer::control.in_set(WwSimSet::Execute),
+                (
+                    swhammer::control.in_set(WwSimSet::Execute),
                     shmrgrd::control.in_set(WwSimSet::Execute),
                     statue::control.in_set(WwSimSet::Execute),
                     taglight::control.in_set(WwSimSet::Execute),
@@ -1370,7 +1380,8 @@ pub fn build(
                     chuchu::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (figure::control.in_set(WwSimSet::Execute),                    salvage::control.in_set(WwSimSet::Execute),
+                (
+                    figure::control.in_set(WwSimSet::Execute),                    salvage::control.in_set(WwSimSet::Execute),
                     obj_nest::control.in_set(WwSimSet::Execute),
 
                     armos::control.in_set(WwSimSet::Execute),
@@ -1394,7 +1405,8 @@ pub fn build(
                     helmaroc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (gohdan::control.in_set(WwSimSet::Execute),                    gnbtaki::control.in_set(WwSimSet::Execute),
+                (
+                    gohdan::control.in_set(WwSimSet::Execute),                    gnbtaki::control.in_set(WwSimSet::Execute),
                     acorn_leaf::control.in_set(WwSimSet::Execute),
                     andsw0::control.in_set(WwSimSet::Execute),
 
@@ -1421,7 +1433,8 @@ pub fn build(
                     .chain(),
             )
                 .chain(),
-            (pickup::control.in_set(WwSimSet::Execute),
+            (
+                pickup::control.in_set(WwSimSet::Execute),
                     collision::remember_move_from.in_set(WwSimSet::Execute),
                     walk::walk.in_set(WwSimSet::Execute),
                     swim::surface.in_set(WwSimSet::Execute),
