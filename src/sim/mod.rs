@@ -44,6 +44,7 @@ pub mod collision;
 pub mod combat;
 pub mod daioeye;
 pub mod daiocta;
+pub mod dai;
 pub mod damage;
 pub mod daynight;
 pub mod death;
@@ -66,6 +67,7 @@ pub mod evsw;
 pub mod events;
 pub mod fallrock;
 pub mod fan;
+pub mod ff;
 pub mod fire;
 pub mod figure;
 pub mod flags;
@@ -102,6 +104,7 @@ pub mod health;
 pub mod helmaroc;
 pub mod hhyu;
 pub mod hbrf1;
+pub mod hlift;
 pub mod lbridge;
 pub mod htobi3;
 pub mod hotfloor;
@@ -153,6 +156,8 @@ pub mod lenzo;
 pub mod lines;
 pub mod lpalm;
 pub mod lwood;
+pub mod leaflift;
+pub mod lstair;
 pub mod lock;
 pub mod magma;
 pub mod makar;
@@ -168,6 +173,7 @@ pub mod msdansb;
 pub mod msdansub2;
 pub mod mkiek;
 pub mod msdan2;
+pub mod mtest;
 pub mod msg;
 pub mod nh;
 pub mod obj_akabe;
@@ -618,6 +624,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if ohatch::is_ohatch(&source.name) {
         let v = ohatch::Ohatch::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if ff::is_ff(&source.name) {
+        world.spawn((actor, ff::Ff::spawn(source.parameters))).id()
+    } else if leaflift::is_olift(&source.name) {
+        world.spawn((actor, leaflift::Olift::spawn(source.parameters))).id()
+    } else if hlift::is_hlift(&source.name) {
+        world.spawn((actor, hlift::Hlift::spawn(source.parameters))).id()
+    } else if lstair::is_lstair(&source.name) {
+        world.spawn((actor, lstair::Lstair::spawn(source.parameters))).id()
+    } else if mtest::is_mtest(&source.name) {
+        world.spawn((actor, mtest::Mtest::spawn(source.parameters))).id()
+    } else if dai::is_dai(&source.name) {
+        world.spawn((actor, dai::Dai::spawn(source.parameters))).id()
     } else if stair::is_stair(&source.name) {
         let v = stair::Stair::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
@@ -1642,6 +1660,7 @@ pub fn build(
                 schedule::control.in_set(WwSimSet::Execute),
                 esa::control.in_set(WwSimSet::Execute),
                 ki::control.in_set(WwSimSet::Execute),
+                ff::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (combat::control.in_set(WwSimSet::Execute),
@@ -1808,7 +1827,12 @@ pub fn build(
                 tornado::control.in_set(WwSimSet::Execute),
                 stair::control.in_set(WwSimSet::Execute),
                 vrbox2::control.in_set(WwSimSet::Execute),
+                hlift::control.in_set(WwSimSet::Execute),
+                lstair::control.in_set(WwSimSet::Execute),
                 buoyrace::control.in_set(WwSimSet::Execute),
+                leaflift::control.in_set(WwSimSet::Execute),
+                mtest::control.in_set(WwSimSet::Execute),
+                dai::control.in_set(WwSimSet::Execute),
         )
             .chain(),
     );
