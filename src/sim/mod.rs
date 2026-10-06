@@ -1566,6 +1566,8 @@ pub fn build(
                     .chain(),
                 (kanat::control.in_set(WwSimSet::Execute),
                 seatag::control.in_set(WwSimSet::Execute),
+                obj_correct::control.in_set(WwSimSet::Execute),
+                obj_mkie::control.in_set(WwSimSet::Execute),
                 scenechange::control.in_set(WwSimSet::Execute),
                 woodbox::control.in_set(WwSimSet::Execute),
                 cafelmp::control.in_set(WwSimSet::Execute),
@@ -1669,6 +1671,8 @@ pub fn build(
                 sage::control.in_set(WwSimSet::Execute),
                 servant::control.in_set(WwSimSet::Execute),
                 merchant::control.in_set(WwSimSet::Execute),
+                pedestal::control.in_set(WwSimSet::Execute),
+                warphr::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1746,6 +1750,8 @@ pub fn build(
                 statue::control.in_set(WwSimSet::Execute),
                 taglight::control.in_set(WwSimSet::Execute),
                 swlight::control.in_set(WwSimSet::Execute),
+                obj_swheavy::control.in_set(WwSimSet::Execute),
+                swhit0::control.in_set(WwSimSet::Execute),
                 rockfall::control.in_set(WwSimSet::Execute),
                 wind::control.in_set(WwSimSet::Execute),
                 homen::control.in_set(WwSimSet::Execute),
