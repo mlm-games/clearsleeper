@@ -26,7 +26,7 @@ use super::tsubo;
 use super::walk;
 use super::water;
 
-pub const CHUCHU_ACTORS: [&str; 5] = ["chuchu0", "chuchu1", "chuchu2", "c_kiiro", "c_red"];
+pub const CHUCHU_ACTORS: [&str; 5] = ["c_green", "c_red", "c_blue", "c_black", "c_kiiro"];
 pub const CHUCHU_COLOURS: [&str; 5] = ["c_green", "c_red", "c_blue", "c_black", "c_kiiro"];
 
 const BEHAVIOUR_SHIFT: u32 = 0x00;

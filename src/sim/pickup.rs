@@ -6,7 +6,7 @@ use super::health::Health;
 use super::item::{BOOMERANG, FIRST_ARROW, FIRST_BOMB, Held, LAST_ARROW, LAST_BOMB};
 use super::player::Player;
 
-pub const ITEM_ACTORS: [&str; 4] = ["item000", "itemFLY", "itemKaze", "itemKaze2"];
+pub const ITEM_ACTORS: [&str; 2] = ["item", "itemFLY"];
 
 const NO_GET_TICKS: u8 = 16;
 const MAX_LIFE: u8 = 0x50;

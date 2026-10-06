@@ -14,7 +14,7 @@ use crate::text::msgproc::MsgGameInfo;
 /// `fpcNm_Obj_Tide_e`, whose archive is `"Humi"` (`d_a_obj_tide.cpp:19`) - the sea surface, i.e.
 /// exactly what "UmiSen" names. This module is therefore `daObjTide::Act_c` from
 /// `d_a_obj_tide.cpp`, ported into the filename the assignment reserved.
-pub const TIDE_ACTORS: [&str; 5] = ["Humi0z", "Humi2z", "Humi3z", "Humi4z", "Humi5z"];
+pub const TIDE_ACTORS: [&str; 6] = ["Humi0z", "Humi2z", "Humi3z", "Humi4z", "Humi5z", "Tide3"];
 
 const TYPE_SHIFT: u32 = 16; // <- d_a_obj_tide.h:33 (PRM_TYPE_W = 3, PRM_TYPE_S = 16)
 const TYPE_MASK: u32 = 0x7; // <- d_a_obj_tide.h:33

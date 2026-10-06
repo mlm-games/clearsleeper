@@ -8,7 +8,7 @@ use super::flags::Switches;
 use super::ground::surface;
 use super::walk::from_s16;
 
-pub const LADDER_ACTORS: [&str; 6] = ["Mhsg15", "Mhsg4H", "Mhsg12", "Mhsg4h", "Mhsg6", "Mhsg9"];
+pub const LADDER_ACTORS: [&str; 5] = ["Mhsg6", "Mhsg9", "Mhsg12", "Mhsg15", "Mhsg4h"];
 
 pub const NO_SWITCH: u8 = 0xFF;
 

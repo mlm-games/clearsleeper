@@ -6,9 +6,8 @@ use super::actor::Actor;
 use super::collision::Collision;
 use super::ground::grounded;
 
-pub const TSUBO_ACTORS: [&str; 13] = [
+pub const TSUBO_ACTORS: [&str; 12] = [
     "Odokuro",
-    "Tsubo",
     "Ktaru",
     "Ostool",
     "Ptubo",
