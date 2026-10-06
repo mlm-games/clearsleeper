@@ -153,6 +153,7 @@ pub mod puppet_ganon;
 pub mod player;
 pub mod pscnchg;
 pub mod player_status;
+pub mod ritem;
 pub mod rforce;
 pub mod roten;
 pub mod raft;
@@ -918,6 +919,8 @@ world.spawn((actor, kaji::Kaji::spawn())).id()
 world.spawn((actor, touseki::Touseki::spawn())).id()
     } else if qtkhd::is_qtkhd(&source.name) {
 world.spawn((actor, qtkhd::Qtkhd::spawn(source.parameters))).id()
+    } else if ritem::is_ritem(&source.name) {
+world.spawn((actor, ritem::Ritem::spawn(source.parameters))).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1229,6 +1232,7 @@ pub fn build(
                     .chain(),
                 (
                     ending::control.in_set(WwSimSet::Execute),
+                    ritem::control.in_set(WwSimSet::Execute),
                     qtkhd::control.in_set(WwSimSet::Execute),
                     touseki::control.in_set(WwSimSet::Execute),
                     ground::ground_check.in_set(WwSimSet::Execute),

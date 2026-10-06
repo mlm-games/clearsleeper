@@ -32,7 +32,6 @@ const BIT_NO_MASK: u32 = 0x7F;
 const KIND_SHIFT: u32 = 0xF;
 const KIND_MASK: u32 = 0xF;
 
-const NO_BIT: u8 = 0x7F;
 const KIND_NORMAL: u8 = 1;
 
 const BOOMERANG_BIT: u8 = 0x01;
