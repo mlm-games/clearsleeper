@@ -61,6 +61,7 @@ pub mod daioeye;
 pub mod daiocta;
 pub mod dai;
 pub mod damage;
+pub mod damage_fx;
 pub mod damage_resolve;
 pub mod daynight;
 pub mod death;
@@ -1478,6 +1479,8 @@ pub fn build(
     sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(damage_resolve::HitStop::default());
     sim.world.insert_resource(damage_resolve::HitAudio::default());
+    sim.world.insert_resource(damage_fx::DamageFxQueue::default());
+    sim.world.insert_resource(damage_fx::DamageParticles::default());
     sim.world.insert_resource(pause::Pause::default());
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
@@ -2066,6 +2069,9 @@ pub fn build(
                 stair::control.in_set(WwSimSet::Execute),
                 sail::control.in_set(WwSimSet::Execute),
                 ferris::control.in_set(WwSimSet::Execute),
+                bita::control.in_set(WwSimSet::Execute),
+                coming3::control.in_set(WwSimSet::Execute),
+                grid::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (

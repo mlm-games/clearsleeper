@@ -12,13 +12,13 @@ pub const LPALM_ACTORS: [&str; 1] = ["Oyashi"];
 const CULL_MIN: [f32; 3] = [-350.0, -50.0, -350.0]; // <- d_a_obj_lpalm.cpp:72
 const CULL_MAX: [f32; 3] = [350.0, 1300.0, 350.0]; // <- d_a_obj_lpalm.cpp:72
 
-/// `daObjLpalm_c::M_attr = {0, 0}` (`d_a_obj_lpalm.cpp:14`, `d_a_obj_lpalm.h:22-25`) is a
+/// `daObjLpalm_c::M_attr = {0, 0}` (`d_a_obj_lpalm.cpp:14`, `d_a_obj_lpalm.h:19-23`) is a
 /// file-scope constant, not a per-actor field, and both of its bytes are zero - which is why
 /// `_execute`'s `if (attr().flag0) return true;` (`:125-126`) never short-circuits and `_draw`'s
 /// `if (attr().flag1) return true;` (`:174-175`) never short-circuits either. Neither guard is
 /// stored: both are compile-time false and would be dead fields.
 
-/// The palm tree - `daObjLpalm_c` (`d_a_obj_lpalm.h:10-39`), the actor behind the stage string
+/// The palm tree - `daObjLpalm_c` (`d_a_obj_lpalm.h:8-37`), the actor behind the stage string
 /// `Oyashi`.
 ///
 /// The struct has NO fields: `daObjLpalm_c::_execute` (`:124-171`) is one unbroken wind
@@ -27,16 +27,19 @@ const CULL_MAX: [f32; 3] = [350.0, 1300.0, 350.0]; // <- d_a_obj_lpalm.cpp:72
 /// * `cMtx_YrotS(*calc_mtx, -current.angle.y)` (`:132`) then
 ///   `MtxPosition(dKyw_get_wind_vec(), &windDir)` (`:133`) and
 ///   `f32 windPow = dKyw_get_wind_pow()` (`:134`). `dKyw_get_wind_vec` and `dKyw_get_wind_pow`
-///   are config symbols with no value in this checkout (RULE 3b) - unlike `REG0_F(i)`, which RULE
+///   are declared at `d_kankyo_wether.h:361-366` and defined NOWHERE in `src/`, so they are
+///   config symbols with no value in this checkout (RULE 3b) - unlike `REG0_F(i)`, which RULE
 ///   2b proves is zero, these are genuinely unknown, so folding them to a literal would be the
-///   invented data RULE 1 forbids.
+///   invented data RULE 1 forbids. `dKyw_get_wind_vec` is NOT the crate's
+///   `super::windmill::Wind { strength: f32 }` (`windmill.rs:69-71`), which carries the mill's own
+///   turn force and never had a wind *vector* to give.
 /// * Everything downstream - the `up.outprod(windDir)` / `dir.abs() < 8e-09` /
 ///   `mBaseQuatTarget` quaternion build (`:136-150`), the
 ///   `mDoMtx_quatSlerp(&mBaseQuat, &mBaseQuatTarget, &q, 0.25f)` (`:152-153`) and the
 ///   `cLib_addCalcAngleS2` / `cM_rndFX(128.0f)` / `cM_ssin` per-frond loop (`:155-167`) - consumes
 ///   only `windDir` and `windPow`. With them gone the whole body is unevaluable, so none of
 ///   `mBaseQuat`, `mBaseQuatTarget`, `mAnmMtxQuat[2]`, `mAnimDir[2]` or `mAnimWave[2]`
-///   (`d_a_obj_lpalm.h:26-35`) can be stored: every one of them is written and read only by the
+///   (`d_a_obj_lpalm.h:29-33`) can be stored: every one of them is written and read only by the
 ///   omitted wind body and by `nodeCallBack` (`:22-39`), a `J3DNodeCBCalcTiming_In` J3D hook that
 ///   only rewrites `model->setAnmMtx` (`:35`).
 /// * `CreateInit`'s `mAnimWave[1] = cM_rndFX(0x8000)` (`:70`) and the rest of the quaternion
@@ -49,11 +52,14 @@ const CULL_MAX: [f32; 3] = [350.0, 1300.0, 350.0]; // <- d_a_obj_lpalm.cpp:72
 ///   and moving-background work. `_create` (`:81-94`) returns `cPhs_ERROR_e` only from
 ///   `fopAcM_entrySolidHeap` (`:86`).
 ///
+/// With every field's reader inside the omitted wind body, NO `control` system is derivable -
+/// the outcome PORT_BRIEF:50 names for `lpalm` and `lwood`.
+///
 /// `daObjLpalmIsDelete` (`:189-192`) is the bare "accepts a delete request" form of RULE 6b.
 ///
 /// (a) inbound damage: NONE. (b) outbound damage: NONE. `daObjLpalm_c` holds a moving background,
-/// a model and six quaternions/angle pairs (`d_a_obj_lpalm.h:26-35`) and registers no `dCcD`
-/// collider of any kind. The profile `Group` is `fopAc_ACTOR_e` (`:216`). Neither
+/// a model and six quaternions/angle pairs (`d_a_obj_lpalm.h:28-36`) and registers no `dCcD`
+/// collider of any kind. The profile `Group` is `fopAc_ACTOR_e` (`:215`). Neither
 /// `combat::HitPoints` nor `enemy::Hurt` is attached.
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Lpalm;
@@ -63,7 +69,7 @@ impl Lpalm {
     /// (`:83`), `fopAcM_ct_Demo` (`:85`), `fopAcM_entrySolidHeap` / `CheckCreateHeap` /
     /// `CreateHeap` (`:86`, `:17-19`, `:42-59`) and `CreateInit` (`:89`) - archive, heap, moving
     /// background and renderer work. The profile's `Parameters` field is `0`
-    /// (`d_a_obj_lpalm.cpp:213`), so `daObjLpalm_c` carries no parameter to decode.
+    /// (`d_a_obj_lpalm.cpp:210`), so `daObjLpalm_c` carries no parameter to decode.
     pub fn spawn(_parameters: u32) -> Self {
         Lpalm
     }
