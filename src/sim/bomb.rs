@@ -4,11 +4,14 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::collision::Collision;
 use super::combat::HitPoints;
+use super::damage_fx::DamageFxQueue;
+use super::damage_resolve::{HitAudio, HitStop};
 use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Switches, ZoneActors};
 use super::ground::grounded;
 use super::player::Player;
+use super::registry::ActorRegistry;
 use super::water::Water;
 
 /// `"Bomb2"` is `fpcNm_Bomb2_e` (`d_stage.cpp:1246`) - a DIFFERENT process from the `fpcNm_BOMB_e`
@@ -145,6 +148,10 @@ pub fn control(
         ),
     >,
     mut switches: ResMut<Switches>,
+    registry: Res<ActorRegistry>,
+    mut stop: ResMut<HitStop>,
+    mut audio: ResMut<HitAudio>,
+    mut fx: ResMut<DamageFxQueue>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
@@ -172,13 +179,19 @@ pub fn control(
     }
     for origin in burst {
         events.list.push(SimEvent::Explode);
+        let atk = super::bombflower::blast_atk(BOMB_ACTORS[0], origin);
         super::bombflower::blast(
             origin,
+            &atk,
             &mut published,
             &mut foes,
             owner,
             &mut zones,
             &mut events,
+            &registry,
+            &mut stop,
+            &mut audio,
+            &mut fx,
             &mut fences,
             &mut floats,
             &mut switches,

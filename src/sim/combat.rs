@@ -7,7 +7,7 @@ use super::damage;
 use super::damage_resolve::{
     AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
     CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, Atk, Attacker, CcAtInfo,
-    DamageFx, HitAudio, HitStop, NAME_PLAYER, PlayerCut, Target, cc_at_check,
+    HitAudio, HitStop, NAME_PLAYER, PlayerCut, Target, cc_at_check,
 };
 use super::enemy;
 use super::events::{SimEvent, SimEvents};
@@ -75,6 +75,19 @@ fn cut(kind: CutKind) -> (u32, f32, f32) {
 
 fn is_finisher(kind: CutKind) -> bool {
     kind == CutKind::EA || kind == CutKind::EB
+}
+
+/// `setNormalCutAtParam` and `setFinishCutAtParam` both branch on `checkNormalSwordEquip`,
+/// which reads the C-button selection: one heart for Hero's Sword, two for the Master Sword,
+/// and the finisher doubles it.
+fn sword_at_power(selected: u8, finisher: bool) -> u8 {
+    let normal = selected == damage::ITEM_SWORD;
+    match (normal, finisher) {
+        (true, false) => 1,
+        (false, false) => 2,
+        (true, true) => 2,
+        (false, true) => 4,
+    }
 }
 
 /// The player's cut type each cut kind carries. The reference writes the same six cut types onto
@@ -207,15 +220,15 @@ pub fn control(
     mut out: Outcome<'_>,
     mut players: Query<&mut Player>,
     registry: Res<ActorRegistry>,
+    mut fx: ResMut<super::damage_fx::DamageFxQueue>,
     mut commands: Commands,
 ) {
     let pressed = item.0 && !out.combat.held;
     out.combat.held = item.0;
     let riding = gates.ships.iter().any(|ship| ship.riding);
-    let blade = gates.held.item;
+    let selected = gates.equipped.item(0);
     let bare_hands =
         gates.equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
-    let soup = out.combat.soup;
     for mut player in &mut players {
         let player = &mut *player;
         if gates.swim.active || gates.health.units == 0 {
@@ -278,7 +291,7 @@ pub fn control(
                 at_type: AT_TYPE_SWORD,
                 at_se: AT_SE_SWORD,
                 at_spl: cut_spl(kind),
-                at_atp: damage::sword_power(blade, soup) as u8,
+                at_atp: sword_at_power(selected, is_finisher(kind)),
                 ac: Some(Attacker {
                     name: NAME_PLAYER.to_owned(),
                     pos: player.pos,
@@ -291,7 +304,6 @@ pub fn control(
                     tsubo_type: 0,
                 }),
             };
-            let mut fx: Vec<DamageFx> = Vec::new();
             let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for (entity, actor, hp, mut hurt) in actors.iter_mut() {
                 let Some(mut hp) = hp else {
@@ -308,6 +320,9 @@ pub fn control(
                     room: actor.room,
                     status: actor_status(&registry, entity),
                     health: *hp,
+                    steal_item_left: actor.steal_item_left,
+                    steal_item_bit_no: actor.steal_item_bit_no,
+                    item_table_idx: actor.item_table_idx,
                     ..Default::default()
                 };
                 let mut info = CcAtInfo {
@@ -322,7 +337,7 @@ pub fn control(
                     &mut out.events,
                     &mut out.stop,
                     &mut out.audio,
-                    &mut fx,
+                    &mut fx.items,
                 );
                 hp.0 = target.health.0;
                 if let Some(hurt) = hurt.as_deref_mut() {

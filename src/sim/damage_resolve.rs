@@ -178,17 +178,18 @@ const MO2_DAMAGE_CAP: u8 = damage::KILL_POWER as u8;
 /// `fpcNm_MT_e`'s forced damage, `damage::MEGA_SWORD`.
 const MT_DAMAGE: u8 = damage::MEGA_SWORD as u8;
 
-/// The `JA_SE_*` ids the two hit-sound ladders return.
-const SE_LK_HAMMER_HIT: u32 = 0x2855;
-const SE_LK_W_WEP_HIT: u32 = 0x2833;
-const SE_LK_MS_WEP_HIT: u32 = 0x2834;
-const SE_LK_ARROW_HIT: u32 = 0x2879;
-const SE_LK_HS_SPIKE: u32 = 0x286F;
-const SE_LK_SW_HIT_S: u32 = 0x2803;
-const SE_LK_W_WEP_CRT_HIT: u32 = 0x2835;
-const SE_LK_MS_WEP_CRT_HIT: u32 = 0x2836;
-const SE_LK_SW_CRT_HIT: u32 = 0x2806;
-const SE_OBJ_MG_BALL_DMG: u32 = 0x693A;
+/// The `JA_SE_*` ids the two hit-sound ladders return, and the ball-damage id the `fpcNm_MT_e`
+/// branch plays instead. Public so `audio::hit_cue` can name the cue each one gets.
+pub const SE_LK_HAMMER_HIT: u32 = 0x2855;
+pub const SE_LK_W_WEP_HIT: u32 = 0x2833;
+pub const SE_LK_MS_WEP_HIT: u32 = 0x2834;
+pub const SE_LK_ARROW_HIT: u32 = 0x2879;
+pub const SE_LK_HS_SPIKE: u32 = 0x286F;
+pub const SE_LK_SW_HIT_S: u32 = 0x2803;
+pub const SE_LK_W_WEP_CRT_HIT: u32 = 0x2835;
+pub const SE_LK_MS_WEP_CRT_HIT: u32 = 0x2836;
+pub const SE_LK_SW_CRT_HIT: u32 = 0x2806;
+pub const SE_OBJ_MG_BALL_DMG: u32 = 0x693A;
 
 /// `dPa_name::ID_AK_JN_OK` (`d_particle_name.h:46`), the normal hit mark.
 pub const PARTICLE_OK: u16 = 0x000D;
@@ -360,7 +361,8 @@ impl HitAudio {
 }
 
 /// The presentation `cc_at_check` produces that `SimEvent` has no variant for: the death
-/// branch's two hit marks, and the steal-item spawn.
+/// branch's two hit marks, and the steal-item spawn. The call sites append to a
+/// [`DamageFxQueue`](super::damage_fx::DamageFxQueue), which the shell drains each frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DamageFx {
     /// `dComIfGp_particle_set`. `angle` and `scale` are `None` for the overload that takes

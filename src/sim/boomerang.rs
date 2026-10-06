@@ -5,7 +5,7 @@ use glam::Vec3;
 use super::combat::{HitPoints, actor_status};
 use super::damage;
 use super::damage_resolve::{
-    AT_SE_WOOD, AT_SPL_UNK0, AT_TYPE_BOOMERANG, Atk, Attacker, CcAtInfo, CUT_TYPE_NONE, DamageFx,
+    AT_SE_WOOD, AT_SPL_UNK0, AT_TYPE_BOOMERANG, Atk, Attacker, CcAtInfo, CUT_TYPE_NONE,
     HitAudio, HitStop, NAME_BOOMERANG, PlayerCut, Target, cc_at_check,
 };
 use super::enemy::Hurt;
@@ -194,6 +194,7 @@ pub fn control(
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
     mut events: ResMut<SimEvents>,
+    mut fx: ResMut<super::damage_fx::DamageFxQueue>,
     mut commands: Commands,
 ) {
     let Some(player) = players.iter().next() else {
@@ -204,7 +205,6 @@ pub fn control(
         cut_count: 0,
         pos: player.pos,
     };
-    let mut fx: Vec<DamageFx> = Vec::new();
     let on_ship = riding.iter().any(|ship| ship.riding);
     let mut caught = false;
     let mut spent: Vec<Entity> = Vec::new();
@@ -257,7 +257,7 @@ pub fn control(
                     &mut events,
                     &mut stop,
                     &mut audio,
-                    &mut fx,
+                    &mut fx.items,
                 );
                 hp.0 = target.health.0;
                 if let Some(hurt) = hurt.as_deref_mut() {

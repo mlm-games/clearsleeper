@@ -2,6 +2,8 @@
 
 use repame_audio::{Audio, AudioChannel, CueDef, synth_sine_wav};
 
+use crate::sim::{canon, damage_resolve as hit};
+
 pub const FOOTSTEP_CUE: &str = "footstep";
 pub const SLASH_CUE: &str = "slash";
 pub const HIT_CUE: &str = "hit";
@@ -11,6 +13,18 @@ pub const HURT_CUE: &str = "hurt";
 pub const HAMMER_CUE: &str = "hammer";
 pub const HAMMER_SWING_CUE: &str = "hammer-swing";
 pub const MOVIE_CUE: &str = "movie";
+pub const SWORD_HIT_CUE: &str = "sword-hit";
+pub const SWORD_CRITICAL_HIT_CUE: &str = "sword-critical-hit";
+pub const WOOD_HIT_CUE: &str = "wood-hit";
+pub const WOOD_CRITICAL_HIT_CUE: &str = "wood-critical-hit";
+pub const METAL_HIT_CUE: &str = "metal-hit";
+pub const METAL_CRITICAL_HIT_CUE: &str = "metal-critical-hit";
+pub const ARROW_HIT_CUE: &str = "arrow-hit";
+pub const HOOKSHOT_HIT_CUE: &str = "hookshot-hit";
+pub const HAMMER_HIT_CUE: &str = "hammer-hit";
+pub const LAST_HIT_CUE: &str = "last-hit";
+pub const BALL_HIT_CUE: &str = "ball-hit";
+pub const BGM_HIT_CUE: &str = "bgm-hit";
 
 const FOOTSTEP_HZ: f32 = 140.0;
 const FOOTSTEP_SECS: f32 = 0.09;
@@ -28,6 +42,30 @@ const HAMMER_HZ: f32 = 96.0;
 const HAMMER_SECS: f32 = 0.42;
 const HAMMER_SWING_HZ: f32 = 300.0;
 const HAMMER_SWING_SECS: f32 = 0.2;
+const SWORD_HIT_HZ: f32 = 880.0;
+const SWORD_HIT_SECS: f32 = 0.08;
+const SWORD_CRITICAL_HIT_HZ: f32 = 1240.0;
+const SWORD_CRITICAL_HIT_SECS: f32 = 0.11;
+const WOOD_HIT_HZ: f32 = 320.0;
+const WOOD_HIT_SECS: f32 = 0.07;
+const WOOD_CRITICAL_HIT_HZ: f32 = 430.0;
+const WOOD_CRITICAL_HIT_SECS: f32 = 0.1;
+const METAL_HIT_HZ: f32 = 1700.0;
+const METAL_HIT_SECS: f32 = 0.09;
+const METAL_CRITICAL_HIT_HZ: f32 = 2100.0;
+const METAL_CRITICAL_HIT_SECS: f32 = 0.12;
+const ARROW_HIT_HZ: f32 = 640.0;
+const ARROW_HIT_SECS: f32 = 0.07;
+const HOOKSHOT_HIT_HZ: f32 = 520.0;
+const HOOKSHOT_HIT_SECS: f32 = 0.06;
+const HAMMER_HIT_HZ: f32 = 110.0;
+const HAMMER_HIT_SECS: f32 = 0.3;
+const LAST_HIT_HZ: f32 = 260.0;
+const LAST_HIT_SECS: f32 = 0.25;
+const BALL_HIT_HZ: f32 = 760.0;
+const BALL_HIT_SECS: f32 = 0.1;
+const BGM_HIT_HZ: f32 = 1040.0;
+const BGM_HIT_SECS: f32 = 0.05;
 const FALLBACK_RATE: u32 = 44100;
 
 pub fn footstep_cue() -> CueDef {
@@ -60,7 +98,31 @@ pub fn movie_cue() -> CueDef {
     }
 }
 
-pub fn boot_cues() -> [(CueDef, f32, f32); 8] {
+/// Every cue the bank holds, in the order [`boot_cues`] returns its voices.
+pub const CUE_NAMES: [&str; 20] = [
+    FOOTSTEP_CUE,
+    SLASH_CUE,
+    HIT_CUE,
+    BOOM_CUE,
+    PICKUP_CUE,
+    HURT_CUE,
+    HAMMER_CUE,
+    HAMMER_SWING_CUE,
+    SWORD_HIT_CUE,
+    SWORD_CRITICAL_HIT_CUE,
+    WOOD_HIT_CUE,
+    WOOD_CRITICAL_HIT_CUE,
+    METAL_HIT_CUE,
+    METAL_CRITICAL_HIT_CUE,
+    ARROW_HIT_CUE,
+    HOOKSHOT_HIT_CUE,
+    HAMMER_HIT_CUE,
+    LAST_HIT_CUE,
+    BALL_HIT_CUE,
+    BGM_HIT_CUE,
+];
+
+pub fn boot_cues() -> [(CueDef, f32, f32); 20] {
     [
         (footstep_cue(), FOOTSTEP_HZ, FOOTSTEP_SECS),
         (cue(0.42, 40, 0.22), SLASH_HZ, SLASH_SECS),
@@ -70,7 +132,50 @@ pub fn boot_cues() -> [(CueDef, f32, f32); 8] {
         (cue(0.66, 60, 0.14), HURT_HZ, HURT_SECS),
         (cue(0.9, 90, 0.1), HAMMER_HZ, HAMMER_SECS),
         (cue(0.6, 50, 0.2), HAMMER_SWING_HZ, HAMMER_SWING_SECS),
+        (cue(0.6, 40, 0.15), SWORD_HIT_HZ, SWORD_HIT_SECS),
+        (
+            cue(0.7, 40, 0.15),
+            SWORD_CRITICAL_HIT_HZ,
+            SWORD_CRITICAL_HIT_SECS,
+        ),
+        (cue(0.5, 40, 0.12), WOOD_HIT_HZ, WOOD_HIT_SECS),
+        (
+            cue(0.6, 40, 0.12),
+            WOOD_CRITICAL_HIT_HZ,
+            WOOD_CRITICAL_HIT_SECS,
+        ),
+        (cue(0.55, 40, 0.1), METAL_HIT_HZ, METAL_HIT_SECS),
+        (
+            cue(0.65, 40, 0.1),
+            METAL_CRITICAL_HIT_HZ,
+            METAL_CRITICAL_HIT_SECS,
+        ),
+        (cue(0.5, 40, 0.14), ARROW_HIT_HZ, ARROW_HIT_SECS),
+        (cue(0.45, 40, 0.14), HOOKSHOT_HIT_HZ, HOOKSHOT_HIT_SECS),
+        (cue(0.9, 60, 0.1), HAMMER_HIT_HZ, HAMMER_HIT_SECS),
+        (cue(0.8, 50, 0.1), LAST_HIT_HZ, LAST_HIT_SECS),
+        (cue(0.6, 40, 0.12), BALL_HIT_HZ, BALL_HIT_SECS),
+        (cue(0.35, 40, 0.2), BGM_HIT_HZ, BGM_HIT_SECS),
     ]
+}
+
+/// The cue a hit sound id plays: the two `d_cc_uty` ladders' ids, the last-hit sound of the
+/// death branch, and the `fpcNm_MT_e` ball damage. `None` for an id with no ported cue.
+pub fn hit_cue(id: u32) -> Option<&'static str> {
+    match id {
+        hit::SE_LK_SW_HIT_S => Some(SWORD_HIT_CUE),
+        hit::SE_LK_SW_CRT_HIT => Some(SWORD_CRITICAL_HIT_CUE),
+        hit::SE_LK_W_WEP_HIT => Some(WOOD_HIT_CUE),
+        hit::SE_LK_W_WEP_CRT_HIT => Some(WOOD_CRITICAL_HIT_CUE),
+        hit::SE_LK_MS_WEP_HIT => Some(METAL_HIT_CUE),
+        hit::SE_LK_MS_WEP_CRT_HIT => Some(METAL_CRITICAL_HIT_CUE),
+        hit::SE_LK_ARROW_HIT => Some(ARROW_HIT_CUE),
+        hit::SE_LK_HS_SPIKE => Some(HOOKSHOT_HIT_CUE),
+        hit::SE_LK_HAMMER_HIT => Some(HAMMER_HIT_CUE),
+        hit::SE_OBJ_MG_BALL_DMG => Some(BALL_HIT_CUE),
+        canon::SE_LAST_HIT => Some(LAST_HIT_CUE),
+        _ => None,
+    }
 }
 
 /// Open the output device, falling back to silence when none is available.
@@ -90,19 +195,9 @@ pub fn load_cues(audio: &mut Audio) -> anyhow::Result<()> {
         0 => FALLBACK_RATE,
         r => r,
     };
-    let names = [
-        FOOTSTEP_CUE,
-        SLASH_CUE,
-        HIT_CUE,
-        BOOM_CUE,
-        PICKUP_CUE,
-        HURT_CUE,
-        HAMMER_CUE,
-        HAMMER_SWING_CUE,
-    ];
-    for (index, (def, hz, secs)) in boot_cues().into_iter().enumerate() {
+    for (name, (def, hz, secs)) in CUE_NAMES.iter().zip(boot_cues()) {
         let wave = synth_sine_wav(hz, secs, rate);
-        audio.load_cue(names[index], def, &[&wave])?;
+        audio.load_cue(name, def, &[&wave])?;
     }
     Ok(())
 }

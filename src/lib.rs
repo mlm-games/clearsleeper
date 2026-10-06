@@ -408,10 +408,21 @@ impl App {
         std::mem::take(&mut self.sim.world.resource_mut::<sim::events::SimEvents>().list)
     }
 
+    /// The particles `cc_at_check` queued this frame. Nothing draws them yet: the port has no
+    /// particle renderer, so this is the seam one would take its spawns from.
+    pub fn particles(&self) -> &[sim::damage_fx::DamageParticle] {
+        &self.sim
+            .world
+            .resource::<sim::damage_fx::DamageParticles>()
+            .items
+    }
+
     /// Frame boundary for audio: advance voices, realize queued sim events.
     pub fn pump_audio(&mut self, dt: Duration) {
         self.audio.update(dt.as_secs_f32());
         self.audio.take_finished();
+        self.pump_hit_audio();
+        self.pump_damage_fx();
         for event in self.drain_events() {
             let cue = match event {
                 sim::events::SimEvent::Footstep => Some(audio::FOOTSTEP_CUE),
@@ -428,11 +439,80 @@ impl App {
                 | sim::events::SimEvent::Credits
                 | sim::events::SimEvent::CreditsDone
                 | sim::events::SimEvent::Se(_)
-                | sim::events::SimEvent::Bgm(_) => None,
+                | sim::events::SimEvent::Bgm(_)
+                | sim::events::SimEvent::StealItem(_) => None,
             };
             if let Some(cue) = cue {
                 self.audio.play(cue);
             }
+        }
+    }
+
+    /// Play what `cc_at_check` queued: every sound start it made, the positional ones at their
+    /// own point, and the sword-combo hit sound the music side takes. The enemy-damage flag
+    /// only ever reaches a music port in retail, which this shell has no equivalent of, so it
+    /// is cleared rather than turned into a sound of its own.
+    fn pump_hit_audio(&mut self) {
+        let (se, bgm_hit_sound) = {
+            let mut hit = self.sim.world.resource_mut::<sim::damage_resolve::HitAudio>();
+            hit.enemy_damage = false;
+            (std::mem::take(&mut hit.se), hit.bgm_hit_sound.take())
+        };
+        if bgm_hit_sound.is_some() {
+            self.audio.play(audio::BGM_HIT_CUE);
+        }
+        if se.iter().any(|sound| sound.pos.is_some()) {
+            let listener = self
+                .sim
+                .world
+                .iter_entities()
+                .find_map(|entity| entity.get::<sim::player::Player>().copied())
+                .map(|player| (player.pos.x, player.pos.z))
+                .unwrap_or_default();
+            self.audio.bank().set_listener(listener.0, listener.1);
+            self.audio
+                .bank()
+                .set_spatial_scale(1.0 / sim::events::STRIDE_UNITS);
+        }
+        for sound in se {
+            let Some(cue) = audio::hit_cue(sound.id) else {
+                continue;
+            };
+            match sound.pos {
+                Some(pos) => {
+                    self.audio.play_at(cue, pos.x, pos.z);
+                }
+                None => {
+                    self.audio.play(cue);
+                }
+            }
+        }
+    }
+
+    /// Split the frame's damage effects: the particles replace the view layer's one-frame list,
+    /// and the steal-item creates become events for the item layer.
+    fn pump_damage_fx(&mut self) {
+        let mut particles = std::mem::take(
+            self.sim
+                .world
+                .resource_mut::<sim::damage_fx::DamageParticles>()
+                .as_mut(),
+        );
+        let steals = self
+            .sim
+            .world
+            .resource_mut::<sim::damage_fx::DamageFxQueue>()
+            .drain(&mut particles);
+        *self
+            .sim
+            .world
+            .resource_mut::<sim::damage_fx::DamageParticles>() = particles;
+        if steals.is_empty() {
+            return;
+        }
+        let mut events = self.sim.world.resource_mut::<sim::events::SimEvents>();
+        for steal in steals {
+            events.list.push(sim::events::SimEvent::StealItem(steal));
         }
     }
 

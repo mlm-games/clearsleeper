@@ -7,7 +7,7 @@ use super::combat::{HitPoints, actor_status};
 use super::damage;
 use super::damage_resolve::{
     AT_SE_ARROW, AT_SPL_UNK0, AT_TYPE_FIRE_ARROW, AT_TYPE_ICE_ARROW, AT_TYPE_LIGHT_ARROW,
-    AT_TYPE_NORMAL_ARROW, Atk, AtkType, Attacker, CcAtInfo, CUT_TYPE_NONE, DamageFx, HitAudio,
+    AT_TYPE_NORMAL_ARROW, Atk, AtkType, Attacker, CcAtInfo, CUT_TYPE_NONE, HitAudio,
     HitStop, NAME_ARROW, PlayerCut, Target, cc_at_check,
 };
 use super::enemy::Hurt;
@@ -169,6 +169,7 @@ pub fn control(
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
     mut events: ResMut<super::events::SimEvents>,
+    mut fx: ResMut<super::damage_fx::DamageFxQueue>,
     mut commands: Commands,
 ) {
     let solid = collision.as_deref();
@@ -181,7 +182,6 @@ pub fn control(
             .next()
             .map_or(Vec3::ZERO, |player| player.pos),
     };
-    let mut fx: Vec<DamageFx> = Vec::new();
     let mut spent: Vec<Entity> = Vec::new();
     let mut slain: Vec<(i8, u16)> = Vec::new();
     for (entity, mut arrow) in &mut arrows {
@@ -234,6 +234,9 @@ pub fn control(
                         room: actor.room,
                         status: actor_status(&registry, foe),
                         health: *hp,
+                        steal_item_left: actor.steal_item_left,
+                        steal_item_bit_no: actor.steal_item_bit_no,
+                        item_table_idx: actor.item_table_idx,
                         ..Default::default()
                     };
                     let mut info = CcAtInfo {
@@ -264,7 +267,7 @@ pub fn control(
                         &mut events,
                         &mut stop,
                         &mut audio,
-                        &mut fx,
+                        &mut fx.items,
                     );
                     hp.0 = target.health.0;
                     if let Some(hurt) = hurt.as_deref_mut() {

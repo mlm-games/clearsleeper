@@ -3,14 +3,18 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::bomb::Bomb;
 use super::collision::Collision;
-use super::combat::HitPoints;
-use super::damage;
+use super::combat::{HitPoints, actor_status};
+use super::damage_fx::DamageFxQueue;
+use super::damage_resolve::{
+    AT_SE_NONE, AT_SPL_UNK1, AT_TYPE_BOMB, CUT_TYPE_NONE, Atk, Attacker, CcAtInfo, HitAudio,
+    HitStop, PlayerCut, Target, cc_at_check,
+};
 use super::enemy::Hurt;
 use super::flags::{Switches, ZoneActors};
 use super::ground;
 use super::player::Player;
+use super::registry::ActorRegistry;
 use super::walk::within;
 
 pub const FLOWER_ACTORS: [&str; 2] = ["BFlower", "VbakH"];
@@ -47,6 +51,12 @@ pub const LAND_DAMP: f32 = 0.9;
 pub const SETTLE_SPEED: f32 = 19.5;
 pub const HOP_SPEED: f32 = 13.0;
 pub const BLAST_RADIUS: f32 = 200.0;
+
+/// `l_sph_src`'s `SrcObjAt Atp` for a normal bomb, the `mDamage` `at_power_check` charges and
+/// `damage::BOMB` carries. A bomb made in `daBomb_c::STATE_8` is the only bomb whose power
+/// differs, and `create_init` halves its AT object to 2, so this is the value every bomb this
+/// module spawns reaches.
+const BLAST_ATP: u8 = 0x04;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flower {
@@ -199,6 +209,10 @@ pub fn crawler_control(
     >,
     mut events: ResMut<super::events::SimEvents>,
     mut published: ResMut<Blasts>,
+    registry: Res<ActorRegistry>,
+    mut stop: ResMut<HitStop>,
+    mut audio: ResMut<HitAudio>,
+    mut fx: ResMut<DamageFxQueue>,
     mut fences: Query<
         (&Actor, &mut super::barricade::Barricade),
         (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
@@ -253,13 +267,19 @@ pub fn crawler_control(
     }
     for (entity, origin) in burst {
         events.list.push(super::events::SimEvent::Explode);
+        let atk = blast_atk(BOMB_ACTOR, origin);
         blast(
             origin,
+            &atk,
             &mut published,
             &mut foes,
             owner,
             &mut zones,
             &mut events,
+            &registry,
+            &mut stop,
+            &mut audio,
+            &mut fx,
             &mut fences,
             &mut floats,
             &mut switches,
@@ -288,13 +308,40 @@ pub fn clear_blasts(mut blasts: ResMut<Blasts>) {
     blasts.list.clear();
 }
 
+/// The blast's AT object, the one `at_power_check` reads through `GetAc()`. `daBomb_c`'s
+/// `l_sph_src` and `daBomb2::Act_c::M_sph_src` are the same rows, so one builder covers both
+/// processes; `name` is what picks the `RESULT_BOMB` branch of the name chain
+/// (`d_cc_uty.cpp:135-145`) and therefore the `PL_CUT_BOMB` bit. `speed` is zero because each
+/// bomb's explode init zeroes `speed` and then sets `mSph`'s centre to `current.pos` before it
+/// switches the AT on, so the knockback angle comes off the struck actor's position.
+pub fn blast_atk(name: &str, origin: Vec3) -> Atk {
+    Atk {
+        at_type: AT_TYPE_BOMB,
+        at_se: AT_SE_NONE,
+        at_spl: AT_SPL_UNK1,
+        at_atp: BLAST_ATP,
+        ac: Some(Attacker {
+            name: name.to_owned(),
+            pos: origin,
+            speed: Vec3::ZERO,
+            bomb_state: 0,
+            tsubo_type: 0,
+        }),
+    }
+}
+
 pub fn blast(
     origin: Vec3,
+    atk: &Atk,
     published: &mut ResMut<Blasts>,
     foes: &mut Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
     events: &mut super::events::SimEvents,
+    registry: &ActorRegistry,
+    stop: &mut HitStop,
+    audio: &mut HitAudio,
+    fx: &mut DamageFxQueue,
     fences: &mut Query<(&Actor, &mut super::barricade::Barricade), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
     floats: &mut Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
     switches: &mut ResMut<super::flags::Switches>,
@@ -313,12 +360,42 @@ pub fn blast(
             let _ = commands.entity(entity).despawn();
         }
     }
+    let player = PlayerCut {
+        cut_type: CUT_TYPE_NONE,
+        cut_count: 0,
+        pos: owner.unwrap_or(Vec3::ZERO),
+    };
     let mut slain: Vec<(Entity, i8, u16)> = Vec::new();
     for (entity, actor, mut hp, mut hurt) in foes.iter_mut() {
         if !within(origin, actor.pos, BLAST_RADIUS) {
             continue;
         }
-        hp.0 -= damage::BOMB;
+        let mut target = Target {
+            name: actor.name.clone(),
+            pos: actor.pos,
+            room: actor.room,
+            status: actor_status(registry, entity),
+            health: *hp,
+            steal_item_left: actor.steal_item_left,
+            steal_item_bit_no: actor.steal_item_bit_no,
+            item_table_idx: actor.item_table_idx,
+            ..Default::default()
+        };
+        let mut info = CcAtInfo {
+            mp_obj: Some(atk.clone()),
+            p_particle_pos: Some(actor.pos),
+            ..Default::default()
+        };
+        cc_at_check(
+            &mut target,
+            &mut info,
+            &player,
+            events,
+            stop,
+            audio,
+            &mut fx.items,
+        );
+        hp.0 = target.health.0;
         if let Some(hurt) = hurt.as_deref_mut() {
             hurt.0 = FLINCH;
         }

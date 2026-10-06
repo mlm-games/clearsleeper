@@ -31,6 +31,12 @@ pub struct Actor {
     pub gravity: f32,
     pub max_fall_speed: f32,
     pub eye: Vec3,
+    /// `itemTableIdx`, the item table the steal-item create call reads.
+    pub item_table_idx: i32,
+    /// `stealItemBitNo`, the bit number the steal-item create call sets before incrementing it.
+    pub steal_item_bit_no: u8,
+    /// `stealItemLeft`, the count of steal items still owed, the value that gates the steal.
+    pub steal_item_left: i8,
 }
 
 impl Default for Actor {
@@ -50,6 +56,9 @@ impl Default for Actor {
             gravity: 0.0,
             max_fall_speed: 0.0,
             eye: Vec3::ZERO,
+            item_table_idx: 0,
+            steal_item_bit_no: 0,
+            steal_item_left: 0,
         }
     }
 }
