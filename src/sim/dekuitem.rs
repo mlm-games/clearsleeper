@@ -49,9 +49,9 @@ const CULL_MAX: [f32; 3] = [50.0, 100.0, 50.0]; // <- d_a_deku_item.cpp:92
 /// (`:950`) with `i_itemBitNo = -1` (the header's third argument, defaulted at
 /// `f_op_actor_mng.h:568`) and `i_argFlag = 0x00` (`f_op_actor_mng.cpp:801`), and creates
 /// `fpcNm_Demo_Item_e` - stage string `Ditem` (`d_stage.cpp:1257`).
-const ITEM_NO: u32 = 0x34; // <- d_item_data.h:59 (dItemNo_DEKU_LEAF_e)
+pub const ITEM_NO: u8 = 0x34; // <- d_item_data.h:59 (dItemNo_DEKU_LEAF_e)
 const ITEM_BIT_PARAM: u32 = 0x7F; // <- f_op_actor_mng.cpp:950 ((-1) & 0x7F)
-const ITEM_PARAM: u32 = ITEM_NO | (ITEM_BIT_PARAM << 8); // <- f_op_actor_mng.cpp:950
+const ITEM_PARAM: u32 = ITEM_NO as u32 | (ITEM_BIT_PARAM << 8); // <- f_op_actor_mng.cpp:950
 const DEMO_ITEM_ACTOR: &str = "Ditem"; // <- d_stage.cpp:1257 (fpcNm_Demo_Item_e)
 
 /// `fopAcM_orderOtherEvent(this, "DEFAULT_GETITEM")` (`d_a_deku_item.cpp:219`),

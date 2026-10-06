@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
+use super::enemy::Enemy;
 use super::flags::Switches;
 
 pub const CLEARED_ACTOR: &str = "ALLdie";
@@ -26,20 +27,27 @@ pub fn spawn(parameters: u32, switches: &Switches, room: i32) -> Cleared {
     }
 }
 
+/// `fopAcM_myRoomSearchEnemy` (`f_op_actor_mng.cpp:1283`) judges each proc in the
+/// room's layer with `enemySearchJugge`, which tests `i_ac->group == fopAc_ENEMY_e`
+/// (`:1275`) - the actor PROFILE GROUP, not the presence of hit points. Several
+/// enemies (`gohdan`, `phantom_ganon`, `bwds`, `bwd`) carry `Enemy` without
+/// `combat::HitPoints`, so gating on hit points made those rooms read as cleared.
+/// `roomNo` is `fopAcM_GetRoomNo(this)` (`:1334`), re-read every tick, not frozen
+/// at spawn.
 pub fn control(
     mut switches: ResMut<Switches>,
-    mut markers: Query<&mut Cleared>,
-    foes: Query<(&Actor, Option<&super::combat::HitPoints>)>,
+    mut markers: Query<(&Actor, &mut Cleared)>,
+    foes: Query<&Actor, With<Enemy>>,
 ) {
-    for mut marker in &mut markers {
+    for (actor, mut marker) in &mut markers {
         if marker.done {
             continue;
         }
-        let room = marker.room;
+        let room = marker.room.max(i32::from(actor.room));
         let living = room >= 0
             && foes
                 .iter()
-                .any(|(other, hp)| hp.is_some() && i32::from(other.room) == room);
+                .any(|other| i32::from(other.room) == room);
         if living {
             marker.countdown = COUNTDOWN;
             continue;

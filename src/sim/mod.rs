@@ -174,6 +174,10 @@ pub mod npc_pf1;
 pub mod npc_p1;
 pub mod npc_uk;
 pub mod npc_tc;
+pub mod tagetc;
+pub mod dekuitem;
+pub mod ospbox;
+pub mod bwd;
 pub mod npc_ho;
 pub mod npc_hi1;
 pub mod npc_fa1;
@@ -547,6 +551,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if npc_fa1::is_npc_fa1(&source.name) {
         let v = npc_fa1::NpcFa1::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if tagetc::is_tagetc(&source.name) {
+        let v = tagetc::TagEtc::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if dekuitem::is_dekuitem(&source.name) {
+        let v = dekuitem::DekuItem::spawn(source.parameters, world.resource::<flags::EventFlags>());
+        world.spawn((actor, v)).id()
+    } else if ospbox::is_ospbox(&source.name) {
+        let v = ospbox::Ospbox::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if toripost::is_toripost(&source.name) {
         let v = toripost::Toripost::spawn(source.parameters);
@@ -1558,6 +1571,7 @@ pub fn build(
                 wind::control.in_set(WwSimSet::Execute),
                 homen::control.in_set(WwSimSet::Execute),
                 leaves::control.in_set(WwSimSet::Execute),
+                ospbox::control.in_set(WwSimSet::Execute),
                 swpush::control.in_set(WwSimSet::Execute),
                 mflft::control.in_set(WwSimSet::Execute),
                 hmlif::control.in_set(WwSimSet::Execute),
@@ -1668,6 +1682,8 @@ pub fn build(
                 vfan::control.in_set(WwSimSet::Execute),
                 htobi3::control.in_set(WwSimSet::Execute),
                 branch::control.in_set(WwSimSet::Execute),
+                tagetc::control.in_set(WwSimSet::Execute),
+                dekuitem::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
             (hami3::control.in_set(WwSimSet::Execute),
@@ -1683,3 +1699,4 @@ pub fn build(
 }
 
 pub mod auction;
+pub mod goal_flag;

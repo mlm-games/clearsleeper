@@ -233,8 +233,9 @@ impl Ospbox {
         self.ground_tries -= 1;
     }
 
-    /// The `Create` stores that need no live input: `m498 = 5` via `init_ground` (`:207`) and the
-    /// one-shot guard for the matrix work `Create` does (`:57-58`).
+    /// `Create`'s only remaining store is the one-shot guard for the matrix work it does
+    /// (`fopAcM_SetMtx` / `init_mtx`, `:57-58`); `m498 = 5` (`:207`) and `m49A = 2` (`:73`) are
+    /// already applied by `spawn`, because nothing can change between Create and the first Execute.
     fn create_init(&mut self) {
         self.entered = true;
     }

@@ -1,8 +1,21 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use glam::{Mat4, Vec3};
 
 use super::actor::Actor;
-use super::walk::RAD_PER_UNIT;
+use super::area::StageName;
+use super::event::{ActiveEvent, EventList};
+use super::event_manager::EventManager;
+use super::events::{SimEvent, SimEvents};
+use super::flags::{EventFlags, OrderFlags};
+use super::intent::{DoIntent, UseIntent};
+use super::isle_timer::IsleTimer;
+use super::player::Player;
+use super::player_status::{PlayerStatus, STTS0_TELESCOPE_LOOK};
+use super::transition::{NextStage, Target};
+use super::walk::{self, RAD_PER_UNIT};
+use crate::text::driver::Counters;
+use crate::text::msgproc::{self, MsgAppend, MsgProcs};
 
 pub const GOAL_FLAG_ACTORS: [&str; 1] = ["Gflag"];
 
@@ -127,6 +140,7 @@ pub struct Statics {
     pub wind_scale2: f32,
     pub flag_sag_factor: f32,
     pub cloth_stiffness: f32,
+    pub wind_vec: Vec3,
 }
 
 impl Default for Statics {
@@ -151,6 +165,7 @@ impl Default for Statics {
             wind_scale2: HIO_MWIND_SCALE2,
             flag_sag_factor: HIO_MFLAG_SAG_FACTOR,
             cloth_stiffness: HIO_MCLOTH_STIFFNESS,
+            wind_vec: Vec3::ZERO,
         }
     }
 }
@@ -214,6 +229,7 @@ pub struct GoalFlag {
     pub rope_points: [Vec3; ROPE_COUNT * ROPE_MAX_SEGMENTS],
     pub heap_ok: bool,
     pub curr_proc: GoalFlagProc,
+    pub mgame_status: u8,
     pub created: bool,
 }
 
@@ -261,6 +277,7 @@ impl GoalFlag {
             rope_points: [Vec3::ZERO; ROPE_COUNT * ROPE_MAX_SEGMENTS],
             heap_ok: false,
             curr_proc: GoalFlagProc::None,
+            mgame_status: MGAME_STATUS_IDLE,
             created: false,
         }
     }
@@ -375,18 +392,30 @@ impl GoalFlag {
         }
     }
 
-    pub fn create_buoy_races(&mut self, room: i8, parent: u32, out: &mut Vec<(u32, Vec3)>) {
+    pub fn create_buoy_races(
+        &mut self,
+        paths: &RacePaths,
+        room: i8,
+        out: &mut Vec<BuoyRaceSpawn>,
+    ) {
         for i in 0..self.num_ropes.clamp(0, ROPE_COUNT as i32) as usize {
             let buoys = self.num_rope_buoys[i].max(0);
+            let points: Vec<Vec3> = match paths.get(self.rope_path_ids[i], room) {
+                Some(path) => path.points.clone(),
+                None => Vec::new(),
+            };
             for j in 0..buoys {
-                let (x, y, z) = self.rope_pt(i, j as usize);
-                out.push((
-                    j as u32 | ((i as u32) << 8),
-                    Vec3::new(x, y + ROPE_POINT_LIFT, z),
-                ));
-                self.set_rope_pt(i, j as usize, Vec3::new(x, y + ROPE_POINT_LIFT, z));
+                let source = points.get(j as usize).copied().unwrap_or(Vec3::ZERO);
+                out.push(BuoyRaceSpawn {
+                    prm: j as u32 | ((i as u32) << 8),
+                    pos: source,
+                });
+                self.set_rope_pt(
+                    i,
+                    j as usize,
+                    Vec3::new(source.x, source.y + ROPE_POINT_LIFT, source.z),
+                );
             }
-            let _ = (room, parent);
             let first = self.rope_pos(i, 0);
             self.set_rope_pt(i, buoys as usize, first);
         }
@@ -721,4 +750,602 @@ fn norm_zc(v: Vec3) -> Vec3 {
 
 fn avg_norm_helper(v: Vec3) -> Vec3 {
     v
+}
+
+pub const FPC_NM_TIMER: u16 = 0x01EC;
+pub const FPC_NM_MINIGAME_STARTER: u16 = 0x01EF;
+pub const FPC_NM_MINIGAME_TERMINATER: u16 = 0x01F0;
+
+pub const TIMER_MODE_BOAT_RACE: i32 = 2;
+pub const TIMER_SHOW_TYPE: u8 = 3;
+pub const TIMER_ICON_TYPE: u8 = 0;
+pub const TIMER_POS_X: f32 = 221.0;
+pub const TIMER_POS_Y: f32 = 439.0;
+pub const TIMER_RUPEE_POS_X: f32 = 32.0;
+pub const TIMER_RUPEE_POS_Y: f32 = 419.0;
+
+pub const MGAME_STARTER_PARAM_1: u8 = 0;
+pub const MGAME_STARTER_PARAM_2: u16 = 0x200;
+
+pub const MGAME_STATUS_IDLE: u8 = 0;
+pub const MGAME_STATUS_COUNTING: u8 = 1;
+pub const MGAME_STATUS_START_CHECK_TRUE: u8 = 2;
+pub const MGAME_STATUS_START_CHECK_FALSE: u8 = 3;
+
+pub const MGAME_TERM_PARAM_1: i16 = 0;
+pub const MGAME_TERM_PARAM_2: i16 = 0;
+
+pub const BGM_SEA_GAME: u32 = 0x8000_000B;
+pub const BGM_SEA_GOAL: u32 = 0x8000_000C;
+pub const BGM_SEA_FAIL: u32 = 0x8000_000D;
+pub const SE_SGAME_TIMER_0: u32 = 0x0847;
+
+pub const ACTION_NAMES: [&str; 5] = [
+    "00_dummy",
+    "01_dummy",
+    "02_dummy",
+    "03_dummy",
+    "04_dummy",
+];
+
+pub const STAFF_TAG_ID: i32 = 0;
+pub const EVENT_REG_BYTE_AA: usize = 0xAA;
+pub const EVT_CND_UNK2: u16 = 0x0002;
+pub const ISLE_ROOM_BOATING_COURSE: u8 = 48;
+pub const PROC_ID_NONE: i32 = -1;
+pub const GOAL_FLAG_STAFF_NAME: &str = "Gflag";
+
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MiniGame {
+    pub game_type: u8,
+    pub result: u8,
+    pub running: bool,
+}
+
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SaraceShip {
+    pub race_result: i32,
+    pub race_rupee: i32,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct BuoyRaceSpawn {
+    pub prm: u32,
+    pub pos: Vec3,
+}
+
+impl GoalFlag {
+    #[allow(clippy::too_many_arguments)]
+    pub fn create(
+        &mut self,
+        pos: Vec3,
+        shape_angle: i16,
+        player_pos: Option<Vec3>,
+        room: i8,
+        paths: &RacePaths,
+        stage_name: &str,
+        stage_point: i16,
+        event_reg_aa_ff: u8,
+        hio: &Statics,
+        wind_vec: Vec3,
+        timer: &mut IsleTimer,
+        procs: &mut MsgProcs,
+        mini: &mut MiniGame,
+        rupees: &mut i32,
+        out: &mut Vec<BuoyRaceSpawn>,
+    ) -> bool {
+        self.shape_angle = shape_angle;
+
+        if self.path_id != PATH_ID_NONE {
+            if let Some(path) = paths.get(self.path_id, room) {
+                let next_id = path.next_id;
+                if self.get_race_path(next_id, room, paths) {
+                    if self.create_heap() {
+                        self.create_buoy_races(paths, room, out);
+                    } else {
+                        return false;
+                    }
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        if let Some(path) = paths.get(self.path_id, room) {
+            if let Some(point) = path.points.first() {
+                self.goal_flag_pole_pos[0] = *point;
+            }
+            if let Some(point) = path.points.get(1) {
+                self.goal_flag_pole_pos[1] = *point;
+            }
+        }
+
+        let mut stack = Mat4::from_translation(pos);
+        stack *= Mat4::from_rotation_y(walk::from_s16(shape_angle));
+        stack *= Mat4::from_scale(self.scale);
+        self.mtx = stack;
+
+        if stage_name == RACE_STAGE_NAME && stage_point == RACE_STAGE_POINT {
+            let mut time_limit = hio.time_limit;
+            let time_limit_modifier = u32::from(event_reg_aa_ff) * TIME_LIMIT_EVENT_MULT;
+            time_limit = time_limit.wrapping_sub(time_limit_modifier);
+            let limit = u16::try_from(time_limit).unwrap_or(0);
+            self.timer_proc_id = i32::try_from(msgproc::fop_timer_create(
+                procs,
+                FPC_NM_TIMER,
+                TIMER_MODE_BOAT_RACE as u8,
+                limit,
+                TIMER_SHOW_TYPE,
+                TIMER_ICON_TYPE,
+                TIMER_POS_X,
+                TIMER_POS_Y,
+                TIMER_RUPEE_POS_X,
+                TIMER_RUPEE_POS_Y,
+            ))
+            .unwrap_or(i32::MAX);
+            let _ = timer.create_timer(
+                TIMER_MODE_BOAT_RACE,
+                limit,
+                TIMER_SHOW_TYPE,
+                TIMER_ICON_TYPE,
+                TIMER_POS_X,
+                TIMER_POS_Y,
+                TIMER_RUPEE_POS_X,
+                TIMER_RUPEE_POS_Y,
+            );
+            self.mgame_start_proc_id = i32::try_from(procs.spawn(
+                FPC_NM_MINIGAME_STARTER,
+                MsgAppend::Class(msgproc::create_append(
+                    None,
+                    None,
+                    None,
+                    None,
+                    i32::from(MGAME_STARTER_PARAM_2 << 16),
+                )),
+            ))
+            .unwrap_or(i32::MAX);
+            mini.game_type = MINI_GAME_TYPE_BOAT_RACE as u8;
+            mini.running = true;
+            *rupees = 0;
+            self.set_action(GoalFlagProc::RaceStart);
+            self.race_start_state = 0;
+        }
+
+        self.prev_player_line_side =
+            self.finish_side(player_pos.unwrap_or(Vec3::ZERO));
+        self.race_end_state = 0;
+
+        for _ in 0..CREATED_WARMUP_FRAMES {
+            self.flag_move(0, wind_vec, hio);
+        }
+
+        self.created = true;
+        true
+    }
+
+    pub fn delete(&mut self, mini: &mut MiniGame, sarace: &mut SaraceShip, rupees: i32) {
+        if mini.game_type == MINI_GAME_TYPE_BOAT_RACE as u8 {
+            if mini.result == MINI_GAME_WIN as u8 {
+                sarace.race_result = 2;
+                sarace.race_rupee = rupees;
+            } else if mini.result == MINI_GAME_LOSE as u8 {
+                sarace.race_result = 1;
+                sarace.race_rupee = rupees;
+            }
+            mini.running = false;
+            mini.game_type = 0;
+        }
+    }
+
+    pub fn get_demo_action(&self, staff_idx: i32, manager: &mut EventManager) -> i32 {
+        manager.get_my_act_idx(staff_idx, &ACTION_NAMES, false, 0)
+    }
+
+    pub fn mgame_start_count_start(&mut self) {
+        if self.mgame_status == MGAME_STATUS_IDLE {
+            self.mgame_status = MGAME_STATUS_COUNTING;
+        }
+    }
+
+    pub fn mgame_start_check(&self) -> bool {
+        self.mgame_status == MGAME_STATUS_START_CHECK_FALSE
+            || self.mgame_status == MGAME_STATUS_START_CHECK_TRUE
+    }
+
+    pub fn mgame_start_delete_check(&self) -> bool {
+        self.mgame_status == MGAME_STATUS_START_CHECK_FALSE
+    }
+
+    pub fn race_start(
+        &mut self,
+        procs: &mut MsgProcs,
+        manager: &mut EventManager,
+        timer: &mut IsleTimer,
+        events: &mut SimEvents,
+    ) -> bool {
+        let staff_idx = manager.get_my_staff_id(GOAL_FLAG_STAFF_NAME, None, STAFF_TAG_ID);
+        let action_idx = self.get_demo_action(staff_idx, manager);
+
+        if self.race_start_state == 0 {
+            if staff_idx != -1 && action_idx == 0 {
+                manager.cut_end(staff_idx);
+            } else {
+                return true;
+            }
+            self.race_start_state += 1;
+        } else {
+            let timer_p = self.timer_proc_id != PROC_ID_NONE;
+            let mgame_start_p = self.mgame_start_proc_id != PROC_ID_NONE
+                && procs.search_by_id(self.mgame_start_proc_id as u32).is_some();
+
+            if action_idx == 1 && mgame_start_p {
+                self.mgame_start_count_start();
+                manager.cut_end(staff_idx);
+            }
+
+            if timer_p && mgame_start_p && self.mgame_start_check() {
+                manager.cut_end(staff_idx);
+                let _ = timer.start_delayed(TIMER_START_COUNT as i16);
+                if self.race_start_state == 1 {
+                    events.list.push(SimEvent::Bgm(BGM_SEA_GAME));
+                    self.race_start_state += 1;
+                }
+            }
+
+            if manager.end_check_old(EVENT_RACE_START_CAM) {
+                self.set_action(GoalFlagProc::TimerExecute);
+                self.race_start_state = 0;
+            }
+        }
+        true
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn timer_execute(
+        &mut self,
+        player_pos: Option<Vec3>,
+        procs: &mut MsgProcs,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        order_flags: &mut OrderFlags,
+        events: &mut SimEvents,
+        timer: &mut IsleTimer,
+        mini: &mut MiniGame,
+        rupees: i32,
+        hio: &Statics,
+        command_demo_accepted: bool,
+        entity: Entity,
+    ) -> bool {
+        if self.mgame_start_proc_id != PROC_ID_NONE {
+            if self.mgame_start_delete_check()
+                && procs.search_by_id(self.mgame_start_proc_id as u32).is_some()
+            {
+                procs.delete(self.mgame_start_proc_id as u32);
+                self.mgame_start_proc_id = PROC_ID_NONE;
+            }
+        }
+
+        let goal_chk = self.goal_check(player_pos.unwrap_or(Vec3::ZERO));
+
+        let timer_p = self.timer_proc_id != PROC_ID_NONE;
+
+        if goal_chk == 1 {
+            if self.race_end_state == 1 {
+                if timer_p {
+                    let _ = timer.end(TIMER_END_ARG);
+                }
+                if rupees == 0 {
+                    self.race_end_state = 2;
+                } else {
+                    self.race_end_state = 3;
+                }
+            } else {
+                self.race_end_state = 1;
+            }
+        } else if goal_chk == -1 {
+            if timer_p {
+                let _ = timer.end(TIMER_END_ARG);
+            }
+            events.list.push(SimEvent::Se(SE_SGAME_TIMER_0));
+            self.race_end_state = 2;
+        }
+
+        let rest_time_ms = if timer_p {
+            timer.get_rest_time_ms()
+        } else {
+            0
+        };
+        if rest_time_ms == 0 {
+            if timer_p {
+                let _ = timer.end(TIMER_END_ARG);
+            }
+            if self.race_end_state != 3 {
+                self.race_end_state = 2;
+                events.list.push(SimEvent::Se(SE_SGAME_TIMER_0));
+            }
+        }
+
+        if self.race_end_state == 3 || self.race_end_state == 2 {
+            if command_demo_accepted {
+                let finish_type;
+                if self.race_end_state == 3 {
+                    finish_type = if rupees < hio.perfect_rupee_score {
+                        FINISH_STANDARD
+                    } else {
+                        FINISH_PERFECT
+                    };
+                    mini.result = MINI_GAME_WIN as u8;
+                } else {
+                    finish_type = FINISH_NONE;
+                    mini.result = MINI_GAME_LOSE as u8;
+                }
+                if u16::try_from(finish_type).unwrap_or(0) == 1
+                    || u16::try_from(finish_type).unwrap_or(0) == 2
+                {
+                    events.list.push(SimEvent::Bgm(BGM_SEA_GOAL));
+                } else {
+                    events.list.push(SimEvent::Bgm(BGM_SEA_FAIL));
+                }
+                let rupees_collected = rupees;
+                let remaining_time = rest_time_ms / TIMER_REST_SCALE;
+                self.mgame_term_proc_id = i32::try_from(msgproc::fop_mgame_term_create(
+                    procs,
+                    FPC_NM_MINIGAME_TERMINATER,
+                    MGAME_TERM_PARAM_1,
+                    i16::try_from(finish_type).unwrap_or(0),
+                    remaining_time,
+                    rupees_collected,
+                ))
+                .unwrap_or(i32::MAX);
+                self.cam_frames_passed = 0;
+                self.set_action(GoalFlagProc::RaceEnd);
+                self.race_start_state = 0;
+            } else {
+                let event_name = if self.race_end_state != 3 {
+                    EVENT_RACE_FAIL_CAM
+                } else {
+                    EVENT_RACE_GOAL_CAM
+                };
+                if let Some(index) = list.event_index(event_name) {
+                    if active.stage_of(index).is_none() {
+                        active.order(list, index, entity);
+                    }
+                }
+                order_flags.set(EVT_CND_UNK2);
+            }
+        }
+
+        true
+    }
+
+    pub fn race_end(
+        &mut self,
+        procs: &mut MsgProcs,
+        manager: &mut EventManager,
+        timer: &mut IsleTimer,
+        mini: &mut MiniGame,
+        next: &mut NextStage,
+        hio: &Statics,
+        trig_a: bool,
+        trig_b: bool,
+        trig_start: bool,
+    ) -> bool {
+        self.cam_frames_passed += 1;
+
+        if self.timer_proc_id != PROC_ID_NONE && timer.delete_check() {
+            procs.delete(self.timer_proc_id as u32);
+            self.timer_proc_id = PROC_ID_NONE;
+        }
+
+        let staff_idx = manager.get_my_staff_id(GOAL_FLAG_STAFF_NAME, None, STAFF_TAG_ID);
+
+        if staff_idx != -1 {
+            manager.cut_end(staff_idx);
+        }
+
+        let event_name = if self.race_end_state != 3 {
+            EVENT_RACE_FAIL_CAM
+        } else {
+            EVENT_RACE_GOAL_CAM
+        };
+        let end_chk = manager.end_check_old(event_name);
+        let _ = mini;
+
+        if end_chk
+            || (i32::from(self.cam_frames_passed) > hio.end_cam_early_frame
+                && (trig_a || trig_b || trig_start))
+        {
+            next.target = Some(Target {
+                stage: RACE_NEXT_STAGE.to_owned(),
+                room: ISLE_ROOM_BOATING_COURSE,
+                start: u8::try_from(RACE_NEXT_POINT).unwrap_or(0),
+            });
+        }
+
+        true
+    }
+
+    pub fn execute(
+        &mut self,
+        procs: &mut MsgProcs,
+        manager: &mut EventManager,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        order_flags: &mut OrderFlags,
+        events: &mut SimEvents,
+        timer: &mut IsleTimer,
+        mini: &mut MiniGame,
+        next: &mut NextStage,
+        hio: &Statics,
+        rupees: i32,
+        player_pos: Option<Vec3>,
+        wind_vec: Vec3,
+        angle_y: i16,
+        command_demo_accepted: bool,
+        trig_a: bool,
+        trig_b: bool,
+        trig_start: bool,
+        entity: Entity,
+    ) {
+        match self.curr_proc {
+            GoalFlagProc::None => {}
+            GoalFlagProc::RaceStart => {
+                self.race_start(procs, manager, timer, events);
+            }
+            GoalFlagProc::TimerExecute => {
+                self.timer_execute(
+                    player_pos,
+                    procs,
+                    list,
+                    active,
+                    order_flags,
+                    events,
+                    timer,
+                    mini,
+                    rupees,
+                    hio,
+                    command_demo_accepted,
+                    entity,
+                );
+            }
+            GoalFlagProc::RaceEnd => {
+                self.race_end(
+                    procs,
+                    manager,
+                    timer,
+                    mini,
+                    next,
+                    hio,
+                    trig_a,
+                    trig_b,
+                    trig_start,
+                );
+            }
+        }
+        self.flag_move(angle_y, wind_vec, hio);
+        self.rope_move();
+    }
+}
+
+fn event_reg_aa_ff(flags: &EventFlags) -> u8 {
+    flags.words().get(EVENT_REG_BYTE_AA).copied().unwrap_or(0)
+}
+#[derive(SystemParam)]
+pub struct Watch<'w, 's> {
+    statics: Res<'w, Statics>,
+    paths: Res<'w, RacePaths>,
+    stage: Res<'w, StageName>,
+    list: Res<'w, EventList>,
+    do_intent: Res<'w, DoIntent>,
+    use_intent: Res<'w, UseIntent>,
+    players: Query<'w, 's, &'static Player, Without<GoalFlag>>,
+}
+
+#[derive(SystemParam)]
+pub struct World<'w> {
+    counters: ResMut<'w, Counters>,
+    ev_flags: ResMut<'w, EventFlags>,
+    order_flags: ResMut<'w, OrderFlags>,
+    events: ResMut<'w, SimEvents>,
+    procs: ResMut<'w, MsgProcs>,
+    active: ResMut<'w, ActiveEvent>,
+    manager: ResMut<'w, EventManager>,
+    timer: ResMut<'w, IsleTimer>,
+    mini: ResMut<'w, MiniGame>,
+    next: ResMut<'w, NextStage>,
+    status: ResMut<'w, PlayerStatus>,
+}
+
+pub fn control(
+    watch: Watch<'_, '_>,
+    mut world: World,
+    mut commands: Commands,
+    mut actors: Query<(Entity, &mut Actor, &mut GoalFlag), (With<GoalFlag>, Without<Player>)>,
+) {
+    let hio = *watch.statics;
+    let paths = &*watch.paths;
+    let stage_name: &str = &watch.stage.0;
+    let player_pos = watch.players.iter().next().map(|link| link.pos);
+    let trig_a = watch.do_intent.0;
+    let trig_b = watch.use_intent.0;
+    let trig_start = false;
+    let event_reg = event_reg_aa_ff(&world.ev_flags);
+    let stage_point = 0;
+    let mut spawns: Vec<BuoyRaceSpawn> = Vec::new();
+
+    for (entity, actor, mut flag) in &mut actors {
+        if !flag.created {
+            let room = actor.room;
+            let shape_angle = flag.shape_angle;
+            let created = flag.create(
+                actor.pos,
+                shape_angle,
+                player_pos,
+                room,
+                paths,
+                stage_name,
+                stage_point,
+                event_reg,
+                &hio,
+                hio.wind_vec,
+                &mut world.timer,
+                &mut world.procs,
+                &mut world.mini,
+                &mut world.counters.mini_game_rupee,
+                &mut spawns,
+            );
+            for spawn in spawns.drain(..) {
+                commands.spawn((
+                    Actor {
+                        name: BUOY_RACE_ACTOR.to_owned(),
+                        parameters: spawn.prm,
+                        pos: spawn.pos,
+                        angle: [0; 3],
+                        set_id: 0,
+                        room,
+                    },
+                    BuoyRaceSpawn {
+                        prm: spawn.prm,
+                        pos: spawn.pos,
+                    },
+                ));
+            }
+            if !created {
+                continue;
+            }
+        }
+        let rupees = world.counters.mini_game_rupee;
+        let angle_y = actor.angle[1];
+        let pos = actor.pos;
+        flag.execute(
+            &mut world.procs,
+            &mut world.manager,
+            &watch.list,
+            &mut world.active,
+            &mut world.order_flags,
+            &mut world.events,
+            &mut world.timer,
+            &mut world.mini,
+            &mut world.next,
+            &hio,
+            rupees,
+            player_pos,
+            hio.wind_vec,
+            angle_y,
+            false,
+            trig_a,
+            trig_b,
+            trig_start,
+            entity,
+        );
+        flag.mtx = {
+            let mut stack = Mat4::from_translation(pos);
+            stack *= Mat4::from_rotation_y(walk::from_s16(angle_y));
+            stack *= Mat4::from_scale(flag.scale);
+            stack
+        };
+        world.status.status0 &= !STTS0_TELESCOPE_LOOK;
+        }
 }
