@@ -25,7 +25,11 @@ fn order(entity: Entity, list: &EventList, active: &mut ActiveEvent, name: &str)
     let Some(slot) = list.event_index(name) else {
         return;
     };
-    let _ = active.order(list, slot, entity);
+    // Guarded: re-ordering every tick rewrites mEventState back to ORDER and the
+    // demo never starts. Only order when this event holds no stage yet.
+    if active.stage_of(slot).is_none() {
+        let _ = active.order(list, slot, entity);
+    }
 }
 
 /// The Outset Island stone slab shutter under the shop of the bombs, split into four quarter
