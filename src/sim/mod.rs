@@ -36,11 +36,13 @@ pub mod damage;
 pub mod daynight;
 pub mod death;
 pub mod doguud;
+pub mod demodk;
 pub mod door;
 pub mod dmgroom;
 pub mod demokmm;
 pub mod dummy;
 pub mod eayogn;
+pub mod esekh;
 pub mod ending;
 pub mod enemy;
 pub mod event;
@@ -85,11 +87,13 @@ pub mod jump;
 pub mod kalle_demos;
 pub mod kamome;
 pub mod ktaruo;
+pub mod kmon;
 pub mod kita;
 pub mod kn;
 pub mod komore;
 pub mod kytag02;
 pub mod kytag00;
+pub mod kanat;
 pub mod kytag01;
 pub mod kytag03;
 pub mod kytag04;
@@ -173,6 +177,7 @@ pub mod tag_msg;
 pub mod tagkk1;
 pub mod taglight;
 pub mod trapdoor;
+pub mod table;
 pub mod talk;
 pub mod tama;
 pub mod tbox;
@@ -186,6 +191,7 @@ pub mod usovmc;
 pub mod volcano;
 pub mod vgnfd;
 pub mod vmsms;
+pub mod vteng;
 pub mod vmsdz;
 pub mod walk;
 pub mod wall;
@@ -796,6 +802,21 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, tpota::Tpota::spawn())).id()
     } else if ktaruo::is_ktaruo(&source.name) {
         world.spawn((actor, ktaruo::Ktaruo::spawn())).id()
+    } else if kanat::is_kanat(&source.name) {
+let v = kanat::Kanat::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if demodk::is_demodk(&source.name) {
+let v = demodk::DemoDk::spawn(actor.pos);
+        world.spawn((actor, v)).id()
+    } else if esekh::is_esekh(&source.name) {
+let v = esekh::Esekh::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if kmon::is_kmon(&source.name) {
+world.spawn((actor, kmon::Kmon::spawn())).id()
+    } else if table::is_table(&source.name) {
+world.spawn((actor, table::Table::spawn())).id()
+    } else if vteng::is_vteng(&source.name) {
+world.spawn((actor, vteng::Vteng::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -986,6 +1007,7 @@ pub fn build(
                     dummy::control.in_set(WwSimSet::Execute),
                     spotbox::control.in_set(WwSimSet::Execute),
                     rectangle::control.in_set(WwSimSet::Execute),
+                    kanat::control.in_set(WwSimSet::Execute),
                     seatag::control.in_set(WwSimSet::Execute),
                     scenechange::control.in_set(WwSimSet::Execute),
                     magma::control.in_set(WwSimSet::Execute),
@@ -1030,6 +1052,9 @@ pub fn build(
                     canon::control.in_set(WwSimSet::Execute),
                     mbdoor::control.in_set(WwSimSet::Execute),                    demokmm::control.in_set(WwSimSet::Execute),
                     komore::control.in_set(WwSimSet::Execute),
+                    esekh::control.in_set(WwSimSet::Execute),
+                    table::control.in_set(WwSimSet::Execute),
+                    vteng::control.in_set(WwSimSet::Execute),
                     bscurtain::control.in_set(WwSimSet::Execute),
                     pbco::control.in_set(WwSimSet::Execute),
 
@@ -1048,6 +1073,8 @@ pub fn build(
                     kamome::control.in_set(WwSimSet::Execute),
                     npc_mt::control.in_set(WwSimSet::Execute),
                     npc_p1::control.in_set(WwSimSet::Execute),
+                    demodk::control.in_set(WwSimSet::Execute),
+                    kmon::control.in_set(WwSimSet::Execute),
                     amos_knight::control.in_set(WwSimSet::Execute),
                     ganon_form3::control.in_set(WwSimSet::Execute),
                 )
@@ -1149,13 +1176,7 @@ pub fn build(
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),                    gaship2::control.in_set(WwSimSet::Execute),                    eayogn::control.in_set(WwSimSet::Execute),
-                    doguud::control.in_set(WwSimSet::Execute),                    kanat::control.in_set(WwSimSet::Execute),
-                    demodk::control.in_set(WwSimSet::Execute),
-                    esekh::control.in_set(WwSimSet::Execute),
-                    kmon::control.in_set(WwSimSet::Execute),
-                    table::control.in_set(WwSimSet::Execute),
-                    vteng::control.in_set(WwSimSet::Execute),
-                    ktaruo::control.in_set(WwSimSet::Execute),
+                    doguud::control.in_set(WwSimSet::Execute),                    ktaruo::control.in_set(WwSimSet::Execute),
                     gaship::control.in_set(WwSimSet::Execute),
                     hhyu::control.in_set(WwSimSet::Execute),
                     xtower::control.in_set(WwSimSet::Execute),
