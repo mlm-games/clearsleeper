@@ -30,6 +30,7 @@ pub mod boko;
 pub mod cafelmp;
 pub mod bscurtain;
 pub mod buoybarrel;
+pub mod buoyrace;
 pub mod canon;
 pub mod bomb;
 pub mod bombflower;
@@ -164,6 +165,7 @@ pub mod morth;
 pub mod molgera;
 pub mod movebox;
 pub mod msdansb;
+pub mod msdansub2;
 pub mod mkiek;
 pub mod msdan2;
 pub mod msg;
@@ -223,6 +225,7 @@ pub mod schedule;
 pub mod andsw0;
 pub mod andsw2;
 pub mod obj_nest;
+pub mod ohatch;
 pub mod obj_paper;
 pub mod obj_rcloud;
 pub mod qdghd;
@@ -262,6 +265,7 @@ pub mod switem;
 pub mod swtdoor;
 pub mod swtact;
 pub mod swpush;
+pub mod swpropeller;
 pub mod tag;
 pub mod tagba1;
 pub mod tagkb;
@@ -286,6 +290,7 @@ pub mod vfan;
 pub mod vdora;
 pub mod usovmc;
 pub mod vrbox;
+pub mod vrbox2;
 pub mod volcano;
 pub mod vgnfd;
 pub mod vmsms;
@@ -598,6 +603,20 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if hole::is_hole(&source.name) {
         let v = hole::Hole::spawn(source.parameters, actor.angle[2]);
+        world.spawn((actor, v)).id()
+    } else if msdansub2::is_msdansub2(&source.name) {
+        let tread = msdansub2::MsdanSub2::spawn(source.parameters);
+        world.spawn((actor, tread)).id()
+    } else if vrbox2::is_vrbox2(&source.name) {
+        world.spawn((actor, vrbox2::Vrbox2::spawn(source.parameters))).id()
+    } else if buoyrace::is_buoyrace(&source.name) {
+        let float = buoyrace::BuoyRace::spawn(source.parameters);
+        world.spawn((actor, float)).id()
+    } else if swpropeller::is_swpropeller(&source.name) {
+        let v = swpropeller::SwPropeller::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if ohatch::is_ohatch(&source.name) {
+        let v = ohatch::Ohatch::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if stair::is_stair(&source.name) {
         let v = stair::Stair::spawn(source.parameters, world.resource::<flags::Switches>());
@@ -1615,13 +1634,6 @@ pub fn build(
                 hop::control.in_set(WwSimSet::Execute),
                 schedule::control.in_set(WwSimSet::Execute),
                 esa::control.in_set(WwSimSet::Execute),
-                shutter2::control.in_set(WwSimSet::Execute),
-                auzu::control.in_set(WwSimSet::Execute),
-                hole::control.in_set(WwSimSet::Execute),
-                toge::control.in_set(WwSimSet::Execute),
-                lbridge::control.in_set(WwSimSet::Execute),
-                tornado::control.in_set(WwSimSet::Execute),
-                stair::control.in_set(WwSimSet::Execute),
                 ki::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -1777,6 +1789,18 @@ pub fn build(
 
             )
                 .chain(),
+                msdansub2::control.in_set(WwSimSet::Execute),
+                swpropeller::control.in_set(WwSimSet::Execute),
+                ohatch::control.in_set(WwSimSet::Execute),
+                shutter2::control.in_set(WwSimSet::Execute),
+                auzu::control.in_set(WwSimSet::Execute),
+                hole::control.in_set(WwSimSet::Execute),
+                toge::control.in_set(WwSimSet::Execute),
+                lbridge::control.in_set(WwSimSet::Execute),
+                tornado::control.in_set(WwSimSet::Execute),
+                stair::control.in_set(WwSimSet::Execute),
+                vrbox2::control.in_set(WwSimSet::Execute),
+                buoyrace::control.in_set(WwSimSet::Execute),
         )
             .chain(),
     );

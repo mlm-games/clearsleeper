@@ -54,14 +54,22 @@ impl Msdan2 {
         for slot in 0..RING {
             pos.x += STEP * sin;
             pos.z += STEP * cos;
-            commands.spawn(Actor {
-                name: MSDAN_SUB2_ACTOR.to_owned(),
-                parameters: (slot << SLOT_SHIFT) + u32::from(self.switch_no),
-                pos,
-                angle,
-                set_id: NO_SET_ID,
-                room: actor.room,
-            });
+            // `fopAcM_create(fpcNm_Obj_MsdanSub2_e, ...)` per child
+            // (`d_a_obj_msdan2.cpp`), so each ring member IS a daObjMsdanSub2. Spawning a
+            // bare `Actor` left all 16 children inert: `spawn_actor` only runs over the
+            // stage table, so nothing ever gave them their component.
+            let parameters = (slot << SLOT_SHIFT) + u32::from(self.switch_no);
+            commands.spawn((
+                Actor {
+                    name: MSDAN_SUB2_ACTOR.to_owned(),
+                    parameters,
+                    pos,
+                    angle,
+                    set_id: NO_SET_ID,
+                    room: actor.room,
+                },
+                super::msdansub2::MsdanSub2::spawn(parameters),
+            ));
         }
     }
 
