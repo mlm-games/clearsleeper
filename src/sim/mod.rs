@@ -30,10 +30,10 @@ pub mod canon;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
-pub mod chest;
 pub mod carry;
 pub mod chuchu;
 pub mod cleared;
+pub mod chest;
 pub mod clock;
 pub mod collision;
 pub mod combat;
@@ -594,9 +594,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == tingle::TINGLE_ACTOR {
         let home = actor.pos;
         world.spawn((actor, tingle::Tingle::spawn(home))).id()
-    } else if chest::is_chest(&source.name) {
-        let box_ = chest::Chest::spawn(source.parameters, source.angle[2], source.room);
-        world.spawn((actor, box_)).id()
     } else if stone::is_stone(&source.name) {
         let rock = stone::Stone::spawn(source.parameters);
         world.spawn((actor, rock, carry::Carryable::Stone)).id()

@@ -114,8 +114,11 @@ pub const ROPE_DOWN_OFFSET: [f32; 4] = [0.0, 150.0, 225.0, 150.0];
 pub const ROPE_POINT_LIFT: f32 = 250.0;
 pub const ROPE_SUB_INDEX_SHIFT: u32 = 2;
 
-pub const CULL_MIN: [f32; 3] = [-400.0, -300.0, -400.0];
-pub const CULL_MAX: [f32; 3] = [400.0, 600.0, 400.0];
+pub const CULL_MIN: [f32; 3] = [-40.0, 0.0, -40.0];
+pub const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0];
+
+pub const NEAR_ZERO_SQUARE: f32 = 8e-11;
+pub const CM3D_F_ABS_MIN: f32 = 3.8146973e-06;
 
 const L_POS: [Vec3; CLOTH_VERTS] = [Vec3::ZERO; CLOTH_VERTS];
 
@@ -429,7 +432,9 @@ impl GoalFlag {
         let mut player_along = player_from_line_start;
         player_along.y = 0.0;
 
-        let finish_line_len = (self.goal_flag_pole_pos[1] - self.goal_flag_pole_pos[0]).length();
+        let pole_delta = self.goal_flag_pole_pos[1] - self.goal_flag_pole_pos[0];
+        let finish_line_len =
+            Vec3::new(pole_delta.x, 0.0, pole_delta.z).length();
         let player_along_line = finish_line_dir.dot(player_along);
         let finish_line_normal =
             Vec3::new(finish_line_dir.z, 0.0, -finish_line_dir.x);
@@ -499,7 +504,7 @@ impl GoalFlag {
                 averaged_normal += tri_normal;
             }
         }
-        averaged_normal = norm_zc(avg_norm_helper(averaged_normal));
+        averaged_normal = norm_zc(averaged_normal);
 
         let flutter_arg = i32::from(self.normal_flutter_phase)
             + i_col * (0 + NRM_FLUTTER_COL_STEP)
@@ -532,7 +537,7 @@ impl GoalFlag {
         let calc_mtx = Mat4::from_rotation_y(walk::from_s16(angle_y.wrapping_neg()));
         let mut wind_vector = calc_mtx.transform_point3(wind_vec);
         let mag = wind_vector.length_squared();
-        if mag == 0.0 {
+        if mag.abs() < CM3D_F_ABS_MIN {
             wind_vector = Vec3::ZERO;
         } else {
             wind_vector = wind_vector.normalize();
@@ -741,15 +746,23 @@ fn scos(angle: i32) -> f32 {
 }
 
 fn norm_zp(v: Vec3) -> Vec3 {
-    v.normalize_or_zero()
+    if v.length_squared() >= NEAR_ZERO_SQUARE {
+        v.normalize()
+    } else {
+        Vec3::ZERO
+    }
 }
 
 fn norm_zc(v: Vec3) -> Vec3 {
-    v.normalize_or_zero()
-}
-
-fn avg_norm_helper(v: Vec3) -> Vec3 {
-    v
+    if v.length_squared() >= NEAR_ZERO_SQUARE {
+        return v.normalize();
+    }
+    let out = norm_zp(v * (1.25 * 1000000.0));
+    if out.length_squared() < NEAR_ZERO_SQUARE {
+        Vec3::Z
+    } else {
+        out
+    }
 }
 
 pub const FPC_NM_TIMER: u16 = 0x01EC;
@@ -796,6 +809,9 @@ pub const PROC_ID_NONE: i32 = -1;
 pub const GOAL_FLAG_STAFF_NAME: &str = "Gflag";
 
 #[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StartStagePoint(pub i16);
+
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MiniGame {
     pub game_type: u8,
     pub result: u8,
@@ -820,6 +836,7 @@ impl GoalFlag {
         &mut self,
         pos: Vec3,
         shape_angle: i16,
+        angle_y: i16,
         player_pos: Option<Vec3>,
         room: i8,
         paths: &RacePaths,
@@ -918,11 +935,17 @@ impl GoalFlag {
         self.race_end_state = 0;
 
         for _ in 0..CREATED_WARMUP_FRAMES {
-            self.flag_move(0, wind_vec, hio);
+            self.flag_move(angle_y, wind_vec, hio);
         }
 
         self.created = true;
         true
+    }
+
+    pub fn draw_mtx(&self, angle_y: i16) -> Mat4 {
+        let mut calc = Mat4::from_rotation_y(walk::from_s16(angle_y));
+        calc *= Mat4::from_scale(self.scale);
+        calc
     }
 
     pub fn delete(&mut self, mini: &mut MiniGame, sarace: &mut SaraceShip, rupees: i32) {
@@ -1237,6 +1260,7 @@ pub struct Watch<'w, 's> {
     statics: Res<'w, Statics>,
     paths: Res<'w, RacePaths>,
     stage: Res<'w, StageName>,
+    start_point: Res<'w, StartStagePoint>,
     list: Res<'w, EventList>,
     do_intent: Res<'w, DoIntent>,
     use_intent: Res<'w, UseIntent>,
@@ -1272,7 +1296,7 @@ pub fn control(
     let trig_b = watch.use_intent.0;
     let trig_start = false;
     let event_reg = event_reg_aa_ff(&world.ev_flags);
-    let stage_point = 0;
+    let stage_point = watch.start_point.0;
     let mut spawns: Vec<BuoyRaceSpawn> = Vec::new();
 
     for (entity, actor, mut flag) in &mut actors {
@@ -1282,6 +1306,7 @@ pub fn control(
             let created = flag.create(
                 actor.pos,
                 shape_angle,
+                actor.angle[1],
                 player_pos,
                 room,
                 paths,
@@ -1318,7 +1343,6 @@ pub fn control(
         }
         let rupees = world.counters.mini_game_rupee;
         let angle_y = actor.angle[1];
-        let pos = actor.pos;
         flag.execute(
             &mut world.procs,
             &mut world.manager,
@@ -1340,12 +1364,7 @@ pub fn control(
             trig_start,
             entity,
         );
-        flag.mtx = {
-            let mut stack = Mat4::from_translation(pos);
-            stack *= Mat4::from_rotation_y(walk::from_s16(angle_y));
-            stack *= Mat4::from_scale(flag.scale);
-            stack
-        };
+        flag.mtx = flag.draw_mtx(angle_y);
         world.status.status0 &= !STTS0_TELESCOPE_LOOK;
         }
 }

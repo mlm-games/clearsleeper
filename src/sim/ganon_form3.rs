@@ -16,7 +16,6 @@ use super::water::Water;
 pub const GANON_FORM3_ACTOR: &str = "Bgn3";
 pub const BGN_ACTOR: &str = "Bgn";
 pub const ESA_ACTOR: &str = "Esa";
-pub const KEETH_ACTORS: [&str; 2] = ["keeth", "Fkeeth"];
 pub const KEETH_SPAWN_NAME: &str = "keeth";
 pub const KEETH_SPAWN_PARAMETERS: u32 = 0xFFFF_0003;
 pub const BGN_CS_MODE_DEATH: i8 = 20;

@@ -4,7 +4,6 @@ use super::flags::Switches;
 use super::inventory::{Equipped, Got};
 use super::pickup::Rupees;
 
-pub const CHEST_ACTORS: [&str; 19] = ["takara", "takara2", "takara3", "takara4", "takara5", "takara6", "takara7", "takara8", "takaraK", "takaraI", "takaraM", "tkrASw", "tkrAGc", "tkrAKd", "tkrAIk", "tkrBMs", "tkrCTf", "tkrAOc", "tkrAOs"];
 
 pub const FUNC_NORMAL: u8 = 0;
 pub const FUNC_EXTRA_SAVE_INFO: u8 = 7;
@@ -108,9 +107,6 @@ impl Chest {
     }
 }
 
-pub fn is_chest(name: &str) -> bool {
-    CHEST_ACTORS.contains(&name)
-}
 
 pub fn present(chest: &Chest, switches: &Switches) -> bool {
     if chest.uses_switch() {
