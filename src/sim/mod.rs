@@ -37,6 +37,7 @@ pub mod daynight;
 pub mod death;
 pub mod doguud;
 pub mod demodk;
+pub mod adnno;
 pub mod door;
 pub mod dmgroom;
 pub mod demokmm;
@@ -84,7 +85,9 @@ pub mod inventory;
 pub mod item;
 pub mod ivan;
 pub mod jump;
+pub mod kanban;
 pub mod kalle_demos;
+pub mod akabe;
 pub mod kamome;
 pub mod ktaruo;
 pub mod kmon;
@@ -134,6 +137,7 @@ pub mod puppet_ganon;
 pub mod player;
 pub mod player_status;
 pub mod rforce;
+pub mod roten;
 pub mod raft;
 pub mod rectangle;
 pub mod redead;
@@ -817,6 +821,14 @@ world.spawn((actor, kmon::Kmon::spawn())).id()
 world.spawn((actor, table::Table::spawn())).id()
     } else if vteng::is_vteng(&source.name) {
 world.spawn((actor, vteng::Vteng::spawn())).id()
+    } else if adnno::is_adnno(&source.name) {
+world.spawn((actor, adnno::Adnno::spawn())).id()
+    } else if roten::is_roten(&source.name) {
+let v = roten::Roten::spawn(source.parameters, 0);
+        world.spawn((actor, v)).id()
+    } else if kanban::is_kanban(&source.name) {
+let v = kanban::Kanban::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1052,6 +1064,9 @@ pub fn build(
                     canon::control.in_set(WwSimSet::Execute),
                     mbdoor::control.in_set(WwSimSet::Execute),                    demokmm::control.in_set(WwSimSet::Execute),
                     komore::control.in_set(WwSimSet::Execute),
+                    adnno::control.in_set(WwSimSet::Execute),
+                    roten::control.in_set(WwSimSet::Execute),
+                    kanban::control.in_set(WwSimSet::Execute),
                     esekh::control.in_set(WwSimSet::Execute),
                     table::control.in_set(WwSimSet::Execute),
                     vteng::control.in_set(WwSimSet::Execute),
