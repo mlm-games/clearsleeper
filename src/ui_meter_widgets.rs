@@ -7,6 +7,11 @@ use crate::sim::daynight::DayNight;
 use crate::sim::flags::EventFlags;
 use crate::sim::pickup::Rupees;
 use crate::sim::player_status::{PlayerStatus, STTS0_BOW_AIM};
+use crate::text::msgproc::MsgProcs;
+use crate::ui_meter_gauges::{
+    self, boss_gauge_collect, GaugeEnv, GaugeOutput, MeterGauges, MeterTuning,
+};
+use crate::ui_meter_vitals::{self, Vitals, VitalsEnv};
 
 pub const SCREEN_PARTS1: &str = "main_parts1.blo";
 pub const SCREEN_PARTS2: &str = "main_parts2.blo";
@@ -1188,6 +1193,162 @@ pub trait Peers {
     fn action_draw(&mut self, widget: &mut Widget);
     fn item_row_draw(&mut self, widget: &mut Widget);
     fn gauge_draw(&mut self, widget: &mut Widget);
+}
+
+pub struct MeterPeers<'a> {
+    pub vitals: &'a mut Vitals,
+    pub vitals_env: &'a mut VitalsEnv,
+    pub gauges: &'a mut MeterGauges,
+    pub gauge_env: &'a mut GaugeEnv,
+    pub gauge_out: &'a mut GaugeOutput,
+    pub gauge_tuning: &'a MeterTuning,
+    pub procs: &'a mut MsgProcs,
+}
+
+impl MeterPeers<'_> {
+    fn share(&mut self, widget: &Widget, input: &Input) {
+        let MeterPeers {
+            vitals,
+            vitals_env,
+            gauge_env,
+            ..
+        } = self;
+        gauge_env.status_flags = widget.status_flags;
+        gauge_env.button_icon_mode = widget.button_icon_mode;
+        gauge_env.menu_open = input.menu_open;
+        gauge_env.menu_status = input.menu_status;
+        gauge_env.push_menu_button = input.menu_button;
+        gauge_env.collect_mode = input.collect_mode;
+        gauge_env.auction_flag = input.auction_flag != 0;
+        gauge_env.event_running = input.event_running;
+        gauge_env.event_hind = input.event_hind as u16;
+        gauge_env.overlap_request = input.overlay_running;
+        gauge_env.metronome = input.metronome;
+        gauge_env.bow_aim = input.bow_aim;
+        gauge_env.start_stage.clear();
+        gauge_env.start_stage.push_str(&input.start_stage);
+        gauge_env.next_stage.clear();
+        gauge_env.next_stage.push_str(&input.next_stage);
+        gauge_env.save_table = input.save_table;
+        gauge_env.stage_boss = vitals_env.stage_type == vitals::stage::TYPE_BOSS;
+        gauge_env.stage_boss_enemy = input.stage_boss_enemy;
+        gauge_env.collect_boss_gauge = boss_gauge_collect(&vitals_env.collect);
+        gauge_env.up_button = vitals_env.up_button as u8;
+        gauge_env.picture_status = vitals_env.picture_status;
+        gauge_env.mini_game_type = vitals_env.mini_game_type;
+        gauge_env.operate_wind = vitals_env.operate_wind;
+        gauge_env.player_status1 = vitals_env.player_status1;
+        gauge_env.r_status = vitals_env.r_status;
+        gauge_env.r_status_force = vitals_env.r_status_force;
+        gauge_env.max_life = i32::from(vitals_env.max_life);
+        gauge_env.heart_alpha = vitals.heart_alpha;
+    }
+
+    fn play(&mut self, widget: &mut Widget) {
+        for sound in self.gauge_out.sounds.drain(..) {
+            widget.play(sound);
+        }
+    }
+}
+
+impl Peers for MeterPeers<'_> {
+    fn status_check(&mut self, widget: &mut Widget, _input: &mut Input) {
+        self.vitals.fade_bits = 0;
+        self.vitals.globals.sounds.clear();
+        self.gauges.icon.action_mode = 0;
+        self.gauge_out.reset();
+        self.vitals.status_check(self.vitals_env);
+        widget.status_flags = self.vitals.status_flags;
+    }
+
+    fn alpha_control(&mut self, _widget: &mut Widget, _input: &mut Input) {
+        self.vitals.alpha_control(self.vitals_env);
+    }
+
+    fn heart_move(&mut self, _widget: &mut Widget, _input: &mut Input) {
+        self.vitals.heart_move(self.vitals_env);
+    }
+
+    fn action_move(&mut self, widget: &mut Widget, _input: &mut Input) {
+        self.vitals.action_move(self.vitals_env);
+        widget.button_icon_mode |= self.vitals.fade_bits;
+        self.vitals.fade_bits = 0;
+    }
+
+    fn wepen_move(&mut self, widget: &mut Widget, _input: &mut Input) {
+        self.vitals.wepon_move(self.vitals_env);
+        widget.button_icon_mode |= self.vitals.fade_bits;
+        self.vitals.fade_bits = 0;
+    }
+
+    fn item_row_move(&mut self, widget: &mut Widget, _input: &mut Input) {
+        self.vitals.xy_move(self.vitals_env);
+        widget.button_icon_mode |= self.vitals.fade_bits;
+        self.vitals.fade_bits = 0;
+    }
+
+    fn gauge_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::icon_move(self.gauges, self.gauge_env, self.gauge_tuning);
+        widget.button_icon_mode |= self.gauges.icon.action_mode;
+        self.gauges.icon.action_mode = 0;
+    }
+
+    fn enemy_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.vitals.pane_scale_transform();
+        self.share(widget, input);
+        gauges::enemy_move(self.gauges, self.gauge_env, self.gauge_tuning);
+    }
+
+    fn magic_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::magic_move(self.gauges, self.gauge_env, self.gauge_out);
+        self.play(widget);
+    }
+
+    fn wind_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::wind_move(self.gauges, self.gauge_env, self.gauge_out, self.procs);
+        self.play(widget);
+    }
+
+    fn metronome_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::metronome_move(self.gauges, self.gauge_env);
+    }
+
+    fn menu_move(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::menu_move(self.gauges, self.gauge_env, self.gauge_tuning);
+        input.map_alpha = self.gauge_env.map_alpha as u8;
+        self.gauge_out.map_alpha = self.gauge_env.map_alpha;
+        self.gauge_out.button_action_mode = widget.button_icon_mode;
+    }
+
+    fn gauge_alpha(&mut self, widget: &mut Widget, input: &mut Input) {
+        self.share(widget, input);
+        gauges::gauge_alpha(self.gauges, self.gauge_env);
+    }
+
+    fn heart_draw(&mut self, _widget: &mut Widget) {
+        self.vitals.heart_draw();
+    }
+
+    fn wepen_draw(&mut self, _widget: &mut Widget) {
+        self.vitals.wepon_draw();
+    }
+
+    fn action_draw(&mut self, _widget: &mut Widget) {
+        self.vitals.action_draw();
+    }
+
+    fn item_row_draw(&mut self, _widget: &mut Widget) {
+        self.vitals.xy_draw();
+    }
+
+    fn gauge_draw(&mut self, _widget: &mut Widget) {
+        gauges::icon_draw(self.gauges);
+    }
 }
 
 pub fn value_increase(max: i32, value: i32, mode: u8) -> f32 {
