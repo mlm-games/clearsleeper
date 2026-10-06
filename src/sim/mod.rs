@@ -46,6 +46,7 @@ pub mod doguud;
 pub mod demodk;
 pub mod adnno;
 pub mod door;
+pub mod dragon;
 pub mod dmgroom;
 pub mod demokmm;
 pub mod dummy;
@@ -91,6 +92,7 @@ pub mod hhyu;
 pub mod htobi3;
 pub mod hotfloor;
 pub mod hys;
+pub mod hfuck1;
 pub mod hmlif;
 pub mod homen;
 pub mod hookshot;
@@ -103,6 +105,7 @@ pub mod inventory;
 pub mod item;
 pub mod ivan;
 pub mod isle_timer;
+pub mod jbaba;
 pub mod jump;
 pub mod kanban;
 pub mod npc_ah;
@@ -145,6 +148,7 @@ pub mod morth;
 pub mod molgera;
 pub mod movebox;
 pub mod msdansb;
+pub mod mkiek;
 pub mod msdan2;
 pub mod msg;
 pub mod nh;
@@ -210,6 +214,7 @@ pub mod select;
 pub mod medli;
 pub mod merchant;
 pub mod phantom_ganon;
+pub mod sitem;
 pub mod shop;
 pub mod sea;
 pub mod servant;
@@ -281,6 +286,7 @@ pub mod woodbox;
 pub mod ygcwp;
 pub mod yboil;
 pub mod ygawa;
+pub mod ykgr;
 pub mod ylzou;
 pub mod zelda;
 pub mod zunari;
@@ -1085,6 +1091,22 @@ let v = npc_jb1::NpcJb1::spawn(source.parameters);
     } else if npc_tt::is_npc_tt(&source.name) {
 let v = npc_tt::NpcTt::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if hfuck1::is_hfuck1(&source.name) {
+world.spawn((actor, hfuck1::Hfuck1::spawn())).id()
+    } else if jbaba::is_jbaba(&source.name) {
+let v = jbaba::Baba::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if dragon::is_dragon(&source.name) {
+world.spawn((actor, dragon::Dragon::spawn())).id()
+    } else if sitem::is_sitem(&source.name) {
+let v = sitem::SItem::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if ykgr::is_ykgr(&source.name) {
+let v = ykgr::Ykgr::spawn(source.parameters, world.resource::<area::StageName>(), world.resource::<flags::Collect>());
+        world.spawn((actor, v)).id()
+    } else if mkiek::is_mkiek(&source.name) {
+let v = mkiek::Mkiek::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1125,6 +1147,7 @@ pub fn build(
     sim.world.insert_resource(intent::UseIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
+    sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());
     sim.world.insert_resource(events::SimEvents::default());
@@ -1462,6 +1485,12 @@ pub fn build(
                 )
                     .chain(),
                 (combat::control.in_set(WwSimSet::Execute),
+                    hfuck1::control.in_set(WwSimSet::Execute),
+                    jbaba::control.in_set(WwSimSet::Execute),
+                    dragon::control.in_set(WwSimSet::Execute),
+                    sitem::control.in_set(WwSimSet::Execute),
+                    ykgr::control.in_set(WwSimSet::Execute),
+                    mkiek::control.in_set(WwSimSet::Execute),
                 tagba1::control.in_set(WwSimSet::Execute),
                 qdghd::control.in_set(WwSimSet::Execute),
                 syan::control.in_set(WwSimSet::Execute),

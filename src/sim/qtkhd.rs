@@ -74,8 +74,8 @@ pub fn is_qtkhd(name: &str) -> bool {
     QTKHD_ACTORS.contains(&name)
 }
 
-pub fn control(mut events: ResMut<SimEvents>, towers: Query<(&mut Actor, &Qtkhd)>) {
-    for (mut actor, tower) in &towers {
+pub fn control(mut events: ResMut<SimEvents>, mut towers: Query<(&mut Actor, &Qtkhd)>) {
+    for (mut actor, tower) in &mut towers {
         let slot = &mut *actor;
         tower.step(slot, &mut events);
     }
