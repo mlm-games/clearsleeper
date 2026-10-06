@@ -18,9 +18,9 @@ pub const TAGSO_ACTORS: [&str; 2] = ["TagSo", "TagMSo"];
 /// `return TRUE` - an empty body, not a stub. `Mthd_IsDelete` (`:100-102`) is a bare TRUE, an
 /// accepted delete request. So per RULE 7 nothing is stored: the decode has no reader here.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TagSo;
+pub struct Tagso;
 
-impl TagSo {
+impl Tagso {
     pub fn spawn() -> Self {
         Self
     }
@@ -30,4 +30,4 @@ pub fn is_tagso(name: &str) -> bool {
     TAGSO_ACTORS.contains(&name)
 }
 
-pub fn control(_tags: Query<&TagSo>) {}
+pub fn control(_tags: Query<&Tagso>) {}

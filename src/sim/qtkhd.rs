@@ -29,12 +29,12 @@ const EXEC_QTKHD: i32 = 0; // <- d_a_obj_smplbg.cpp:113 (exec_proc[0])
 /// `startTower` (`:775`, `:780` `offStop`), so it is left clear here and exposed for the
 /// caller to set.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct QtKhd {
+pub struct Qtkhd {
     pub kind: i32,
     pub stopped: bool,
 }
 
-impl QtKhd {
+impl Qtkhd {
     /// `daObjSmplbg::Act_c::Mthd_Create` (`:60-63`).
     pub fn spawn(parameters: u32) -> Self {
         let raw = ((parameters >> TYPE_SHIFT) & TYPE_MASK) as i32;
@@ -74,7 +74,7 @@ pub fn is_qtkhd(name: &str) -> bool {
     QTKHD_ACTORS.contains(&name)
 }
 
-pub fn control(mut events: ResMut<SimEvents>, towers: Query<(&mut Actor, &QtKhd)>) {
+pub fn control(mut events: ResMut<SimEvents>, towers: Query<(&mut Actor, &Qtkhd)>) {
     for (mut actor, tower) in &towers {
         tower.step(&mut actor, &mut events);
     }

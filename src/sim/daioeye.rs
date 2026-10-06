@@ -87,7 +87,6 @@ pub struct DaioEye {
     pub dead: bool,
     pub damaged: bool,
     pub damaged_bomb: bool,
-    pub tg_live: bool,
     pub eye_scale: f32,
     pub scale_idx: i32,
 }
@@ -101,7 +100,6 @@ impl DaioEye {
             dead: false,
             damaged: false,
             damaged_bomb: false,
-            tg_live: false,
             eye_scale: 1.0,
             scale_idx: 0,
         }
@@ -113,18 +111,6 @@ impl DaioEye {
 
     pub fn drawn(&self) -> bool {
         self.appear
-    }
-
-    /// `daDaiocta_c::modeAppear`'s `big_octo_eye_p->mbAppear = true`
-    /// (`d_a_daiocta.cpp:917`): the eye becomes live and its sphere registers
-    /// (`d_a_daiocta_eye.cpp:403-405`), matching `createInit`'s `mSph.Set(l_sph_src)`.
-    pub fn show(&mut self) {
-        self.appear = true;
-        self.mode = Mode::Wait;
-        self.health = MAX_HEALTH;
-        self.dead = false;
-        self.tg_live = true;
-        self.eye_scale = 1.0;
     }
 
     /// `_coHit` (`d_a_daiocta_eye.cpp:184-202`): the Co callback only fires for a
@@ -157,7 +143,7 @@ impl DaioEye {
 
     /// `checkTgHit` (`d_a_daiocta_eye.cpp:222-275`).
     fn check_tg_hit(&mut self, at: Option<TgAt>, events: &mut SimEvents) {
-        if !self.tg_live {
+        if self.dead {
             return;
         }
         let Some(at) = at else {
@@ -222,9 +208,6 @@ impl DaioEye {
     ) {
         if !self.appear {
             return;
-        }
-        if self.dead {
-            self.tg_live = false;
         }
         self.damaged = false;
         self.damaged_bomb = false;

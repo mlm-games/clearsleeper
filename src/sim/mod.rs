@@ -5,6 +5,7 @@ pub mod ajavw;
 pub mod ajav;
 pub mod area;
 pub mod amos_knight;
+pub mod amiprop;
 pub mod armos;
 pub mod aryll;
 pub mod arrow;
@@ -92,6 +93,7 @@ pub mod ivan;
 pub mod jump;
 pub mod kanban;
 pub mod kalle_demos;
+pub mod quake;
 pub mod qtkhd;
 pub mod akabe;
 pub mod kamome;
@@ -127,6 +129,7 @@ pub mod mmusic;
 pub mod morth;
 pub mod molgera;
 pub mod movebox;
+pub mod msdansb;
 pub mod msdan2;
 pub mod msg;
 pub mod nh;
@@ -150,6 +153,7 @@ pub mod pbka;
 pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
+pub mod plant;
 pub mod player;
 pub mod pscnchg;
 pub mod player_status;
@@ -166,6 +170,7 @@ pub mod salvage;
 pub mod sage;
 pub mod scenery;
 pub mod scenechange;
+pub mod steamtag;
 pub mod schedule;
 pub mod seatag;
 pub mod select;
@@ -230,6 +235,7 @@ pub mod xtower;
 pub mod xfuta;
 pub mod windmill;
 pub mod warship;
+pub mod wbird;
 pub mod water;
 pub mod woodbox;
 pub mod ylzou;
@@ -921,6 +927,21 @@ world.spawn((actor, touseki::Touseki::spawn())).id()
 world.spawn((actor, qtkhd::Qtkhd::spawn(source.parameters))).id()
     } else if ritem::is_ritem(&source.name) {
 world.spawn((actor, ritem::Ritem::spawn(source.parameters))).id()
+    } else if steamtag::is_steamtag(&source.name) {
+world.spawn((actor, steamtag::Steamtag::spawn())).id()
+    } else if wbird::is_wbird(&source.name) {
+world.spawn((actor, wbird::Wbird::spawn())).id()
+    } else if plant::is_plant(&source.name) {
+world.spawn((actor, plant::Plant::spawn())).id()
+    } else if quake::is_quake(&source.name) {
+let v = quake::Quake::spawn(source.parameters, world.resource::<flags::Collect>());
+        world.spawn((actor, v)).id()
+    } else if amiprop::is_amiprop(&source.name) {
+let v = amiprop::Amiprop::spawn(source.parameters, actor.angle);
+        world.spawn((actor, v)).id()
+    } else if msdansb::is_msdansb(&source.name) {
+let v = msdansb::Msdansb::spawn(source.parameters, actor.pos[1], world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1232,6 +1253,12 @@ pub fn build(
                     .chain(),
                 (
                     ending::control.in_set(WwSimSet::Execute),
+                    steamtag::control.in_set(WwSimSet::Execute),
+                    wbird::control.in_set(WwSimSet::Execute),
+                    plant::control.in_set(WwSimSet::Execute),
+                    quake::control.in_set(WwSimSet::Execute),
+                    amiprop::control.in_set(WwSimSet::Execute),
+                    msdansb::control.in_set(WwSimSet::Execute),
                     ritem::control.in_set(WwSimSet::Execute),
                     qtkhd::control.in_set(WwSimSet::Execute),
                     touseki::control.in_set(WwSimSet::Execute),
