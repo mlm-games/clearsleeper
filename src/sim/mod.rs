@@ -41,6 +41,7 @@ pub mod carry;
 pub mod chuchu;
 pub mod cleared;
 pub mod clock;
+pub mod coming3;
 pub mod collision;
 pub mod combat;
 pub mod daioeye;
@@ -181,6 +182,9 @@ pub mod msdan2;
 pub mod mtest;
 pub mod msg;
 pub mod nh;
+pub mod obj_correct;
+pub mod obj_mkie;
+pub mod obj_swheavy;
 pub mod obj_akabe;
 pub mod stair;
 pub mod ojtree;
@@ -207,6 +211,7 @@ pub mod npc_hi1;
 pub mod npc_fa1;
 pub mod pbco;
 pub mod pbka;
+pub mod pedestal;
 pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
@@ -268,6 +273,7 @@ pub mod ssturu;
 pub mod sk2;
 pub mod spcitem;
 pub mod swc00;
+pub mod swhit0;
 pub mod swhammer;
 pub mod swatk;
 pub mod smtoge;
@@ -320,6 +326,7 @@ pub mod windmill;
 pub mod shutter2;
 pub mod warpt;
 pub mod warpf;
+pub mod warphr;
 pub mod warship;
 pub mod wbird;
 pub mod water;
@@ -653,6 +660,26 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, warpf::Warpf::spawn(source.parameters))).id()
     } else if demo00::is_demo00(&source.name) {
         world.spawn((actor, demo00::Demo00::spawn(source.parameters))).id()
+    } else if obj_correct::is_obj_correct(&source.name) {
+        let v = obj_correct::ObjCorrect::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if obj_swheavy::is_obj_swheavy(&source.name) {
+        let v = obj_swheavy::SwHeavy::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if obj_mkie::is_obj_mkie(&source.name) {
+        let v = obj_mkie::ObjMkie::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if swhit0::is_swhit0(&source.name) {
+        let v = swhit0::SwHit0::spawn(source.parameters, source.angle, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if pedestal::is_pedestal(&source.name) {
+        let v = pedestal::Pedestal::spawn(source.parameters, &source.name);
+        world.spawn((actor, v)).id()
+    } else if warphr::is_warphrule(&source.name) {
+        let v = warphr::WarpRule::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if coming3::is_coming3(&source.name) {
+        world.spawn((actor, coming3::Coming3::spawn())).id()
     } else if hsh::is_hsh(&source.name) {
         let arg = i8::from(source.name != "Hsh");
         world.spawn((actor, hsh::Hsh::spawn(source.parameters, arg))).id()

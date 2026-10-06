@@ -985,7 +985,7 @@ impl Bgn3 {
                 if self.check_ground(actor) {
                     actor.speed.y = BOUNCE_Y;
                     self.inner = 2;
-                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
+                    actor.angle[1] = (self.rnd_f(65536.0) as i32) as i16;
                     self.lag = 1.0;
                 }
             }
@@ -1030,11 +1030,11 @@ impl Bgn3 {
                 }
                 if self.check_ground(actor) {
                     self.inner += 1;
-                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
+                    actor.angle[1] = (self.rnd_f(65536.0) as i32) as i16;
                     self.lag = 1.0;
                     actor.speed.y = FALL_Y;
                     actor.speed_f = 0.0;
-                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
+                    actor.angle[1] = (self.rnd_f(65536.0) as i32) as i16;
                     events.list.push(SimEvent::Se(SE_HIT_1));
                 }
                 if self.inner == 4 && actor.speed.y <= -30.0 {
@@ -1103,7 +1103,6 @@ impl Bgn3 {
 
     pub fn damage_check(
         &mut self,
-        actor: &mut Actor,
         hits: &[At],
         stat: &mut Bgn3Static,
         events: &mut SimEvents,
@@ -1227,7 +1226,7 @@ impl Bgn3 {
             }
         }
         self.tail_eff_set(actor, solid, wet, events);
-        self.damage_check(actor, hits, stat, events);
+        self.damage_check(hits, stat, events);
         add_calc_angle_s2(
             &mut actor.shape_angle[1],
             actor.angle[1],
@@ -1526,8 +1525,9 @@ pub fn control(
         .map_or(Vec3::ZERO, |(_, body)| body.pos);
     let wet = false;
     let mut spawned = 0i32;
-    for (_, actor, boss) in bosses.iter_mut() {
-        let (actor, boss) = (&mut *actor, &mut *boss);
+    for (_, mut actor, mut boss) in bosses.iter_mut() {
+        let actor = &mut *actor;
+        let boss = &mut *boss;
         if boss
             .execute(
                 actor,
