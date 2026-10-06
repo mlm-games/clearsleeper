@@ -42,6 +42,8 @@ pub mod boomerang;
 pub mod chest;
 pub mod camera;
 pub mod carry;
+pub mod coming;
+pub mod coming2;
 pub mod chuchu;
 pub mod cleared;
 pub mod clock;
@@ -76,6 +78,7 @@ pub mod event_manager;
 pub mod evsw;
 pub mod events;
 pub mod fallrock;
+pub mod ferris;
 pub mod fan;
 pub mod ff;
 pub mod fire;
@@ -149,6 +152,7 @@ pub mod qtkhd;
 pub mod kamome;
 pub mod ktaruo;
 pub mod kokiie;
+pub mod kui;
 pub mod lamp;
 pub mod kmon;
 pub mod kaji;
@@ -247,6 +251,7 @@ pub mod retag;
 pub mod rockfall;
 pub mod roll;
 pub mod salvage;
+pub mod sail;
 pub mod salvage_tbox;
 pub mod sage;
 pub mod scenery;
@@ -334,6 +339,7 @@ pub mod vmsdz;
 pub mod warpfo;
 pub mod walk;
 pub mod wall;
+pub mod warpdm20;
 pub mod warpls;
 pub mod wlvtag;
 pub mod zouk;
@@ -717,6 +723,18 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if vmc::is_vmc(&source.name) {
         let v = vmc::Vmc::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
+    } else if kui::is_kui(&source.name) {
+        world.spawn((actor, kui::Kui::spawn(source.parameters))).id()
+    } else if warpdm20::is_warpdm20(&source.name) {
+        world.spawn((actor, warpdm20::WarpDm20::spawn())).id()
+    } else if coming::is_coming(&source.name) {
+        world.spawn((actor, coming::Coming::spawn(source.parameters))).id()
+    } else if ferris::is_ferris(&source.name) {
+        world.spawn((actor, ferris::Ferris::spawn(source.parameters))).id()
+    } else if sail::is_sail(&source.name) {
+        world.spawn((actor, sail::Sail::spawn())).id()
+    } else if coming2::is_coming2(&source.name) {
+        world.spawn((actor, coming2::Coming2::spawn(actor.angle[1], actor.pos))).id()
     } else if zouk::is_zouk(&source.name) {
         world.spawn((actor, zouk::Zouk::spawn(source.parameters))).id()
     } else if warpls::is_warpls(&source.name) {
@@ -1748,11 +1766,7 @@ pub fn build(
                 demodk::control.in_set(WwSimSet::Execute),
                 kmon::control.in_set(WwSimSet::Execute),
                 dk::control.in_set(WwSimSet::Execute),
-                zouk::control.in_set(WwSimSet::Execute),
-                warpls::control.in_set(WwSimSet::Execute),
-                mshokki::control.in_set(WwSimSet::Execute),
-                arrowlight::control.in_set(WwSimSet::Execute),
-                eskban::control.in_set(WwSimSet::Execute),
+                kui::control.in_set(WwSimSet::Execute),
                 amos_knight::control.in_set(WwSimSet::Execute),
                 ganon_form3::control.in_set(WwSimSet::Execute),
                 )
@@ -2006,6 +2020,16 @@ pub fn build(
                 dai::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
+                zouk::control.in_set(WwSimSet::Execute),
+                warpls::control.in_set(WwSimSet::Execute),
+                mshokki::control.in_set(WwSimSet::Execute),
+                arrowlight::control.in_set(WwSimSet::Execute),
+                eskban::control.in_set(WwSimSet::Execute),
+                warpdm20::control.in_set(WwSimSet::Execute),
+                coming::control.in_set(WwSimSet::Execute),
+                ferris::control.in_set(WwSimSet::Execute),
+                sail::control.in_set(WwSimSet::Execute),
+                coming2::control.in_set(WwSimSet::Execute),
         )
             .chain(),
     );

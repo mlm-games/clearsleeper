@@ -407,7 +407,7 @@ pub fn control(
         };
         let struck = rock.execute(&mut actor, &mut env, btd, kui, &mut sink);
         if struck {
-            if let Some((_, _, boss)) = gohmas.iter_mut().next() {
+            if let Some((_, _, ref mut boss)) = gohmas.iter_mut().next() {
                 boss.m02f6 = 1;
             }
         }

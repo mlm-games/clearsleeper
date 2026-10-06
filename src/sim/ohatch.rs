@@ -29,21 +29,21 @@ const CULL_MAX: [f32; 3] = [125.0, 250.0, 125.0]; // <- f_op_actor_mng.cpp:563 (
 /// `daObjOhatch_HIO_c` (`:19-60`), whose constructor (`:45-60`) writes the identical values. RULE 0's
 /// NTSC-U ordering picks `L_HIO`, so every `HIO(...)` below is a compile-time constant.
 /// `tremor_act_proc`: `m2EC += (s32)HIO(m20);` (`:233`) and `if (m2EC > (s32)HIO(m24))` (`:234`).
-const HIO_M20: f32 = 0x2000; // <- d_a_obj_ohatch.cpp:69 (L_HIO::m20)
-const HIO_M24: f32 = 0x20000; // <- d_a_obj_ohatch.cpp:70 (L_HIO::m24)
+const HIO_M20: f32 = 0x2000_u32 as f32; // <- d_a_obj_ohatch.cpp:69 (L_HIO::m20)
+const HIO_M24: f32 = 0x20000_u32 as f32; // <- d_a_obj_ohatch.cpp:70 (L_HIO::m24)
 /// `tremor_act_proc`: `f32 fVar1 = cM_ssin(m2EC); if (fVar1 < 0.0f) { fVar1 *= -1.0f; }
 /// m2E8 = fVar1 * HIO(m28);` (`:238-242`).
 const HIO_M28: f32 = 6.0; // <- d_a_obj_ohatch.cpp:71 (L_HIO::m28)
 /// `open_act_proc`: `s32 uVar2 = (cM_ssin(sin) + HIO(m1C)) / (HIO(m1C) + 1.0f) * HIO(m08);`
 /// (`:252-253`) and `if (m2D8 <= (s16)HIO(m0C))` (`:257-258`).
-const HIO_M0C: f32 = -0x4000; // <- d_a_obj_ohatch.cpp:64 (L_HIO::m0C)
+const HIO_M0C: f32 = -(0x4000_u32 as f32); // <- d_a_obj_ohatch.cpp:64 (L_HIO::m0C)
 const HIO_M1C: f32 = 1.0; // <- d_a_obj_ohatch.cpp:68 (L_HIO::m1C)
-const HIO_M08: f32 = -0x1000; // <- d_a_obj_ohatch.cpp:63 (L_HIO::m08)
+const HIO_M08: f32 = -(0x1000_u32 as f32); // <- d_a_obj_ohatch.cpp:63 (L_HIO::m08)
 /// `vibrate_act_proc`: `m2F0 += (s32)HIO(m2C);` (`:268`) and `m2F2 += (s32)HIO(m34);` (`:272`);
 /// `open_act_proc`'s `m2F0 = (s16)HIO(m30);` (`:260`).
 const HIO_M2C: f32 = -64.0; // <- d_a_obj_ohatch.cpp:72 (L_HIO::m2C)
-const HIO_M30: f32 = 0x400; // <- d_a_obj_ohatch.cpp:73 (L_HIO::m30)
-const HIO_M34: f32 = 0x2000; // <- d_a_obj_ohatch.cpp:74 (L_HIO::m34)
+const HIO_M30: f32 = (0x400_u32 as f32); // <- d_a_obj_ohatch.cpp:73 (L_HIO::m30)
+const HIO_M34: f32 = (0x2000_u32 as f32); // <- d_a_obj_ohatch.cpp:74 (L_HIO::m34)
 
 /// `m29C = param_get_swSave(); if (m29C != 0xff && fopAcM_isSwitch(this, m29C) == TRUE)`
 /// (`d_a_obj_ohatch.cpp:136-137`, `:200`). `dSv_info_c::isSwitch` returns FALSE for `i_no == 255`
