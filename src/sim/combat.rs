@@ -2,12 +2,14 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::bodies::AtMeta;
 use super::collision::Collision;
+use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
     AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
-    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, Atk, Attacker, CcAtInfo,
-    HitAudio, HitStop, NAME_PLAYER, PlayerCut, Target, cc_at_check,
+    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, Attacker, HitAudio, HitStop,
+    NAME_PLAYER, PlayerCut, Target,
 };
 use super::enemy;
 use super::events::{SimEvent, SimEvents};
@@ -18,11 +20,16 @@ use super::intent::{CameraYaw, ItemIntent, MoveIntent};
 use super::jump::{self, Jump};
 use super::lock::Lock;
 use super::player::Player;
-use super::registry::ActorRegistry;
+use super::registry::{ActorRegistry, ERROR_PROC_ID};
 use super::roll::Roll;
+use super::shape::Shape;
 use super::ship::Ship;
 use super::swim::Swim;
 use super::walk::{add_calc, from_s16, target_yaw, to_s16, turn_toward};
+
+/// The AT/TG pass every swing runs. It lives in a file of its own and is declared here, so the
+/// four damage sites share one module without the parent's module list having to name it;
+use crate::sim::contact_hit::{AT_SPRM_VS_ENEMY, AtObj, TgObj};
 
 const STICK_GATE: f32 = 0.05;
 const DAMAGE_START: u32 = 1;
@@ -33,11 +40,17 @@ const LUNGE_FACTOR: f32 = 0.2;
 const DECEL_SCALE: f32 = 0.7;
 const DECEL_MIN: f32 = 0.5;
 const SWORD_OFFSET: f32 = 20.0;
+/// `l_at_cps_src`'s capsule radius (`player_main_data.inc:159`), the one value of the sword's AT
+/// volume the reference states as a number; the segment it runs along comes from the sword
+/// model's own joints, which the port does not carry, so the reach is this radius about the tip
+/// the swing puts `SWORD_OFFSET` ahead of the player.
 const SWORD_RADIUS: f32 = 20.0;
 const FLINCH_TICKS: u32 = 10;
 /// `dCcG_SE_UNK1` (`d_cc_d.h:66`), the `SrcGObjAt Se` every sword cut's AT object carries: the
 /// hit-sound ladder reads it as neither wood, nor metal, nor arrow, nor hookshot.
 const AT_SE_SWORD: u8 = 1;
+/// `cCcD_Stts::Init`'s first argument for the player's own status, `player_main.cpp:12184`.
+const AT_WEIGHT: u8 = 120;
 /// The chain step the reference's cut-count field holds on the fourth cut, the finisher and the
 /// only one of the four the `mHitSoundId` ladder gives a non-zero selector.
 const CUT_COUNT_FINISH: u8 = 4;
@@ -212,13 +225,14 @@ pub fn control(
         (
             Entity,
             &Actor,
+            Option<&ContactBodies>,
             Option<&mut HitPoints>,
             Option<&mut enemy::Hurt>,
         ),
         Without<Ship>,
     >,
     mut out: Outcome<'_>,
-    mut players: Query<&mut Player>,
+    mut players: Query<(Entity, &mut Player)>,
     registry: Res<ActorRegistry>,
     mut fx: ResMut<super::damage_fx::DamageFxQueue>,
     mut commands: Commands,
@@ -229,7 +243,7 @@ pub fn control(
     let selected = gates.equipped.item(0);
     let bare_hands =
         gates.equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
-    for mut player in &mut players {
+    for (player_entity, mut player) in &mut players {
         let player = &mut *player;
         if gates.swim.active || gates.health.units == 0 {
             out.combat.active = false;
@@ -279,20 +293,30 @@ pub fn control(
             add_calc(&mut player.speed, 0.0, DECEL_SCALE, decel_max, DECEL_MIN);
         }
         if out.combat.frame >= DAMAGE_START && out.combat.frame < DAMAGE_END {
-            let center_x = player.pos.x + SWORD_OFFSET * player.yaw.sin();
-            let center_z = player.pos.z + SWORD_OFFSET * player.yaw.cos();
             let kind = out.combat.kind;
             let swing = PlayerCut {
                 cut_type: cut_type(kind),
                 cut_count: cut_count(kind, out.combat.combo),
                 pos: player.pos,
             };
-            let swing_atk = Atk {
-                at_type: AT_TYPE_SWORD,
-                at_se: AT_SE_SWORD,
-                at_spl: cut_spl(kind),
-                at_atp: sword_at_power(selected, is_finisher(kind)),
-                ac: Some(Attacker {
+            let at = AtObj::new(
+                Shape::sphere(
+                    player.pos
+                        + Vec3::new(
+                            SWORD_OFFSET * player.yaw.sin(),
+                            0.0,
+                            SWORD_OFFSET * player.yaw.cos(),
+                        ),
+                    SWORD_RADIUS,
+                ),
+                AT_SPRM_VS_ENEMY,
+                &AtMeta {
+                    at_type: AT_TYPE_SWORD,
+                    at_se: AT_SE_SWORD,
+                    at_spl: cut_spl(kind),
+                    at_atp: sword_at_power(selected, is_finisher(kind)),
+                },
+                Attacker {
                     name: NAME_PLAYER.to_owned(),
                     pos: player.pos,
                     speed: Vec3::new(
@@ -302,18 +326,35 @@ pub fn control(
                     ),
                     bomb_state: 0,
                     tsubo_type: 0,
-                }),
+                },
+                AT_WEIGHT,
+                registry.proc_id(player_entity).unwrap_or(ERROR_PROC_ID),
+            );
+            let crossings = {
+                let tg: Vec<TgObj<'_>> = actors
+                    .iter()
+                    .filter_map(|(entity, actor, bodies, hp, _)| {
+                        if hp.is_none() {
+                            return None;
+                        }
+                        Some(TgObj::new(
+                            entity,
+                            bodies?,
+                            actor.weight_uc,
+                            registry.proc_id(entity),
+                        ))
+                    })
+                    .collect();
+                crate::sim::contact_hit::at_tg(std::slice::from_ref(&at), &tg)
             };
             let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
-            for (entity, actor, hp, mut hurt) in actors.iter_mut() {
+            for crossing in crossings {
+                let Ok((entity, actor, _, hp, mut hurt)) = actors.get_mut(crossing.target) else {
+                    continue;
+                };
                 let Some(mut hp) = hp else {
                     continue;
                 };
-                let dx = actor.pos.x - center_x;
-                let dz = actor.pos.z - center_z;
-                if dx * dx + dz * dz > SWORD_RADIUS * SWORD_RADIUS {
-                    continue;
-                }
                 let mut target = Target {
                     name: actor.name.clone(),
                     pos: actor.pos,
@@ -325,14 +366,10 @@ pub fn control(
                     item_table_idx: actor.item_table_idx,
                     ..Default::default()
                 };
-                let mut info = CcAtInfo {
-                    mp_obj: Some(swing_atk.clone()),
-                    p_particle_pos: Some(actor.pos),
-                    ..Default::default()
-                };
-                cc_at_check(
+                crate::sim::contact_hit::resolve(
+                    &at.atk,
+                    crossing.cross,
                     &mut target,
-                    &mut info,
                     &swing,
                     &mut out.events,
                     &mut out.stop,

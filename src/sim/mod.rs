@@ -52,6 +52,7 @@ pub mod carry;
 pub mod coming;
 pub mod coming2;
 pub mod contact;
+pub mod contact_hit;
 pub mod contact_run;
 pub mod chuchu;
 pub mod cleared;
@@ -91,6 +92,7 @@ pub mod fallrock;
 pub mod fan;
 pub mod ff;
 pub mod obj_hha;
+pub mod pirate_flag;
 pub mod shand;
 pub mod tag_hint;
 pub mod tag_md_cb;
@@ -600,6 +602,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if shand::is_shand(&source.name) {
         let a = shand::Shand::spawn(source.parameters);
         world.spawn((actor, a)).id()
+    } else if pirate_flag::is_pirate_flag(&source.name) {
+        let v = pirate_flag::PirateFlag::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1570,6 +1575,8 @@ pub fn build(
     sim.world.insert_resource(title::TitleKirakira::default());
     sim.world.insert_resource(title::TitleScene::default());
     sim.world.insert_resource(shand::ShandStatic::default());
+    sim.world.insert_resource(pirate_flag::PirateFlagHio::default());
+    sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1659,6 +1666,8 @@ pub fn build(
     sim.world.insert_resource(title::TitleKirakira::default());
     sim.world.insert_resource(title::TitleScene::default());
     sim.world.insert_resource(shand::ShandStatic::default());
+    sim.world.insert_resource(pirate_flag::PirateFlagHio::default());
+    sim.world.insert_resource(pirate_flag::PirateFlagShip::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1937,6 +1946,7 @@ pub fn build(
                 obj_hha::control.in_set(WwSimSet::Execute),
                 title::control.in_set(WwSimSet::Execute),
                 shand::control.in_set(WwSimSet::Execute),
+                pirate_flag::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),

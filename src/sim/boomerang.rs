@@ -2,16 +2,20 @@ use bevy_ecs::prelude::*;
 
 use glam::Vec3;
 
+use super::bodies::AtMeta;
+use crate::sim::contact_hit::{AT_SPRM_NO_TG_HIT_INF, AtObj, TgObj};
 use super::combat::{HitPoints, actor_status};
+use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
-    AT_SE_WOOD, AT_SPL_UNK0, AT_TYPE_BOOMERANG, Atk, Attacker, CcAtInfo, CUT_TYPE_NONE,
-    HitAudio, HitStop, NAME_BOOMERANG, PlayerCut, Target, cc_at_check,
+    AT_SE_WOOD, AT_SPL_UNK0, AT_TYPE_BOOMERANG, Attacker, CUT_TYPE_NONE, HitAudio, HitStop,
+    NAME_BOOMERANG, PlayerCut, Target,
 };
 use super::enemy::Hurt;
 use super::events::SimEvents;
 use super::player::Player;
-use super::registry::ActorRegistry;
+use super::registry::{ActorRegistry, ERROR_PROC_ID};
+use super::shape::Shape;
 use super::ship::Ship;
 use super::walk::{self, within};
 
@@ -36,6 +40,9 @@ pub const TURN_SCALE: f32 = TURN_UNITS;
 pub const TURN_CAP: f32 = 0.25 * core::f32::consts::TAU;
 pub const NOMINAL_RANGE: f32 = 0.1;
 pub const FLINCH: u32 = 6;
+
+/// `mStts.Init`'s first argument for the boomerang's own status, `boomerang.cpp:802`.
+const AT_WEIGHT: u8 = 0x3C;
 
 #[derive(Component, Debug, Clone, PartialEq)]
 pub struct Boomerang {
@@ -190,7 +197,15 @@ pub fn control(
     players: Query<&Player>,
     riding: Query<&Ship>,
     held: Option<ResMut<super::item::Held>>,
-    mut foes: Query<(Entity, &super::actor::Actor, &mut HitPoints, Option<&mut Hurt>)>,
+    mut foes: Query<
+        (
+            Entity,
+            &super::actor::Actor,
+            Option<&ContactBodies>,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+        ),
+    >,
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
     mut events: ResMut<SimEvents>,
@@ -220,23 +235,47 @@ pub fn control(
         if boom.returning {
             boom.home(player);
         } else {
-            let swing = Atk {
-                at_type: AT_TYPE_BOOMERANG,
-                at_se: AT_SE_WOOD,
-                at_spl: AT_SPL_UNK0,
-                at_atp: damage::BOMERANG as u8,
-                ac: Some(Attacker {
+            let at = AtObj::new(
+                Shape::sphere(boom.pos, CAPSULE_RADIUS + HIT_REACH),
+                AT_SPRM_NO_TG_HIT_INF,
+                &AtMeta {
+                    at_type: AT_TYPE_BOOMERANG,
+                    at_se: AT_SE_WOOD,
+                    at_spl: AT_SPL_UNK0,
+                    at_atp: damage::BOMERANG as u8,
+                },
+                Attacker {
                     name: NAME_BOOMERANG.to_owned(),
                     pos: boom.pos,
                     speed: carried,
                     bomb_state: 0,
                     tsubo_type: 0,
-                }),
+                },
+                AT_WEIGHT,
+                registry.proc_id(entity).unwrap_or(ERROR_PROC_ID),
+            );
+            let crossings = {
+                let tg: Vec<TgObj<'_>> = foes
+                    .iter()
+                    .filter_map(|(foe, actor, bodies, _, _)| {
+                        Some(TgObj::new(
+                            foe,
+                            bodies?,
+                            actor.weight_uc,
+                            registry.proc_id(foe),
+                        ))
+                    })
+                    .collect();
+                crate::sim::contact_hit::at_tg(std::slice::from_ref(&at), &tg)
             };
-            for (foe, actor, mut hp, mut hurt) in &mut foes {
-                if boom.struck.contains(&foe) || !within(boom.pos, actor.pos, CAPSULE_RADIUS + HIT_REACH) {
+            for crossing in crossings {
+                let foe = crossing.target;
+                if boom.struck.contains(&foe) {
                     continue;
                 }
+                let Ok((_, actor, _, mut hp, mut hurt)) = foes.get_mut(foe) else {
+                    continue;
+                };
                 let mut target = Target {
                     name: actor.name.clone(),
                     pos: actor.pos,
@@ -245,14 +284,10 @@ pub fn control(
                     health: *hp,
                     ..Default::default()
                 };
-                let mut info = CcAtInfo {
-                    mp_obj: Some(swing.clone()),
-                    p_particle_pos: Some(actor.pos),
-                    ..Default::default()
-                };
-                cc_at_check(
+                crate::sim::contact_hit::resolve(
+                    &at.atk,
+                    crossing.cross,
                     &mut target,
-                    &mut info,
                     &thrower,
                     &mut events,
                     &mut stop,
@@ -280,7 +315,7 @@ pub fn control(
         }
     }
     for foe in slain {
-        let Ok((_, actor, _, _)) = foes.get(foe) else {
+        let Ok((_, actor, _, _, _)) = foes.get(foe) else {
             continue;
         };
         zones.mark_done(actor.room, actor.set_id);
