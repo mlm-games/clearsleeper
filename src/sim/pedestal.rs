@@ -318,7 +318,11 @@ impl Pedestal {
         // (:239-241). `event_action_tbl` (:210-215) is `[actionDefault, actionMoveEvent,
         // actionDefault, actionDefault]`, so indices 0, 2 and 3 return TRUE immediately and the
         // omitted effect entries still end their cut.
-        let done = action != CUT_MOVE || self.action_move(actor, events);
+        let done = if action == CUT_MOVE {
+            self.action_move(actor, events)
+        } else {
+            true
+        };
         if done {
             active.end_staff_cut(list, flags, staff);
         }

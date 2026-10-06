@@ -24,6 +24,7 @@ const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:558
 /// `daObj::PrmAbstract(this, W, S)` = `((1 << W) - 1) & (param >> S)` (`d_a_obj.h:14`), with
 /// `PRM_SWSAVE_W = 0x08` (`:24`) - the whole byte, no mask beyond the shift.
 const SWSAVE_SHIFT: u32 = 0x08; // <- d_a_obj_correct.h:23
+const SWSAVE_MASK: u32 = 0xFF; // <- d_a_obj_correct.h:24 (PRM_SWSAVE_W = 0x08, d_a_obj.h:14)
 /// `if (swSave == 0xFF) { return cPhs_ERROR_e; }` (`d_a_obj_correct.cpp:52`). The test is against
 /// the raw `int` the accessor returns, so the sentinel is the full decoded byte.
 const NO_SWITCH: u8 = 0xFF; // <- d_a_obj_correct.cpp:52
@@ -89,7 +90,7 @@ impl ObjCorrect {
     /// The profile's `Parameters` field is `0` (`:436`), so `daObjCorrect::Act_c` still carries a
     /// parameter word; only `prm_get_swSave` (`:48`) is decoded here.
     pub fn spawn(parameters: u32) -> Self {
-        let sw_save = ((parameters >> SWSAVE_SHIFT) & 0xFF) as u8;
+        let sw_save = ((parameters >> SWSAVE_SHIFT) & SWSAVE_MASK) as u8;
         Self {
             refused: sw_save == NO_SWITCH,
         }

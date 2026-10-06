@@ -1,6 +1,7 @@
 pub mod acorn_leaf;
 pub mod actor;
 pub mod agbsw0;
+pub mod agb;
 pub mod ajavw;
 pub mod ajav;
 pub mod apzl;
@@ -48,6 +49,7 @@ pub mod dai;
 pub mod damage;
 pub mod daynight;
 pub mod death;
+pub mod demo00;
 pub mod doguud;
 pub mod demodk;
 pub mod adnno;
@@ -93,12 +95,15 @@ pub mod ground;
 pub mod grammarian;
 pub mod gy_ctrl;
 pub mod gnbtaki;
+pub mod grid;
 pub mod gtaki;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
 pub mod hami3;
+pub mod himo3;
 pub mod hami4;
+pub mod hsh;
 pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
@@ -314,6 +319,7 @@ pub mod xfuta;
 pub mod windmill;
 pub mod shutter2;
 pub mod warpt;
+pub mod warpf;
 pub mod warship;
 pub mod wbird;
 pub mod water;
@@ -637,6 +643,19 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, mtest::Mtest::spawn(source.parameters))).id()
     } else if dai::is_dai(&source.name) {
         world.spawn((actor, dai::Dai::spawn(source.parameters))).id()
+    } else if agb::is_agb(&source.name) {
+        world.spawn((actor, agb::Agb::spawn(source.parameters))).id()
+    } else if grid::is_grid(&source.name) {
+        world.spawn((actor, grid::Grid::spawn(source.parameters))).id()
+    } else if himo3::is_himo3(&source.name) {
+        world.spawn((actor, himo3::Himo3::spawn(source.parameters))).id()
+    } else if warpf::is_warpf(&source.name) {
+        world.spawn((actor, warpf::Warpf::spawn(source.parameters))).id()
+    } else if demo00::is_demo00(&source.name) {
+        world.spawn((actor, demo00::Demo00::spawn(source.parameters))).id()
+    } else if hsh::is_hsh(&source.name) {
+        let arg = i8::from(source.name != "Hsh");
+        world.spawn((actor, hsh::Hsh::spawn(source.parameters, arg))).id()
     } else if stair::is_stair(&source.name) {
         let v = stair::Stair::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
@@ -1464,6 +1483,11 @@ pub fn build(
                 player_status::control.in_set(WwSimSet::Execute),
                 bombflower::clear_blasts.in_set(WwSimSet::Execute),
                 ajav::control.in_set(WwSimSet::Execute),
+                agb::control.in_set(WwSimSet::Execute),
+                warpf::control.in_set(WwSimSet::Execute),
+                himo3::control.in_set(WwSimSet::Execute),
+                demo00::control.in_set(WwSimSet::Execute),
+                hsh::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (death::freeze.in_set(WwSimSet::Execute),

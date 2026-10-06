@@ -47,8 +47,7 @@ impl Default for Actor {
             speed_f: 0.0,
             eye: Vec3::ZERO,
         }
-    },
-    ..Default::default()
+    }
 }
 
 impl Actor {

@@ -172,7 +172,10 @@ const PAY_TYPE: [u8; ISLE_IDX_COUNT] = [
 ];
 
 const EVT_CND_CANTALK: u16 = 0x0001;
-const EVT_CND_CANTALKITEM: u16 = 0x0002;
+// `dEvtCnd_CANTALKITEM_e = 0x0020` (`f_op_actor.h:150`). This was 0x0002, which is
+// `dEvtCnd_UNK2_e` (`f_op_actor.h:146`) - the sibling CANTALK constant copied off the
+// wrong enum row, so `order_flags.set(...)` was raising a bit nothing tests.
+const EVT_CND_CANTALKITEM: u16 = 0x0020; // <- f_op_actor.h:150
 
 const EVENT_IDX_NONE: i8 = 0;
 const EVENT_IDX_TALK: i8 = 1;

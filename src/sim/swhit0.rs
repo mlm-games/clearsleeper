@@ -37,8 +37,8 @@ const TIMER_NONE: u8 = 0xFF; // <- d_a_swhit0.cpp:92
 /// `s32 daSwhit0_c::getSwNo2() { return home.angle.z & 0xFF; }` (`.cpp:99-101`) - the second switch
 /// index lives in the placed roll angle, not in the parameter word, and the actor never writes
 /// `home.angle.z` (only `shape_angle.z = 0; current.angle.z = 0;` at `:194-195`), so the stage
-/// file's roll is the value for the actor's whole life.
-const SW2_NO_MASK: u8 = 0xFF; // <- d_a_swhit0.cpp:100
+/// file's roll is the value for the actor's whole life. `& 0xFF` on retail's `s16` is exactly a
+/// truncation to `u8`, including for a negative roll (0xFFFF -> 255), so that is the decode.
 /// `mOnTimer = (u8)getTimer() * 0x0F;` (`.cpp:339`) - the on-timer counts down one per frame, so
 /// this multiplier is the number of frames the switch stays forced on.
 const ON_TIMER_STEP: i16 = 0x0F; // <- d_a_swhit0.cpp:339
@@ -113,6 +113,8 @@ const TYPE_RELEASE: u8 = 0x02; // <- d_a_swhit0.cpp:328
 ///   `cM_ssin(home.angle.x) * 65.0f * cM_ssin(home.angle.y)` offsets off `home.pos` per
 ///   `f_op_actor.cpp:295`) and `eyePos = attention_info.position` (`.cpp:152`) - the sum's only
 ///   readers are `mColSph.SetC(attention_info.position)` (`:164`), a collider, and `eyePos` itself.
+/// * `daSwhit0_IsDelete` (`.cpp:456-460`) is the bare `return TRUE` form - RULE 6b, it ACCEPTS a
+///   delete request and is not a despawn.
 /// * `mStaffId` (`.h:59`), `CreateHeap` (`.cpp:104-124`), `setDrawMtx` (`:369-375`), `draw` (`:377-415`),
 ///   `mAnm.play()` / `mTexAnm.play()` (`.cpp:424-425`), `CreateInit`'s `fopAcM_SetMtx` (`:143`) and
 ///   `daSwhit0_Delete` (`:463-466`) - BCK / BTK archives (frame counts are archive data, RULE 3b),
@@ -158,7 +160,7 @@ impl SwHit0 {
         };
         Self {
             switch_no,
-            switch2_no: angle[2] as u8 & SW2_NO_MASK,
+            switch2_no: angle[2] as u8,
             kind: ((parameters >> TYPE_SHIFT) & TYPE_MASK) as u8,
             state,
             on_timer: 0,

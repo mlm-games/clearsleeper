@@ -12,6 +12,7 @@ use super::esa::Esa;
 use super::events::{SimEvent, SimEvents};
 use super::health::Health;
 use super::player::Player;
+use super::puppet_ganon::PuppetGanon;
 use super::stream::add_calc_angle_s2;
 use super::walk;
 
@@ -62,7 +63,7 @@ pub const HIO_M54: u8 = 0x42;
 
 pub const KE_MAX: [u16; 7] = [0x0028, 0x0023, 0x001E, 0x0019, 0x0014, 0x000F, 0x000F];
 pub const SIZE_D: [f32; 9] = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.6];
-pub const FL_CHECK_D: [s16; 9] =
+pub const FL_CHECK_D: [i16; 9] =
     [0x0015, 0x0013, 0x0011, 0x000F, 0x000D, 0x000B, 0x0009, 0x0007, 0x0005];
 
 pub const PARTS: usize = 9;
@@ -878,9 +879,9 @@ impl Bgn3 {
         } else {
             actor.angle[1] = actor.angle[1].wrapping_add(self.turn);
         }
-        let want = if actor.health == 3 {
+        let want = if self.health == 3 {
             hio.m08
-        } else if actor.health == 2 {
+        } else if self.health == 2 {
             hio.m10
         } else {
             hio.m18
@@ -897,9 +898,9 @@ impl Bgn3 {
             self.cool_body[1] = WALL_COOLDOWN;
             events.list.push(SimEvent::Se(SE_HIT_WALL));
             self.ring = i32::from(hio.m3c);
-            let cap = if actor.health == 3 {
+            let cap = if self.health == 3 {
                 hio.m0e
-            } else if actor.health == 2 {
+            } else if self.health == 2 {
                 hio.m16
             } else {
                 hio.m1e
@@ -907,9 +908,9 @@ impl Bgn3 {
             self.wall_count += 1;
             if self.wall_count >= cap {
                 self.wall_count = 0;
-                self.turn_timer = if actor.health == 3 {
+                self.turn_timer = if self.health == 3 {
                     hio.m20
-                } else if actor.health == 2 {
+                } else if self.health == 2 {
                     hio.m22
                 } else {
                     hio.m24
@@ -921,9 +922,9 @@ impl Bgn3 {
             moved = true;
         }
         if moved {
-            self.turn = if actor.health == 3 {
+            self.turn = if self.health == 3 {
                 hio.m0c
-            } else if actor.health == 2 {
+            } else if self.health == 2 {
                 hio.m14
             } else {
                 hio.m1c
@@ -984,7 +985,7 @@ impl Bgn3 {
                 if self.check_ground(actor) {
                     actor.speed.y = BOUNCE_Y;
                     self.inner = 2;
-                    actor.angle[1] = self.rnd_f(0x10000) as i16;
+                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
                     self.lag = 1.0;
                 }
             }
@@ -1029,11 +1030,11 @@ impl Bgn3 {
                 }
                 if self.check_ground(actor) {
                     self.inner += 1;
-                    actor.angle[1] = self.rnd_f(0x10000) as i16;
+                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
                     self.lag = 1.0;
                     actor.speed.y = FALL_Y;
                     actor.speed_f = 0.0;
-                    actor.angle[1] = self.rnd_f(0x10000) as i16;
+                    actor.angle[1] = (self.rnd_f(0x10000) as i32) as i16;
                     events.list.push(SimEvent::Se(SE_HIT_1));
                 }
                 if self.inner == 4 && actor.speed.y <= -30.0 {
@@ -1168,10 +1169,10 @@ impl Bgn3 {
             self.flash_run = 1;
             self.at = AT_DAMAGE;
             self.inner = 0;
-            if actor.health != 0 {
-                actor.health -= 1;
+            if self.health != 0 {
+                self.health -= 1;
                 events.list.push(SimEvent::Se(SE_ARROW_HIT));
-                if actor.health == 0 {
+                if self.health == 0 {
                     events.list.push(SimEvent::Se(SE_HIT_LAST));
                     events.list.push(SimEvent::Se(SE_BRK_ORB));
                     self.at = AT_END;
@@ -1193,7 +1194,7 @@ impl Bgn3 {
         }
     }
 
-    pub fn move(
+    pub fn move_state(
         &mut self,
         actor: &mut Actor,
         hio: &Bgn3Hio,
@@ -1267,7 +1268,7 @@ impl Bgn3 {
             let mut ke = self.hairs[i];
             ke.pos[0] = root;
             ke.head = point(&m, Vec3::new(0.0, hio.m40, 0.0)) - self.body_sph.centre;
-            self.ke_move(&mut ke, 2.0 * hio.m44, hio);
+            Self::ke_move(&mut ke, 2.0 * hio.m44, hio);
             self.hairs[i] = ke;
         }
         if self.flash_timer != 0 {
@@ -1294,7 +1295,7 @@ impl Bgn3 {
                 * Mat4::from_scale(Vec3::splat(part.scale));
             let centre = point(&m, Vec3::ZERO);
             if i == PART_CORE {
-                self.parts[i].weak = match actor.health {
+                self.parts[i].weak = match self.health {
                     3 => WEAK_A,
                     2 => WEAK_B,
                     1 => WEAK_C,
@@ -1320,7 +1321,7 @@ impl Bgn3 {
                     let mut ke = part.hair[slot];
                     ke.pos[0] = point(&km, Vec3::ZERO);
                     ke.head = point(&km, Vec3::new(0.0, hio.m40, 0.0)) - centre;
-                    self.ke_move(&mut ke, part.scale * hio.m44, hio);
+                    Self::ke_move(&mut ke, part.scale * hio.m44, hio);
                     self.parts[i].hair[slot] = ke;
                 }
             }
@@ -1371,7 +1372,7 @@ impl Bgn3 {
         }
         let hio = stat.hio;
         if hio.m06 != 0 {
-            actor.health = i16::from(hio.m06);
+            self.health = i16::from(hio.m06);
         }
         if !sib.bgn_found || sib.bgn_phase != 2 {
             self.at = AT_HIDDEN;
@@ -1409,7 +1410,7 @@ impl Bgn3 {
         } else {
             None
         };
-        self.move(
+        self.move_state(
             actor, &hio, stat, sib, esa, player, solid, wet, hits, events,
         );
         if self.ring != 0 {
