@@ -771,7 +771,7 @@ pub fn control(
     let mut writes: Vec<(Entity, Link)> = Vec::new();
     let mut dropped: Vec<Entity> = Vec::new();
 
-    for (_, actor, board) in &mut boards {
+    for (_, mut actor, mut board) in &mut boards {
         if board.entered {
             continue;
         }
@@ -782,7 +782,7 @@ pub fn control(
         *board = fresh;
     }
 
-    for (entity, actor, board) in &mut boards {
+    for (entity, mut actor, board) in &mut boards {
         if board.doomed || !board.whole {
             continue;
         }
@@ -824,7 +824,7 @@ pub fn control(
             set_id: actor.set_id,
             room: actor.room,
         };
-        let next = board.execute_part(actor, &env, &mut sink, &live.1);
+        let next = board.execute_part(&mut actor, &env, &mut sink, &live.1);
         writes.push((parent, next));
         if board.doomed {
             dropped.push(entity);

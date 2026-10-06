@@ -311,8 +311,22 @@ impl OrderFlags {
     }
 
     pub fn has(&self, bits: u16) -> bool {
-        self.bits & bits != 0
+        self.bits & bits == bits
     }
+
+    pub fn clear(&mut self) {
+        self.bits = 0;
+    }
+}
+
+/// `fopAc_Execute` calls `actor->eventInfo.beforeProc()` on every actor before it
+/// runs (`f_op_actor.cpp:176`), which is `mCondition = dEvtCnd_NONE_e`
+/// (`f_op_actor.h:172`). `chkCondition` is `(mCondition & c) == c`
+/// (`f_op_actor.h:170`), so a condition raised by one actor frame is visible only
+/// to that frame. One shared word stands in for every actor's own word, so it has
+/// to be cleared once per tick before any actor executes.
+pub fn clear_order_flags(mut flags: ResMut<OrderFlags>) {
+    flags.clear();
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]

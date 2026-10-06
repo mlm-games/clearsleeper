@@ -914,7 +914,6 @@ impl Apzl {
                             archive,
                             env.clear_count,
                             self.msg_no,
-                            None,
                             Vec3::ZERO,
                         );
                     }
@@ -1212,7 +1211,7 @@ pub fn control(
     let mut stops: Vec<Entity> = Vec::new();
     let mut spawns: Vec<Rupee> = Vec::new();
 
-    for (_, actor, board) in &mut boards {
+    for (_, actor, mut board) in &mut boards {
         if board.entered {
             continue;
         }

@@ -546,7 +546,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let v = npc_hi1::NpcHi1::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if npc_fa1::is_npc_fa1(&source.name) {
-        let v = npc_fa1::NpcFa1::spawn();
+        let v = npc_fa1::NpcFa1::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if toripost::is_toripost(&source.name) {
         let v = toripost::Toripost::spawn(source.parameters);
@@ -1209,7 +1209,6 @@ pub fn build(
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(door::StayRoom::default());
-    sim.world.insert_resource(npc_nz::Statics::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
@@ -1262,7 +1261,6 @@ pub fn build(
         next_id: 1,
         ..Default::default()
     });
-    sim.world.insert_resource(npc_nz::Statics::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
@@ -1306,6 +1304,7 @@ pub fn build(
         (
             (
                 (
+                    flags::clear_order_flags.in_set(WwSimSet::Execute),
                     registry::control.in_set(WwSimSet::Execute),
                     isle_timer::control.in_set(WwSimSet::Execute),
                     daynight::control.in_set(WwSimSet::Execute),
