@@ -24,6 +24,7 @@ pub mod barricade;
 pub mod bgn3;
 pub mod bitem;
 pub mod bita;
+pub mod bmdhand;
 pub mod dr2;
 pub mod hole;
 pub mod bird;
@@ -548,6 +549,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if dr2::is_dr2(&source.name) {
         let a = dr2::Dr2::spawn(source.parameters);
         world.spawn((actor, a)).id()
+    } else if bmdhand::is_bmdhand(&source.name) {
+        let t = bmdhand::Bmdhand::spawn(source.parameters);
+        world.spawn((actor, t)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1448,6 +1452,8 @@ pub fn build(
     sim.world.insert_resource(himo3::Himo3WindTouch::default());
     sim.world.insert_resource(ks::Statics::default());
     sim.world.insert_resource(dr2::Dr2Hio::default());
+    sim.world.insert_resource(bmdhand::BmdhandHio::default());
+    sim.world.insert_resource(bmdhand::BmdhandStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1514,6 +1520,8 @@ pub fn build(
     sim.world.insert_resource(himo3::Himo3WindTouch::default());
     sim.world.insert_resource(ks::Statics::default());
     sim.world.insert_resource(dr2::Dr2Hio::default());
+    sim.world.insert_resource(bmdhand::BmdhandHio::default());
+    sim.world.insert_resource(bmdhand::BmdhandStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1717,6 +1725,7 @@ pub fn build(
                 (ivan::control.in_set(WwSimSet::Execute),
                 morth::control.in_set(WwSimSet::Execute),
                 kalle_demos::control.in_set(WwSimSet::Execute),
+                bmdhand::control.in_set(WwSimSet::Execute),
                 agbsw0::control.in_set(WwSimSet::Execute),
                 npc_tc::control.in_set(WwSimSet::Execute),
                 movebox::control.in_set(WwSimSet::Execute),

@@ -5,6 +5,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::area::StageName;
 use super::arrow;
+use super::bmdhand;
 use super::boomerang;
 use super::bombflower;
 use super::collision::Collision;
@@ -287,7 +288,7 @@ const ITEM_HEART_CONTAINER: u8 = 0x08;
 const ITEM_FOREST_WATER: u8 = 0x59;
 const BOTTLE_SLOT_0: usize = 14;
 const BOTTLE_SLOTS: usize = 4;
-const HAND_ACTOR: &str = "Bmdhand";
+const HAND_ACTOR: &str = bmdhand::BMD_HAND_ACTOR;
 const FOOT_ACTOR: &str = "Bmdfoot";
 const NO_SET_ID: u16 = 0xFFFF;
 
@@ -2743,6 +2744,8 @@ pub fn control(
             };
             if spawn.pickup {
                 commands.spawn((fresh, pickup::Pickup::spawn(spawn.parameters)));
+            } else if bmdhand::is_bmdhand(&spawn.name) {
+                commands.spawn((fresh, bmdhand::Bmdhand::spawn(spawn.parameters)));
             } else {
                 commands.spawn(fresh);
             }
