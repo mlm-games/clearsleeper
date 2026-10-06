@@ -132,6 +132,8 @@ pub mod item;
 pub mod ivan;
 pub mod isle_timer;
 pub mod jbaba;
+pub mod jnt_hit;
+pub const FLOORMASTER_ARCHIVE: &str = "fm";
 pub mod jump;
 pub mod kanban;
 pub mod npc_ah;
@@ -310,6 +312,7 @@ pub mod vdora;
 pub mod usovmc;
 pub mod vrbox;
 pub mod vrbox2;
+pub mod vmc;
 pub mod volcano;
 pub mod vgnfd;
 pub mod vmsms;
@@ -506,7 +509,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, grandma)).id()
     } else if floormaster::is_floormaster(&source.name) {
         let robot = floormaster::Floormaster::spawn(source.parameters);
-        world.spawn((actor, robot)).id()
+        match crate::assets::load_actor_joints(FLOORMASTER_ARCHIVE) {
+            Some(bind_pose) => {
+                let colliders = jnt_hit::JntHit::new(&jnt_hit::floormaster_colliders(), &bind_pose);
+                world.spawn((actor, robot, colliders)).id()
+            }
+            None => world.spawn((actor, robot)).id(),
+        }
     } else if gohdan::is_gohdan(&source.name) {
         let boss = gohdan::Gohdan::spawn(source.parameters);
         world.spawn((actor, boss)).id()
@@ -688,6 +697,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if coming3::is_coming3(&source.name) {
         world.spawn((actor, coming3::Coming3::spawn())).id()
+    } else if vmc::is_vmc(&source.name) {
+        let v = vmc::Vmc::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if hsh::is_hsh(&source.name) {
         let arg = i8::from(source.name != "Hsh");
         world.spawn((actor, hsh::Hsh::spawn(source.parameters, arg))).id()
@@ -1536,6 +1548,7 @@ pub fn build(
                 himo3::control.in_set(WwSimSet::Execute),
                 demo00::control.in_set(WwSimSet::Execute),
                 hsh::control.in_set(WwSimSet::Execute),
+                vmc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (death::freeze.in_set(WwSimSet::Execute),
