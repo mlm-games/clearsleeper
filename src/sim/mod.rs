@@ -779,6 +779,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, tagetc::Tagetc::spawn(source.parameters))).id()
     } else if warpgn::is_warpgn(&source.name) {
         world.spawn((actor, warpgn::Warpgn::spawn(source.parameters))).id()
+    } else if dekuitem::is_dekuitem(&source.name) {
+        let v = dekuitem::DekuItem::spawn(source.parameters, world.resource::<flags::EventFlags>());
+        world.spawn((actor, v)).id()
+    } else if ospbox::is_ospbox(&source.name) {
+        world.spawn((actor, ospbox::Ospbox::spawn(source.parameters))).id()
     } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
     } else if drift::is_drift(&source.name) {
@@ -2061,6 +2066,11 @@ pub fn build(
                 stair::control.in_set(WwSimSet::Execute),
                 sail::control.in_set(WwSimSet::Execute),
                 ferris::control.in_set(WwSimSet::Execute),
+            )
+                .chain(),
+            (
+                dekuitem::control.in_set(WwSimSet::Execute),
+                ospbox::control.in_set(WwSimSet::Execute),
                 bwd::control.in_set(WwSimSet::Execute),
                 sbox::control.in_set(WwSimSet::Execute),
                 tagetc::control.in_set(WwSimSet::Execute),
@@ -2110,4 +2120,3 @@ pub mod warpdm20;
 pub mod ferris;
 pub mod sail;
 pub mod kui;
-pub mod tag_hint;
