@@ -1668,4 +1668,3 @@ pub fn build(
 }
 
 pub mod auction;
-pub mod toripost;

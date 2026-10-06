@@ -5,7 +5,7 @@ use glam::{Quat, Vec3};
 use super::actor::Actor;
 use super::area::StageName;
 use super::collision::Collision;
-use super::event::{ActiveEvent, EventList, PresentItem};
+use super::event::{ActiveEvent, EventList, ItemPartner, PresentItem};
 use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Collect, EventFlags, MemBits, StoryBits};
@@ -704,9 +704,7 @@ impl Toripost {
     }
 
     pub fn check_talk(&self, pos: Vec3, player: Option<Vec3>, statics: &Statics) -> bool {
-        let Some(target) = player else {
-            return false;
-        };
+        let target = player.unwrap_or(pos);
         let dx = target.x - pos.x;
         let dz = target.z - pos.z;
         (dx * dx + dz * dz).sqrt() < statics.talk_distance
@@ -1307,7 +1305,6 @@ impl Toripost {
         self.attention_speak = ATTENTION_SPEAK;
 
         self.set_anm(ANMPRM_POST_GET0, false, ctx);
-        self.shape_angle = actor.angle;
         self.set_base_scale(Vec3::ONE);
         self.set_mtx(actor.pos);
         self.morf_play();
@@ -1499,6 +1496,7 @@ pub struct Ctx<'a, 'w, 's> {
     pub list: &'a EventList,
     pub active: &'a mut ActiveEvent,
     pub manager: &'a mut EventManager,
+    pub item_partner: &'a mut ItemPartner,
     pub collision: Option<&'a Collision>,
     pub particles: &'a mut Vec<Particle>,
     pub hit_se: &'a mut Vec<(Vec3, i8, u8)>,
@@ -1713,17 +1711,25 @@ impl Ctx<'_, '_, '_> {
     }
 
     fn create_item_for_present_demo(&mut self, pos: Vec3, item: u8) {
-        self.commands.spawn((
-            Actor {
-                name: PRESENT_ITEM_ACTOR.to_owned(),
-                parameters: 0,
-                pos,
-                angle: [0; 3],
-                set_id: PRESENT_ITEM_SET_ID,
-                room: PRESENT_ITEM_ROOM,
-            },
-            PresentItem { item, hidden: false },
-        ));
+        if item == ITEM_NONE {
+            return;
+        }
+        let entity = self
+            .commands
+            .spawn((
+                Actor {
+                    name: PRESENT_ITEM_ACTOR.to_owned(),
+                    parameters: 0,
+                    pos,
+                    angle: [0; 3],
+                    set_id: PRESENT_ITEM_SET_ID,
+                    room: PRESENT_ITEM_ROOM,
+                },
+                PresentItem { item, hidden: false },
+            ))
+            .id();
+        self.item_partner.entity = Some(entity);
+        self.item_partner.item = item;
     }
 }
 
@@ -1750,6 +1756,7 @@ pub struct World<'w> {
     events: ResMut<'w, SimEvents>,
     active: ResMut<'w, ActiveEvent>,
     manager: ResMut<'w, EventManager>,
+    item_partner: ResMut<'w, ItemPartner>,
     procs: ResMut<'w, MsgProcs>,
     info: ResMut<'w, MsgGameInfo>,
     one: ResMut<'w, Msg1Box>,
@@ -1802,6 +1809,7 @@ pub fn control(
             list: &watch.list,
             active: &mut world.active,
             manager: &mut world.manager,
+            item_partner: &mut world.item_partner,
             collision: watch.collision.as_deref(),
             particles: &mut particles,
             hit_se: &mut hit_se,

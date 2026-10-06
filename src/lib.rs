@@ -925,6 +925,13 @@ impl App {
                 let (min, max) = v.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::toripost::Toripost>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
                 if !robot.drawn() {
                     continue;
