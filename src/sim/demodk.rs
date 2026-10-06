@@ -36,7 +36,7 @@ impl DemoDk {
     }
 }
 
-pub fn is_demo_dk(name: &str) -> bool {
+pub fn is_demodk(name: &str) -> bool {
     DEMODK_ACTORS.contains(&name)
 }
 

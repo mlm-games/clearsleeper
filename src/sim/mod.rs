@@ -56,6 +56,7 @@ pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
 pub mod gaship;
+pub mod gbed;
 pub mod gaship2;
 pub mod ghostship;
 pub mod gntakie;
@@ -69,6 +70,7 @@ pub mod gnbtaki;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
+pub mod hami4;
 pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
@@ -81,6 +83,7 @@ pub mod hop;
 pub mod iball;
 pub mod ice;
 pub mod intent;
+pub mod ikari;
 pub mod inventory;
 pub mod item;
 pub mod ivan;
@@ -116,6 +119,7 @@ pub mod marlon;
 pub mod mbdoor;
 pub mod mflft;
 pub mod mjdoor;
+pub mod mmusic;
 pub mod morth;
 pub mod molgera;
 pub mod movebox;
@@ -123,6 +127,8 @@ pub mod msdan2;
 pub mod msg;
 pub mod nh;
 pub mod obj_akabe;
+pub mod otble;
+pub mod omensmk;
 pub mod objtime;
 pub mod npc_ds1;
 pub mod npc_ac1;
@@ -141,6 +147,7 @@ pub mod pickup;
 pub mod pirateship;
 pub mod puppet_ganon;
 pub mod player;
+pub mod pscnchg;
 pub mod player_status;
 pub mod rforce;
 pub mod roten;
@@ -190,14 +197,18 @@ pub mod trapdoor;
 pub mod table;
 pub mod talk;
 pub mod tama;
+pub mod tenmado;
 pub mod tbox;
 pub mod tingle;
+pub mod tide;
 pub mod turu;
 pub mod torch;
 pub mod tpota;
 pub mod transition;
 pub mod tsubo;
+pub mod vdora;
 pub mod usovmc;
+pub mod vrbox;
 pub mod volcano;
 pub mod vgnfd;
 pub mod vmsms;
@@ -207,6 +218,7 @@ pub mod walk;
 pub mod wall;
 pub mod wlvtag;
 pub mod wind;
+pub mod ygush;
 pub mod xtower;
 pub mod xfuta;
 pub mod windmill;
@@ -847,6 +859,38 @@ world.spawn((actor, npc_gp1::NpcGp1::spawn())).id()
 world.spawn((actor, npc_pf1::NpcPf1::spawn())).id()
     } else if npc_co1::is_npc_co1(&source.name) {
 world.spawn((actor, npc_co1::NpcCo1::spawn())).id()
+    } else if ikari::is_ikari(&source.name) {
+world.spawn((actor, ikari::Ikari::spawn(source.parameters))).id()
+    } else if gbed::is_gbed(&source.name) {
+world.spawn((actor, gbed::Gbed::spawn())).id()
+    } else if hami4::is_hami4(&source.name) {
+let v = hami4::Hami4::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+    } else if vrbox::is_vrbox(&source.name) {
+world.spawn((actor, vrbox::Vrbox::spawn())).id()
+    } else if tide::is_tide(&source.name) {
+let level = *world.resource::<wlvtag::WaterLevel>();
+        let mut flags = world.resource_mut::<flags::EventFlags>();
+        let home = actor.pos;
+        let v = tide::Tide::spawn(source.parameters, home, &level, &mut flags);
+        world.spawn((actor, v)).id()
+    } else if pscnchg::is_pscnchg(&source.name) {
+world.spawn((actor, pscnchg::PScnChg::spawn())).id()
+    } else if vdora::is_vdora(&source.name) {
+world.spawn((actor, vdora::Vdora::spawn())).id()
+    } else if otble::is_otble(&source.name) {
+world.spawn((actor, otble::Otble::spawn(source.parameters))).id()
+    } else if tenmado::is_tenmado(&source.name) {
+let mut sw = world.resource_mut::<flags::Switches>();
+        let v = tenmado::Tenmado::spawn(source.parameters, &mut sw);
+        world.spawn((actor, v)).id()
+    } else if omensmk::is_omensmk(&source.name) {
+world.spawn((actor, omensmk::Omensmk::spawn())).id()
+    } else if mmusic::is_mmusic(&source.name) {
+let v = mmusic::Mmusic::spawn(world.resource::<inventory::Equipped>(), world.resource::<flags::Collect>(), world.resource::<flags::EventFlags>());
+        world.spawn((actor, v)).id()
+    } else if ygush::is_ygush(&source.name) {
+world.spawn((actor, ygush::Ygush::spawn(source.parameters))).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1003,6 +1047,18 @@ pub fn build(
             (
                 (
                     daynight::control.in_set(WwSimSet::Execute),
+                    ikari::control.in_set(WwSimSet::Execute),
+                    gbed::control.in_set(WwSimSet::Execute),
+                    hami4::control.in_set(WwSimSet::Execute),
+                    vrbox::control.in_set(WwSimSet::Execute),
+                    tide::control.in_set(WwSimSet::Execute),
+                    pscnchg::control.in_set(WwSimSet::Execute),
+                    vdora::control.in_set(WwSimSet::Execute),
+                    otble::control.in_set(WwSimSet::Execute),
+                    tenmado::control.in_set(WwSimSet::Execute),
+                    omensmk::control.in_set(WwSimSet::Execute),
+                    mmusic::control.in_set(WwSimSet::Execute),
+                    ygush::control.in_set(WwSimSet::Execute),
                     player_status::control.in_set(WwSimSet::Execute),
                     bombflower::clear_blasts.in_set(WwSimSet::Execute),
                     ajav::control.in_set(WwSimSet::Execute),

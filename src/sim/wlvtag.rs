@@ -20,6 +20,9 @@ const SCH_SHIFT: u32 = 0; // <- d_a_tag_waterlevel.h:18
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
 pub struct WaterLevel {
     pub now: f32,
+    /// `daTagWaterlevel::Act_c::M_state` (`d_a_tag_waterlevel.cpp:70-85`), read by
+    /// `daObj_tide::mode_norm` (`d_a_obj_tide.cpp:425-426`).
+    pub state: u8,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]

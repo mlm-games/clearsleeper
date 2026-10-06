@@ -293,8 +293,6 @@ const REACH_ARROW: f32 = 35.0;
 const REACH_HAMMER: f32 = 50.0;
 const REACH_HOOKSHOT: f32 = 5.0;
 const REACH_BOOMERANG: f32 = 90.0;
-const BODY_RADIUS: f32 = HIO_0C8;
-const BODY_RADIUS_BUSY: f32 = HIO_0C8 * 1.5;
 const HOLE_GATE: f32 = 0.015;
 const ATTENTION_LIFT: f32 = 20.0;
 const LINE_LIFT: f32 = 100.0;
@@ -351,18 +349,107 @@ const PARRY_JUMP: u8 = 1;
 const PARRY_VERTICAL: u8 = 3;
 const PARRY_REACH: f32 = 700.0;
 
+const AT_TYPE_ALL: u32 = u32::MAX;
+const AT_TYPE_UNK8: u32 = 1 << 3;
+const AT_TYPE_UNK800: u32 = 1 << 11;
+const AT_TYPE_WATER: u32 = 1 << 8;
+const AT_TYPE_UNK20000: u32 = 1 << 17;
+const AT_TYPE_WIND: u32 = 1 << 21;
+const AT_TYPE_UNK400000: u32 = 1 << 22;
+const AT_TYPE_LIGHT: u32 = 1 << 23;
+
+const SPH_SRC_RADIUS: f32 = 60.0;
+const CYL_SRC_RADIUS: f32 = 60.0;
+const CYL_HEIGHT: f32 = 150.0;
+const SPH_TG_TYPE: u32 = AT_TYPE_ALL
+    & !AT_TYPE_UNK8
+    & !AT_TYPE_WATER
+    & !AT_TYPE_UNK20000
+    & !AT_TYPE_UNK400000;
+const CYL_TG_TYPE: u32 = AT_TYPE_ALL
+    & !AT_TYPE_WATER
+    & !AT_TYPE_UNK20000
+    & !AT_TYPE_WIND
+    & !AT_TYPE_UNK400000
+    & !AT_TYPE_LIGHT;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BodySph {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub registered: bool,
+    pub at_type: u32,
+    pub tg_type: u32,
+    pub tg_set: bool,
+    pub tg_vs_other: bool,
+    pub tg_hit: bool,
+    pub co_set: bool,
+    pub co_vs_enemy: bool,
+    pub co_no_crr: bool,
+}
+
+impl BodySph {
+    const SRC: BodySph = BodySph {
+        centre: Vec3::ZERO,
+        radius: SPH_SRC_RADIUS,
+        registered: false,
+        at_type: 0,
+        tg_type: SPH_TG_TYPE,
+        tg_set: true,
+        tg_vs_other: true,
+        tg_hit: false,
+        co_set: true,
+        co_vs_enemy: true,
+        co_no_crr: true,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HoleCyl {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub height: f32,
+    pub registered: bool,
+    pub at_type: u32,
+    pub tg_type: u32,
+    pub tg_set: bool,
+    pub co_set: bool,
+    pub co_vs_enemy: bool,
+    pub co_no_crr: bool,
+}
+
+impl HoleCyl {
+    const SRC: HoleCyl = HoleCyl {
+        centre: Vec3::ZERO,
+        radius: CYL_SRC_RADIUS,
+        height: 0.0,
+        registered: false,
+        at_type: AT_TYPE_UNK800,
+        tg_type: CYL_TG_TYPE,
+        tg_set: false,
+        co_set: true,
+        co_vs_enemy: true,
+        co_no_crr: true,
+    };
+}
+
 const EVENT_APPEAR: &str = "DEFAULT_FM_SW_APEEAR";
 const EVENT_GRAB: &str = "DEFAULT_FM_GRAB";
 const EVENT_GRAB_FOOT: &str = "DEFAULT_FM_GRAB_FOOT";
-const EVENT_GRAB_NPC: &str = "DEFAULT_FM_GRAB_NPC";
+const EVENT_GRAB_NPC: &str = "DEFAULT_FM_NPC_GRAB";
 const EVENT_SUIKOMI: &str = "DEFAULT_FM_SUIKOMI_NPC";
 
-const CUT_FRAME_PULL: f32 = 25.0;
+const CUT_FRAME_PULL_GRAB: f32 = 15.0;
+const CUT_FRAME_PULL_FOOT: f32 = 25.0;
 const CUT_FRAME_HAND: f32 = 10.0;
 const CUT_FRAME_END: f32 = 40.0;
 const CUT_REACH: f32 = 3.0;
 const CUT_TWEEN: f32 = 0.3;
 const CUT_TWEEN_STEP: f32 = 10.0;
+
+const REG12_S2: i16 = 0;
+const REG12_S3: i16 = 0;
+const REG12_F0: f32 = 0.0;
 
 fn frame_max(bck: i32) -> i16 {
     match bck {
@@ -555,14 +642,16 @@ impl Phase {
     }
 
     fn lock_off(self) -> bool {
-        !matches!(
+        matches!(
             self,
-            Self::Appear
+            Self::SwWait
+                | Self::Hide
+                | Self::UnderFoot
+                | Self::PathMove
+                | Self::GoalKeeper
                 | Self::Disappear
-                | Self::Wait
-                | Self::Attack
-                | Self::Throw
-                | Self::Grab
+                | Self::PrepareItem
+                | Self::Death
                 | Self::GrabDemo
                 | Self::GrabFootDemo
                 | Self::GrabNpcDemo
@@ -786,7 +875,8 @@ pub struct Floormaster {
     pub target: Option<Entity>,
     pub target_flag: u8,
     pub target_sub: u8,
-    pub spawn_item: u8,
+    pub spawn_item: Option<Entity>,
+    pub player_busy: bool,
     pub retreat_timer: i32,
     pub mode_timer: i32,
     pub far_timer: i32,
@@ -808,8 +898,11 @@ pub struct Floormaster {
     pub parry_end: f32,
     pub parry_now: f32,
     pub parry_kind: u8,
+    pub body_sph: BodySph,
+    pub hole_cyl: HoleCyl,
     pub entered: bool,
     pub doomed: bool,
+    pub killed: bool,
     pub wall_hit: bool,
     pub seed: [i32; 3],
 }
@@ -873,7 +966,8 @@ impl Floormaster {
             target: None,
             target_flag: NO_TARGET,
             target_sub: 0,
-            spawn_item: 0,
+            spawn_item: None,
+            player_busy: false,
             retreat_timer: 0,
             mode_timer: 0,
             far_timer: 0,
@@ -895,8 +989,11 @@ impl Floormaster {
             parry_end: HIO_SP_VJUMP_END,
             parry_now: 0.0,
             parry_kind: PARRY_NONE,
+            body_sph: BodySph::SRC,
+            hole_cyl: HoleCyl::SRC,
             entered: false,
             doomed: false,
+            killed: false,
             wall_hit: false,
             seed: [RND_SEED; 3],
         }
@@ -910,8 +1007,19 @@ impl Floormaster {
         self.hole_scale > HOLE_GATE || self.is_body_appear()
     }
 
-    pub fn hull(&self) -> (f32, f32) {
-        (self.parry_height, self.parry_radius)
+    pub fn hull(&self) -> ([f32; 3], [f32; 3]) {
+        (
+            [
+                self.body_sph.centre.x - self.body_sph.radius,
+                self.body_sph.centre.y - self.body_sph.radius,
+                self.body_sph.centre.z - self.body_sph.radius,
+            ],
+            [
+                self.body_sph.centre.x + self.body_sph.radius,
+                self.body_sph.centre.y + self.body_sph.radius,
+                self.body_sph.centre.z + self.body_sph.radius,
+            ],
+        )
     }
 
     pub fn read_args(&mut self, actor: &mut Actor) {
@@ -1001,7 +1109,11 @@ impl Floormaster {
         if !timer(&mut self.arm_timer) {
             return;
         }
-        self.arm_phase = self.arm_phase.wrapping_add(ARM_RATE).wrapping_add(ARM_BASE);
+        self.arm_phase = self
+            .arm_phase
+            .wrapping_add(ARM_RATE)
+            .wrapping_add(ARM_BASE)
+            .wrapping_add(REG12_S2);
         stream::add_calc_angle_s2(&mut self.arm_sway, 0, ARM_DIV, ARM_CAP);
     }
 
@@ -1033,7 +1145,7 @@ impl Floormaster {
             Phase::Appear => self.mode_appear_init(actor),
             Phase::Disappear => self.mode_disappear_init(),
             Phase::Wait => self.mode_wait_init(actor),
-            Phase::Attack => self.mode_attack_init(),
+            Phase::Attack => self.mode_attack_init(actor, player),
             Phase::Throw => self.mode_throw_init(),
             Phase::Damage => self.mode_damage_init(),
             Phase::PrepareItem => self.mode_prepare_item_init(),
@@ -1101,9 +1213,13 @@ impl Floormaster {
         self.move_dest = actor.pos;
     }
 
-    fn mode_attack_init(&mut self) {
-        self.set_anm(4, false);
-        self.mode_timer = i32::from(HIO_094);
+    fn mode_attack_init(&mut self, actor: &mut Actor, player: &Player) {
+        if self.player_busy {
+            self.mode_proc_init(Phase::Wait, actor, player);
+        } else {
+            self.set_anm(4, false);
+            self.mode_timer = i32::from(HIO_094);
+        }
     }
 
     fn mode_throw_init(&mut self) {
@@ -1483,11 +1599,10 @@ impl Floormaster {
     }
 
     fn ice_proc(&mut self, actor: &Actor) {
+        self.set_attention(actor);
         if self.light != 0 || self.health <= 0 {
             self.set_hole_scale(HIO_120, HOLE_SCALE, HIO_128);
         }
-        self.attention = actor.pos + turned(actor.angle[1], HIO_HAND_OFFSET);
-        self.attention.y += ATTENTION_LIFT;
         self.cancel_grab();
     }
 
@@ -1507,6 +1622,41 @@ impl Floormaster {
         }
         self.attention = self.hand;
         self.attention.y += ATTENTION_LIFT;
+    }
+
+    fn set_collision(&mut self, actor: &Actor, busy: bool) {
+        if self.is_body_appear() {
+            self.body_sph.radius = if busy {
+                HIO_0C8 * 1.5
+            } else {
+                HIO_0C8
+            };
+            self.body_sph.centre = self.hand;
+            self.body_sph.registered = true;
+        } else {
+            self.body_sph.registered = false;
+        }
+        if self.is_hole_appear() {
+            self.hole_cyl.radius = self.hole_scale;
+            self.hole_cyl.height = CYL_HEIGHT;
+            self.hole_cyl.centre = actor.pos;
+            self.hole_cyl.registered = true;
+        } else {
+            self.hole_cyl.registered = false;
+        }
+    }
+
+    fn calc_tg_hit(&mut self, ctx: &Ctx<'_, '_>, at: At) {
+        let reach = at.reach();
+        let hit = self.body_sph.tg_set
+            && self.body_sph.registered
+            && touches(
+                self.body_sph.centre,
+                self.body_sph.radius,
+                ctx.player.pos,
+                reach,
+            );
+        self.body_sph.tg_hit = hit;
     }
 
     fn search_target(&mut self, actor: &Actor, ctx: &mut Ctx<'_, '_>) {
@@ -1532,7 +1682,7 @@ impl Floormaster {
                     let near = flat(actor.pos, ctx.player.pos);
                     let reach = flat(other.pos, ctx.player.pos);
                     if near < HIO_0E8
-                        && (reach > 80.0 || ctx.carry_held == Some(other.entity))
+                        && (reach > REG12_F0 + 80.0 || ctx.carry_held == Some(other.entity))
                         && matches!(other.sub, TSUBO_POT | TSUBO_BIG | TSUBO_JUG | TSUBO_STOOL | TSUBO_SKULL | TSUBO_PAIL)
                     {
                         self.target = Some(other.entity);
@@ -1572,15 +1722,7 @@ impl Floormaster {
         if !timer(&mut self.hit_timer) {
             return false;
         }
-        if ctx.blow.at == At::Idle {
-            return false;
-        }
-        let radius = if ctx.busy {
-            BODY_RADIUS_BUSY
-        } else {
-            BODY_RADIUS
-        };
-        if !touches(self.hand, radius, ctx.player.pos, ctx.blow.at.reach()) {
+        if ctx.blow.at == At::Idle || !self.body_sph.tg_hit {
             return false;
         }
         self.hit_timer = i32::from(HIO_09C);
@@ -1705,6 +1847,14 @@ impl Floormaster {
     pub fn begin(&mut self, actor: &mut Actor, player: &Player, switches: &Switches) {
         self.entered = true;
         self.read_args(actor);
+        if self.kill_switch != NO_BYTE && switches.test(self.kill_switch) {
+            self.killed = true;
+            return;
+        }
+        if self.demo_mode && self.switch_no != NO_BYTE && switches.test(self.switch_no) {
+            self.killed = true;
+            return;
+        }
         self.grab_pos = actor.pos;
         self.home_pos = actor.pos;
         self.wander_pos = actor.pos;
@@ -1725,7 +1875,13 @@ impl Floormaster {
         }
     }
 
-    fn execute(&mut self, actor: &mut Actor, mut ctx: Ctx<'_, '_>, commands: &mut Commands) {
+    fn execute(
+        &mut self,
+        actor: &mut Actor,
+        mut ctx: Ctx<'_, '_>,
+        mut commands: &mut Commands,
+    ) {
+        self.player_busy = ctx.busy;
         self.hand = actor.pos + turned(actor.angle[1], HIO_HAND_OFFSET);
         self.tip = self.hand + turned(actor.angle[1], HIO_TIP_OFFSET);
         if self.is_hole_appear() {
@@ -1748,6 +1904,7 @@ impl Floormaster {
             self.morph.play();
             return;
         }
+        self.calc_tg_hit(&ctx, ctx.blow.at);
         let from = actor.pos;
         let in_area = self.area_check(actor, ctx.solid);
         self.in_area = u8::from(in_area);
@@ -1783,7 +1940,7 @@ impl Floormaster {
             Phase::Throw => self.mode_throw(actor, &mut ctx),
             Phase::Damage => self.mode_damage(actor, &mut ctx),
             Phase::PrepareItem => self.mode_prepare_item(actor, &mut ctx, commands),
-            Phase::Death => self.mode_death(actor, &mut ctx, commands),
+            Phase::Death => self.mode_death(actor, &mut commands),
             Phase::Grab => self.mode_grab(actor, &mut ctx),
             Phase::GrabDemo => self.mode_grab_demo(actor, &mut ctx),
             Phase::GrabFootDemo => self.mode_grab_foot_demo(actor, &mut ctx),
@@ -1800,6 +1957,7 @@ impl Floormaster {
         actor.pos = next;
         self.wall_hit = wall;
         self.set_attention(actor);
+        self.set_collision(actor, ctx.busy);
     }
 
     fn mode_sw_wait(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
@@ -2185,7 +2343,7 @@ impl Floormaster {
                     return;
                 }
                 self.set_anm(1, true);
-                self.arm_timer = ARM_TIMER + 3;
+                self.arm_timer = ARM_TIMER + i32::from(REG12_S3);
                 self.arm_sway = ARM_SWAY;
             }
         } else if self.anm_prm == 1 && self.arm_timer == 0 {
@@ -2262,7 +2420,7 @@ impl Floormaster {
 
     fn mode_grab_demo(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
         if ctx.running(EVENT_GRAB) {
-            if self.anm_prm == 6 && self.morph.frame == CUT_FRAME_PULL {
+            if self.anm_prm == 6 && self.morph.frame == CUT_FRAME_PULL_GRAB {
                 ctx.se(SE_CM_FM_PULL_IN);
             }
             if self.grab_demo_link {
@@ -2282,6 +2440,9 @@ impl Floormaster {
                 }
                 self.caught = true;
                 if ctx.event_done(EVENT_SUIKOMI) {
+                    if self.point_restart != i16::from(NO_BYTE) {
+                        self.cancel_grab();
+                    }
                     self.mode_proc_init(Phase::Delete, actor, ctx.player);
                 }
             }
@@ -2295,7 +2456,7 @@ impl Floormaster {
     fn mode_grab_foot_demo(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
         if ctx.running(EVENT_GRAB_FOOT) {
             if self.anm_prm == 10 {
-                if self.morph.frame == CUT_FRAME_PULL {
+                if self.morph.frame == CUT_FRAME_PULL_FOOT {
                     ctx.se(SE_CM_FM_PULL_IN);
                 }
                 if self.morph.frame == CUT_FRAME_HAND {
@@ -2327,7 +2488,7 @@ impl Floormaster {
                 if self.demo_mode {
                     self.mode_proc_init(Phase::GrabDemo, actor, ctx.player);
                 } else {
-                    self.mode_proc_init(Phase::GrabNpcDemo, actor, ctx.player);
+                    self.mode_proc_init(Phase::Grab, actor, ctx.player);
                 }
             }
         } else {
@@ -2354,7 +2515,7 @@ impl Floormaster {
         }
     }
 
-    fn mode_death(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>, commands: &mut Commands) {
+    fn mode_death(&mut self, actor: &mut Actor, commands: &mut Commands) {
         if self.anm_prm == 8 && self.set_hole_scale(HIO_120, HOLE_SCALE, HIO_128) {
             commands.spawn((
                 Actor {
@@ -2377,21 +2538,27 @@ impl Floormaster {
         }
         let step = self.anm_prm;
         if step == 3 && self.morph.is_stop() {
-            commands.spawn((
-                Actor {
-                    name: TSUBO_ACTOR.to_owned(),
-                    parameters: SKULL_PARAM,
-                    pos: self.hand,
-                    angle: actor.angle,
-                    set_id: 0,
-                    room: actor.room,
-                },
-                tsubo::Tsubo::spawn(SKULL_PARAM),
-            ));
-            self.spawn_item = 1;
+            self.spawn_item = Some(
+                commands
+                    .spawn((
+                        Actor {
+                            name: TSUBO_ACTOR.to_owned(),
+                            parameters: SKULL_PARAM,
+                            pos: self.hand,
+                            angle: actor.angle,
+                            set_id: 0,
+                            room: actor.room,
+                        },
+                        tsubo::Tsubo::spawn(SKULL_PARAM),
+                    ))
+                    .id(),
+            );
             return;
         }
         if step == 8 {
+            self.target = self.spawn_item;
+            self.target_flag = TARGET_TSUBO;
+            self.target_sub = TSUBO_SKULL;
             self.carry_kind = CARRY_TSUBO;
             self.set_anm(2, false);
             self.set_grab_pos(ctx);
@@ -2546,6 +2713,12 @@ pub fn control(
         if watch
             .chains
             .iter()
+            .any(|chain| chain.phase == hookshot::Phase::Pull)
+        {
+            found = At::Grapple;
+        } else if watch
+            .chains
+            .iter()
             .any(|chain| chain.phase != hookshot::Phase::Wait)
         {
             found = At::Hookshot;
@@ -2606,6 +2779,10 @@ pub fn control(
         let boss = &mut *boss;
         if !boss.entered {
             boss.begin(actor, &player, &switches);
+        }
+        if boss.killed {
+            spent.push((entity, actor.room, actor.set_id));
+            continue;
         }
         let target_pos = boss
             .target

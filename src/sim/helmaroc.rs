@@ -45,19 +45,13 @@ const HIO_M024: f32 = 100.0;
 const HIO_M028: i16 = 0x2D0;
 
 const REG0_F0: f32 = 0.0;
-const REG0_F1: f32 = 0.0;
 const REG0_F2: f32 = 0.0;
 const REG0_F3: f32 = 0.0;
 const REG0_F4: f32 = 0.0;
 const REG0_F7: f32 = 0.0;
 const REG0_F8: f32 = 0.0;
-const REG0_F9: f32 = 0.0;
-const REG0_F10: f32 = 0.0;
 const REG0_F11: f32 = 0.0;
-const REG0_F12: f32 = 0.0;
 const REG0_F15: f32 = 0.0;
-const REG0_F5: f32 = 0.0;
-const REG0_F6: f32 = 0.0;
 const REG0_F13: f32 = 0.0;
 const REG0_F16: f32 = 0.0;
 const REG0_S0: i16 = 0;
@@ -69,7 +63,10 @@ const REG0_S6: i16 = 0;
 const REG0_S7: i16 = 0;
 const REG0_S8: i16 = 0;
 
+const REG6_F1: f32 = 0.0;
+const REG6_F4: f32 = 0.0;
 const REG6_F2: f32 = 0.0;
+const REG6_F10: f32 = 0.0;
 const REG6_F11: f32 = 0.0;
 const REG6_F12: f32 = 0.0;
 const REG6_F13: f32 = 0.0;
@@ -84,7 +81,12 @@ const REG6_S3: i16 = 0;
 const REG6_S4: i16 = 0;
 const REG6_S7: i16 = 0;
 
+const REG8_F0: f32 = 0.0;
+const REG8_F1: f32 = 0.0;
 const REG8_F2: f32 = 0.0;
+const REG8_F3: f32 = 0.0;
+const REG8_F4: f32 = 0.0;
+const REG8_F5: f32 = 0.0;
 const REG8_F6: f32 = 0.0;
 const REG8_F7: f32 = 0.0;
 const REG8_F8: f32 = 0.0;
@@ -100,10 +102,17 @@ const REG8_S4: i16 = 0;
 const REG8_S5: i16 = 0;
 const REG8_S8: i16 = 0;
 
+const REG12_F2: f32 = 0.0;
+const REG12_F3: f32 = 0.0;
 const REG12_F4: f32 = 0.0;
 const REG12_F5: f32 = 0.0;
 const REG12_F6: f32 = 0.0;
 const REG12_F7: f32 = 0.0;
+const REG12_F8: f32 = 0.0;
+const REG12_F9: f32 = 0.0;
+const REG12_F11: f32 = 0.0;
+const REG12_F12: f32 = 0.0;
+const REG12_F15: f32 = 0.0;
 const REG12_S7: i16 = 0;
 
 const REG13_F0: f32 = 0.0;
@@ -112,7 +121,14 @@ const REG13_F2: f32 = 0.0;
 const REG13_F3: f32 = 0.0;
 const REG13_F4: f32 = 0.0;
 const REG13_F5: f32 = 0.0;
+const REG13_F6: f32 = 0.0;
+const REG13_F7: f32 = 0.0;
+const REG13_F8: f32 = 0.0;
+const REG13_F9: f32 = 0.0;
+const REG13_F10: f32 = 0.0;
 const REG13_F11: f32 = 0.0;
+const REG13_F12: f32 = 0.0;
+const REG13_F13: f32 = 0.0;
 const REG13_F17: f32 = 0.0;
 const REG13_F18: f32 = 0.0;
 const REG13_S1: i16 = 0;
@@ -121,8 +137,16 @@ const REG13_S6: i16 = 0;
 const REG13_S7: i16 = 0;
 const REG13_S8: i16 = 0;
 
+const REG14_F0: f32 = 0.0;
+const REG14_F1: f32 = 0.0;
 const REG14_F2: f32 = 0.0;
+const REG14_F3: f32 = 0.0;
 const REG14_F4: f32 = 0.0;
+const REG14_F5: f32 = 0.0;
+const REG14_F7: f32 = 0.0;
+const REG14_F9: f32 = 0.0;
+const REG14_F10: f32 = 0.0;
+const REG14_S8: i16 = 0;
 const REG14_S9: i16 = 0;
 
 
@@ -254,7 +278,7 @@ const AT_BOMB: u8 = 2;
 const AT_TSUBO: u8 = 3;
 const AT_JUG: u8 = 4;
 const AT_HOOKSHOT: u8 = 5;
-const AT_LANCE: u8 = 7;
+const AT_MO2: u8 = 7;
 const AT_WIND: u8 = 8;
 const AT_HAMMER: u8 = 9;
 const AT_BOOMERANG: u8 = 10;
@@ -269,6 +293,46 @@ const REACH_HOOKSHOT: f32 = 5.0;
 const REACH_BOMB: f32 = 150.0;
 const REACH_TSUBO: f32 = 30.0;
 const PLAYER_BODY_RADIUS: f32 = 20.0;
+
+const AT_TYPE_UNK800: u32 = 0x800;
+const AT_TYPE_WIND: u32 = 0x200000;
+const AT_TYPE_UNK400000: u32 = 0x400000;
+const TG_TYPE_ALL: u32 = !0xE20100;
+const TG_TYPE_NO_WIND: u32 = !0xC20100;
+const AT_SPL_UNK0: u8 = 0;
+const AT_SPL_UNK1: u8 = 1;
+const AT_SPL_UNK9: u8 = 9;
+
+const HULL_HEAD_AT: usize = 0;
+const HULL_HEAD_TG: usize = 1;
+const HULL_BODY: usize = 2;
+const HULL_TOSAKA: usize = 3;
+const HULL_FOOT: usize = 4;
+const HULL_WIND: usize = 6;
+const HULL_KAMEN: usize = 16;
+const HULL_COUNT: usize = 20;
+const HULL_NON_POS: [f32; 3] = [0.0, -10000.0, 10000.0];
+const HULL_PARK: [f32; 3] = [-50000.0, -50000.0, -50000.0];
+const KAMEN_RADIUS: f32 = 70.0;
+const EFFECT_RADIUS: f32 = 100.0;
+const PLAYER_WIND_RADIUS: f32 = 30.0;
+const WIND_PUSH_SPEED: f32 = 27.0;
+const WIND_PUSH_STEP: f32 = 18.0;
+const WIND_DRAG_SCALE: f32 = 0.5;
+const WIND_DRAG_MIN: f32 = 0.5;
+const WIND_RVEC_FLOOR: f32 = 1.0;
+const WIND_AT_POWER: u8 = 10;
+const KAMEN_PUSH_SWORD_Y: f32 = 5.0;
+const KAMEN_PUSH_SWORD_Z: f32 = 5.0;
+const KAMEN_PUSH_OTHER_Y: f32 = 30.0;
+const KAMEN_PUSH_OTHER_Z: f32 = 10.0;
+const KAMEN_PUSH_RND_Y: f32 = 10.0;
+const KAMEN_PUSH_RND_Z: f32 = 5.0;
+const KAMEN_SWAY: f32 = 200.0;
+const KAMEN_BLOW_SPEED: f32 = 7.0;
+const KAMEN_BLOW_SPREAD: f32 = 2000.0;
+const KAMEN_BLOW_SWAY: f32 = 200.0;
+const KAMEN_SWING_STEP: f32 = 200.0;
 
 const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -344,6 +408,7 @@ const SHUTTER_Z: f32 = 4700.0;
 const SHUTTER_YAW: f32 = 7000.0;
 const GROCK_DROP: f32 = -10.0;
 const EFF_FALL: f32 = -130.0;
+const EFF_FALL_CHASE: f32 = -300.0;
 const EFF_RISE_CAP: f32 = 2.0;
 const EFF_RISE: f32 = 10.0;
 const EFF_UP: f32 = 15000.0;
@@ -384,7 +449,6 @@ const TURN_STEP: f32 = 0.05;
 const TURN_STEP_GROUND: f32 = 0.1;
 const SPEED_STEP: f32 = 1.0;
 const RISE_SPEED_UP: f32 = 1.5;
-const RISE_SPEED_DOWN: f32 = -1.5;
 const RISE_FRAMES: f32 = 20.0;
 
 const ACTION_FLY: i16 = 0;
@@ -612,7 +676,7 @@ pub enum At {
     Bomb,
     Tsubo,
     TsuboJug,
-    Lance,
+    Mo2,
     Wind,
     Water,
     Helmaroc,
@@ -628,7 +692,7 @@ impl At {
             Self::Tsubo => AT_TSUBO,
             Self::TsuboJug => AT_JUG,
             Self::Hookshot | Self::FireArrow => AT_HOOKSHOT,
-            Self::Lance => AT_LANCE,
+            Self::Mo2 => AT_MO2,
             Self::Wind => AT_WIND,
             Self::Hammer => AT_HAMMER,
             Self::Boomerang => AT_BOOMERANG,
@@ -646,7 +710,7 @@ impl At {
             Self::Boomerang => damage::BOMERANG,
             Self::Tsubo => damage::TSUBO,
             Self::TsuboJug => damage::WATER_JUG,
-            Self::Lance => {
+            Self::Mo2 => {
                 if damage::ARROW > LANCE_POWER_MAX {
                     LANCE_POWER_MAX
                 } else {
@@ -767,12 +831,55 @@ fn add_calc0(value: &mut f32, scale: f32, max_step: f32) {
     *value -= step;
 }
 
+fn add_calc_xz(value: &mut Vec3, target: Vec3, scale: f32, max_step: f32, min_step: f32) {
+    let mut step = (target.x - value.x) * scale;
+    if step.abs() < min_step {
+        step = 0.0;
+    } else if step > max_step {
+        step = max_step;
+    } else if step < -max_step {
+        step = -max_step;
+    }
+    value.x += step;
+    let mut step = (target.z - value.z) * scale;
+    if step.abs() < min_step {
+        step = 0.0;
+    } else if step > max_step {
+        step = max_step;
+    } else if step < -max_step {
+        step = -max_step;
+    }
+    value.z += step;
+}
+
+fn wind_push(rvec: Vec3, centre: Vec3, player: Vec3) -> Vec3 {
+    let mut target = Vec3::new(rvec.x, 0.0, rvec.z);
+    let mut speed = (target.x * target.x + target.z * target.z).sqrt();
+    if speed < WIND_RVEC_FLOOR {
+        target = (player - centre) * WIND_PUSH_SPEED;
+        speed = (target.x * target.x + target.z * target.z).sqrt();
+    }
+    if speed > WIND_PUSH_SPEED {
+        target *= WIND_PUSH_SPEED / speed;
+    }
+    target
+}
+
 fn turned(yaw: i16, offset: [f32; 3]) -> Vec3 {
     let (sin, cos) = from_s16(yaw).sin_cos();
     Vec3::new(
         offset[0] * cos + offset[2] * sin,
         offset[1],
         offset[2] * cos - offset[0] * sin,
+    )
+}
+
+fn pitched(pitch: i16, offset: [f32; 3]) -> Vec3 {
+    let (sin, cos) = from_s16(pitch).sin_cos();
+    Vec3::new(
+        offset[0],
+        offset[1] * cos - offset[2] * sin,
+        offset[1] * sin + offset[2] * cos,
     )
 }
 
@@ -796,6 +903,51 @@ fn touches(centre: Vec3, radius: f32, at: Vec3, reach: f32) -> bool {
     (at - centre).length_squared() <= (radius + reach) * (radius + reach)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sph {
+    pub centre: Vec3,
+    pub radius: f32,
+    pub at_type: u32,
+    pub at_power: u8,
+    pub at_set: bool,
+    pub at_spl: u8,
+    pub tg_type: u32,
+    pub tg_set: bool,
+    pub tg_shield: bool,
+    pub co_set: bool,
+    pub co_player: bool,
+    pub co_all: bool,
+}
+
+impl Sph {
+    const SRC: Sph = Sph {
+        centre: Vec3::ZERO,
+        radius: 0.0,
+        at_type: 0,
+        at_power: 0,
+        at_set: false,
+        at_spl: AT_SPL_UNK0,
+        tg_type: TG_TYPE_ALL,
+        tg_set: true,
+        tg_shield: true,
+        co_set: false,
+        co_player: false,
+        co_all: false,
+    };
+
+    fn touches(&self, at: Vec3, reach: f32) -> bool {
+        touches(self.centre, self.radius, at, reach)
+    }
+
+    fn hits(&self, at: Vec3, reach: f32) -> bool {
+        self.at_set && self.touches(at, reach)
+    }
+
+    pub fn blocks(&self, at: Vec3) -> bool {
+        self.co_set && self.co_player && self.co_all && self.touches(at, 0.0)
+    }
+}
+
 fn timer(value: &mut i16) -> bool {
     if *value != 0 {
         *value -= 1;
@@ -803,14 +955,9 @@ fn timer(value: &mut i16) -> bool {
     *value == 0
 }
 
-fn timer8(value: &mut u8) -> bool {
-    if *value != 0 {
-        *value -= 1;
-    }
-    *value == 0
-}
 pub struct Env<'a> {
     pub player_pos: Vec3,
+    pub player_yaw: i16,
     pub player_hover: bool,
     pub solid: Option<&'a Collision>,
     pub blow: Blow,
@@ -860,6 +1007,7 @@ impl Env<'_> {
 pub struct Orders {
     pub purge_mobs: bool,
     pub purge_shards: bool,
+    pub purge_eyes: bool,
 }
 
 pub struct Sink<'a> {
@@ -867,10 +1015,8 @@ pub struct Sink<'a> {
     pub switches: &'a mut Switches,
     pub stories: &'a mut StoryBits,
     pub flags: &'a mut EventFlags,
-    pub zones: &'a mut ZoneActors,
     pub health: &'a mut Health,
     pub orders: &'a mut Orders,
-    pub drop: &'a mut Vec<(Entity, i8, u16)>,
 }
 
 impl Sink<'_> {
@@ -892,6 +1038,10 @@ impl Sink<'_> {
 
     fn purge_shards(&mut self) {
         self.orders.purge_shards = true;
+    }
+
+    fn purge_eyes(&mut self) {
+        self.orders.purge_eyes = true;
     }
 }
 
@@ -935,6 +1085,7 @@ pub struct Helmaroc {
     pub cam_look: Vec3,
     pub cam_eye: Vec3,
     pub cam_yaw: i16,
+    pub cam_pitch: i16,
     pub fov: f32,
     pub demo_param: f32,
     pub demo_radius: f32,
@@ -990,6 +1141,7 @@ pub struct Helmaroc {
     pub foot_at: [bool; FOOT_COUNT],
     pub foot_tg: [bool; FOOT_COUNT],
     pub foot_split: [bool; FOOT_COUNT],
+    pub hulls: [Sph; HULL_COUNT],
     pub wind_active: [u8; WIND_COUNT],
     pub wind_pos: [Vec3; WIND_COUNT],
     pub wind_move: [Vec3; WIND_COUNT],
@@ -1067,6 +1219,7 @@ impl Helmaroc {
             cam_look: Vec3::ZERO,
             cam_eye: Vec3::ZERO,
             cam_yaw: 0,
+            cam_pitch: 0,
             fov: 45.0,
             demo_param: 0.0,
             demo_radius: 0.0,
@@ -1122,6 +1275,7 @@ impl Helmaroc {
             foot_at: [false; FOOT_COUNT],
             foot_tg: [true; FOOT_COUNT],
             foot_split: [false; FOOT_COUNT],
+            hulls: [Sph::SRC; HULL_COUNT],
             wind_active: [0; WIND_COUNT],
             wind_pos: [Vec3::ZERO; WIND_COUNT],
             wind_move: [Vec3::ZERO; WIND_COUNT],
@@ -1238,17 +1392,17 @@ impl Helmaroc {
             SPEED_STEP,
             self.speed_step,
         );
-        let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_walk]);
+        let forward = pitched(actor.angle[ANGLE_X], [0.0, 0.0, self.speed_walk]);
+        let out = turned(actor.angle[ANGLE_Y], forward.to_array());
         if self.resume_pending == 0 {
-            self.speed = forward;
+            self.speed = out;
         } else {
-            let out = turned(actor.angle[ANGLE_X], forward.to_array());
             self.speed.x = out.x;
             self.speed.z = out.z;
             if self.morph.frame < RISE_FRAMES {
-                self.speed.y -= REG0_F9 + RISE_SPEED_UP;
+                self.speed.y -= REG14_F9 + RISE_SPEED_UP;
             } else {
-                self.speed.y += REG0_F10 + RISE_SPEED_DOWN;
+                self.speed.y += REG14_F10 + RISE_SPEED_UP;
             }
         }
         actor.pos += self.speed;
@@ -1264,9 +1418,8 @@ impl Helmaroc {
             self.speed_step,
         );
         let forward = turned(actor.angle[ANGLE_Y], [0.0, 0.0, self.speed_walk]);
-        let out = turned(actor.angle[ANGLE_X], forward.to_array());
-        self.speed.x = out.x;
-        self.speed.z = out.z;
+        self.speed.x = forward.x;
+        self.speed.z = forward.z;
         actor.pos += self.speed;
         self.speed.y += self.gravity;
         add_calc_angle_s2(
@@ -1355,11 +1508,11 @@ impl Helmaroc {
                 break;
             }
             1 => {
-                if self.morph.frame == f32::from(REG0_S7 + 0x17) {
+                if self.morph.frame == f32::from(REG12_S7 + 0x17) {
                     self.state = 2;
-                    self.speed_walk = REG0_F8 + 50.0;
+                    self.speed_walk = REG12_F8 + 50.0;
                     self.speed_f = 40.0;
-                    self.speed_step = REG0_F9 + 1.0;
+                    self.speed_step = REG12_F9 + 1.0;
                     actor.angle[ANGLE_X] = -0x3000;
                     arm = 2;
                 } else {
@@ -1395,7 +1548,7 @@ impl Helmaroc {
             _ => {}
         }
         self.speed_f = HIO_M020;
-        self.speed_step = REG0_F9 + 1.0;
+        self.speed_step = REG12_F9 + 1.0;
         self.turn_scale = 600.0;
         match self.state {
             0 => {
@@ -1411,26 +1564,26 @@ impl Helmaroc {
                     self.loop_kind = 0;
                 }
                 if self.loop_kind == 0 {
-                    self.target.x = REG0_F0 + 6500.0;
-                    self.target.y = REG0_F1 + 11000.0;
-                    self.target.z = REG0_F2 + 2600.0;
-                    self.target.x += self.rnd_fx(REG0_F3 + 3000.0);
+                    self.target.x = REG14_F0 + 6500.0;
+                    self.target.y = REG14_F1 + 11000.0;
+                    self.target.z = REG14_F2 + 2600.0;
+                    self.target.x += self.rnd_fx(REG14_F3 + 3000.0);
                     self.target.y = self.target.y + 1000.0;
-                    self.target.z += self.rnd_fx(REG0_F3 + 3000.0);
+                    self.target.z += self.rnd_fx(REG14_F3 + 3000.0);
                 } else if self.loop_kind == 1 {
-                    self.target.x = REG0_F0 + 9800.0;
-                    self.target.y = REG0_F1 + 12000.0;
-                    self.target.z = REG0_F2 - 1500.0;
-                    self.target.x += self.rnd_fx(REG0_F3 + 1000.0);
+                    self.target.x = REG14_F0 + 9800.0;
+                    self.target.y = REG14_F1 + 12000.0;
+                    self.target.z = REG14_F2 - 1500.0;
+                    self.target.x += self.rnd_fx(REG14_F3 + 1000.0);
                     self.target.y += self.rnd_f(1000.0);
-                    self.target.z += self.rnd_fx(REG0_F3 + 1000.0);
+                    self.target.z += self.rnd_fx(REG14_F3 + 1000.0);
                 } else if self.loop_kind == 2 {
-                    self.target.x = REG0_F0 - 1000.0;
-                    self.target.y = REG0_F1 + 12000.0;
-                    self.target.z = REG0_F2 - 2900.0;
-                    self.target.x += self.rnd_fx(REG0_F3 + 1000.0);
+                    self.target.x = REG14_F0 - 1000.0;
+                    self.target.y = REG14_F1 + 12000.0;
+                    self.target.z = REG14_F2 - 2900.0;
+                    self.target.x += self.rnd_fx(REG14_F3 + 1000.0);
                     self.target.y += self.rnd_f(1000.0);
-                    self.target.z += self.rnd_fx(REG0_F3 + 1000.0);
+                    self.target.z += self.rnd_fx(REG14_F3 + 1000.0);
                 }
                 self.turn_step = 0.0;
                 if (self.target - actor.pos).length() > 1000.0 {
@@ -1673,10 +1826,10 @@ impl Helmaroc {
                             self.state = 0;
                         } else {
                             self.sit_count = self.sit_count.wrapping_add(1);
-                            if dist < REG0_F11 + 450.0 {
+                            if dist < REG12_F11 + 450.0 {
                                 self.action = Action::JidaAttack;
                                 self.state = 0;
-                            } else if dist < REG0_F11 + 550.0 {
+                            } else if dist < REG12_F12 + 550.0 {
                                 if self.mask_damage < 2 {
                                     self.action = Action::KutiAttack;
                                 } else if self.rnd_f(1.0) < 0.25 {
@@ -1685,7 +1838,7 @@ impl Helmaroc {
                                     self.action = Action::KutiAttack;
                                 }
                                 self.state = 0;
-                            } else if dist < REG0_F15 + 1300.0 {
+                            } else if dist < REG12_F15 + 1300.0 {
                                 self.state = 2;
                                 self.anm_init(BCK_WALK1, 3.0, EMODE_LOOP, HIO_M01C, 0x19, 0);
                                 self.turn_step = 0.0;
@@ -1704,7 +1857,7 @@ impl Helmaroc {
                 2 => {
                     self.speed_f = HIO_M018;
                     self.speed_step = 1.0;
-                    if dist < REG0_F12 + 530.0 || dist > 1350.0 {
+                    if dist < REG12_F12 + 530.0 || dist > 1350.0 {
                         self.state = 1;
                     }
                     break;
@@ -1753,7 +1906,7 @@ impl Helmaroc {
                     break;
                 }
                 1 => {
-                    if self.morph.frame != f32::from(REG0_S7 + 0x17) {
+                    if self.morph.frame != f32::from(REG12_S7 + 0x17) {
                         break;
                     }
                     self.speed.y = REG8_F9 + 50.0;
@@ -1816,7 +1969,7 @@ impl Helmaroc {
                             0.0,
                             -10.0,
                             if (frame >= 4 && frame <= 0xB) || (frame >= 0x10 && frame <= 0x17) {
-                                REG0_F1 + 10.0
+                                REG6_F1 + 10.0
                             } else {
                                 0.0
                             },
@@ -1838,7 +1991,7 @@ impl Helmaroc {
         let mut rock = false;
         let mut grab = false;
         self.beak_amp = 2500;
-        let mut arm = self.state;
+        let arm = self.state;
         loop {
             match arm {
                 0 => {
@@ -1858,7 +2011,7 @@ impl Helmaroc {
                         let eff = &mut self.effects[EFF_ROCK];
                         eff.kind = 2;
                         eff.count = 0;
-                        let rock_pos = turned(actor.angle[ANGLE_Y], [0.0, 0.0, 500.0]);
+                        let rock_pos = turned(self.shape_angle[ANGLE_Y], [0.0, 0.0, 500.0]);
                         eff.pos = rock_pos + actor.pos;
                         self.eff_hane_set(self.body, 5, 0);
                         rock = true;
@@ -1939,7 +2092,7 @@ impl Helmaroc {
                 if self.wind_active[index] == 0 {
                     self.wind_active[index] = 1;
                     let yaw = actor.angle[ANGLE_Y].wrapping_add(self.rnd_fx(6000.0) as i16);
-                    self.wind_move[index] = turned(yaw, [0.0, 0.0, REG0_F4 + 100.0]);
+                    self.wind_move[index] = turned(yaw, [0.0, 0.0, REG6_F4 + 100.0]);
                     self.wind_pos[index] = at;
                     self.wind_pos[index].y = env.player_pos.y;
                     break;
@@ -2174,12 +2327,17 @@ impl Helmaroc {
         }
         let reach = env.blow.at.reach();
         let mut hit: u8 = HIT_NONE;
-        if self.mask_damage < 4 {
-            if touches(self.head, self.head_radius, env.player_pos, reach) {
-                hit = HIT_HEAD;
-            }
-        } else if touches(self.tosaka, self.tosaka_radius, env.player_pos, reach) {
-            hit = HIT_TOSAKA;
+        let slot = if self.mask_damage < 4 {
+            HULL_HEAD_TG
+        } else {
+            HULL_TOSAKA
+        };
+        if self.hulls[slot].tg_set && self.hulls[slot].touches(env.player_pos, reach) {
+            hit = if self.mask_damage < 4 {
+                HIT_HEAD
+            } else {
+                HIT_TOSAKA
+            };
         }
         if hit == HIT_NONE {
             return;
@@ -2257,7 +2415,7 @@ impl Helmaroc {
         !matches!(env.blow.at, At::Idle)
     }
 
-    fn kamen_demo(&mut self, actor: &Actor, out: &mut Sink<'_>) {
+    fn kamen_demo(&mut self, out: &mut Sink<'_>) {
         self.beak_amp = 0;
         match self.state {
             0 => {
@@ -2272,18 +2430,22 @@ impl Helmaroc {
                 for index in 0..PIECE_COUNT {
                     self.piece_live[index] = 1;
                     self.piece_pos[index] =
-                        turned(actor.angle[ANGLE_Y], JOINT_ATAMA1);
-                    self.piece_rot[index][1] = actor.angle[ANGLE_Y];
+                        turned(self.shape_angle[ANGLE_Y], JOINT_ATAMA1);
+                    self.piece_rot[index][1] = self.shape_angle[ANGLE_Y];
                     self.piece_rot[index][0] = REG0_S6 + 0x3625;
                     self.piece_rot[index][2] = 0;
-                    let scale = 1.0 + REG0_F7;
+                    let scale = 1.0 + REG14_F7;
                     let away = turned(
                         self.piece_rot[index][1],
-                        [
-                            -KAMEN_BREAK_OFF_X[index],
-                            0.01 * REG0_F15 + (55.0 - KAMEN_BREAK_OFF_Y[index]),
-                            0.01 * REG0_F16 + (110.0 - KAMEN_BREAK_OFF_Z[index]),
-                        ],
+                        pitched(
+                            self.piece_rot[index][0],
+                            [
+                                -KAMEN_BREAK_OFF_X[index],
+                                0.01 * REG0_F15 + (55.0 - KAMEN_BREAK_OFF_Y[index]),
+                                0.01 * REG0_F16 + (110.0 - KAMEN_BREAK_OFF_Z[index]),
+                            ],
+                        )
+                        .to_array(),
                     );
                     self.piece_pos[index] += away;
                     self.piece_prev[index] = self.piece_pos[index];
@@ -2300,7 +2462,7 @@ impl Helmaroc {
                 self.state = 2;
             }
             2 => {
-                if self.demo_sub > REG0_S8 + 0x2D {
+                if self.demo_sub > REG14_S8 + 0x2D {
                     self.beak_amp = 500;
                     self.beak_free = 1;
                 }
@@ -2338,15 +2500,15 @@ impl Helmaroc {
                     self.demo_flag = 0;
                     self.state = 2;
                     self.tail_hold = REG0_S6 + 0x19;
-                    actor.pos.y = REG0_F10 + 8500.0;
-                    self.speed.y = REG0_F12 + 80.0;
+                    actor.pos.y = REG13_F10 + 8500.0;
+                    self.speed.y = REG13_F12 + 80.0;
                     self.anm_init(BCK_S_DEMO1, 5.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
                     out.se(SE_CM_DK_ROUND_UP);
                 }
             }
             2 => {
                 actor.pos.y += self.speed.y;
-                self.speed.y -= REG0_F13 + 1.0;
+                self.speed.y -= REG13_F13 + 1.0;
                 actor.angle[ANGLE_Y] = actor.angle[ANGLE_Y].wrapping_add(0x1300);
                 if self.demo_flag != 0 {
                     self.demo_flag = 0;
@@ -2358,7 +2520,7 @@ impl Helmaroc {
             3 => {
                 if self.timers[0] != 0 {
                     actor.pos.y += self.speed.y;
-                    self.speed.y -= REG0_F13 + 1.0;
+                    self.speed.y -= REG13_F13 + 1.0;
                 }
                 if self.timers[0] == REG8_S8 + 5 {
                     out.se(SE_CV_DK_ENTER);
@@ -2531,8 +2693,10 @@ impl Helmaroc {
                         self.at_mode = 2;
                     }
                 }
-                if touches(self.foot[0], self.foot_radius[0], env.player_pos, PLAYER_BODY_RADIUS)
-                    || touches(self.foot[1], self.foot_radius[1], env.player_pos, PLAYER_BODY_RADIUS)
+                if self.hulls[HULL_FOOT].at_set
+                    && self.hulls[HULL_FOOT].touches(env.player_pos, PLAYER_BODY_RADIUS)
+                    || self.hulls[HULL_FOOT + 1].at_set
+                        && self.hulls[HULL_FOOT + 1].touches(env.player_pos, PLAYER_BODY_RADIUS)
                 {
                     out.se(SE_CM_DK_FOOT_ATK_COL);
                 }
@@ -2546,7 +2710,8 @@ impl Helmaroc {
         let pos = self.target - Vec3::new(AREA_X, AREA_Y, AREA_Z);
         let angle = bearing(Vec3::ZERO, pos);
         add_calc_angle_s2(&mut actor.angle[ANGLE_Y], angle, 10, 0x800);
-        let dist = turned(angle, [0.0, dy, dz - 450.0]);
+        let span = pitched(REG8_S4, [0.0, dy, dz - 450.0]);
+        let dist = turned(angle, span.to_array());
         add_calc2(
             &mut actor.pos.x,
             self.target.x + dist.x,
@@ -2571,7 +2736,7 @@ impl Helmaroc {
             step * self.turn_step,
         );
         add_calc2(&mut self.turn_step, 1.0, 1.0, 0.02);
-        if env.player_pos.y > REG0_F3 + 9300.0 - 50.0 {
+        if env.player_pos.y > REG13_F3 + 9300.0 - 50.0 {
             self.action = Action::TLastAttack;
             self.state = 0;
         }
@@ -2587,9 +2752,9 @@ impl Helmaroc {
     }
 
     fn t_lastattack(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
-        let goal_z = REG0_F9 * 0.01 + (-3872.0);
-        let goal_y = REG0_F8 * 0.01 + 9579.0;
-        self.target.x = REG0_F7 * 0.01 + 2825.0 - 40.0;
+        let goal_z = REG13_F9 * 0.01 + (-3872.0);
+        let goal_y = REG13_F8 * 0.01 + 9579.0;
+        self.target.x = REG13_F7 * 0.01 + 2825.0 - 40.0;
         self.target.y = goal_y;
         self.target.z = goal_z;
         add_calc2(&mut actor.pos.x, self.target.x, 0.5, 30.0);
@@ -2602,7 +2767,7 @@ impl Helmaroc {
             self.speed.y = -1.0;
             falling = true;
         }
-        let mut angle = env.player_bearing(actor.pos).wrapping_sub(-0x8000);
+        let mut angle = env.player_bearing(actor.pos).wrapping_sub(-32768);
         if angle < -0xEB8 {
             angle = -0xEB8;
         } else if 0xE8 < angle {
@@ -2610,13 +2775,13 @@ impl Helmaroc {
         }
         add_calc_angle_s2(
             &mut actor.angle[ANGLE_Y],
-            angle.wrapping_add(-0x8000),
+            angle.wrapping_add(-32768),
             TURN_DIV_WALK,
             TURN_CAP as i16,
         );
         match self.state {
             0 => {
-                self.speed.y = REG0_F6 + 80.0;
+                self.speed.y = REG13_F6 + 80.0;
                 self.state = self.state.wrapping_add(1);
                 self.anm_init(BCK_TYAKUTI_T1, 10.0, EMODE_NONE, 0.001, 0x18, 0);
             }
@@ -2624,8 +2789,6 @@ impl Helmaroc {
                 if falling {
                     self.anm_init(BCK_TYAKUTI_T1, 1.0, EMODE_NONE, 1.0, 0x18, 0);
                     self.state = self.state.wrapping_add(1);
-                    out.se(SE_CM_DK_PECK);
-                    self.eff_hane_set(self.body, 5, 0);
                 }
             }
             2 => {
@@ -2660,10 +2823,10 @@ impl Helmaroc {
             }
             _ => {}
         }
-        if env.player_pos.y < REG0_F3 + 9290.0 - 50.0 {
+        if env.player_pos.y < REG13_F3 + 9290.0 - 50.0 {
             self.action = Action::TFly;
             self.state = -10;
-            self.speed.y = REG0_F7 + 70.0;
+            self.speed.y = REG13_F7 + 70.0;
         }
     }
 
@@ -2690,7 +2853,7 @@ impl Helmaroc {
                     add_calc2(&mut actor.pos.z, AREA_Z, 0.2, REG0_F4 + 10.0);
                     add_calc_angle_s2(&mut self.blure_rate, 1, 1, 2);
                     if self.timers[1] == 1 {
-                        self.anm_init(BCK_RAKKA_T1, REG0_F6 + 20.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
+                        self.anm_init(BCK_RAKKA_T1, REG13_F6 + 20.0, EMODE_LOOP, 1.0, BAS_NONE, 0);
                         self.blure_rate = 1;
                         out.se(SE_CM_DK_FALL_WATER);
                     }
@@ -2731,7 +2894,7 @@ impl Helmaroc {
             Action::JidaAttack => self.jida_attack(actor, env),
             Action::FlyAttack => self.fly_attack(actor, env, out),
             Action::WindAttack => self.wind_attack(actor, env, out),
-            Action::KamenDemo => self.kamen_demo(actor, out),
+            Action::KamenDemo => self.kamen_demo(out),
             Action::End => self.end(actor, out),
             Action::Start => self.start(actor, env, out),
             Action::TFly => self.t_fly(actor, env, out),
@@ -2751,58 +2914,115 @@ impl Helmaroc {
     }
 
     fn col_set(&mut self, actor: &Actor) {
-        let yaw = actor.angle[ANGLE_Y];
+        let yaw = self.shape_angle[ANGLE_Y];
         self.body = actor.pos;
         self.body.y += BODY_LIFT;
         self.head_prev = self.head;
+        self.hulls[HULL_HEAD_TG].tg_type = TG_TYPE_ALL;
+        self.hulls[HULL_HEAD_TG].tg_set = true;
+        self.hulls[HULL_HEAD_TG].tg_shield = self.beak_free == 0;
+        self.hulls[HULL_HEAD_TG].co_set = true;
+        self.hulls[HULL_HEAD_TG].co_player = true;
+        self.hulls[HULL_HEAD_TG].co_all = true;
+        self.hulls[HULL_BODY].tg_type = TG_TYPE_ALL;
+        self.hulls[HULL_BODY].tg_set = true;
+        self.hulls[HULL_BODY].co_set = true;
+        self.hulls[HULL_BODY].co_player = true;
+        self.hulls[HULL_BODY].co_all = true;
+        self.hulls[HULL_HEAD_AT].at_type = AT_TYPE_UNK800;
+        self.hulls[HULL_HEAD_AT].at_power = AT_POWER_HEAD;
+        self.hulls[HULL_HEAD_AT].at_set = true;
         let mut offset = HEAD_OFFSET;
+        offset[0] = REG8_F0 + offset[0];
+        offset[1] = REG8_F1 + offset[1];
         if self.mask_damage >= 4 {
             offset[2] = 0.0;
             self.head_radius = HEAD_RADIUS_BARE;
         } else {
-            offset[2] += REG0_F2;
+            offset[2] = REG8_F2 + offset[2];
             self.head_radius = HEAD_RADIUS_MASKED;
         }
         self.head = Self::at_pos(yaw, JOINT_ATAMA1) + turned(yaw, offset);
+        self.hulls[HULL_HEAD_TG].centre = self.head;
+        self.hulls[HULL_HEAD_TG].radius = self.head_radius;
         if self.at_mode == 1 {
-            self.beak = Self::at_pos(yaw, JOINT_AGO) + turned(yaw, BEAK_OFFSET);
+            self.beak = Self::at_pos(yaw, JOINT_AGO)
+                + turned(
+                    yaw,
+                    [
+                        REG8_F3 + BEAK_OFFSET[0],
+                        REG8_F4 + BEAK_OFFSET[1],
+                        REG8_F5 + BEAK_OFFSET[2],
+                    ],
+                );
         } else {
             self.beak.y = HEAD_OFF_Y;
         }
         self.beak_radius = REG8_F6 + BEAK_RADIUS;
         self.body_radius = REG8_F8 + BODY_RADIUS;
+        self.hulls[HULL_HEAD_AT].centre = self.beak;
+        self.hulls[HULL_HEAD_AT].radius = self.beak_radius;
+        self.hulls[HULL_BODY].centre = self.body;
+        self.hulls[HULL_BODY].radius = self.body_radius;
         if self.mask_damage >= 4 {
             self.tosaka = Self::at_pos(yaw, JOINT_TOSAKA_A3) + turned(yaw, BEAK_TIP_OFFSET);
             self.tosaka_radius = REG8_F11 + TOSAKA_RADIUS;
+            self.hulls[HULL_TOSAKA].centre = self.tosaka;
+            self.hulls[HULL_TOSAKA].radius = self.tosaka_radius;
+            self.hulls[HULL_TOSAKA].tg_type = TG_TYPE_ALL;
+            self.hulls[HULL_TOSAKA].tg_set = true;
+            self.hulls[HULL_TOSAKA].co_set = true;
+            self.hulls[HULL_TOSAKA].co_player = true;
+            self.hulls[HULL_TOSAKA].co_all = true;
+        } else {
+            self.hulls[HULL_TOSAKA] = Sph::SRC;
         }
         for index in 0..FOOT_COUNT {
+            let hull = HULL_FOOT + index;
             let base = if index == 0 {
                 JOINT_ASHI_L3
             } else {
                 JOINT_ASHI_R3
             };
             let step = if self.action == Action::TLastAttack {
-                self.foot_radius[index] = REG0_F8 + FOOT_RADIUS_T_FLY;
+                self.foot_radius[index] = REG12_F8 + FOOT_RADIUS_T_FLY;
                 self.foot_tg[index] = false;
-                [REG0_F3 + FOOT_TALL_X, REG0_F4 + FOOT_TALL_Y, REG0_F5]
+                [REG12_F3 + FOOT_TALL_X, REG12_F4 + FOOT_TALL_Y, REG12_F5]
             } else {
-                self.foot_radius[index] = REG0_F9 + FOOT_RADIUS;
+                self.foot_radius[index] = REG12_F9 + FOOT_RADIUS;
                 self.foot_tg[index] = true;
-                [REG0_F3 + FOOT_X, REG0_F4, REG0_F5]
+                [REG12_F3 + FOOT_X, REG12_F4, REG12_F5]
             };
             self.foot[index] = Self::at_pos(yaw, base) + turned(yaw, step);
+            self.hulls[hull].centre = self.foot[index];
+            self.hulls[hull].radius = self.foot_radius[index];
+            self.hulls[hull].at_type = AT_TYPE_UNK800;
+            self.hulls[hull].at_power = AT_POWER_FOOT;
+            self.hulls[hull].tg_type = TG_TYPE_ALL;
+            self.hulls[hull].tg_set = self.foot_tg[index];
+            self.hulls[hull].co_set = true;
+            self.hulls[hull].co_player = true;
+            self.hulls[hull].co_all = true;
             if self.at_mode == 2 {
                 self.foot_at[index] = true;
                 self.foot_split[index] = matches!(
                     self.action,
                     Action::FlyAttack | Action::TFly | Action::JidaAttack
                 );
+                self.hulls[hull].at_set = true;
+                self.hulls[hull].at_spl = if self.foot_split[index] {
+                    AT_SPL_UNK9
+                } else {
+                    AT_SPL_UNK0
+                };
                 if self.foot_at_live == 0 {
                     self.foot_at_live = 1;
                 }
             } else {
                 self.foot_at[index] = false;
                 self.foot_at_live = 0;
+                self.hulls[hull].at_set = false;
+                self.hulls[hull].at_spl = AT_SPL_UNK0;
             }
         }
     }
@@ -2815,6 +3035,18 @@ impl Helmaroc {
         add_calc0(&mut self.wind_power, 1.0, 0.02);
         self.wind_scale.y = if self.wind_power > 1.0 { 1.0 } else { 0.0 };
         for index in 0..WIND_COUNT {
+            let hull = HULL_WIND + index;
+            self.hulls[hull].at_set = true;
+            self.hulls[hull].at_power = WIND_AT_POWER;
+            self.hulls[hull].at_type = if self.battle_mode == 0 {
+                AT_TYPE_WIND
+            } else {
+                AT_TYPE_UNK400000
+            };
+            self.hulls[hull].co_set = false;
+            self.hulls[hull].co_player = false;
+            self.hulls[hull].co_all = false;
+            self.hulls[hull].at_spl = AT_SPL_UNK1;
             if self.wind_active[index] != 0 {
                 self.wind_pos[index] += self.wind_move[index];
                 self.wind_radius[index] = if self.battle_mode == 1 {
@@ -2826,37 +3058,53 @@ impl Helmaroc {
                 if self.wind_active[index] > 25 {
                     self.wind_active[index] = 0;
                 }
+                self.hulls[hull].centre = self.wind_pos[index];
+                self.hulls[hull].radius = self.wind_radius[index];
+            } else {
+                self.hulls[hull].centre = Vec3::from_array(HULL_NON_POS);
+                self.hulls[hull].radius = 0.0;
             }
         }
     }
 
     fn kamen_break_move(&mut self, env: &Env<'_>, out: &mut Sink<'_>) {
         for index in 0..PIECE_COUNT {
+            let hull = HULL_KAMEN + index;
+            self.hulls[hull].radius = KAMEN_RADIUS;
+            self.hulls[hull].tg_type = TG_TYPE_NO_WIND;
+            self.hulls[hull].co_set = true;
+            self.hulls[hull].co_player = true;
+            self.hulls[hull].co_all = false;
             if self.piece_live[index] == 0 {
+                self.hulls[hull].tg_set = false;
+                self.hulls[hull].centre = Vec3::from_array(HULL_PARK);
                 continue;
             }
-            let mut rot_x = 0;
-            let mut rot_z = 0;
+            self.hulls[hull].tg_set = true;
+            self.hulls[hull].centre = self.piece_pos[index];
             if self.piece_hold[index] == 0 {
                 self.piece_prev[index] = self.piece_pos[index];
                 self.piece_pos[index] += self.piece_move[index];
                 self.piece_move[index].y -= GRAVITY_FALL;
                 if self.piece_pos[index].y < PIECE_FLOOR {
                     self.piece_live[index] = 0;
+                    self.hulls[hull].tg_set = false;
+                    self.hulls[hull].centre = Vec3::from_array(HULL_PARK);
+                    continue;
                 }
                 let probe = Vec3::new(
                     self.piece_pos[index].x,
                     self.piece_pos[index].y + 200.0,
                     self.piece_pos[index].z,
                 );
-                let ground = env.ground_h(probe) + PIECE_GROUND_LIFT + REG0_F11;
+                let ground = env.ground_h(probe) + PIECE_GROUND_LIFT + REG12_F11;
                 if self.piece_pos[index].y <= ground {
                     self.piece_pos[index].y = ground;
                     self.piece_push[index][0] = 0;
                     self.piece_push[index][1] = 0;
-                    if self.piece_move[index].y < REG0_F2 + PIECE_BOUNCE_CAP {
-                        self.piece_move[index].y = 4.0 + (10.0 + REG0_F3);
-                        self.piece_roll[index] = REG0_F4 + PIECE_SPIN;
+                    if self.piece_move[index].y < REG12_F2 + PIECE_BOUNCE_CAP {
+                        self.piece_move[index].y = 4.0 + (10.0 + REG12_F3);
+                        self.piece_roll[index] = REG12_F4 + PIECE_SPIN;
                         self.piece_rot[index][2] = KAMEN_BREAK_Z2[index];
                         out.se(SE_CM_MAGBALL_BOUND);
                     } else {
@@ -2867,7 +3115,7 @@ impl Helmaroc {
                                     .wrapping_add(PIECE_SPIN_STEP)
                                     .wrapping_add(index as i32 * PIECE_SPIN_SPREAD) as i16,
                             );
-                        add_calc0(&mut self.piece_roll[index], 1.0, 200.0 + REG0_F5);
+                        add_calc0(&mut self.piece_roll[index], 1.0, KAMEN_SWING_STEP + REG12_F5);
                         add_calc_angle_s2(
                             &mut self.piece_rot[index][2],
                             KAMEN_BREAK_Z1[index].wrapping_add(swing as i16),
@@ -2881,11 +3129,19 @@ impl Helmaroc {
                     );
                     self.piece_move[index].x = push.x;
                     self.piece_move[index].z = push.z;
+                    self.hulls[hull].centre = self.piece_pos[index];
                     self.piece_rot[index][1] = self.piece_rot[index][1].wrapping_add(
                         (self.piece_sway_speed[index] * self.piece_speed[index]) as i16,
                     );
-                    add_calc0(&mut self.piece_speed[index], 1.0, REG0_F5 + PIECE_PUSH_STEP);
+                    add_calc0(&mut self.piece_speed[index], 1.0, REG14_F5 + PIECE_PUSH_STEP);
+                    if self.hulls[hull].tg_set
+                        && self.piece_speed[index] < 1.0
+                        && self.hulls[hull].touches(env.player_pos, env.blow.at.reach())
+                    {
+                        self.kamen_struck(index, env, out);
+                    }
                     add_calc_angle_s2(&mut self.piece_rot[index][0], 0x4000, 1, 0x2000);
+                    self.hulls[hull].centre = self.piece_pos[index];
                 }
                 let travel = self.piece_pos[index] - self.piece_prev[index];
                 if travel.length() > 0.0 {
@@ -2902,15 +3158,10 @@ impl Helmaroc {
                         self.piece_speed[index] = 0.0;
                     }
                 }
+                self.hulls[hull].centre = self.piece_pos[index];
             } else {
                 self.piece_hold[index] = self.piece_hold[index].wrapping_sub(1);
-                if self.piece_hold[index] < 0x14 {
-                    rot_x = (sin_s((self.piece_hold[index] as i16).wrapping_mul(3300)) * 200.0) as i16;
-                    rot_z = (cos_s((self.piece_hold[index] as i16).wrapping_mul(4800)) * 200.0) as i16;
-                }
             }
-            self.piece_rot[index][0] = self.piece_rot[index][0].wrapping_add(rot_x);
-            self.piece_rot[index][2] = self.piece_rot[index][2].wrapping_add(rot_z);
             for axis in 0..3 {
                 self.piece_sway[index][axis] =
                     self.piece_sway[index][axis].wrapping_add(self.piece_push[index][axis]);
@@ -2918,15 +3169,44 @@ impl Helmaroc {
         }
     }
 
+    fn kamen_struck(&mut self, index: usize, env: &Env<'_>, out: &mut Sink<'_>) {
+        if env.blow.at.result() == AT_WIND {
+            self.piece_speed[index] = REG14_F4 + KAMEN_BLOW_SPEED + self.rnd_f(2.0);
+            self.piece_angle[index] = env.player_yaw.wrapping_add(self.rnd_fx(KAMEN_BLOW_SPREAD) as i16);
+            self.piece_sway_speed[index] = self.rnd_fx(KAMEN_BLOW_SWAY);
+        } else {
+            let yaw = bearing(env.player_pos, self.piece_pos[index]);
+            let (up, fwd) = if env.blow.at.result() == AT_SWORD {
+                (
+                    KAMEN_PUSH_SWORD_Y + self.rnd_f(KAMEN_PUSH_RND_Y),
+                    KAMEN_PUSH_SWORD_Z + self.rnd_f(KAMEN_PUSH_RND_Z),
+                )
+            } else {
+                (
+                    KAMEN_PUSH_OTHER_Y + self.rnd_f(KAMEN_PUSH_RND_Y),
+                    KAMEN_PUSH_OTHER_Z + self.rnd_f(KAMEN_PUSH_RND_Z),
+                )
+            };
+            self.piece_move[index] = turned(yaw, [0.0, up, fwd]);
+            if env.blow.at.result() == AT_SWORD {
+                self.piece_push[index][1] = self.rnd_fx(KAMEN_SWAY) as i16;
+            } else {
+                self.piece_push[index][1] = self.rnd_fx(3000.0) as i16;
+                self.piece_push[index][0] = self.rnd_fx(3000.0) as i16;
+            }
+            self.piece_speed[index] = 0.0;
+            out.se(SE_CM_MAGBALL_BOUND);
+        }
+    }
+
     fn obj_move(&mut self) {
         if self.stage_boss_enemy {
             add_calc2(&mut self.shutter_y, SHUTTER_BATTLE_Y, 1.0, 20.0);
         }
-        self.shutter_ring = REG0_F10 + SHUTTER_X;
         self.shutter_aim = Vec3::new(
-            REG0_F10 + SHUTTER_X,
-            self.shutter_shift + AREA_Y + REG8_F2,
-            REG0_F12 - SHUTTER_Z,
+            REG6_F10 + SHUTTER_X,
+            REG6_F11 + AREA_Y + self.shutter_y,
+            REG6_F12 - SHUTTER_Z,
         );
         self.shutter_yaw = f32::from(REG6_S0) - SHUTTER_YAW;
     }
@@ -2969,7 +3249,7 @@ impl Helmaroc {
             eff.spin[0] = (eff.sway_rate * sin_s(eff.count.wrapping_mul(0x500))) as i16;
             eff.spin[2] = (eff.sway_rate * cos_s(eff.count.wrapping_mul(0x400))) as i16;
             let (up, cap) = if eff.chase != 0 {
-                accel = REG8_F8 + EFF_FALL;
+                accel = REG8_F8 + EFF_FALL_CHASE;
                 rise_cap = EFF_RISE;
                 (REG8_F7 + EFF_UP, EFF_CAP)
             } else {
@@ -3027,29 +3307,31 @@ impl Helmaroc {
         true
     }
 
-    fn demo_camera(&mut self, actor: &Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+    fn demo_camera(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
         let mut run = true;
         let mut rumble = false;
-        match self.demo_state {
-            0 => {}
+        let mut arm = self.demo_state;
+        loop {
+            match arm {
+            0 => break,
             1 => {
                 if !self.demo_gate() {
                     run = false;
-                } else {
-                    self.demo_state = self.demo_state.wrapping_add(1);
-                    self.demo_param = 0.0;
-                    self.demo_count = 0;
-                    self.demo_sub = 0;
-                    self.fov = 45.0;
-                    self.mask_damage = 4;
+                    break;
                 }
+                self.demo_state = self.demo_state.wrapping_add(1);
+                self.demo_count = 0;
+                self.demo_sub = 0;
+                self.fov = 45.0;
+                self.mask_damage = 4;
+                arm = 2;
             }
             2 => {
                 self.cam_eye =
-                    turned(actor.angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG0_F1 - 30.0, REG0_F2 + 50.0])
+                    turned(self.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG14_F1 - 30.0, REG14_F2 + 50.0])
                         + self.head;
                 self.cam_look =
-                    turned(actor.angle[ANGLE_Y], [REG0_F5 + 400.0, REG0_F6 - 100.0, REG0_F7 + 400.0])
+                    turned(self.shape_angle[ANGLE_Y], [REG12_F5 + 400.0, REG12_F6 - 100.0, REG12_F7 + 400.0])
                         + self.head;
                 if self.demo_sub > REG6_S7 + 0x3C {
                     add_calc2(&mut self.fov, 20.0, 0.5, 1.0);
@@ -3058,19 +3340,21 @@ impl Helmaroc {
                 } else {
                     add_calc2(&mut self.fov, 45.0, 0.05, 1.0);
                 }
+                break;
             }
             0xA => {
                 if !self.demo_gate() {
                     run = false;
-                } else {
-                    self.demo_state = self.demo_state.wrapping_add(1);
-                    self.demo_param = 0.0;
-                    self.demo_count = 0;
-                    self.demo_sub = 0;
-                    self.fov = 55.0;
-                    self.cam_eye = Vec3::new(2598.0, 9902.0, -3498.0);
-                    self.cam_look = Vec3::new(2228.0, 9961.0, -3403.0);
+                    break;
                 }
+                self.demo_state = self.demo_state.wrapping_add(1);
+                self.demo_param = 0.0;
+                self.demo_count = 0;
+                self.demo_sub = 0;
+                self.fov = 55.0;
+                self.cam_eye = Vec3::new(2598.0, 9902.0, -3498.0);
+                self.cam_look = Vec3::new(2228.0, 9961.0, -3403.0);
+                arm = 0xB;
             }
             0xB => {
                 add_calc2(&mut self.cam_eye.x, 164.0, 0.05, self.demo_param * 24.34);
@@ -3098,6 +3382,9 @@ impl Helmaroc {
                     self.cam_look = Vec3::new(1816.0, 10051.0, -4137.0);
                     self.demo_param = 0.0;
                     self.demo_sub = 0;
+                    arm = 0xC;
+                } else {
+                    break;
                 }
             }
             0xC => {
@@ -3122,6 +3409,7 @@ impl Helmaroc {
                 add_calc2(&mut self.cam_look.y, 9961.0, 0.05, self.demo_param * 0.9);
                 add_calc2(&mut self.cam_look.z, -3524.0, 0.05, self.demo_param * 6.1299998);
                 add_calc2(&mut self.demo_param, REG13_F3 + 1.5, 1.0, REG13_F4 + 0.02);
+                break;
             }
             0xD => {
                 if self.demo_sub < REG0_S3 + 0x64 {
@@ -3148,6 +3436,7 @@ impl Helmaroc {
                     self.demo_state = 0xE;
                 }
                 rumble = true;
+                break;
             }
             0xE => {
                 self.cam_eye = Vec3::new(3304.0, 10983.0, -3644.0);
@@ -3157,15 +3446,17 @@ impl Helmaroc {
                 self.demo_param = 0.0;
                 self.shutter_ring = REG13_F17 - 100.0;
                 self.shutter_roll = 0.0;
-                rumble = true;
+                arm = 0xF;
             }
             0xF | 0x10 => {
+                rumble = true;
                 add_calc0(&mut self.shutter_ring, 1.0, REG6_F11 + 1.5);
                 if self.shutter_ring.abs() < 1.0 {
                     add_calc0(&mut self.shutter_shift, 1.0, REG6_F12 + 1.0);
                     if self.demo_state == 0xF {
                         self.flags_on(out);
                         self.stage_boss_demo = true;
+                        out.purge_eyes();
                         self.demo_state = 0x10;
                     }
                 }
@@ -3182,20 +3473,22 @@ impl Helmaroc {
                     self.shape_angle[ANGLE_X] = 0;
                     out.bgm(BGM_DK_BATTLE);
                 }
+                break;
             }
             0x32 => {
                 if !self.demo_gate() {
                     run = false;
-                } else {
-                    self.demo_state = self.demo_state.wrapping_add(1);
-                    self.demo_param = 0.0;
-                    self.demo_count = 0;
-                    self.demo_sub = 0;
-                    self.fov = 60.0;
-                    self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
-                    self.cam_eye = self.eye;
-                    self.cam_eye.y -= REG0_F7 + 100.0;
+                    break;
                 }
+                self.demo_state = self.demo_state.wrapping_add(1);
+                self.demo_param = 0.0;
+                self.demo_count = 0;
+                self.demo_sub = 0;
+                self.fov = 60.0;
+                self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
+                self.cam_eye = self.eye;
+                self.cam_eye.y -= REG0_F7 + 100.0;
+                arm = 0x33;
             }
             0x33 => {
                 add_calc2(&mut self.cam_eye.x, self.eye.x, 0.1, self.demo_param * 100.0);
@@ -3211,29 +3504,32 @@ impl Helmaroc {
                     self.demo_sub = 0;
                 }
                 add_calc2(&mut self.demo_param, 1.0, 1.0, REG0_F4 + 0.02);
+                break;
             }
             0x34 => {
                 if self.demo_sub >= 0x64 {
                     self.demo_state = 0x96;
                 }
+                break;
             }
             0x64 => {
                 if !self.demo_gate() {
                     run = false;
-                } else {
-                    self.demo_state = self.demo_state.wrapping_add(1);
-                    self.demo_param = 0.0;
-                    self.demo_count = 0;
-                    self.demo_sub = 0;
-                    self.fov = 45.0;
-                    self.cam_look = Vec3::new(
-                        env.player_pos.x,
-                        env.player_pos.y,
-                        env.player_pos.z,
-                    );
-                    self.cam_yaw = actor.angle[ANGLE_Y].wrapping_add(self.rnd_fx(4000.0) as i16);
-                    self.demo_radius = 1500.0;
+                    break;
                 }
+                self.demo_state = self.demo_state.wrapping_add(1);
+                self.demo_param = 0.0;
+                self.demo_count = 0;
+                self.demo_sub = 0;
+                self.fov = 45.0;
+                self.cam_look = self.cam_eye;
+                let dx = self.cam_eye.x - self.head.x;
+                let dz = self.cam_eye.z - self.head.z;
+                self.cam_yaw = bearing(Vec3::ZERO, Vec3::new(dx, 0.0, dz));
+                self.cam_pitch = 0;
+                actor.angle[ANGLE_Y] = self.cam_yaw.wrapping_add(self.rnd_fx(4000.0) as i16);
+                self.demo_radius = 1500.0;
+                arm = 0x65;
             }
             0x65 => {
                 if self.demo_sub == 0x3C {
@@ -3241,8 +3537,8 @@ impl Helmaroc {
                 }
                 self.cam_eye = self.head;
                 self.cam_eye.y += REG6_F16 - 100.0;
-                let look = turned(self.cam_yaw, [0.0, 0.0, self.demo_radius + REG6_F17]);
-                let look = look + self.cam_eye;
+                let local = pitched(self.cam_pitch, [0.0, 0.0, self.demo_radius + REG6_F17]);
+                let look = turned(self.cam_yaw, local.to_array()) + self.cam_eye;
                 add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
                 if self.flown_high == 0 {
                     self.cam_look.y = REG6_F18 + 9950.0;
@@ -3250,11 +3546,13 @@ impl Helmaroc {
                     add_calc2(&mut self.cam_look.y, look.y + REG6_F13, 0.1, 100.0);
                 }
                 add_calc2(&mut self.cam_look.z, look.z, 0.1, 100.0);
+                break;
             }
             0x6E => {
                 self.fov = 40.0;
                 self.cam_look = Vec3::new(-25267.0, -948.0, 22916.0);
                 self.demo_state = 0x6F;
+                arm = 0x6F;
             }
             0x6F => {
                 self.cam_eye.x = AREA_X;
@@ -3266,12 +3564,14 @@ impl Helmaroc {
                 if self.demo_sub > REG6_S2 {
                     add_calc2(&mut self.demo_param, f32::from(REG6_S1) + 1.5, 1.0, REG6_F2 + 0.02);
                 }
+                break;
             }
             0x70 => {
                 self.cam_eye = self.target;
                 self.demo_state = self.demo_state.wrapping_add(1);
                 self.demo_sub = 0;
                 self.fov = 45.0;
+                arm = 0x71;
             }
             0x71 => {
                 if self.demo_sub == 0x78 {
@@ -3284,6 +3584,7 @@ impl Helmaroc {
                 self.cam_look = self.target;
                 self.cam_look.y = REG12_F5 + 10000.0;
                 self.cam_look.x += REG12_F7 + 500.0;
+                break;
             }
             0x72 => {
                 self.cam_eye = Vec3::new(4386.0, 10020.0, -4368.0);
@@ -3295,11 +3596,14 @@ impl Helmaroc {
                 if self.demo_sub == 0x28 {
                     self.demo_state = 0x96;
                 }
+                break;
             }
             0x96 => {
                 self.demo_state = 0;
+                break;
             }
-            _ => {}
+            _ => break,
+            }
         }
         if self.demo_state != 0 && run {
             let fx = self.shake * sin_s(self.demo_count.wrapping_mul(0x3300));
@@ -3331,7 +3635,7 @@ impl Helmaroc {
         } else if angle < -8000 {
             angle = -8000;
         }
-        let wobble = ((REG0_F5 + BEAK_WOBBLE) * self.beak_sway_calc
+        let wobble = ((REG14_F5 + BEAK_WOBBLE) * self.beak_sway_calc
             * sin_s(self.beak_tick.wrapping_mul(REG8_S4 + 2500)))
             as i16;
         let rate = (self.beak_calc * 4000.0) as i16;
@@ -3371,18 +3675,18 @@ impl Helmaroc {
     }
 
     fn attention_step(&mut self, actor: &Actor, env: &Env<'_>) {
-        self.eye = Self::at_pos(actor.angle[ANGLE_Y], JOINT_ATAMA1)
+        self.eye = Self::at_pos(self.shape_angle[ANGLE_Y], JOINT_ATAMA1)
             + turned(
-                actor.angle[ANGLE_Y],
+                self.shape_angle[ANGLE_Y],
                 [
-                    REG0_F10 + EYE_OFFSET[0],
+                    REG6_F10 + EYE_OFFSET[0],
                     EYE_OFFSET[1],
-                    REG0_F12 + EYE_OFFSET[2],
+                    REG6_F12 + EYE_OFFSET[2],
                 ],
             );
         let angle = if self.track_player {
             let delta = env.player_pos - actor.pos;
-            let mut turn = bearing(Vec3::ZERO, delta).wrapping_sub(actor.angle[ANGLE_Y]);
+            let mut turn = bearing(Vec3::ZERO, delta).wrapping_sub(self.shape_angle[ANGLE_Y]);
             if turn > TRACK_LIMIT {
                 turn = TRACK_LIMIT;
             } else if turn < -TRACK_LIMIT {
@@ -3397,25 +3701,35 @@ impl Helmaroc {
         add_calc_angle_s2(&mut self.head_yaw, 0, TURN_DIV_NECK, 0x200);
     }
 
-    fn hurt_player(&self, env: &Env<'_>, out: &mut Sink<'_>) {
-        if self.at_mode == 1
-            && touches(self.beak, self.beak_radius, env.player_pos, PLAYER_BODY_RADIUS)
-        {
-            out.health.damage(AT_POWER_HEAD);
-        }
-        for index in 0..FOOT_COUNT {
-            if self.foot_at[index]
-                && touches(self.foot[index], self.foot_radius[index], env.player_pos, PLAYER_BODY_RADIUS)
-            {
-                out.health.damage(AT_POWER_FOOT);
+    fn hurt_player(&self, env: &Env<'_>, out: &mut Sink<'_>) -> Vec3 {
+        let mut push = Vec3::ZERO;
+        for index in 0..HULL_COUNT {
+            let hull = self.hulls[index];
+            if !hull.at_set || !hull.hits(env.player_pos, PLAYER_BODY_RADIUS) {
+                continue;
             }
+            if hull.at_type == AT_TYPE_WIND {
+                if hull.at_spl == AT_SPL_UNK1
+                    && (HULL_WIND..HULL_WIND + WIND_COUNT).contains(&index)
+                    && push == Vec3::ZERO
+                {
+                    push = wind_push(
+                        self.wind_move[index - HULL_WIND],
+                        hull.centre,
+                        env.player_pos,
+                    );
+                }
+                continue;
+            }
+            out.health.damage(hull.at_power);
         }
+        push
     }
 
-    pub fn execute(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
+    pub fn execute(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) -> Vec3 {
         self.smoke_pos = actor.pos;
         self.smoke_pos.y = AREA_Y;
-        self.frame_count = self.frame_count.wrapping_add(1);
+        self.frame_count = (self.frame_count as i16).wrapping_add(1) as i32;
         for slot in 0..TIMER_COUNT {
             timer(&mut self.timers[slot]);
         }
@@ -3456,11 +3770,10 @@ impl Helmaroc {
         self.shape_angle[ANGLE_Y] = actor.angle[ANGLE_Y];
         self.shape_angle[ANGLE_Z] = actor.angle[ANGLE_Z];
         self.attention_step(actor, env);
-        self.hurt_player(env, out);
         self.kamen_break_move(env, out);
         self.my_effect_move(env);
         self.obj_move();
-        self.demo_camera(actor, env, out);
+        self.demo_camera(actor, out);
         self.kankyo_cont(actor);
         for slot in 0..SMOKE_COUNT {
             timer(&mut self.smoke_timer[slot]);
@@ -3474,7 +3787,9 @@ impl Helmaroc {
                 self.nail_live = 0;
             }
         }
+        let push = self.hurt_player(env, out);
         self.at_mode = 0;
+        push
     }
 
     pub fn begin(&mut self, actor: &mut Actor, out: &mut Sink<'_>) {
@@ -3509,8 +3824,9 @@ const SHUTTER_BATTLE: f32 = -630.0;
 const SHUTTER_SHIFT: f32 = -70.0;
 const SPAWN_HEIGHT: f32 = 5000.0;
 const SPAWN_TIMER: i16 = 0x168;
-const PURGE_NAMES: [&str; 6] = ["Kamome", "Dk", "Kui", "Bk", "Boko", "bonbori"];
+const PURGE_NAMES: [&str; 5] = ["Kamome", "Dk", "Kui", "Bk", "Boko"];
 const TIDE_NAMES: [&str; 6] = ["Humi0z", "Humi4z", "Humi5z", "Tide3", "Humi2z", "Humi3z"];
+const EYE_NAME: &str = "bonbori";
 
 fn blow_of(watch: &Watch<'_, '_>) -> Blow {
     let mut at = At::Idle;
@@ -3580,7 +3896,7 @@ pub fn control(
     let Some(entry) = players.iter_mut().next() else {
         return;
     };
-    let player = entry.1;
+    let mut player = entry.1;
     let mut orders = Orders::default();
     let mut drop: Vec<(Entity, i8, u16)> = Vec::new();
     for (_, mut actor, mut boss) in &mut bosses {
@@ -3597,6 +3913,7 @@ pub fn control(
             .map(|(id, other)| (id, other.pos));
         let env = Env {
             player_pos: player.pos,
+            player_yaw: to_s16(player.yaw),
             player_hover: false,
             solid,
             blow,
@@ -3607,24 +3924,38 @@ pub fn control(
             switches: &mut switches,
             stories: &mut stories,
             flags: &mut flags,
-            zones: &mut zones,
             health: &mut health,
             orders: &mut orders,
-            drop: &mut drop,
         };
         if !boss.entered {
             boss.begin(actor, &mut sink);
         }
-        boss.execute(actor, &env, &mut sink);
+        let push = boss.execute(actor, &env, &mut sink);
+        if push != Vec3::ZERO {
+            player.drift.y = 0.0;
+            add_calc_xz(
+                &mut player.drift,
+                push,
+                WIND_DRAG_SCALE,
+                WIND_PUSH_STEP,
+                WIND_DRAG_MIN,
+            );
+            player.pos.x += player.drift.x;
+            player.pos.z += player.drift.z;
+        }
     }
-    if orders.purge_mobs || orders.purge_shards {
+    if orders.purge_mobs || orders.purge_shards || orders.purge_eyes {
         for (id, other) in watch.others.iter() {
             let band = other.parameters & PRM_BYTE_MASK;
             let mob = PURGE_NAMES.contains(&other.name.as_str())
                 || TIDE_NAMES.contains(&other.name.as_str())
                 || (other.name == BDK_OBJ_ACTOR && band >= PRM_NIBBLE_TWO);
             let shard = other.name == BDK_OBJ_ACTOR && band != PRM_MASK_SET;
-            if (orders.purge_mobs && mob) || (orders.purge_shards && shard) {
+            let eye = other.name == EYE_NAME;
+            if (orders.purge_mobs && mob)
+                || (orders.purge_shards && shard)
+                || (orders.purge_eyes && eye)
+            {
                 drop.push((id, other.room, other.set_id));
             }
         }
