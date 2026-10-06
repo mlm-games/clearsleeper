@@ -1340,6 +1340,38 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::msdansub2::MsdanSub2>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::swpropeller::SwPropeller>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::buoyrace::BuoyRace>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ohatch::Ohatch>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::msdansub2::MsdanSub2>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::swpropeller::SwPropeller>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::buoyrace::BuoyRace>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ohatch::Ohatch>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::mkiek::Mkiek>() {
                 let (min, max) = x.cull();
                 lift = min[1];
