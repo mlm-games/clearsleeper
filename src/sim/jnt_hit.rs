@@ -17,7 +17,6 @@ pub const IDX_NONE: i32 = -1;
 
 const FAR: f32 = 10000.0;
 const NEAR_ZERO_SQUARE: f32 = 8e-11;
-const CLAMP: f32 = 500000.0;
 
 pub fn is_cylinder(shape: u8) -> bool {
     matches!(shape, CYL | CYL2 | CYL_THROW | CYL_UNK | CYL_DELETE)
@@ -484,18 +483,4 @@ fn cyl2_surface(gap: Vec3, a: Vec3, b: Vec3, radius: f32, facing: Vec3) -> Vec3 
         hit = dir * hit.dot(dir) + unit * radius;
     }
     hit + a
-}
-
-/// `mDoLib_project`'s depth handling, shared with the scope projection: a point at or behind
-/// the eye plane has its `z` clamped and scaled by the eye distance.
-pub fn depth_scale(eye_distance: f32, z: f32) -> f32 {
-    if eye_distance <= 0.0 {
-        if eye_distance == 0.0 {
-            CLAMP
-        } else {
-            0.5 / eye_distance
-        }
-    } else {
-        0.5 / eye_distance
-    }
 }

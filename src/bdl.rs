@@ -121,6 +121,7 @@ pub struct RoomMesh {
     pub textures: Vec<RoomTexture>,
     pub uv_placements: Vec<[f32; 4]>,
     pub animations: Vec<crate::btk::TextureAnimation>,
+    pub joints: Vec<[f32; 3]>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -158,6 +159,7 @@ impl RoomMesh {
         self.animations.append(&mut part.animations);
         self.groups.append(&mut part.groups);
         self.textures.append(&mut part.textures);
+        self.joints.append(&mut part.joints);
     }
 }
 
@@ -183,6 +185,7 @@ pub fn parse(
         animation,
     };
     let mut mesh = RoomMesh::default();
+    mesh.joints = worlds.clone();
     if let Some(animation) = animation {
         mesh.animations.push(animation.clone());
     }
