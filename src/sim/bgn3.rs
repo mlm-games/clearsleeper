@@ -522,6 +522,8 @@ pub struct Bgn3 {
     pub body_sph: Bgn3Sph,
     pub rope: Bgn3Rope,
     pub seed: [i32; 3],
+    pub home: Vec3,
+    pub entered: bool,
     pub attention: i16,
 }
 
@@ -562,6 +564,8 @@ impl Bgn3 {
             body_sph: Bgn3Sph::new(),
             rope: Bgn3Rope::new(),
             seed: [0; 3],
+            home: Vec3::ZERO,
+            entered: false,
             attention: 0,
         }
     }
@@ -1365,21 +1369,29 @@ impl Bgn3 {
         hits: &[At],
         events: &mut SimEvents,
     ) -> Option<(u32, Vec3, i8)> {
+        let hio = stat.hio;
+        if !sib.bgn_found {
+            return None;
+        }
         if !stat.hio_set {
             stat.hio_set = true;
             stat.ke_color = [stat.hio.m50, stat.hio.m52, stat.hio.m54, 0xFF];
         }
-        let hio = stat.hio;
         if hio.m06 != 0 {
             self.health = i16::from(hio.m06);
         }
-        if !sib.bgn_found || sib.bgn_phase != 2 {
+        if !self.entered {
+            self.entered = true;
+            self.home = actor.pos;
+            self.parts[PART_CORE].sph.core = true;
+        }
+        if sib.bgn_phase != 2 {
             self.at = AT_HIDDEN;
             actor.pos = Vec3::new(0.0, HIDDEN_Y, 0.0);
             return None;
         }
         if self.at == AT_HIDDEN {
-            actor.pos = sib.bgn_pos;
+            actor.pos = self.home;
             self.at = AT_MOVE0;
             self.turn_timer = TIMER_HIDE;
             self.mode = TIMER_RING;

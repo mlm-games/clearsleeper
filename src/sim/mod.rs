@@ -20,6 +20,7 @@ pub mod barrier;
 pub mod barrel;
 pub mod bemos;
 pub mod barricade;
+pub mod bgn3;
 pub mod bitem;
 pub mod bita;
 pub mod hole;
@@ -1381,6 +1382,8 @@ pub fn build(
     sim.world.insert_resource(goal_flag::SaraceShip::default());
     sim.world.insert_resource(bridge::BridgeWeather::default());
     sim.world.insert_resource(bridge::BridgeCamera::default());
+    sim.world.insert_resource(bgn3::Bgn3Static::default());
+    sim.world.insert_resource(bgn3::Bgn3Siblings::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1440,6 +1443,8 @@ pub fn build(
     sim.world.insert_resource(goal_flag::SaraceShip::default());
     sim.world.insert_resource(bridge::BridgeWeather::default());
     sim.world.insert_resource(bridge::BridgeCamera::default());
+    sim.world.insert_resource(bgn3::Bgn3Static::default());
+    sim.world.insert_resource(bgn3::Bgn3Siblings::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1484,6 +1489,7 @@ pub fn build(
                 (
                     flags::clear_order_flags.in_set(WwSimSet::Execute),
                     registry::control.in_set(WwSimSet::Execute),
+                    actor::snapshot.in_set(WwSimSet::Execute),
                     isle_timer::control.in_set(WwSimSet::Execute),
                     daynight::control.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
@@ -1739,6 +1745,7 @@ pub fn build(
                 gull::control.in_set(WwSimSet::Execute),
                 hammer::control.in_set(WwSimSet::Execute),
                 hammerhit::control.in_set(WwSimSet::Execute),
+                bgn3::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1908,4 +1915,3 @@ pub mod auction;
 
 pub mod knob00;
 pub mod bridge;
-pub mod bgn3;
