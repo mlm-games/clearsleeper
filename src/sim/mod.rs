@@ -88,6 +88,7 @@ pub mod events;
 pub mod fallrock;
 pub mod fan;
 pub mod ff;
+pub mod tag_hint;
 pub mod zouk;
 pub mod fire;
 pub mod figure;
@@ -575,6 +576,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if sss::is_sss(&source.name) {
         let v = sss::Sss::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if tag_hint::is_tag_hint(&source.name) {
+        let v = tag_hint::TagHint::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
@@ -1531,6 +1535,12 @@ pub fn build(
     sim.world.insert_resource(obj_doguu::ParticleSets::default());
     sim.world.insert_resource(obj_doguu::LightInfluence::default());
     sim.world.insert_resource(sss::NonPos::default());
+    sim.world.insert_resource(tag_hint::TagHintTmp::default());
+    sim.world.insert_resource(tag_hint::TagHintLight::default());
+    sim.world.insert_resource(tag_hint::TagHintFog::default());
+    sim.world.insert_resource(tag_hint::TagHintMsg::default());
+    sim.world.insert_resource(tag_hint::TagHintRequest::default());
+    sim.world.insert_resource(tag_hint::TagHintPlayerRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1604,6 +1614,12 @@ pub fn build(
     sim.world.insert_resource(obj_doguu::ParticleSets::default());
     sim.world.insert_resource(obj_doguu::LightInfluence::default());
     sim.world.insert_resource(sss::NonPos::default());
+    sim.world.insert_resource(tag_hint::TagHintTmp::default());
+    sim.world.insert_resource(tag_hint::TagHintLight::default());
+    sim.world.insert_resource(tag_hint::TagHintFog::default());
+    sim.world.insert_resource(tag_hint::TagHintMsg::default());
+    sim.world.insert_resource(tag_hint::TagHintRequest::default());
+    sim.world.insert_resource(tag_hint::TagHintPlayerRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1696,6 +1712,7 @@ pub fn build(
                 bombflower::crawler_control.in_set(WwSimSet::Execute),
                 ladder::control.in_set(WwSimSet::Execute),
                 arrow::control.in_set(WwSimSet::Execute),
+                stone::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1869,6 +1886,7 @@ pub fn build(
                 goal_flag::control.in_set(WwSimSet::Execute),
                 obj_doguu::control.in_set(WwSimSet::Execute),
                 sss::control.in_set(WwSimSet::Execute),
+                tag_hint::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
