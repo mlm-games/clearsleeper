@@ -24,6 +24,8 @@ pub const HOOKSHOT_HIT_CUE: &str = "hookshot-hit";
 pub const HAMMER_HIT_CUE: &str = "hammer-hit";
 pub const LAST_HIT_CUE: &str = "last-hit";
 pub const BALL_HIT_CUE: &str = "ball-hit";
+/// Stand-in for the battle-music hit accent. The function that owns the hook has no recovered
+/// body, so its five selector values collapse to this one tone. See the drain site for why.
 pub const BGM_HIT_CUE: &str = "bgm-hit";
 
 const FOOTSTEP_HZ: f32 = 140.0;

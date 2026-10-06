@@ -497,9 +497,21 @@ impl App {
     }
 
     /// Play what `cc_at_check` queued: every sound start it made, the positional ones at their
-    /// own point, and the sword-combo hit sound the music side takes. The enemy-damage flag
-    /// only ever reaches a music port in retail, which this shell has no equivalent of, so it
-    /// is cleared rather than turned into a sound of its own.
+    /// own point.
+    ///
+    /// `mDoAud_bgmHitSound` is `JAIZelBasic::bgmHitSound` at `802A564C-802A579C` — 0x150 bytes
+    /// whose body the reference project carries as a stub that does not match those addresses,
+    /// so its selector cannot be resolved. Every neighbour in that file drives the running
+    /// battle music (`bgmNowKaitengiri` fades a `JAIZelParam` track, `onEnemyDamage` writes a
+    /// sequence port), which makes the selector a music accent rather than a sound id, and
+    /// nothing in the tree names a table for it. One tone therefore stands in for the whole
+    /// range; splitting it into five cues would be invented, not recovered.
+    ///
+    /// `mDoAud_onEnemyDamage` at `802A57A4-802A5818` does match, and its body only writes `1`
+    /// into port 9 of the sea-enemy sub-music or port app `0x000b0000` of the normal-battle
+    /// music. It touches no wave, no flag and no track id, so there is nothing to hear without
+    /// a sequencer. `SimEvent::Bgm` is the shell's music channel and it has no consumer either,
+    /// so the flag is cleared rather than turned into a sound of its own.
     fn pump_hit_audio(&mut self) {
         let (se, bgm_hit_sound) = {
             let mut hit = self.sim.world.resource_mut::<sim::damage_resolve::HitAudio>();

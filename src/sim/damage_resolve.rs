@@ -329,12 +329,17 @@ pub struct HitAudio {
 }
 
 impl HitAudio {
-    /// `mDoAud_onEnemyDamage()`.
+    /// `mDoAud_onEnemyDamage()`. Its retail body writes `1` into port 9 of the sea-enemy
+    /// sub-music, or into port app `0x000b0000` of the normal-battle music — a sequencer
+    /// trigger that names no wave, flag or track id, so it stays inert until the shell plays
+    /// music. The call site in `cc_at_check` is unconditional once an actor is struck.
     pub fn on_enemy_damage(&mut self) {
         self.enemy_damage = true;
     }
 
-    /// `mDoAud_bgmHitSound(id)`.
+    /// `mDoAud_bgmHitSound(id)`. `id` is `m_hit_sound_id`: a 0-4 accent selector into the
+    /// running battle music, not a sound id. The owning function has no recovered body, so
+    /// every value reaches the same cue at the drain site. Only reached when `m_damage != 0`.
     pub fn bgm_hit_sound(&mut self, id: i32) {
         self.bgm_hit_sound = Some(id);
     }
