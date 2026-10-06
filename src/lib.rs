@@ -569,11 +569,7 @@ impl App {
                 if present.hidden {
                     continue;
                 }
-                let size = sim::pickup::Pickup {
-                    item: present.item,
-                    timer: 0,
-                }
-                .size();
+                let size = sim::pickup::Pickup::spawn(present.item as u32).size();
                 (view::ActorKind::Pickup, present.item, size, size)
             } else if entity.contains::<sim::stalfos::Stalfos>() {
                 (view::ActorKind::Enemy, 0, 162.5, 125.0)
