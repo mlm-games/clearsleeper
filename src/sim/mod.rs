@@ -8,6 +8,7 @@ pub mod area;
 pub mod amos_knight;
 pub mod amiprop;
 pub mod armos;
+pub mod auzu;
 pub mod arrowice;
 pub mod aryll;
 pub mod arrow;
@@ -20,6 +21,7 @@ pub mod bemos;
 pub mod barricade;
 pub mod bitem;
 pub mod bita;
+pub mod hole;
 pub mod bird;
 pub mod bwds;
 pub mod ebomzo;
@@ -74,6 +76,7 @@ pub mod majuu_flag;
 pub mod npc_nz;
 pub mod toripost;
 pub mod touseki;
+pub mod toge;
 pub mod gaship;
 pub mod gbed;
 pub mod gaship2;
@@ -98,6 +101,7 @@ pub mod health;
 pub mod helmaroc;
 pub mod hhyu;
 pub mod hbrf1;
+pub mod lbridge;
 pub mod htobi3;
 pub mod hotfloor;
 pub mod hys;
@@ -165,6 +169,7 @@ pub mod msdan2;
 pub mod msg;
 pub mod nh;
 pub mod obj_akabe;
+pub mod stair;
 pub mod ojtree;
 pub mod otble;
 pub mod omensmk;
@@ -224,6 +229,7 @@ pub mod qdghd;
 pub mod sie_flag;
 pub mod syan;
 pub mod tori_flag;
+pub mod tornado;
 pub mod seatag;
 pub mod shape;
 pub mod select;
@@ -295,6 +301,7 @@ pub mod ygush;
 pub mod xtower;
 pub mod xfuta;
 pub mod windmill;
+pub mod shutter2;
 pub mod warpt;
 pub mod warship;
 pub mod wbird;
@@ -574,6 +581,27 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if hbrf1::is_hbrf1(&source.name) {
         let lift = hbrf1::Hbrf1::spawn(source.parameters, actor.pos);
         world.spawn((actor, lift)).id()
+    } else if shutter2::is_shutter2(&source.name) {
+        let v = shutter2::Shutter2::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if auzu::is_auzu(&source.name) {
+        let v = auzu::Auzu::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if lbridge::is_lbridge(&source.name) {
+        let v = lbridge::Lbridge::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if tornado::is_tornado(&source.name) {
+        let v = tornado::Tornado::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if toge::is_toge(&source.name) {
+        let v = toge::Toge::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if hole::is_hole(&source.name) {
+        let v = hole::Hole::spawn(source.parameters, actor.angle[2]);
+        world.spawn((actor, v)).id()
+    } else if stair::is_stair(&source.name) {
+        let v = stair::Stair::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if fan::is_fan(&source.name) {
         let v = fan::Fan::spawn(source.parameters);
         world.spawn((actor, v)).id()
@@ -1587,6 +1615,13 @@ pub fn build(
                 hop::control.in_set(WwSimSet::Execute),
                 schedule::control.in_set(WwSimSet::Execute),
                 esa::control.in_set(WwSimSet::Execute),
+                shutter2::control.in_set(WwSimSet::Execute),
+                auzu::control.in_set(WwSimSet::Execute),
+                hole::control.in_set(WwSimSet::Execute),
+                toge::control.in_set(WwSimSet::Execute),
+                lbridge::control.in_set(WwSimSet::Execute),
+                tornado::control.in_set(WwSimSet::Execute),
+                stair::control.in_set(WwSimSet::Execute),
                 ki::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
