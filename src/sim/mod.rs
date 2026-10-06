@@ -279,6 +279,7 @@ pub mod shelf;
 pub mod shmrgrd;
 pub mod stage_data;
 pub mod stalfos;
+pub mod sss;
 pub mod spotbox;
 pub mod statue;
 pub mod stone;
@@ -557,6 +558,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, t)).id()
     } else if obj_doguu::is_obj_doguu(&source.name) {
         let v = obj_doguu::ObjDoguu::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if sss::is_sss(&source.name) {
+        let v = sss::Sss::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
@@ -1464,6 +1468,7 @@ pub fn build(
     sim.world.insert_resource(obj_doguu::AllColRatio::default());
     sim.world.insert_resource(obj_doguu::ParticleSets::default());
     sim.world.insert_resource(obj_doguu::LightInfluence::default());
+    sim.world.insert_resource(sss::NonPos::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1536,6 +1541,7 @@ pub fn build(
     sim.world.insert_resource(obj_doguu::AllColRatio::default());
     sim.world.insert_resource(obj_doguu::ParticleSets::default());
     sim.world.insert_resource(obj_doguu::LightInfluence::default());
+    sim.world.insert_resource(sss::NonPos::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1798,6 +1804,7 @@ pub fn build(
                 majuu_flag::control.in_set(WwSimSet::Execute),
                 goal_flag::control.in_set(WwSimSet::Execute),
                 obj_doguu::control.in_set(WwSimSet::Execute),
+                sss::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
