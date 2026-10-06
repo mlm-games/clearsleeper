@@ -98,7 +98,7 @@ const ACT_MARGIN: f32 = 100.0; // <- d_a_obj_coming.cpp:335-336
 const RANGE_SCALE: f32 = 10000.0; // <- d_a_obj_coming.cpp:256
 /// `s16 rnd = cM_rndFX(0x2000); barrel2->mAngleY = angle + rnd;` (`:420-421`) - the barrel's yaw
 /// jitter, +/- 0x2000.
-const ANGLE_JITTER: f32 = 0x2000.0; // <- d_a_obj_coming.cpp:420
+const ANGLE_JITTER: f32 = 8192.0;
 /// `cXyz sp08(current.pos.x, current.pos.y + 500.0f, current.pos.z); M_gnd_work.SetPos(&sp08);`
 /// (`:220-221`) in `_create` - the height the room query is made from.
 const ROOM_PROBE_LIFT: f32 = 500.0; // <- d_a_obj_coming.cpp:220

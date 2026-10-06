@@ -1086,7 +1086,7 @@ fn collect_hits(
             at_atp: 2,
         });
     }
-    for blast in watch.blasts.list.iter() {
+    for blast in blasts.list.iter() {
         hits.push(Hit {
             pos: *blast,
             reach: 30.0,
@@ -1095,7 +1095,7 @@ fn collect_hits(
             at_atp: 4,
         });
     }
-    for shaft in watch.shafts.iter() {
+    for shaft in shafts.iter() {
         if shaft.phase != arrow::Phase::Flying {
             continue;
         }
@@ -1113,7 +1113,7 @@ fn collect_hits(
             at_atp: 2,
         });
     }
-    for bolt in watch.bolts.iter() {
+    for bolt in bolts.iter() {
         if bolt.parameter != boomerang::MODE_THROW {
             continue;
         }
