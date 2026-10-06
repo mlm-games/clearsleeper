@@ -45,55 +45,55 @@ const MODE_SWAY: i16 = 3;
 const MODE_BREAK: i16 = 4;
 const MODE_FALL: i16 = 5;
 
-const PLANK_LEN_RIDE: f32 = 76.5;
-const RIDE_PLAYER: f32 = 100.0;
-const RIDE_MO2: f32 = 150.0;
-const RIDE_BOOK: f32 = 100.0;
-const RIDE_OTHER: f32 = 50.0;
+const PLANK_LEN_RIDE: f32 = 76.5; // <- d_a_bridge.cpp:33
+const RIDE_PLAYER: f32 = 100.0; // <- d_a_bridge.cpp:56
+const RIDE_MO2: f32 = 150.0; // <- d_a_bridge.cpp:60
+const RIDE_BOOK: f32 = 100.0; // <- d_a_bridge.cpp:66
+const RIDE_OTHER: f32 = 50.0; // <- d_a_bridge.cpp:83
 const RIDE_SOFT: f32 = 0.85;
-const TENSION_PLAYER: f32 = -31.0;
-const TENSION_MO2: f32 = -40.0;
-const TENSION_BOOK: f32 = -25.0;
-const TENSION_OTHER: f32 = -10.0;
-const TENSION_BOMB: f32 = -300.0;
-const RIDE_FALL: f32 = -5.0;
-const RIDE_FALL_MO2: f32 = -20.0;
+const TENSION_PLAYER: f32 = -31.0; // <- d_a_bridge.cpp:57
+const TENSION_MO2: f32 = -40.0; // <- d_a_bridge.cpp:61
+const TENSION_BOOK: f32 = -25.0; // <- d_a_bridge.cpp:67
+const TENSION_OTHER: f32 = -10.0; // <- d_a_bridge.cpp:84
+const TENSION_BOMB: f32 = -300.0; // <- d_a_bridge.cpp:89
+const RIDE_FALL: f32 = -5.0; // <- d_a_bridge.cpp:52
+const RIDE_FALL_MO2: f32 = -20.0; // <- d_a_bridge.cpp:62
 const RIDE_SWAY_FACTOR: f32 = 0.03;
-const RIDE_TWIST_MAX: f32 = 20.0;
-const RIDE_TWIST_SCALE: f32 = 0.3;
-const RIDE_ROLL_MAX: f32 = 50.0;
+const RIDE_TWIST_MAX: f32 = 20.0; // <- d_a_bridge.cpp:117
+const RIDE_TWIST_SCALE: f32 = 0.3; // <- d_a_bridge.cpp:107
+const RIDE_ROLL_MAX: f32 = 50.0; // <- d_a_bridge.cpp:118
 const RIDE_ROLL_STEP: f32 = 0.5;
 const BOMB_REST_LIMIT: i32 = 1;
 const BOMB_RELAX: f32 = 20.0;
 
-const SWAY_SHORT: i16 = 4000;
-const SWAY_LONG: i16 = 8000;
-const SWAY_STEP: i16 = 3000;
-const SWAY_STEP_BREAK: i16 = 4000;
+const SWAY_SHORT: i16 = 4000; // <- d_a_bridge.cpp:396
+const SWAY_LONG: i16 = 8000; // <- d_a_bridge.cpp:398
+const SWAY_STEP: i16 = 3000; // <- d_a_bridge.cpp:649
+const SWAY_STEP_BREAK: i16 = 4000; // <- d_a_bridge.cpp:811
 const SWAY_LEAD: i16 = 1000;
-const SWAY_SALT: i16 = 0x578;
-const SWAY_SALT2: i16 = 0x578;
-const SWAY_SUB: i16 = 0x5DC;
-const SWAY_SUB_MUL: f32 = 5.0;
-const SWAY_WIND_GAIN: f32 = 2.0;
-const SWAY_WIND_BIAS: f32 = 5.0;
-const SWAY_WIND_OFF: f32 = 0.3;
-const SWAY_SETTLE: i16 = 3000;
+const SWAY_SALT: i16 = 0x578; // <- d_a_bridge.cpp:772
+const SWAY_SALT2: i16 = 0x578; // <- d_a_bridge.cpp:1108
+const SWAY_SUB: i16 = 0x5DC; // <- d_a_bridge.cpp:1106
+const SWAY_SUB_MUL: f32 = 5.0; // <- d_a_bridge.cpp:409
+const SWAY_WIND_GAIN: f32 = 2.0; // <- d_a_bridge.cpp:1108
+const SWAY_WIND_BIAS: f32 = 5.0; // <- d_a_bridge.cpp:1108
+const SWAY_WIND_OFF: f32 = 0.3; // <- d_a_bridge.cpp:1107
+const SWAY_SETTLE: i16 = 3000; // <- d_a_bridge.cpp:771
 
-const SEG_LEN: f32 = 75.0;
-const SEG_LEN_WIND: f32 = 5.0;
-const SEG_LEN_HIMO: f32 = 23.0;
-const SEG_LEN_HIMO_WIND: f32 = 7.0;
+const SEG_LEN: f32 = 75.0; // <- d_a_bridge.cpp:413
+const SEG_LEN_WIND: f32 = 5.0; // <- d_a_bridge.cpp:409
+const SEG_LEN_HIMO: f32 = 23.0; // <- d_a_bridge.cpp:592
+const SEG_LEN_HIMO_WIND: f32 = 7.0; // <- d_a_bridge.cpp:587
 const SEG_LEN_CHAIN: f32 = 50.0;
 const SEG_LEN_CHAIN_END: f32 = -50.0;
 const SEG_LEN_CHAIN_MID: f32 = -40.0;
 const SEG_LEN_VTX: f32 = -40.0;
 
-const HALF_TURN: i16 = 0x8000;
-const QUARTER_TURN: i16 = 0x4000;
-const EIGHTH_TURN: i16 = 0x2000;
+const HALF_TURN: i16 = 0x8000; // <- d_a_bridge.cpp:518
+const QUARTER_TURN: i16 = 0x4000; // <- d_a_bridge.cpp:78
+const EIGHTH_TURN: i16 = 0x2000; // <- d_a_bridge.cpp:79
 
-const TENSION_CUT: f32 = -200.0;
+const TENSION_CUT: f32 = -200.0; // <- d_a_bridge.cpp:732
 const EVENT_WAIT_MAX: i32 = 100;
 const EVENT_STEP: i32 = 2;
 const SHAKE_FLAGS: i32 = -0x21;
@@ -102,25 +102,25 @@ const CUT_FLOOR: f32 = 30.0;
 const CUT_DROP: f32 = -15.0;
 const CUT_RATE: f32 = -50.0;
 const CUT_HANG: f32 = -10000.0;
-const BREAK_FRAMES: i16 = 50;
-const BREAK_SPREAD: f32 = 50.0;
+const BREAK_FRAMES: i16 = 50; // <- d_a_bridge.cpp:802
+const BREAK_SPREAD: f32 = 50.0; // <- d_a_bridge.cpp:789
 
-const PLANK_HP: i8 = 3;
-const HULL_RADIUS: f32 = 5.0;
-const HULL_HEIGHT: f32 = 1000.0;
+const PLANK_HP: i8 = 3; // <- d_a_bridge.cpp:644
+const HULL_RADIUS: f32 = 5.0; // <- d_a_bridge.cpp:1276
+const HULL_HEIGHT: f32 = 1000.0; // <- d_a_bridge.cpp:1277
 const HULL_HEIGHT_PLANK: f32 = 200.0;
-const TG_GATE_CUT: i16 = 20;
-const TG_GATE_STRIKE: i16 = 15;
+const TG_GATE_CUT: i16 = 20; // <- d_a_bridge.cpp:942
+const TG_GATE_STRIKE: i16 = 15; // <- d_a_bridge.cpp:992
 const ROPE_HEIGHT_DROP: f32 = -10000.0;
 const ROPE_HEIGHT_GAIN: f32 = 100.0;
-const ROPE_FLAME_TIME: i16 = 30;
+const ROPE_FLAME_TIME: i16 = 30; // <- d_a_bridge.cpp:1040
 const ROPE_FLAME_REACH: f32 = 50.0;
-const ROPE_FLAME_SQUASH: f32 = 0.4;
+const ROPE_FLAME_SQUASH: f32 = 0.4; // <- d_a_bridge.cpp:1037
 const ROPE_HEIGHT_CHAIN: f32 = 1000.0;
 const ROPE_HEIGHT_PLANK: f32 = 200.0;
-const ROPE_SWAY_CHAIN: f32 = 1000.0;
-const ROPE_SWAY_PLANK: f32 = 200.0;
-const ROPE_SPAN: f32 = 99.0;
+const ROPE_SWAY_CHAIN: f32 = 1000.0; // <- d_a_bridge.cpp:915
+const ROPE_SWAY_PLANK: f32 = 200.0; // <- d_a_bridge.cpp:915
+const ROPE_SPAN: f32 = 99.0; // <- d_a_bridge.cpp:898
 const ROPE_SPAN_OFF: f32 = -30.0;
 const HANG_DROP: f32 = -10.0;
 const RIDE_SLACK: f32 = 0.75;
@@ -146,7 +146,7 @@ const RND_SEED: i32 = 100;
 
 const ITA_Z_P: [f32; 11] = [
     0.1, 0.3, 0.5, 0.75, 0.9, 1.0, 0.9, 0.75, 0.5, 0.3, 0.1,
-];
+]; // <- d_a_bridge.cpp:26
 
 const LINE_MAIN_LINES: usize = 2;
 const LINE_MAIN_SEGS: usize = 14;
@@ -459,8 +459,6 @@ pub struct Bridge {
     pub entered: bool,
     pub line: [[Vec3; LINE_MAIN_SEGS]; LINE_MAIN_LINES],
     pub br: [Br; 50],
-    pub health: i32,
-    pub max_health: i32,
 }
 
 impl Bridge {
@@ -505,8 +503,6 @@ impl Bridge {
             entered: false,
             line: [[Vec3::ZERO; LINE_MAIN_SEGS]; LINE_MAIN_LINES],
             br: [Br::zero(); 50],
-            health: 0,
-            max_health: 0,
         }
     }
 

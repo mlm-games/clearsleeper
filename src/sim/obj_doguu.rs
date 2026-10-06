@@ -57,9 +57,9 @@ pub const CUT_NAME_TABLE: [&str; 9] = [
 ];
 
 pub const PARTICLE_GLOW_NAMES: [&str; 3] = [
-    "ID_IT_SN_SINJYU_GLOWD00",
-    "ID_IT_SN_SINJYU_GLOWF00",
-    "ID_IT_SN_SINJYU_GLOWN00",
+    "ID_IT_SN_SINJYU_GLOWD00", // <- d_a_obj_doguu.cpp:472
+    "ID_IT_SN_SINJYU_GLOWF00", // <- d_a_obj_doguu.cpp:474
+    "ID_IT_SN_SINJYU_GLOWN00", // <- d_a_obj_doguu.cpp:476
 ];
 
 pub const PARTICLE_GLOW_DIN: u32 = 0;
@@ -112,21 +112,21 @@ pub const EVENT_UNK_1E40: u32 = 0x1E40;
 
 pub const MSG_STATUS_NONE: u8 = 0xFF;
 
-pub const MSG_GREAT_FAIRY: u32 = 3821;
-pub const MSG_FIRST: u32 = 3822;
-pub const MSG_SECOND: u32 = 3823;
-pub const MSG_THIRD: u32 = 3824;
-pub const MSG_SECOND_CHANCE: u32 = 3825;
-pub const MSG_LAST_CHANCE: u32 = 3826;
+pub const MSG_GREAT_FAIRY: u32 = 3821; // <- d_a_obj_doguu.cpp:316
+pub const MSG_FIRST: u32 = 3822; // <- d_a_obj_doguu.cpp:318
+pub const MSG_SECOND: u32 = 3823; // <- d_a_obj_doguu.cpp:320
+pub const MSG_THIRD: u32 = 3824; // <- d_a_obj_doguu.cpp:322
+pub const MSG_SECOND_CHANCE: u32 = 3825; // <- d_a_obj_doguu.cpp:298
+pub const MSG_LAST_CHANCE: u32 = 3826; // <- d_a_obj_doguu.cpp:300
 
-pub const SE_LK_PUT_PEARL: u32 = 0x288C;
-pub const SE_OBJ_SDOLL_EYE_PULSE: u32 = 0x6A31;
-pub const BGM_GET_PEARL: u32 = 0x8000_004F;
+pub const SE_LK_PUT_PEARL: u32 = 0x288C; // <- JAZelAudio_SE.h:586 (JA_SE_LK_PUT_PEARL)
+pub const SE_OBJ_SDOLL_EYE_PULSE: u32 = 0x6A31; // <- JAZelAudio_SE.h:2068 (JA_SE_OBJ_SDOLL_EYE_PULSE)
+pub const BGM_GET_PEARL: u32 = 0x8000_004F; // <- JAZelAudio_BGM.h:85 (JA_BGM_GET_PEARL)
 
-pub const CYL_RADIUS: f32 = 200.0;
-pub const CYL_RADIUS_HELD: f32 = 50.0;
-pub const CYL_RADIUS_DONE: f32 = 30.0;
-pub const CYL_HEIGHT: f32 = 200.0;
+pub const CYL_RADIUS: f32 = 200.0; // <- d_a_obj_doguu.cpp:40
+pub const CYL_RADIUS_HELD: f32 = 50.0; // <- d_a_obj_doguu.cpp:678
+pub const CYL_RADIUS_DONE: f32 = 30.0; // <- d_a_obj_doguu.cpp:747
+pub const CYL_HEIGHT: f32 = 200.0; // <- d_a_obj_doguu.cpp:41
 
 pub const CO_SET: u32 = 0x01;
 pub const CO_IS_OTHER: u32 = 0x08;
@@ -145,17 +145,17 @@ pub const LIGHT_COLOR: [[u16; 3]; 3] = [
     [0x0032, 0x0032, 0x00C8],
 ];
 
-pub const LIGHT_RND_BASE: f32 = 1.0;
-pub const LIGHT_RND_RANGE: f32 = 0.1;
-pub const LIGHT_SCALE: f32 = 0.5;
-pub const LIGHT_MAX_STEP: f32 = 0.05;
-pub const LIGHT_POWER_SCALE: f32 = 300.0;
-pub const LIGHT_FLUCTUATION: f32 = 100.0;
+pub const LIGHT_RND_BASE: f32 = 1.0; // <- d_a_obj_doguu.cpp:82
+pub const LIGHT_RND_RANGE: f32 = 0.1; // <- d_a_obj_doguu.cpp:82
+pub const LIGHT_SCALE: f32 = 0.5; // <- d_a_obj_doguu.cpp:82
+pub const LIGHT_MAX_STEP: f32 = 0.05; // <- d_a_obj_doguu.cpp:82
+pub const LIGHT_POWER_SCALE: f32 = 300.0; // <- d_a_obj_doguu.cpp:87
+pub const LIGHT_FLUCTUATION: f32 = 100.0; // <- d_a_obj_doguu.cpp:88
 
-pub const EYE_OFFSET: f32 = 125.0;
+pub const EYE_OFFSET: f32 = 125.0; // <- d_a_obj_doguu.cpp:68
 
-pub const CULL_MIN: [f32; 3] = [-600.0, -0.0, -600.0];
-pub const CULL_MAX: [f32; 3] = [600.0, 400.0, 600.0];
+pub const CULL_MIN: [f32; 3] = [-600.0, -0.0, -600.0]; // <- d_a_obj_doguu.cpp:196
+pub const CULL_MAX: [f32; 3] = [600.0, 400.0, 600.0]; // <- d_a_obj_doguu.cpp:196
 pub const CULL_FAR: f32 = 1.0;
 
 pub const SETLIGHT_END: i32 = 200;
@@ -183,7 +183,7 @@ pub const SETLIGHT_SEG6_BASE: f32 = 0.625;
 pub const SETLIGHT_PARTICLE_TICK: i32 = 40;
 pub const SETLIGHT_GLOW_TICK: i32 = 125;
 
-pub const QUAKE_PATTERN: u32 = 0x0010_FFEE;
+pub const QUAKE_PATTERN: u32 = 0x0010_FFEE; // <- d_a_obj_doguu.cpp:348
 pub const QUAKE_FLAGS: i32 = 63;
 pub const QUAKE_COORD: Vec3 = Vec3::new(0.0, 1.0, 0.0);
 
@@ -416,8 +416,6 @@ fn has_event(index: i32) -> bool {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct ObjDoguu {
-    pub health: i32,
-    pub max_health: i32,
     pub argument: i32,
     pub kind: i32,
     pub item_no: u8,
@@ -462,8 +460,6 @@ impl ObjDoguu {
     pub fn spawn(parameters: u32) -> Self {
         let _ = parameters & BYTE_MASK;
         Self {
-            health: 0,
-            max_health: 0,
             argument: EVENT_IDX_NONE,
             kind: 0,
             item_no: inventory::ITEM_PEARL_DIN,

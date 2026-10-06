@@ -27,7 +27,20 @@ use crate::text::{
     STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_TYPING,
 };
 
-pub const TAG_MD_CB_ACTORS: [&str; 3] = ["TagCb1", "TagCb11", "TagCb12"];
+pub const TAG_MD_CB_ACTORS: [&str; 12] = [
+    "TagMd1", // <- d_stage.cpp:d_stage.cpp:588 (argument 0)
+    "TagCb1", // <- d_stage.cpp:d_stage.cpp:589 (argument 1)
+    "TagMd11", // <- d_stage.cpp:d_stage.cpp:590 (argument 2)
+    "TagMd12", // <- d_stage.cpp:d_stage.cpp:591 (argument 3)
+    "TagMd13", // <- d_stage.cpp:d_stage.cpp:592 (argument 4)
+    "TagMd14", // <- d_stage.cpp:d_stage.cpp:593 (argument 5)
+    "TagMd15", // <- d_stage.cpp:d_stage.cpp:594 (argument 6)
+    "TagMd16", // <- d_stage.cpp:d_stage.cpp:595 (argument 7)
+    "TagCb11", // <- d_stage.cpp:d_stage.cpp:596 (argument 8)
+    "TagCb12", // <- d_stage.cpp:d_stage.cpp:597 (argument 9)
+    "TagCb13", // <- d_stage.cpp:d_stage.cpp:598 (argument 10)
+    "TagCb14", // <- d_stage.cpp:d_stage.cpp:599 (argument 11)
+];
 
 pub fn is_tag_md_cb(name: &str) -> bool {
     TAG_MD_CB_ACTORS.contains(&name)
@@ -43,7 +56,7 @@ pub const ANGLE_SW_MASK: u16 = 0xFF;
 pub const ARG_MD1: i32 = 0;
 pub const ARG_CB1: i32 = 1;
 
-pub const EVENT_BIT_TABLE: [u32; 2] = [0x2920, 0x2910];
+pub const EVENT_BIT_TABLE: [u32; 2] = [0x2920, 0x2910]; // <- d_a_tag_md_cb.cpp:48
 
 pub const EVENT_NAME_TABLE: [&str; 7] = [
     "md_tag_message",
@@ -85,30 +98,30 @@ pub const CUT_MESSAGE: i32 = 3;
 pub const CUT_PLAYER_OFF: i32 = 4;
 pub const CUT_PLAYER_ON: i32 = 5;
 
-pub const HIO_M00: f32 = 200.0;
-pub const HIO_M04: f32 = 200.0;
-pub const HIO_M08: i16 = 900;
-pub const HIO_M0A: i16 = 150;
-pub const HIO_NO_NONE: i8 = -1;
+pub const HIO_M00: f32 = 200.0; // <- d_a_tag_md_cb.cpp:31
+pub const HIO_M04: f32 = 200.0; // <- d_a_tag_md_cb.cpp:32
+pub const HIO_M08: i16 = 900; // <- d_a_tag_md_cb.cpp:33 (DEMO_SELECT(600, 900))
+pub const HIO_M0A: i16 = 150; // <- d_a_tag_md_cb.cpp:34
+pub const HIO_NO_NONE: i8 = -1; // <- d_a_tag_md_cb.cpp:45
 
 pub const SCALE_MESSAGE: f32 = 50.0;
-pub const SCALE_ARG3_X: f32 = 2250.0;
-pub const TIMER_ARG3: i16 = 60;
+pub const SCALE_ARG3_X: f32 = 2250.0; // <- d_a_tag_md_cb.cpp:117
+pub const TIMER_ARG3: i16 = 60; // <- d_a_tag_md_cb.cpp:116
 
-pub const EVENT_UNK_3301: u32 = 0x3301;
-pub const EVENT_UNK_3302: u32 = 0x3302;
-pub const EVENT_UNK_3304: u32 = 0x3304;
-pub const EVENT_UNK_3308: u32 = 0x3308;
-pub const EVENT_UNK_3310: u32 = 0x3310;
-pub const EVENT_UNK_3320: u32 = 0x3320;
-pub const EVENT_UNK_3404: u32 = 0x3404;
-pub const EVENT_UNK_3408: u32 = 0x3408;
-pub const EVENT_UNK_3410: u32 = 0x3410;
-pub const EVENT_UNK_3420: u32 = 0x3420;
-pub const EVENT_UNK_3440: u32 = 0x3440;
-pub const EVENT_UNK_3480: u32 = 0x3480;
-pub const EVENT_UNK_4001: u32 = 0x4001;
-pub const EVENT_UNK_4180: u32 = 0x4180;
+pub const EVENT_UNK_3301: u32 = 0x3301; // <- d_save_event_flag.inc:392
+pub const EVENT_UNK_3302: u32 = 0x3302; // <- d_save_event_flag.inc:391
+pub const EVENT_UNK_3304: u32 = 0x3304; // <- d_save_event_flag.inc:390
+pub const EVENT_UNK_3308: u32 = 0x3308; // <- d_save_event_flag.inc:389
+pub const EVENT_UNK_3310: u32 = 0x3310; // <- d_save_event_flag.inc:388
+pub const EVENT_UNK_3320: u32 = 0x3320; // <- d_save_event_flag.inc:387
+pub const EVENT_UNK_3404: u32 = 0x3404; // <- d_save_event_flag.inc:398
+pub const EVENT_UNK_3408: u32 = 0x3408; // <- d_save_event_flag.inc:397
+pub const EVENT_UNK_3410: u32 = 0x3410; // <- d_save_event_flag.inc:396
+pub const EVENT_UNK_3420: u32 = 0x3420; // <- d_save_event_flag.inc:395
+pub const EVENT_UNK_3440: u32 = 0x3440; // <- d_save_event_flag.inc:394
+pub const EVENT_UNK_3480: u32 = 0x3480; // <- d_save_event_flag.inc:393
+pub const EVENT_UNK_4001: u32 = 0x4001; // <- d_save_event_flag.inc:492
+pub const EVENT_UNK_4180: u32 = 0x4180; // <- d_save_event_flag.inc:493
 
 pub const EVENT_INFO_NONE: u8 = 0xFF;
 pub const STAFF_IDX_NONE: i32 = -1;
@@ -117,27 +130,27 @@ pub const ORDER_NONE: i8 = -1;
 pub const CUT_NONE: i8 = -1;
 
 pub const ROOM_NONE: i8 = -1;
-pub const COND_ARG2_DIST2: f32 = 250000.0;
-pub const AREA_MIN_DY: f32 = -10.0;
+pub const COND_ARG2_DIST2: f32 = 250000.0; // <- d_a_tag_md_cb.cpp:520
+pub const AREA_MIN_DY: f32 = -10.0; // <- d_a_tag_md_cb.cpp:492
 
 pub const COLLECT_TACT: u8 = 1;
 pub const COLLECT_TACT_ITEM: u8 = 1;
 
-pub const MSG_MD_HERE: u32 = 0x19F0;
-pub const MSG_MD_HERE_END: u32 = 0x19F1;
-pub const MSG_MD_HERE_2: u32 = 0x19F2;
-pub const MSG_MD_AFTER: u32 = 0x19F3;
-pub const MSG_MD_FINISH: u32 = 0x19F4;
-pub const MSG_MD_FINISH_2: u32 = 0x19F5;
-pub const MSG_CB_HERE: u32 = 0x1530;
-pub const MSG_CB_AFTER: u32 = 0x1531;
-pub const MSG_CB_LAST: u32 = 0x1533;
-pub const MSG_CB_FINISH: u32 = 0x1534;
-pub const MSG_CB_TAIL: u32 = 0x1535;
+pub const MSG_MD_HERE: u32 = 0x19F0; // <- d_a_tag_md_cb.cpp:286
+pub const MSG_MD_HERE_END: u32 = 0x19F1; // <- d_a_tag_md_cb.cpp:289
+pub const MSG_MD_HERE_2: u32 = 0x19F2; // <- d_a_tag_md_cb.cpp:295
+pub const MSG_MD_AFTER: u32 = 0x19F3; // <- d_a_tag_md_cb.cpp:297
+pub const MSG_MD_FINISH: u32 = 0x19F4; // <- d_a_tag_md_cb.cpp:299
+pub const MSG_MD_FINISH_2: u32 = 0x19F5; // <- d_a_tag_md_cb.cpp:301
+pub const MSG_CB_HERE: u32 = 0x1530; // <- d_a_tag_md_cb.cpp:303
+pub const MSG_CB_AFTER: u32 = 0x1531; // <- d_a_tag_md_cb.cpp:305
+pub const MSG_CB_LAST: u32 = 0x1533; // <- d_a_tag_md_cb.cpp:307
+pub const MSG_CB_FINISH: u32 = 0x1534; // <- d_a_tag_md_cb.cpp:310
+pub const MSG_CB_TAIL: u32 = 0x1535; // <- d_a_tag_md_cb.cpp:312
 pub const MSG_KEY: &str = "msg_number";
 
-pub const SE_CV_MD_I_AM_HERE: u32 = 0x4921;
-pub const SE_CV_CB_I_AM_HERE: u32 = 0x491B;
+pub const SE_CV_MD_I_AM_HERE: u32 = 0x4921; // <- JAZelAudio_SE.h:968 (JA_SE_CV_MD_I_AM_HERE)
+pub const SE_CV_CB_I_AM_HERE: u32 = 0x491B; // <- JAZelAudio_SE.h:962 (JA_SE_CV_CB_I_AM_HERE)
 
 pub const SHOCK_PATTERN: i32 = 4;
 pub const SHOCK_FLAGS: i32 = -0x21;
@@ -156,7 +169,7 @@ pub const ORDER_CB_CARRY: i8 = 4;
 pub const ORDER_CB_ARG9: i8 = 5;
 pub const ORDER_CB_ARG11: i8 = 6;
 
-pub const M2BC_OFFSET: i32 = 0x2BC;
+pub const M2BC_OFFSET: i32 = 0x2BC; // <- d_a_tag_md_cb.h:68
 
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct TagMdCbHio {
@@ -208,8 +221,6 @@ pub enum TagMdCbAction {
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct TagMdCb {
-    pub health: i32,
-    pub max_health: i32,
     pub argument: i32,
     pub m29c: i32,
     pub m2a0: i32,
@@ -240,8 +251,6 @@ impl TagMdCb {
     pub fn spawn(parameters: u32) -> Self {
         let _ = parameters;
         Self {
-            health: 0,
-            max_health: 0,
             argument: ARG_MD1,
             m29c: 0,
             m2a0: 0,
@@ -271,9 +280,18 @@ impl TagMdCb {
 
     pub fn argument_of(name: &str) -> i32 {
         match name {
-            "TagCb1" => 1,
-            "TagCb11" => 8,
-            "TagCb12" => 9,
+            "TagMd1" => 0, // <- d_stage.cpp:588
+            "TagCb1" => 1, // <- d_stage.cpp:589
+            "TagMd11" => 2, // <- d_stage.cpp:590
+            "TagMd12" => 3, // <- d_stage.cpp:591
+            "TagMd13" => 4, // <- d_stage.cpp:592
+            "TagMd14" => 5, // <- d_stage.cpp:593
+            "TagMd15" => 6, // <- d_stage.cpp:594
+            "TagMd16" => 7, // <- d_stage.cpp:595
+            "TagCb11" => 8, // <- d_stage.cpp:596
+            "TagCb12" => 9, // <- d_stage.cpp:597
+            "TagCb13" => 10, // <- d_stage.cpp:598
+            "TagCb14" => 11, // <- d_stage.cpp:599
             _ => 0,
         }
     }

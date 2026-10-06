@@ -99,82 +99,82 @@ const ATTENTION_LIFT: f32 = 60.0;
 const ATTENTION_TALK: u8 = 5;
 const ATTENTION_SPEAK: u8 = 6;
 
-const WATER_GRAVITY: f32 = -3.0;
+const WATER_GRAVITY: f32 = -3.0; // <- d_a_kanban.cpp:185
 const WAVE_LIFT: f32 = 7.0;
-const WAVE_DROP: f32 = 120.0;
-const WAVE_STEP: f32 = 1000.0;
-const WAVE_BASE: f32 = 147.0;
-const WAVE_AMP: f32 = 2.0;
-const WAVE_RISE: f32 = 30.0;
-const WAVE_DAMP: f32 = 2.0;
+const WAVE_DROP: f32 = 120.0; // <- d_a_kanban.cpp:194
+const WAVE_STEP: f32 = 1000.0; // <- d_a_kanban.cpp:198
+const WAVE_BASE: f32 = 147.0; // <- d_a_kanban.cpp:200
+const WAVE_AMP: f32 = 2.0; // <- d_a_kanban.cpp:200
+const WAVE_RISE: f32 = 30.0; // <- d_a_kanban.cpp:201
+const WAVE_DAMP: f32 = 2.0; // <- d_a_kanban.cpp:548
 
 const TARGET_MAX: usize = 10;
-const SHOCK_DIST: f32 = 1000.0;
-const SHOCK_TIMER: i16 = 100;
+const SHOCK_DIST: f32 = 1000.0; // <- d_a_kanban.cpp:287
+const SHOCK_TIMER: i16 = 100; // <- d_a_kanban.cpp:288
 const SHOCK_JITTER: f32 = 10.0;
 const SHOCK_RISE: f32 = 20.0;
 
-const BACK_FAR: u32 = 0x6000;
-const BACK_EDGE: u32 = 0x2000;
-const TOSS_TURN: i16 = -0x4000;
-const TOSS_FAST: f32 = 20.0;
-const TOSS_RISE: f32 = 10.0;
-const TOSS_SLOW: f32 = 3.0;
+const BACK_FAR: u32 = 0x6000; // <- d_a_kanban.cpp:322
+const BACK_EDGE: u32 = 0x2000; // <- d_a_kanban.cpp:324
+const TOSS_TURN: i16 = -0x4000; // <- d_a_kanban.cpp:436
+const TOSS_FAST: f32 = 20.0; // <- d_a_kanban.cpp:440
+const TOSS_RISE: f32 = 10.0; // <- d_a_kanban.cpp:441
+const TOSS_SLOW: f32 = 3.0; // <- d_a_kanban.cpp:444
 const TOSS_SLOW_RISE: f32 = 7.0;
-const FALL_ANGLE: i16 = 0x4000;
-const FALL_TURN: i16 = 0x1000;
-const SPIN_TUMBLE: i16 = 0x800;
-const SPIN_SNAP: i16 = 0x400;
-const SPIN_XOR: i16 = 0xFF00u16 as i16;
+const FALL_ANGLE: i16 = 0x4000; // <- d_a_kanban.cpp:461
+const FALL_TURN: i16 = 0x1000; // <- d_a_kanban.cpp:461
+const SPIN_TUMBLE: i16 = 0x800; // <- d_a_kanban.cpp:465
+const SPIN_SNAP: i16 = 0x400; // <- d_a_kanban.cpp:487
+const SPIN_XOR: i16 = 0xFF00u16 as i16; // <- d_a_kanban.cpp:482
 
-const PART_TURN_JITTER: f32 = 8000.0;
-const PART_FAST_JITTER: f32 = 2.0;
-const PART_FAST_BASE: f32 = 10.0;
-const PART_RISE_JITTER: f32 = 5.0;
-const PART_RISE_BASE: f32 = 20.0;
-const PART_HAMMER_JITTER: f32 = 5.0;
+const PART_TURN_JITTER: f32 = 8000.0; // <- d_a_kanban.cpp:641
+const PART_FAST_JITTER: f32 = 2.0; // <- d_a_kanban.cpp:644
+const PART_FAST_BASE: f32 = 10.0; // <- d_a_kanban.cpp:644
+const PART_RISE_JITTER: f32 = 5.0; // <- d_a_kanban.cpp:645
+const PART_RISE_BASE: f32 = 20.0; // <- d_a_kanban.cpp:645
+const PART_HAMMER_JITTER: f32 = 5.0; // <- d_a_kanban.cpp:650
 const PART_HAMMER_FAST: f32 = 15.0;
-const PART_HAMMER_RISE: f32 = 30.0;
-const PART_GRAVITY: f32 = -5.0;
-const PART_SPIN: i16 = 0x1000;
+const PART_HAMMER_RISE: f32 = 30.0; // <- d_a_kanban.cpp:650
+const PART_GRAVITY: f32 = -5.0; // <- d_a_kanban.cpp:646
+const PART_SPIN: i16 = 0x1000; // <- d_a_kanban.cpp:677
 const PART_GROUND_FAST: f32 = 5.0;
 const PART_GROUND_RISE: f32 = 10.0;
 
-const RETURN_JITTER: f32 = 30.0;
-const RETURN_STEP: i16 = 0x1000;
-const RETURN_TURN: i16 = 0x1000;
-const RETURN_FACE: u32 = 0x100;
-const RETURN_HEIGHT: f32 = 2.0;
-const RETURN_SPAN: f32 = 2.0;
-const RETURN_RATE: f32 = 10.0;
+const RETURN_JITTER: f32 = 30.0; // <- d_a_kanban.cpp:580
+const RETURN_STEP: i16 = 0x1000; // <- d_a_kanban.cpp:552
+const RETURN_TURN: i16 = 0x1000; // <- d_a_kanban.cpp:599
+const RETURN_FACE: u32 = 0x100; // <- d_a_kanban.cpp:601
+const RETURN_HEIGHT: f32 = 2.0; // <- d_a_kanban.cpp:555
+const RETURN_SPAN: f32 = 2.0; // <- d_a_kanban.cpp:560
+const RETURN_RATE: f32 = 10.0; // <- d_a_kanban.cpp:556
 
-const SINK_TALL: f32 = 90.0;
-const SINK_MID: f32 = 65.0;
-const SINK_LOW: f32 = 20.0;
-const SINK_STEP: f32 = 30.0;
+const SINK_TALL: f32 = 90.0; // <- d_a_kanban.cpp:516
+const SINK_MID: f32 = 65.0; // <- d_a_kanban.cpp:518
+const SINK_LOW: f32 = 20.0; // <- d_a_kanban.cpp:522
+const SINK_STEP: f32 = 30.0; // <- d_a_kanban.cpp:525
 const DROP_LIFT: f32 = 70.0;
-const DROP_RISE: f32 = 140.0;
+const DROP_RISE: f32 = 140.0; // <- d_a_kanban.cpp:370
 
-const CC_REST_HEIGHT: f32 = 105.0;
-const CC_REST_RADIUS: f32 = 50.0;
+const CC_REST_HEIGHT: f32 = 105.0; // <- d_a_kanban.cpp:614
+const CC_REST_RADIUS: f32 = 50.0; // <- d_a_kanban.cpp:615
 const CC_GONE_HEIGHT: f32 = 0.0;
 const CC_GONE_RADIUS: f32 = 0.0;
 const CC_EDGE_HEIGHT: f32 = 25.0;
 const CC_EDGE_RADIUS: f32 = 10.0;
 
-const WALL_CREATE_X: f32 = 20.0;
-const WALL_CREATE_Z: f32 = 30.0;
-const WALL_STEP_X: f32 = 0.0;
-const WALL_STEP_Z: f32 = 40.0;
+const WALL_CREATE_X: f32 = 20.0; // <- d_a_kanban.cpp:1131
+const WALL_CREATE_Z: f32 = 30.0; // <- d_a_kanban.cpp:1131
+const WALL_STEP_X: f32 = 0.0; // <- d_a_kanban.cpp:949
+const WALL_STEP_Z: f32 = 40.0; // <- d_a_kanban.cpp:949
 
-const ROLL_DIST: f32 = 35.0;
+const ROLL_DIST: f32 = 35.0; // <- d_a_kanban.cpp:867
 const ROLL_REACH: f32 = 40.0;
 const ROLL_FACE: f32 = -0.9;
 const ROLL_Y_LOW: f32 = -100.0;
 const ROLL_Y_HIGH: f32 = 200.0;
 
-const SE_FALL_WATER: u32 = 0x6919;
-const SE_BREAK_BOARD: u32 = 0x6937;
+const SE_FALL_WATER: u32 = 0x6919; // <- JAZelAudio_SE.h:962 (JA_SE_OBJ_FALL_WATER_M)
+const SE_BREAK_BOARD: u32 = 0x6937; // <- JAZelAudio_SE.h:1842 (JA_SE_OBJ_BREAK_BOARD)
 
 const MSG_NONE: i32 = -1;
 const MSG_OPEN: i32 = 1;
@@ -371,8 +371,6 @@ pub struct Kanban {
     pub cantalk: bool,
     pub crash: bool,
     pub seed: [i32; 3],
-    pub health: i32,
-    pub max_health: i32,
     pub entered: bool,
     pub doomed: bool,
 }
@@ -425,8 +423,6 @@ impl Kanban {
             cantalk: false,
             crash: false,
             seed: [RND_SEED; 3],
-            health: 0,
-            max_health: 0,
             entered: false,
             doomed: false,
         }
