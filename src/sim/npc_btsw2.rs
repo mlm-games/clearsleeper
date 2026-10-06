@@ -70,7 +70,6 @@ const CULL_MIN: [f32; 3] = [-70.0, -100.0, -80.0]; // <- f_op_actor_mng.cpp:570 
 const CULL_MAX: [f32; 3] = [70.0, 240.0, 100.0]; // <- f_op_actor_mng.cpp:570
 
 const ACTION_STARTING: i8 = 0; // <- d_a_npc_btsw2.h:12
-const ACTION_ONGOING: i8 = 1; // <- d_a_npc_btsw2.h:13
 const ACTION_ENDING: i8 = -1; // <- d_a_npc_btsw2.h:14
 
 const MODE_WAIT: i8 = 1; // <- :517

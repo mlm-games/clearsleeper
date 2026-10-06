@@ -51,7 +51,6 @@ const CULL_MIN: [f32; 3] = [-60.0, -20.0, -80.0]; // <- fopAcM_setCullSizeBox, :
 const CULL_MAX: [f32; 3] = [60.0, 160.0, 60.0]; // <- :727
 
 const ACTION_STARTING: i8 = 0; // <- set_action, :518
-const ACTION_ONGOING: i8 = 1; // <- wait_action1, :576
 const ACTION_ENDING: i8 = -1; // <- set_action, :514
 
 const STT_WAIT: i8 = 1; // <- a_anm_prm_tbl[1], :245

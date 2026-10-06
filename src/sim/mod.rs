@@ -102,6 +102,7 @@ pub mod item;
 pub mod ivan;
 pub mod jump;
 pub mod kanban;
+pub mod npc_ah;
 pub mod kalle_demos;
 pub mod quake;
 pub mod qtkhd;
@@ -154,6 +155,9 @@ pub mod npc_bmsw;
 pub mod npc_co1;
 pub mod npc_btsw;
 pub mod npc_gp1;
+pub mod npc_btsw2;
+pub mod npc_jb1;
+pub mod npc_tt;
 pub mod npc_km1;
 pub mod npc_mt;
 pub mod npc_pf1;
@@ -1054,6 +1058,18 @@ world.spawn((actor, branch::Branch::spawn())).id()
     } else if hami3::is_hami3(&source.name) {
 let v = hami3::Hami3::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
+    } else if npc_ah::is_npc_ah(&source.name) {
+let v = npc_ah::NpcAh::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_btsw2::is_npc_btsw2(&source.name) {
+let v = npc_btsw2::NpcBtsw2::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_jb1::is_npc_jb1(&source.name) {
+let v = npc_jb1::NpcJb1::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_tt::is_npc_tt(&source.name) {
+let v = npc_tt::NpcTt::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1641,6 +1657,10 @@ pub fn build(
                 .chain(),
             (
                 pickup::control.in_set(WwSimSet::Execute),
+                    npc_ah::control.in_set(WwSimSet::Execute),
+                    npc_btsw2::control.in_set(WwSimSet::Execute),
+                    npc_jb1::control.in_set(WwSimSet::Execute),
+                    npc_tt::control.in_set(WwSimSet::Execute),
 
                     ebomzo::control.in_set(WwSimSet::Execute),
                     sk2::control.in_set(WwSimSet::Execute),
@@ -1699,7 +1719,6 @@ pub fn build(
                 .chain(),
             (
                 hami3::control.in_set(WwSimSet::Execute),
-                    wlvtag::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
 
                     andsw0::control.in_set(WwSimSet::Execute),

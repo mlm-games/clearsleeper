@@ -53,7 +53,6 @@ const DAT_LOOK_MAX_VEL: i16 = 0x0800; // <- field_0x32, :53
 const DAT_RETURN_TIMER: i16 = 0x001E; // <- field_0x50, :55
 const DAT_FIELD_52: u8 = 0x00; // <- field_0x52, :55
 const DAT_FIELD_53: u8 = 0x00; // <- field_0x53, :55
-const DAT_COLL_RADIUS: f32 = 60.0; // <- field_0x38, :54
 
 // l_msg_ah_0..9 - :58-111; each entry is a two-slot chain terminated by 0x0000.
 const MSG_AH: [u32; 10] = [
@@ -67,12 +66,10 @@ const LOOK_MAX_VEL_SCALE: i16 = 4; // <- :795
 const JNT_SCALE: i16 = 4; // <- d_npc.cpp dNpc_JntCtrl_c::follow
 const JNT_MIN_STEP: i32 = 1; // <- d_npc.cpp dNpc_JntCtrl_c::move
 const PLAYER_HEAD_TOP: f32 = 40.0; // <- d_a_player_main.cpp:11575
-const COLLISION_HEIGHT: f32 = 150.0; // <- setCollision(..., 150.0f), :301
 
 const CULL_MIN: [f32; 3] = [-70.0, 0.0, -70.0]; // <- fopAcM_setCullSizeBox, :281
 const CULL_MAX: [f32; 3] = [70.0, 200.0, 70.0]; // <- :281
 
-const BTP_TIMER: i16 = 0x78; // <- playTexPatternAnm mTimer = 0x78, :824
 const BTP_TIMER_MIN: f32 = 30.0; // <- :823
 const BTP_TIMER_RANGE: f32 = 100.0; // <- :823
 const BTP_FRAME_MAX: u8 = 0xFF; // <- mBtpFrame >= getFrameMax() stand-in, :822

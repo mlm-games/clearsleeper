@@ -68,7 +68,6 @@ const MSG_5B3: u32 = 0x5B3; // <- getMsg, :176
 const MELODY_5: u8 = 5; // <- dComIfGp_setMelodyNum(5), :177
 
 const NOTICE_LINK_TIMER: i16 = 0xF; // <- msgPushButton, :234
-const TACT_TIMER: i16 = 0x14; // <- wait01 mTimer = 0x14, :613
 
 const ATTN_Y_OFFSET: f32 = 65.0; // <- setAttention, :562
 const PLAYER_HEAD_TOP: f32 = 40.0; // <- d_a_player_main.cpp:11575

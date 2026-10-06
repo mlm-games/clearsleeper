@@ -1142,14 +1142,6 @@ impl App {
                 let (min, max) = sim::hys::Hys::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
-            } else if entity.contains::<sim::smtoge::Smtoge>() {
-                let (min, max) = sim::smtoge::Smtoge::spawn(0, &sim::flags::Switches::default()).cull();
-                lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
-            } else if entity.contains::<sim::ygawa::Ygawa>() {
-                let (min, max) = sim::ygawa::Ygawa::spawn().cull();
-                lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::syan::Syan>() {
                 let (min, max) = sim::syan::Syan::spawn().cull();
                 lift = min[1];
@@ -1163,7 +1155,7 @@ impl App {
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::rohat::RoHat>() {
-                let (min, max) = sim::rohat::RoHat::spawn(0).cull();
+                let (min, max) = sim::rohat::RoHat::spawn().cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::vfan::Vfan>() {
@@ -1186,6 +1178,22 @@ impl App {
                 let (min, max) = sim::atdoor::Atdoor::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if let Some(x) = entity.get::<sim::npc_ah::NpcAh>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_btsw2::NpcBtsw2>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_jb1::NpcJb1>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_tt::NpcTt>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];
