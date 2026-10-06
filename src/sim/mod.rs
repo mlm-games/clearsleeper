@@ -18,6 +18,7 @@ pub mod barrel;
 pub mod bemos;
 pub mod barricade;
 pub mod bitem;
+pub mod bita;
 pub mod bird;
 pub mod bwds;
 pub mod ebomzo;
@@ -52,6 +53,7 @@ pub mod demokmm;
 pub mod dummy;
 pub mod eayogn;
 pub mod esekh;
+pub mod esa;
 pub mod ending;
 pub mod enemy;
 pub mod event;
@@ -93,6 +95,7 @@ pub mod hammerhit;
 pub mod health;
 pub mod helmaroc;
 pub mod hhyu;
+pub mod hbrf1;
 pub mod htobi3;
 pub mod hotfloor;
 pub mod hys;
@@ -103,6 +106,7 @@ pub mod hookshot;
 pub mod hop;
 pub mod iball;
 pub mod ice;
+pub mod iceisland;
 pub mod intent;
 pub mod ikari;
 pub mod inventory;
@@ -140,6 +144,8 @@ pub mod layer;
 pub mod leaves;
 pub mod lenzo;
 pub mod lines;
+pub mod lpalm;
+pub mod lwood;
 pub mod lock;
 pub mod magma;
 pub mod makar;
@@ -157,6 +163,7 @@ pub mod msdan2;
 pub mod msg;
 pub mod nh;
 pub mod obj_akabe;
+pub mod ojtree;
 pub mod otble;
 pub mod omensmk;
 pub mod objtime;
@@ -549,6 +556,21 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if npc_fa1::is_npc_fa1(&source.name) {
         let v = npc_fa1::NpcFa1::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if bita::is_bita(&source.name) {
+        world.spawn((actor, bita::Bita::spawn(source.parameters))).id()
+    } else if lwood::is_lwood(&source.name) {
+        world.spawn((actor, lwood::Lwood::spawn(source.parameters))).id()
+    } else if lpalm::is_lpalm(&source.name) {
+        world.spawn((actor, lpalm::Lpalm::spawn(source.parameters))).id()
+    } else if ojtree::is_ojtree(&source.name) {
+        world.spawn((actor, ojtree::Ojtree::spawn(source.parameters))).id()
+    } else if esa::is_esa(&source.name) {
+        world.spawn((actor, esa::Esa::spawn(source.parameters))).id()
+    } else if iceisland::is_iceisland(&source.name) {
+        world.spawn((actor, iceisland::Iceisland::spawn(source.parameters))).id()
+    } else if hbrf1::is_hbrf1(&source.name) {
+        let lift = hbrf1::Hbrf1::spawn(source.parameters, actor.pos);
+        world.spawn((actor, lift)).id()
     } else if toripost::is_toripost(&source.name) {
         let v = toripost::Toripost::spawn(source.parameters);
         world.spawn((actor, v)).id()
@@ -1436,6 +1458,8 @@ pub fn build(
                 select::control.in_set(WwSimSet::Execute),
                 canon::control.in_set(WwSimSet::Execute),
                 mbdoor::control.in_set(WwSimSet::Execute),
+                iceisland::control.in_set(WwSimSet::Execute),
+                hbrf1::control.in_set(WwSimSet::Execute),
                 demokmm::control.in_set(WwSimSet::Execute),
                 komore::control.in_set(WwSimSet::Execute),
                 npc_pf1::control.in_set(WwSimSet::Execute),
@@ -1539,6 +1563,7 @@ pub fn build(
                 roll::control.in_set(WwSimSet::Execute),
                 hop::control.in_set(WwSimSet::Execute),
                 schedule::control.in_set(WwSimSet::Execute),
+                esa::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (combat::control.in_set(WwSimSet::Execute),
@@ -1575,6 +1600,7 @@ pub fn build(
                 leaves::control.in_set(WwSimSet::Execute),
                 swpush::control.in_set(WwSimSet::Execute),
                 mflft::control.in_set(WwSimSet::Execute),
+                ojtree::control.in_set(WwSimSet::Execute),
                 hmlif::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -1698,3 +1724,5 @@ pub fn build(
 }
 
 pub mod auction;
+
+pub mod knob00;
