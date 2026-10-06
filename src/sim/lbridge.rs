@@ -192,14 +192,14 @@ impl Lbridge {
     ) {
         // `bool isSw = fopAcM_isSwitch(this, mSwitchNo);` (:136)
         let is_switch = switches.test(self.switch_no);
-        self.sw_check(switches);
-        self.demo(list, active, ev_flags, entity);
+        self.sw_check(switches, events);
+        self.demo(list, active, ev_flags, events, entity);
         // `mIsSw = isSw;` (:145) - note it is the value sampled at `:136`, NOT a fresh read.
         self.was_switch = is_switch;
     }
 
     /// `daLbridge_c::sw_check` (`:151-189`).
-    fn sw_check(&mut self, switches: &Switches) {
+    fn sw_check(&mut self, switches: &Switches, events: &mut SimEvents) {
         let is_switch = switches.test(self.switch_no);
         // `if (mSwitchNo == 0xFF) { return; }` (:154-156) - an unswitched bridge never appears or
         // disappears, and never fades.
@@ -287,12 +287,13 @@ impl Lbridge {
         list: &EventList,
         active: &mut ActiveEvent,
         ev_flags: &mut EventFlags,
+        events: &mut SimEvents,
         entity: Entity,
     ) {
         // `if (eventInfo.checkCommandDemoAccrpt()) { ... } else { ... }` (:193-219). That latch is
         // set on this actor precisely because the `else` arm ordered one of its two events, so
         // "one of them is in Play or Close" is the exact reading.
-        if !Self::demo_running(active, bridge) {
+        if !Self::demo_running(active, self) {
             // ```
             // if (!isEventBit(UNK_0E01) && unk31C == 1) {
             //     fopAcM_orderOtherEventId(this, mAppearEventIdx); onCondition(UNK2);

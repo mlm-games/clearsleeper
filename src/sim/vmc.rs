@@ -96,7 +96,7 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut mounds: Query<(&mut Actor, &mut Vmc)>,
 ) {
-    for (actor, mound) in &mut mounds {
+    for (actor, mut mound) in &mut mounds {
         match mound.state {
             STATE_BASE_MAIN => {}
             STATE_TREE_DEMO_WAIT => mound.state = STATE_TREE_DEMO_MAIN,

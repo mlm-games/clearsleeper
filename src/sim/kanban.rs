@@ -777,13 +777,13 @@ pub fn control(
             continue;
         }
         let mut fresh = Kanban::spawn(actor.parameters);
-        if !fresh.create(actor, None) {
+        if !fresh.create(&mut actor, None) {
             fresh.doomed = true;
         }
         *board = fresh;
     }
 
-    for (entity, mut actor, board) in &mut boards {
+    for (entity, mut actor, mut board) in &mut boards {
         if board.doomed || !board.whole {
             continue;
         }
@@ -798,11 +798,11 @@ pub fn control(
             set_id: actor.set_id,
             room: actor.room,
         };
-        board.execute(actor, entity, &env, &mut sink);
+        board.execute(&mut actor, entity, &env, &mut sink);
         links.push((entity, board.link()));
     }
 
-    for (entity, actor, board) in &mut boards {
+    for (entity, mut actor, mut board) in &mut boards {
         if board.doomed || board.whole {
             continue;
         }
@@ -832,7 +832,7 @@ pub fn control(
         }
     }
 
-    for (entity, _, board) in &mut boards {
+    for (entity, _, mut board) in &mut boards {
         if board.doomed || !board.whole {
             continue;
         }

@@ -51,12 +51,12 @@ impl Ygush {
         if let Some(entity) = self.pool
             && let Ok((_, actor, pool)) = pools.get(entity)
         {
-            return Some(actor.pos.y + pool.water_lv + pool.wave);
+            return Some(actor.pos.y + pool.water_lv() + pool.wave());
         }
         let found = pools.iter().next();
         if let Some((entity, actor, pool)) = found {
             self.pool = Some(entity);
-            return Some(actor.pos.y + pool.water_lv + pool.wave);
+            return Some(actor.pos.y + pool.water_lv() + pool.wave());
         }
         self.pool = None;
         None

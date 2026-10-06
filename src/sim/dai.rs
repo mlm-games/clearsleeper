@@ -32,7 +32,7 @@ pub const DAI_ACTORS: [&str; 1] = ["Fdai"];
 /// a plain descending run of `0xD1FF + i` - transcribed here as explicit values so each row keeps a
 /// citation, and note `StoryBits` is byte-indexed by `hi_byte << 8 | mask` (RULE 11c), which is
 /// exactly what these ids are.
-const DAI_SAVE_LABELS: [u16; 41] = [
+const DAI_SAVE_LABELS: [u16; 40] = [
     0xF8FF, // <- d_com_static.cpp:199
     0xF7FF, // <- d_com_static.cpp:200
     0xF6FF, // <- d_com_static.cpp:201
@@ -100,7 +100,7 @@ const CULL_MAX: [f32; 3] = [50.0, 200.0, 50.0]; // <- d_a_dai.cpp:79
 /// roughly 65.9 degrees each way.
 const NEAR_XZ: f32 = 100.0; // <- d_a_dai.cpp:256
 const NEAR_Y: f32 = 10.0; // <- d_a_dai.cpp:258
-const FACING_LIMIT: i32 = 12000; // <- d_a_dai.cpp:265
+const FACING_LIMIT: u16 = 12000;
 
 /// The message-box half of this actor is OMITTED (see the struct docs), so its literals are
 /// documented here rather than carried as constants with no reader - RULE 12(b) makes an

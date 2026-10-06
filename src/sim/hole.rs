@@ -140,7 +140,6 @@ impl Hole {
         let scale_local = if angle_z == -1 { 0 } else { angle_z as u16 };
         Self {
             mode: MODE_WAIT,
-            has_model,
             exit_idx,
             scale_local,
             event_slot: None,

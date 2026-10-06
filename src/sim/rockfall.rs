@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
-use super::fallrock::{FallRock, FALLROCK_ACTOR};
+use super::fallrock::{FALLROCK_ACTORS, FallRock};
 use super::schedule::Schedule;
 
 pub const ROCKFALL_ACTOR: &str = "frock";
@@ -91,7 +91,7 @@ pub fn control(
         let angle = fall.tumble();
         commands.spawn((
             Actor {
-                name: FALLROCK_ACTOR.to_owned(),
+                name: FALLROCK_ACTORS[0].to_owned(),
                 parameters: 0,
                 pos: actor.pos + offset,
                 angle,

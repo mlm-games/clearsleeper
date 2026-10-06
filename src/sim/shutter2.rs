@@ -287,9 +287,9 @@ impl Shutter2 {
         // that case, and also the -1 that a missing event name produces - in both retail orders an
         // event that cannot run.
         if self.want == WANT_OPEN && self.open_slot.is_some() {
-            Self::order(self.open_slot, list, active, entity);
+            Self::order(self.open_slot.unwrap(), list, active, entity);
         } else if self.want == WANT_CLOSE && self.close_slot.is_some() {
-            Self::order(self.close_slot, list, active, entity);
+            Self::order(self.close_slot.unwrap(), list, active, entity);
         }
     }
 

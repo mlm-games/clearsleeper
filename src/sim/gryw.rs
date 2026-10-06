@@ -78,6 +78,17 @@ pub struct Gryw {
     btk_state: u8,
 }
 
+
+impl Gryw {
+    pub fn water_lv(&self) -> f32 {
+        self.water_lv
+    }
+
+    pub fn wave(&self) -> f32 {
+        self.wave
+    }
+}
+
 impl Gryw {
     /// `Create` (`d_a_obj_gryw00.cpp:151-190`): `param_get_swSave` reads bits 0..8, and a switch
     /// that is already set at load time takes the "puzzle already solved" branch - static

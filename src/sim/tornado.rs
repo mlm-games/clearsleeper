@@ -166,7 +166,7 @@ impl Tornado {
     /// (`:192-210`, both dead - see the struct doc), the two `setBaseTRMtx` calls (`:211-212`,
     /// `:221-222`), `attention_info.position` (`:213`, RULE 3b), `eyePos = current.pos` (`:214`),
     /// `mCenter.set(...)` (`:215`) and the `mPtclCb` particle colour (`:216-220`).
-    fn execute(&mut self, actor: &mut Actor, ctx: &Context<'_>) {
+    fn execute(&mut self, actor: &mut Actor, ctx: &mut Context<'_>) {
         // ```
         // mAngle2 += 250;    (:112)
         // mAngle1 += 500;    (:113)
@@ -185,7 +185,7 @@ impl Tornado {
     }
 
     /// The `if (param == 0) { ... }` body of `execute` (`:145-191`).
-    fn live_arm(&mut self, actor: &mut Actor, ctx: &Context<'_>) {
+    fn live_arm(&mut self, actor: &mut Actor, ctx: &mut Context<'_>) {
         // `if (!dComIfGp_event_runCheck()) { ... }` (:146) - `runCheck()` is
         // `mMode != dEvtMode_NONE_e` (`d_event.h:133-138`) on the single running event, which is
         // exactly `MsgGameInfo::event_run_check()`.

@@ -55,7 +55,7 @@ const NO_SWITCH: u8 = 0xFF; // <- d_a_obj_ohatch.cpp:137
 const ANGLE_OPEN: i16 = -0x4000; // <- d_a_obj_ohatch.cpp:138
 /// `open_act_proc`: `f32 sin = m2D8 / HIO(m0C) * 0x8000;` (`:252`) - a HALF turn in `f32`, fed to
 /// `cM_ssin`, whose parameter is an `s16` (`c_math.h:39-41`), so it is truncated on the call.
-const HALF_TURN: f32 = 0x8000; // <- d_a_obj_ohatch.cpp:252
+const HALF_TURN: f32 = 0x8000_u32 as f32;
 /// `dComIfGp_evmng_existence("FIGURE_HATCH_OPEN")` (`:201`).
 const EVENT_OPEN: &str = "FIGURE_HATCH_OPEN"; // <- d_a_obj_ohatch.cpp:201
 /// `dComIfGp_evmng_getMyStaffId("Ohatch")` (`:202`).
@@ -110,7 +110,7 @@ const SETTLE_COORD: [f32; 3] = [0.0, 1.0, 0.0]; // <- d_a_obj_ohatch.cpp:261
 /// RULE 2: `init_mtx`'s `mModel->setBaseScale(scale)` / `scaleM(scale)` (`:93`, `:102`) and
 /// `set_mtx`'s `transM(0.0f, -HIO(m14), -HIO(m18))` (`:85`, `:87`) are renderer work, and the
 /// stage-placed scale is exactly 1.0, so nothing is lost.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Ohatch {
     /// `m29C` (`d_a_obj_ohatch.h:37`, an `s32`) from `param_get_swSave()` (`:136`), the
     /// `daObj::PrmAbstract(this, 8, 0)` index `close_wait_act_proc` re-tests at `:200`.

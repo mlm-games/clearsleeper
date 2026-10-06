@@ -1488,6 +1488,7 @@ pub fn control(
     do_intent: Res<DoIntent>,
     others: Query<(Entity, &'static Actor), Without<NpcNz>>,
     mut actors: Query<(Entity, &mut Actor, &mut NpcNz)>,
+    mut links: Query<&mut Player>,
 ) {
     let clear_count = world.text_flags.clear_count;
     let message_rupee = msg.info.message_rupee;
@@ -1545,7 +1546,7 @@ pub fn control(
         }
         nz.execute(&mut actor, &mut ctx);
         if let Some((pos, yaw)) = ctx.teleport
-            && let Some((_, mut link)) = players.iter_mut().next()
+            && let Some(mut link) = links.iter_mut().next()
         {
             link.pos = pos;
             link.yaw = walk::from_s16(yaw);

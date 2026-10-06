@@ -206,7 +206,7 @@ impl Auzu {
             // The `else` arm (`:194-204`) is compiled for retail NTSC-U because
             // `DEMO_SELECT(true, ...)` (`:195`) takes the `true` branch above VERSION_DEMO. It calls
             // `daPy_getPlayerLinkActorClass()` (`:196`) and `setWhirlId` - OMITTED.
-            Self::player_whirl(actor, ctx);
+            self.player_whirl(actor, ctx);
         }
 
         // `f32 scale_target;` filled at `:208-221`.
