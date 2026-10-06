@@ -11,6 +11,9 @@ pub const RFLW_ACTORS: [&str; 1] = ["Rflw"];
 const SE_TREE_SWING: u32 = 0x69E6; // <- JAZelAudio_SE.h:1998 (JA_SE_OBJ_TREE_SWING_S)
 const CYL_RADIUS: f32 = 30.0; // <- d_a_obj_rflw.cpp:38
 const CYL_HEIGHT: f32 = 200.0; // <- d_a_obj_rflw.cpp:39
+/// The bomb's own `M_sph_src` radius (`d_a_bomb2.cpp:326`). `Blasts` carries only the sphere
+/// centre, so the sphere's radius has to come from the decomp to run the real cross test.
+const SPH_RADIUS: f32 = 30.0; // <- d_a_bomb2.cpp:326
 const CULL_MIN: [f32; 3] = [-600.0, 0.0, -600.0]; // <- d_a_obj_rflw.cpp:76
 const CULL_MAX: [f32; 3] = [600.0, 900.0, 600.0]; // <- d_a_obj_rflw.cpp:76
 const SWING_GATE: i16 = 0x38; // <- d_a_obj_rflw.cpp:145 (m40C > 0x38)
@@ -65,17 +68,24 @@ impl Rflw {
     }
 
     /// `mCyl.SetC(current.pos)` + `dComIfG_Ccsp()->Set(&mCyl)` + `ChkCoHit()`/`GetCoHitAc()`
-    /// (`:143-146`). `cM3d_Cross_CylSph` (`c_m3d.cpp:1389-1398`) - the bomb side is a sphere -
-    /// needs `radius_sum >= dist` and then `sph.y + r >= cyl.y && sph.y - r <= cyl.y + h`
-    /// (`cM3d_Cross_CylCyl` at `:1571-1583` is the same convention for a cylinder partner), so
-    /// the tube stands on `current.pos` and reaches `CYL_HEIGHT` upward, not around it.
+    /// (`:143-146`). `l_cyl_src` is a cylinder but the bomb registers
+    /// `d_a_bomb2.cpp::Act_c::M_sph_src`, a sphere, so the cross is `cM3d_Cross_CylSph`
+    /// (`c_m3d.cpp:1377-1414`). With `radius_sum = CYL_RADIUS + SPH_RADIUS` (`:1389`) it rejects
+    /// when `radius_sum < sqrt(dx^2 + dz^2)` (`:1390-1394`), then accepts only where the sphere
+    /// straddles the tube's span: `sph.y + r >= cyl.y && sph.y - r <= cyl.y + h` (`:1396-1398`).
+    /// So the tube stands on `current.pos` and reaches `CYL_HEIGHT` upward, not around it.
+    ///
+    /// The Co hit itself is real: the bomb's `SrcObjCo SPrm` carries `cCcD_CoSPrm_Set_e`
+    /// (`d_a_bomb2.cpp:309`) as does the pool's (`:22`), so `cCcS::SetCoCommonHitInf` runs
+    /// `obj1->SetCoHit(obj2)` (`c_cc_s.cpp:237-242`) and `ChkCoHit()` fires for a bomb.
     fn co_hit(&self, actor: &Actor, blasts: &Blasts) -> Option<Vec3> {
+        let reach = CYL_RADIUS + SPH_RADIUS;
         blasts.list.iter().copied().find(|origin| {
             let dx = origin.x - actor.pos.x;
             let dz = origin.z - actor.pos.z;
-            dx * dx + dz * dz <= CYL_RADIUS * CYL_RADIUS
-                && origin.y >= actor.pos.y
-                && origin.y <= actor.pos.y + CYL_HEIGHT
+            dx * dx + dz * dz <= reach * reach
+                && origin.y + SPH_RADIUS >= actor.pos.y
+                && origin.y - SPH_RADIUS <= actor.pos.y + CYL_HEIGHT
         })
     }
 

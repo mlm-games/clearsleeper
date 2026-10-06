@@ -1109,6 +1109,29 @@ impl App {
                 let (min, max) = sim::msdansb::Msdansb::spawn(0, 0.0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::yboil::Yboil>() {
+                let (min, max) = sim::yboil::Yboil::spawn(0, &sim::flags::EventFlags::default()).cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::lamp::Lamp>() {
+                let (min, max) = sim::lamp::Lamp::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::rflw::Rflw>() {
+                let (min, max) = sim::rflw::Rflw::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if entity.contains::<sim::gtaki::Gtaki>() {
+                let (min, max) = sim::gtaki::Gtaki::spawn().cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+            } else if let Some(plate) = entity.get::<sim::swtact::Swtact>() {
+                if !plate.mark {
+                    continue;
+                }
+                let (min, max) = plate.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];

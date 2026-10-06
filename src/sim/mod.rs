@@ -72,6 +72,7 @@ pub mod ground;
 pub mod grammarian;
 pub mod gy_ctrl;
 pub mod gnbtaki;
+pub mod gtaki;
 pub mod gryw;
 pub mod gull;
 pub mod hammer;
@@ -100,6 +101,7 @@ pub mod qtkhd;
 pub mod akabe;
 pub mod kamome;
 pub mod ktaruo;
+pub mod lamp;
 pub mod kmon;
 pub mod kaji;
 pub mod kita;
@@ -145,6 +147,7 @@ pub mod npc_bmsw;
 pub mod npc_co1;
 pub mod npc_btsw;
 pub mod npc_gp1;
+pub mod npc_km1;
 pub mod npc_mt;
 pub mod npc_pf1;
 pub mod npc_p1;
@@ -164,6 +167,7 @@ pub mod rforce;
 pub mod roten;
 pub mod raft;
 pub mod rectangle;
+pub mod rflw;
 pub mod redead;
 pub mod retag;
 pub mod rockfall;
@@ -207,6 +211,7 @@ pub mod swatk;
 pub mod swlight;
 pub mod switem;
 pub mod swtdoor;
+pub mod swtact;
 pub mod swpush;
 pub mod tag;
 pub mod tagba1;
@@ -236,6 +241,7 @@ pub mod vgnfd;
 pub mod vmsms;
 pub mod vteng;
 pub mod vmsdz;
+pub mod warpfo;
 pub mod walk;
 pub mod wall;
 pub mod wlvtag;
@@ -249,6 +255,7 @@ pub mod warship;
 pub mod wbird;
 pub mod water;
 pub mod woodbox;
+pub mod yboil;
 pub mod ylzou;
 pub mod zelda;
 pub mod zunari;
@@ -303,6 +310,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         set_id: source.set_id,
         room: source.room,
     };
+    if source.name == ship::SHIP_ACTOR {
+        world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
     } else if andsw0::is_andsw0(&source.name) {
         andsw0::spawn(world, source)
     } else if andsw2::is_andsw2(&source.name) {
@@ -317,8 +326,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         sie_flag::spawn(world, source)
     } else if tori_flag::is_tori_flag(&source.name) {
         tori_flag::spawn(world, source)
-    if source.name == ship::SHIP_ACTOR {
-        world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
     } else if source.name == enemy::ENEMY_ACTOR {
         let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
         world
@@ -977,6 +984,23 @@ let v = qdghd::Qdghd::spawn(source.parameters, world.resource::<flags::Switches>
         world.spawn((actor, v)).id()
     } else if syan::is_syan(&source.name) {
 world.spawn((actor, syan::Syan::spawn())).id()
+    } else if yboil::is_yboil(&source.name) {
+let v = yboil::Yboil::spawn(source.parameters, world.resource::<flags::EventFlags>());
+        world.spawn((actor, v)).id()
+    } else if lamp::is_lamp(&source.name) {
+world.spawn((actor, lamp::Lamp::spawn())).id()
+    } else if rflw::is_rflw(&source.name) {
+world.spawn((actor, rflw::Rflw::spawn())).id()
+    } else if gtaki::is_gtaki(&source.name) {
+world.spawn((actor, gtaki::Gtaki::spawn())).id()
+    } else if swtact::is_swtact(&source.name) {
+let v = swtact::Swtact::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if warpfo::is_warpfo(&source.name) {
+world.spawn((actor, warpfo::Warpfo::spawn())).id()
+    } else if npc_km1::is_npc_km1(&source.name) {
+let v = npc_km1::NpcKm1::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1154,7 +1178,10 @@ pub fn build(
                     ajav::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (death::freeze.in_set(WwSimSet::Execute),
+                (death::freeze.in_set(WwSimSet::Execute),                    gy_ctrl::control.in_set(WwSimSet::Execute),
+                    obj_rcloud::control.in_set(WwSimSet::Execute),
+                    tori_flag::control.in_set(WwSimSet::Execute),
+
                     carry::control.in_set(WwSimSet::Execute),
                     tsubo::control.in_set(WwSimSet::Execute),
                     koisi::control.in_set(WwSimSet::Execute),
@@ -1170,7 +1197,10 @@ pub fn build(
                     trapdoor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (torch::control.in_set(WwSimSet::Execute),
+                (torch::control.in_set(WwSimSet::Execute),                    usovmc::control.in_set(WwSimSet::Execute),
+                    obj_akabe::control.in_set(WwSimSet::Execute),
+                    sie_flag::control.in_set(WwSimSet::Execute),
+
                     barrel::control.in_set(WwSimSet::Execute),
                     fallrock::control.in_set(WwSimSet::Execute),
                     windmill::control.in_set(WwSimSet::Execute),
@@ -1196,33 +1226,22 @@ pub fn build(
                 (kytag07::control.in_set(WwSimSet::Execute),
                     kytag00::control.in_set(WwSimSet::Execute),
                     tag_msg::control.in_set(WwSimSet::Execute),
-                    salvage::control.in_set(WwSimSet::Execute),
-                    gy_ctrl::control.in_set(WwSimSet::Execute),
-                    obj_akabe::control.in_set(WwSimSet::Execute),
-                    acorn_leaf::control.in_set(WwSimSet::Execute),
-                    tag_volcano::control.in_set(WwSimSet::Execute),
                     event_manager::control.in_set(WwSimSet::Execute),
-                    andsw0::control.in_set(WwSimSet::Execute),
-                    andsw2::control.in_set(WwSimSet::Execute),
-                    obj_nest::control.in_set(WwSimSet::Execute),
                     obj_paper::control.in_set(WwSimSet::Execute),
-                    obj_rcloud::control.in_set(WwSimSet::Execute),
-                    sie_flag::control.in_set(WwSimSet::Execute),
-                    tori_flag::control.in_set(WwSimSet::Execute),
                     kytag01::control.in_set(WwSimSet::Execute),
                     atttag::control.in_set(WwSimSet::Execute),
-                    usovmc::control.in_set(WwSimSet::Execute),
                     kytag02::control.in_set(WwSimSet::Execute),
                     retag::control.in_set(WwSimSet::Execute),
                     turu::control.in_set(WwSimSet::Execute),
                     spcitem::control.in_set(WwSimSet::Execute),
                     ajavw::control.in_set(WwSimSet::Execute),
-                    gnbtaki::control.in_set(WwSimSet::Execute),
                     dmgroom::control.in_set(WwSimSet::Execute),
                     hotfloor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (door::control.in_set(WwSimSet::Execute),
+                (door::control.in_set(WwSimSet::Execute),                    tag_volcano::control.in_set(WwSimSet::Execute),
+                    andsw2::control.in_set(WwSimSet::Execute),
+
                     door::jail_control.in_set(WwSimSet::Execute),
                     bird::control.in_set(WwSimSet::Execute),
                     tingle::control.in_set(WwSimSet::Execute),
@@ -1309,7 +1328,14 @@ pub fn build(
                     schedule::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (combat::control.in_set(WwSimSet::Execute),                    tagba1::control.in_set(WwSimSet::Execute),
+                (combat::control.in_set(WwSimSet::Execute),
+                    yboil::control.in_set(WwSimSet::Execute),
+                    lamp::control.in_set(WwSimSet::Execute),
+                    rflw::control.in_set(WwSimSet::Execute),
+                    gtaki::control.in_set(WwSimSet::Execute),
+                    swtact::control.in_set(WwSimSet::Execute),
+                    warpfo::control.in_set(WwSimSet::Execute),
+                    npc_km1::control.in_set(WwSimSet::Execute),                    tagba1::control.in_set(WwSimSet::Execute),
 
                     qdghd::control.in_set(WwSimSet::Execute),
                     syan::control.in_set(WwSimSet::Execute),
@@ -1344,7 +1370,9 @@ pub fn build(
                     chuchu::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (figure::control.in_set(WwSimSet::Execute),
+                (figure::control.in_set(WwSimSet::Execute),                    salvage::control.in_set(WwSimSet::Execute),
+                    obj_nest::control.in_set(WwSimSet::Execute),
+
                     armos::control.in_set(WwSimSet::Execute),
                     stalfos::control.in_set(WwSimSet::Execute),
                     boko::control.in_set(WwSimSet::Execute),
@@ -1366,7 +1394,10 @@ pub fn build(
                     helmaroc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (gohdan::control.in_set(WwSimSet::Execute),
+                (gohdan::control.in_set(WwSimSet::Execute),                    gnbtaki::control.in_set(WwSimSet::Execute),
+                    acorn_leaf::control.in_set(WwSimSet::Execute),
+                    andsw0::control.in_set(WwSimSet::Execute),
+
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),
@@ -1386,8 +1417,6 @@ pub fn build(
                     rforce::control.in_set(WwSimSet::Execute),
                     wlvtag::control.in_set(WwSimSet::Execute),
 
-
-
                 )
                     .chain(),
             )
@@ -1405,6 +1434,16 @@ pub fn build(
                     death::check.in_set(WwSimSet::Execute),
                     cleared::control.in_set(WwSimSet::Execute),
                     frame::advance.in_set(WwSimSet::After),
+            )
+                .chain(),
+            (
+                yboil::control.in_set(WwSimSet::Execute),
+                lamp::control.in_set(WwSimSet::Execute),
+                rflw::control.in_set(WwSimSet::Execute),
+                gtaki::control.in_set(WwSimSet::Execute),
+                swtact::control.in_set(WwSimSet::Execute),
+                warpfo::control.in_set(WwSimSet::Execute),
+                npc_km1::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
         )

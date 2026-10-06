@@ -299,6 +299,7 @@ pub fn blast(
     switches: &mut ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {
+    published.push(origin);
     let heat = super::barricade::AT_BOMB;
     for (actor, mut fence) in fences.iter_mut() {
         if within(origin, actor.pos, BLAST_RADIUS) {

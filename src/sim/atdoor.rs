@@ -11,8 +11,8 @@ const SWBIT_MASK: u32 = 0xFF; // <- d_a_atdoor.cpp:23
 const SWBIT_NONE: u8 = 0xFF; // <- d_a_atdoor.cpp:75 (swBit == 0xFF arm)
 const OPEN_MAX: i16 = 0x4000; // <- d_a_atdoor.cpp:79, :146
 const OPEN_STEP: i16 = 0x400; // <- d_a_atdoor.cpp:124, :145
-const CULL_MIN: [f32; 3] = [-150.0, 0.0, -150.0]; // <- f_op_actor_mng.cpp:563 (fopAc_CULLBOX_6_e)
-const CULL_MAX: [f32; 3] = [150.0, 300.0, 150.0]; // <- f_op_actor_mng.cpp:563 (fopAc_CULLBOX_6_e)
+const CULL_MIN: [f32; 3] = [-150.0, 0.0, -150.0]; // <- f_op_actor_mng.cpp:564 (fopAc_CULLBOX_6_e)
+const CULL_MAX: [f32; 3] = [150.0, 300.0, 150.0]; // <- f_op_actor_mng.cpp:564 (fopAc_CULLBOX_6_e)
 
 const ACT_WAIT: u8 = 0; // <- d_a_atdoor.cpp:12 (ACT_WAIT_e)
 const ACT_CLOSE_WAIT: u8 = 1; // <- d_a_atdoor.cpp:13 (ACT_CLOSE_WAIT_e)
