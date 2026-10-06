@@ -583,14 +583,7 @@ pub fn pack_color(c: [u8; 4]) -> u32 {
     ((c[0] as u32) << 24) | ((c[1] as u32) << 16) | ((c[2] as u32) << 8) | c[3] as u32
 }
 
-pub fn unpack_color(c: u32) -> [u8; 4] {
-    [
-        (c >> 24) as u8,
-        ((c >> 16) & 0xFF) as u8,
-        ((c >> 8) & 0xFF) as u8,
-        (c & 0xFF) as u8,
-    ]
-}
+pub use crate::j2d::unpack_color;
 
 pub fn item_message(item: u8) -> u32 {
     ITEM_MESSAGE
@@ -710,50 +703,9 @@ pub fn tact_pulse_sound(beat: i32) -> u32 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct F2 {
-    pub x: f32,
-    pub y: f32,
-}
+pub use crate::j2d::F2;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ContentsColor {
-    pub tl: [u8; 4],
-    pub tr: [u8; 4],
-    pub bl: [u8; 4],
-    pub br: [u8; 4],
-}
-
-impl Default for ContentsColor {
-    fn default() -> Self {
-        Self {
-            tl: [0, 0, 0, 0],
-            tr: [0, 0, 0, 0],
-            bl: [0, 0, 0, 0],
-            br: [0, 0, 0, 0],
-        }
-    }
-}
-
-impl ContentsColor {
-    pub fn from_color(color: u32) -> Self {
-        let raw = unpack_color(color);
-        Self {
-            tl: raw,
-            tr: raw,
-            bl: raw,
-            br: raw,
-        }
-    }
-
-    pub fn get_color(&self) -> Self {
-        *self
-    }
-
-    pub fn set_uniform(&mut self, color: u32) {
-        *self = Self::from_color(color);
-    }
-}
+pub use crate::j2d::ContentsColor;
 
 #[derive(Clone, Debug)]
 pub struct Pane {

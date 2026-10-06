@@ -575,19 +575,9 @@ impl Rng {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct F2 {
-    pub x: f32,
-    pub y: f32,
-}
+pub use crate::j2d::F2;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ContentsColor {
-    pub tl: [u8; 4],
-    pub tr: [u8; 4],
-    pub bl: [u8; 4],
-    pub br: [u8; 4],
-}
+pub use crate::j2d::ContentsColor;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DrawItem {

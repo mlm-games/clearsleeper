@@ -725,17 +725,7 @@ impl SaveState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct F2 {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl F2 {
-    pub fn new(x: f32, y: f32) -> Self {
-        Self { x, y }
-    }
-}
+pub use crate::j2d::F2;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadInput {
