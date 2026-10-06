@@ -4,6 +4,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
+use super::flags::OrderFlags;
 use super::intent::DoIntent;
 use super::player::Player;
 use super::walk;
@@ -126,6 +127,9 @@ const STT_TALK: i8 = 2; // <- :653
 const ORDER_NONE: i8 = 0; // <- :439, :444
 const ORDER_SPEAK: i8 = 1; // <- :426
 const ORDER_TALK: i8 = 2; // <- :429
+const ORDER_EVENT: i8 = 3; // <- :430
+const EVT_CND_CANTALK: u16 = 0x0001; // <- dEvtCnd_CANTALK_e, :424
+const EVENT_IDX_SPEAK: usize = 0x1EA; // <- fopAcM_orderSpeakEvent msgNo, f_op_actor_mng.cpp:677
 // look state field_0x7C4 - lookBack :496
 const LOOK_NONE: i8 = 0; // <- :497 absent case
 const LOOK_PLAYER: i8 = 1; // <- :497
@@ -148,7 +152,6 @@ const DEG2S: f32 = 0x8000 as f32 / 180.0; // <- cM_deg2s, SSystem/SComponent/c_a
 
 const NO_ITEM: u8 = 0xFF; // <- mItemNo = 0xff, :459, :717
 const TYPE_NORMAL: i8 = 0; // <- decideType field_0x7C6 = 0, :550
-const NUM_NONE: i8 = -1; // <- decideType mNo = -1, :62
 
 // dNpc_EventCut_c action_table - d_npc_event_cut.inc:11-19
 const CUT_WAIT: usize = 0; // <- :13
@@ -182,8 +185,8 @@ const CUT_TURN_HEAD_LOCK: u32 = 2; // <- mTurnType case 2, :452
 const CUT_TURN_DEFAULT: u32 = 3; // <- mTurnType default, :459
 
 // _create fopAcM_setCullSizeBox - :947
-const CULL_MIN: [f32; 3] = [-110.0, -20.0, -100.0];
-const CULL_MAX: [f32; 3] = [110.0, 280.0, 100.0];
+const CULL_MIN: [f32; 3] = [-110.0, -20.0, -100.0]; // <- fopAcM_setCullSizeBox, d_a_npc_hi1.cpp:947
+const CULL_MAX: [f32; 3] = [110.0, 280.0, 100.0]; // <- fopAcM_setCullSizeBox, d_a_npc_hi1.cpp:947
 
 const JNT_SCALE: i16 = 4; // <- cLib_addCalcAngleL scale, d_npc.cpp:934, :940, :934
 const JNT_ANG_MIN_STEP: i16 = 0x100; // <- cLib_addCalcAngleS min_step, d_npc.cpp:910
@@ -193,10 +196,10 @@ const PLAYER_HEAD_TOP: f32 = 40.0; // <- d_a_player_main.cpp:11575
 const NO_STATUS: u8 = 0xFF; // <- fopNpc_npc_c::talk u16 status = 0xFF, d_npc.cpp:665
 const NO_EVENT: usize = usize::MAX; // <- dComIfGp_evmng_getEventIdx miss
 
-const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
-const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
-const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
-const RND_SEED: i32 = 100;
+const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA]; // <- cM_rnd, c_math.cpp:178-180
+const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673]; // <- cM_rnd, c_math.cpp:178-180
+const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0]; // <- cM_rnd, c_math.cpp:181
+const RND_SEED: i32 = 100; // <- cM_initRnd actor seeds, c_math.cpp:170-175
 
 fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
@@ -320,14 +323,6 @@ impl JntCtrl {
         self.trn = true;
     }
 
-    pub fn on_head_lock(&mut self) {
-        self.head_lock = true;
-    }
-
-    pub fn off_head_lock(&mut self) {
-        self.head_lock = false;
-    }
-
     pub fn on_backbone_lock(&mut self) {
         self.backbone_lock = true;
     }
@@ -367,7 +362,7 @@ impl JntCtrl {
     fn chk_lim(&self, angle: i32, row: usize, axis: usize) -> i32 {
         let max = i32::from(self.max_angles[row][axis]);
         let min = i32::from(self.min_angles[row][axis]);
-        angle.max(max).min(min)
+        angle.min(max).max(min)
     }
 
     /// `dNpc_JntCtrl_c::turn_fromBackbone2Head` (`d_npc.cpp:796-812`).
@@ -509,8 +504,8 @@ pub struct EventCut {
     pub offset_pos: Vec3,
     pub speed: f32,
     pub pos: Vec3,
+    pub target_angle: i16,
     pub field_0x44: f32,
-    pub target_pos: Vec3,
     pub actor_name: Option<String>,
     pub field_0x52: u8,
 }
@@ -529,8 +524,8 @@ impl EventCut {
             offset_pos: Vec3::ZERO,
             speed: 0.0,
             pos: Vec3::ZERO,
+            target_angle: 0,
             field_0x44: 0.0,
-            target_pos: Vec3::ZERO,
             actor_name: None,
             field_0x52: 0,
         }
@@ -550,38 +545,30 @@ pub struct NpcHi1 {
     pub anm_atr: u8,
     pub anm_tag: u8,
     pub anm_atr_count: i8,
-    pub anm_ended: i8,
     pub attn_ended: bool,
     pub return_home: bool,
     pub talk_order: bool,
     pub head_only_follow: bool,
     pub has_attention: bool,
     pub init_done: bool,
-    pub shape_locked: bool,
-    pub demo_mode: bool,
-    pub inited: bool,
-    pub anm_num: i8,
     pub anm_type: i8,
     pub item_no: u8,
     pub timer2: i32,
     pub target_y: i16,
-    pub other_event: usize,
-    pub dummy_event: usize,
+    pub event_idx: [usize; 1],
+    pub other_slot: i16,
     pub curr_msg_no: u32,
     pub end_msg_no: u32,
     pub msg_id: u32,
     pub msg_bound: bool,
-    pub anm_frame: f32,
     pub eye_pos: Vec3,
     pub attn_base_pos: Vec3,
     pub attn_pos: Vec3,
     pub attn_look: Vec3,
     pub base_pos: Vec3,
     pub home_angle: [i16; 3],
-    pub shape_angle: [i16; 3],
     pub prev_angle: [i16; 3],
     pub btp_idx: i8,
-    pub btk_idx: i8,
     pub btp_frame: u8,
     pub btk_frame: u8,
     pub timer1: i16,
@@ -596,7 +583,7 @@ impl NpcHi1 {
         Self {
             entered: false,
             prev_do: false,
-            anm_no: NUM_NONE,
+            anm_no: 2,
             order: ORDER_NONE,
             state: STT_ANM_NONE,
             return_state: STT_ANM_NONE,
@@ -605,38 +592,30 @@ impl NpcHi1 {
             anm_atr: ANM_ATR_NONE,
             anm_tag: ANM_TAG_NONE,
             anm_atr_count: 0,
-            anm_ended: 0,
             attn_ended: false,
             return_home: false,
             talk_order: false,
             head_only_follow: false,
             has_attention: false,
             init_done: false,
-            shape_locked: false,
-            demo_mode: false,
-            inited: false,
-            anm_num: NUM_NONE,
             anm_type: if param == 0 { TYPE_NORMAL } else { param },
             item_no: NO_ITEM,
             timer2: 0,
             target_y: 0,
-            other_event: 0,
-            dummy_event: NO_EVENT,
+            event_idx: [NO_EVENT],
+            other_slot: 0,
             curr_msg_no: 0,
             end_msg_no: u32::MAX,
             msg_id: FPC_M_ERROR_PROCESS_ID,
             msg_bound: false,
-            anm_frame: 0.0,
             eye_pos: Vec3::ZERO,
             attn_base_pos: Vec3::ZERO,
             attn_pos: Vec3::ZERO,
             attn_look: Vec3::ZERO,
             base_pos: Vec3::ZERO,
             home_angle: [0; 3],
-            shape_angle: [0; 3],
             prev_angle: [0; 3],
             btp_idx: 0,
-            btk_idx: 0,
             btp_frame: 0,
             btk_frame: 0,
             timer1: 0,
@@ -676,7 +655,6 @@ impl NpcHi1 {
         if idx < 0 {
             return false;
         }
-        self.btk_idx = idx;
         self.btk_frame = 0;
         true
     }
@@ -727,8 +705,6 @@ impl NpcHi1 {
             return;
         }
         self.anm_no = prm.index;
-        self.anm_ended = 0;
-        self.anm_frame = 0.0;
     }
 
     /// `daNpc_Hi1_c::setAnm_NUM` (`:314-324`).
@@ -928,13 +904,33 @@ impl NpcHi1 {
         self.set_anm();
     }
 
+    /// `mEventIdx[field_0x796]` (`:430`, `:438`, `:618`); `mEventIdx` holds one
+    /// entry, so any other `field_0x796` reads out of range in retail.
+    fn event_slot(&self) -> usize {
+        self.event_idx
+            .get(self.other_slot.max(0) as usize)
+            .copied()
+            .unwrap_or(NO_EVENT)
+    }
+
     /// `daNpc_Hi1_c::eventOrder` (`:422-433`).
-    fn event_order(&mut self) {}
+    fn event_order(&mut self, ctx: &mut Ctx<'_>) {
+        if self.order == ORDER_SPEAK || self.order == ORDER_TALK {
+            ctx.order_flags.set(EVT_CND_CANTALK);
+            if self.order == ORDER_SPEAK {
+                ctx.order_other(EVENT_IDX_SPEAK);
+            }
+        } else if self.order >= ORDER_EVENT {
+            self.other_slot = i16::from(self.order) - i16::from(ORDER_EVENT);
+            let slot = self.event_slot();
+            ctx.order_other(slot);
+        }
+    }
 
     /// `daNpc_Hi1_c::checkOrder` (`:436-447`).
     fn check_order(&mut self, ctx: &Ctx<'_>) {
         if ctx.demo_command {
-            let slot = self.other_event;
+            let slot = self.event_slot();
             if ctx.start_check(slot) && self.order >= 3 {
                 self.order = ORDER_NONE;
                 self.anm_atr = ANM_ATR_NONE;
@@ -1045,7 +1041,7 @@ impl NpcHi1 {
 
     /// `daNpc_Hi1_c::event_proc` (`:617-625`).
     fn event_proc(&mut self, staff: i32, ctx: &mut Ctx<'_>) {
-        let slot = self.other_event;
+        let slot = self.event_slot();
         if ctx.end_check(slot) {
             self.end_event();
         } else if !self.cut_proc(ctx) {
@@ -1086,13 +1082,12 @@ impl NpcHi1 {
     /// `init_HI1_0` (`:123-126`) runs `wait_action1` once with
     /// `field_0x7C7 == 0` through `set_action` (`:628-639`).
     pub fn create_init(&mut self, actor: &mut Actor, list: &EventList) {
-        self.dummy_event = list.event_index(EVENT_DUMMY).unwrap_or(NO_EVENT);
+        self.event_idx[0] = list.event_index(EVENT_DUMMY).unwrap_or(NO_EVENT);
         self.anm_no = 2;
         self.set_stt(STT_WAIT);
         self.return_home = true;
         self.action_status += 1;
         self.home_angle = actor.angle;
-        self.shape_angle = actor.angle;
         self.base_pos = actor.pos;
         self.entered = true;
     }
@@ -1184,7 +1179,7 @@ impl NpcHi1 {
     /// `dNpc_EventCut_c::cutTurnToActorProc` / `cutTurnToPosProc`
     /// (`d_npc_event_cut.inc:174-238` / `:444-476`).
     fn cut_turn_to_proc(&mut self, pos: Vec3, ctx: &mut Ctx<'_>) {
-        let target = self.cut_goal(pos, ctx);
+        self.cut_goal(pos, ctx);
         let t_angle = target_angle_y(pos, self.cut.pos);
         match self.cut.turn_type {
             CUT_TURN_HEAD_LOCK => {
@@ -1204,7 +1199,6 @@ impl NpcHi1 {
             ctx.end_staff_cut(STAFF_HI1);
         }
         self.cut.field_0x44 = (t_angle.wrapping_sub(pos_angle(ctx)) as f32).abs();
-        let _ = target;
     }
 
     /// `dNpc_EventCut_c::cutMoveToActorStart` (`d_npc_event_cut.inc:241-299`).
@@ -1232,10 +1226,11 @@ impl NpcHi1 {
 
     /// `dNpc_EventCut_c::cutMoveToActorProc` (`d_npc_event_cut.inc:302-343`).
     fn cut_move_to_actor_proc(&mut self, pos: Vec3, ctx: &mut Ctx<'_>) {
-        let goal = self.cut_goal(pos, ctx);
+        self.cut_goal(pos, ctx);
+        let goal = self.cut.pos;
         let mut temp = goal;
         let angle = if self.cut.add_angle != 0 {
-            ctx.player_angle
+            self.cut.target_angle.wrapping_add(self.cut.add_angle)
         } else {
             atan2s(goal.x - pos.x, goal.z - pos.z)
         };
@@ -1350,23 +1345,28 @@ impl NpcHi1 {
         }
     }
 
-    /// `dNpc_EventCut_c::cutTurnToActorProc`'s goal selection (`:205-221`).
-    fn cut_goal(&mut self, from: Vec3, ctx: &mut Ctx<'_>) -> Vec3 {
+    /// `dNpc_EventCut_c::cutTurnToActorProc`'s goal selection (`:205-221`), storing
+    /// into `mPos` exactly as retail does. `:216` reads the target's
+    /// `shape_angle.y`; the sim only carries `current.angle.y`.
+    fn cut_goal(&mut self, from: Vec3, ctx: &mut Ctx<'_>) {
         let want_player = match self.cut.actor_name {
             None => true,
             Some(_) => false,
         };
         if want_player {
-            return ctx.player_eye.unwrap_or(Vec3::ZERO) + self.cut.offset_pos;
+            self.cut.target_angle = ctx.player_angle;
+            self.cut.pos = ctx.player_eye.unwrap_or(Vec3::ZERO) + self.cut.offset_pos;
+            return;
         }
         let name = self.cut.actor_name.as_ref();
         let Some((pos, angle)) = ctx.find_target(self.cut.set_id, name, from)
         else {
             ctx.end_staff_cut(STAFF_HI1);
-            return Vec3::ZERO;
+            self.cut.pos = Vec3::ZERO;
+            return;
         };
-        self.cut.target_pos = pos;
-        if self.cut.add_angle != 0 && self.cut.del_distance != 0.0 {
+        self.cut.target_angle = angle;
+        self.cut.pos = if self.cut.add_angle != 0 && self.cut.del_distance != 0.0 {
             let angle = angle.wrapping_add(self.cut.add_angle);
             Vec3::new(
                 pos.x - self.cut.del_distance * walk::from_s16(angle).sin(),
@@ -1375,7 +1375,7 @@ impl NpcHi1 {
             )
         } else {
             pos + self.cut.offset_pos
-        }
+        };
     }
 
     /// `daNpc_Hi1_c::_execute` (`:846-899`), minus the renderer, `demo()`,
@@ -1414,11 +1414,7 @@ impl NpcHi1 {
         actor.pos = ctx.actor_pos;
         self.look_back(actor, ctx);
         self.play_animation();
-        self.event_order();
-        self.shape_angle = actor.angle;
-        if !self.shape_locked {
-            self.shape_angle = actor.angle;
-        }
+        self.event_order(ctx);
         self.set_attention(self.attn_ended, actor.pos);
     }
 }
@@ -1507,9 +1503,11 @@ pub struct Ctx<'a> {
     pub talk_command: bool,
     pub demo_command: bool,
     pub event_run: bool,
+    pub entity: Entity,
     pub active: &'a mut ActiveEvent,
     pub list: &'a EventList,
     pub flags: &'a mut super::flags::EventFlags,
+    pub order_flags: &'a mut OrderFlags,
     pub targets: &'a [Target],
     pub text: &'a mut Text<'a>,
 }
@@ -1535,6 +1533,17 @@ impl Ctx<'_> {
 
     fn end_staff_cut(&mut self, name: &str) {
         self.active.end_staff_cut(self.list, self.flags, name);
+    }
+
+    /// `fopAcM_orderOtherEventId` (`f_op_actor_mng.cpp:729-740`), guarded so a
+    /// re-order every tick cannot reset `Stage::Order`.
+    fn order_other(&mut self, index: usize) {
+        if index == NO_EVENT {
+            return;
+        }
+        if self.active.stage_of(index).is_none() {
+            self.active.order(self.list, index, self.entity);
+        }
     }
 
     /// `dNpc_EventCut_c::findActorCallBack` (`d_npc_event_cut.inc:346-388`).
@@ -1565,6 +1574,7 @@ impl Ctx<'_> {
 pub struct Env<'w> {
     pub text_flags: Res<'w, TextFlags>,
     pub flags: ResMut<'w, super::flags::EventFlags>,
+    pub order_flags: ResMut<'w, OrderFlags>,
     pub list: Res<'w, EventList>,
     pub active: ResMut<'w, ActiveEvent>,
     pub archive: Option<Res<'w, MsgArchives>>,
@@ -1637,9 +1647,11 @@ pub fn control(
             talk_command: tap,
             demo_command: false,
             event_run,
+            entity,
             active: &mut world.active,
             list: &world.list,
             flags: &mut world.flags,
+            order_flags: &mut world.order_flags,
             targets: &targets,
             text: &mut text,
         };

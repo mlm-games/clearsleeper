@@ -172,6 +172,9 @@ pub mod npc_pf1;
 pub mod npc_p1;
 pub mod npc_uk;
 pub mod npc_tc;
+pub mod npc_ho;
+pub mod npc_hi1;
+pub mod npc_fa1;
 pub mod pbco;
 pub mod pbka;
 pub mod pickup;
@@ -533,6 +536,15 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if npc_nz::is_npc_nz(&source.name) {
         let v = npc_nz::NpcNz::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_ho::is_npc_ho(&source.name) {
+        let v = npc_ho::NpcHo::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_hi1::is_npc_hi1(&source.name) {
+        let v = npc_hi1::NpcHi1::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if npc_fa1::is_npc_fa1(&source.name) {
+        let v = npc_fa1::NpcFa1::spawn();
         world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
@@ -1193,7 +1205,6 @@ pub fn build(
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
     sim.world.insert_resource(bwds::Statics::default());
-    sim.world.insert_resource(npc_nz::Statics::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -1470,6 +1481,9 @@ pub fn build(
                 grammarian::control.in_set(WwSimSet::Execute),
                 apzl::control.in_set(WwSimSet::Execute),
                 npc_nz::control.in_set(WwSimSet::Execute),
+                npc_ho::control.in_set(WwSimSet::Execute),
+                npc_hi1::control.in_set(WwSimSet::Execute),
+                npc_fa1::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -1654,3 +1668,4 @@ pub fn build(
 }
 
 pub mod auction;
+pub mod toripost;

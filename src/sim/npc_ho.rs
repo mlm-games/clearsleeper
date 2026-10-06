@@ -144,14 +144,14 @@ const JNT_MIN_STEP: i32 = 1; // <- cLib_addCalcAngleL min_step, d_npc.cpp:78
 const PLAYER_EYE_OFFSET_Y: f32 = -20.0; // <- dNpc_playerEyePos(-20.0f), :579, :590
 const PLAYER_HEAD_TOP: f32 = 40.0; // <- d_a_player_main.cpp:11575
 
-const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
-const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
-const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
-const RND_SEED: i32 = 100;
+const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA]; // <- cM_rnd, c_math.cpp:178-180
+const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673]; // <- cM_rnd, c_math.cpp:178-180
+const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0]; // <- cM_rnd, c_math.cpp:181
+const RND_SEED: i32 = 100; // <- cM_initRnd actor seeds, c_math.cpp:170-175
 
 // fopAc_CULLBOX_12_e - f_op_actor_mng.cpp:570
-const CULL_MIN: [f32; 3] = [-70.0, -100.0, -80.0];
-const CULL_MAX: [f32; 3] = [70.0, 240.0, 100.0];
+const CULL_MIN: [f32; 3] = [-70.0, -100.0, -80.0]; // <- fopAc_CULLBOX_12_e, f_op_actor_mng.cpp:570; prm :1012
+const CULL_MAX: [f32; 3] = [70.0, 240.0, 100.0]; // <- fopAc_CULLBOX_12_e, f_op_actor_mng.cpp:570; prm :1012
 
 const NO_STATUS: u8 = 0xFF; // <- talk u16 msgStatus = 0xFF, :479
 const NO_EVENT: usize = usize::MAX; // <- dComIfGp_evmng_getEventIdx miss
@@ -427,11 +427,9 @@ pub struct NpcHo {
     pub msg_select_num: u8,
     pub msg_anm_idx: u8,
     pub anm_idx: i8,
-    pub anm_loop_count: u8,
     pub bck_idx: u8,
     pub blink_frame: u8,
     pub blink_timer: i16,
-    pub attn_set_count: u8,
     pub item_num: u8,
     pub next_message_id: i32,
     pub curr_msg_no: u32,
@@ -469,11 +467,9 @@ impl NpcHo {
             msg_select_num: 0,
             msg_anm_idx: ANM_TAG_NONE,
             anm_idx: NO_ANM,
-            anm_loop_count: 0,
             bck_idx: BCK_HO_WAIT01,
             blink_frame: 0,
             blink_timer: 0,
-            attn_set_count: 0,
             item_num: NO_ITEM,
             next_message_id: 0,
             curr_msg_no: 0,
@@ -652,7 +648,6 @@ impl NpcHo {
                     .unwrap_or(0);
                 self.set_anm(idx);
             }
-            self.anm_loop_count = 0;
         }
     }
 
@@ -875,11 +870,10 @@ impl NpcHo {
         status
     }
 
-    /// `daNpc_Ho_c::setAttention` (`:559-566`).
-    fn set_attention(&mut self, param_1: bool) {
-        if !param_1 && self.attn_set_count >= 2 {
-            return;
-        }
+    /// `daNpc_Ho_c::setAttention` (`:559-566`). The `:560` guard needs
+    /// `mAttnSetCount`, which only `nodeCB_Head`'s `incAttnSetCount()` (`:48`)
+    /// bumps, so it stays 0 here and the early return never fires.
+    fn set_attention(&mut self, _param_1: bool) {
         self.eye_pos = Vec3::new(self.eye_pos.x, self.eye_pos.y, self.eye_pos.z);
         self.attn_pos = Vec3::new(
             self.attn_base_pos.x,
