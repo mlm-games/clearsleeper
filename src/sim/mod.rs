@@ -42,6 +42,7 @@ pub mod buoybarrel;
 pub mod buoyrace;
 pub mod canon;
 pub mod canon2;
+pub mod bodies;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
@@ -390,6 +391,7 @@ pub enum WwSimSet {
 
 pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) {
     let stage = tables.name().to_owned();
+    let mut spawned: Vec<Entity> = Vec::new();
     for source in tables.actors() {
         if medli::is_medli(&source.name)
             && !medli::create_ok(
@@ -413,8 +415,9 @@ pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) 
         {
             continue;
         }
-        spawn_actor(world, source);
+        spawned.push(spawn_actor(world, source));
     }
+    bodies::attach(world, &spawned);
 }
 
 pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
@@ -590,6 +593,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if obj_hha::is_obj_hha(&source.name) {
         let a = obj_hha::ObjHha::spawn(source.parameters);
         world.spawn((actor, a)).id()
+    } else if title::is_title(&source.name) {
+        let v = title::Title::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1557,6 +1563,8 @@ pub fn build(
     sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
     sim.world.insert_resource(obj_hha::BgwSets::default());
     sim.world.insert_resource(obj_hha::SplashSets::default());
+    sim.world.insert_resource(title::TitleKirakira::default());
+    sim.world.insert_resource(title::TitleScene::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1643,6 +1651,8 @@ pub fn build(
     sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
     sim.world.insert_resource(obj_hha::BgwSets::default());
     sim.world.insert_resource(obj_hha::SplashSets::default());
+    sim.world.insert_resource(title::TitleKirakira::default());
+    sim.world.insert_resource(title::TitleScene::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1919,6 +1929,7 @@ pub fn build(
                 shop::control.in_set(WwSimSet::Execute),
                 zelda::control.in_set(WwSimSet::Execute),
                 obj_hha::control.in_set(WwSimSet::Execute),
+                title::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -2075,6 +2086,9 @@ pub fn build(
                 swim::surface.in_set(WwSimSet::Execute),
             )
                 .chain(),
+            (bodies::follow
+                .in_set(WwSimSet::Execute)
+                .before(contact_run::run),),
             (ship::control.in_set(WwSimSet::Execute),
                 area::clamp_to_area.in_set(WwSimSet::Execute),
                 transition::check.in_set(WwSimSet::Execute),
@@ -2180,3 +2194,4 @@ pub mod warpdm20;
 pub mod ferris;
 pub mod sail;
 pub mod kui;
+pub mod title;

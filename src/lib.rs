@@ -1,4 +1,4 @@
-//! Wind Waker recreation on repame: fixed-step sim + repose views, no bevy.
+//! Wind Waker recreation on repame: fixed-step sim + repose views (no direct bevy).
 
 use std::cell::Cell;
 use std::collections::HashSet;
@@ -999,6 +999,13 @@ impl App {
                 let (min, max) = a.cull();
                 lift = min[1];
                 (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::title::Title>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::morth::Morth>() {
                 if !x.drawn() {
                     continue;
