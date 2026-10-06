@@ -117,6 +117,7 @@ pub fn spawn(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
         angle: source.angle,
         set_id: source.set_id,
         room: source.room,
+        ..Default::default()
     };
     let item = Akabe::spawn(
         source.parameters,

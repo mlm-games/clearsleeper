@@ -43,7 +43,9 @@ impl Bitem {
             angle: [actor.angle[0], actor.angle[1], ITEM_SWITCH_ANGLE],
             set_id: ITEM_SET_ID,
             room: actor.room,
-        }
+            ..Default::default()
+        },
+        ..Default::default()
     }
 }
 

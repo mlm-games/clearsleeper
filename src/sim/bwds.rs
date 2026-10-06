@@ -530,6 +530,7 @@ pub fn control(
             angle: spawn.angle,
             set_id: spawn.set_id,
             room: spawn.room,
+            ..Default::default()
         };
         commands.spawn((actor, super::pickup::Pickup::spawn(spawn.parameters)));
     }

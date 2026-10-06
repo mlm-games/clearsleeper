@@ -3437,6 +3437,7 @@ pub fn control(
                 angle: [0; 3],
                 set_id: 0,
                 room: spawn.room,
+                ..Default::default()
             },
             Keese,
         ));

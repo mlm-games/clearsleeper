@@ -180,6 +180,7 @@ impl DekuItem {
                     angle: [0; 3],
                     set_id: 0,
                     room: ctx.room,
+                    ..Default::default()
                 })
                 .id(),
         );

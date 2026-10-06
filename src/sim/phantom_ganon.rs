@@ -2703,6 +2703,7 @@ pub fn control(
                 angle: [0; 3],
                 set_id,
                 room,
+                ..Default::default()
             };
             commands.spawn(actor);
         }
@@ -2715,6 +2716,7 @@ pub fn control(
             angle: [0, yaw, 0],
             set_id: 0,
             room,
+            ..Default::default()
         };
         commands.spawn((actor, PhantomGanon::spawn(parameters)));
     }
@@ -2726,6 +2728,7 @@ pub fn control(
             angle: [0; 3],
             set_id,
             room,
+            ..Default::default()
         };
         let Some(mut stick) = boko::Boko::spawn(BOKO_SWORD) else {
             continue;

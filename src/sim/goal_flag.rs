@@ -1326,6 +1326,7 @@ pub fn control(
                         angle: [0; 3],
                         set_id: 0,
                         room,
+                        ..Default::default()
                     },
                     BuoyRaceSpawn {
                         prm: spawn.prm,

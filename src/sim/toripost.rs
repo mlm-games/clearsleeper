@@ -1724,6 +1724,7 @@ impl Ctx<'_, '_, '_> {
                     angle: [0; 3],
                     set_id: PRESENT_ITEM_SET_ID,
                     room: PRESENT_ITEM_ROOM,
+                    ..Default::default()
                 },
                 PresentItem { item, hidden: false },
             ))

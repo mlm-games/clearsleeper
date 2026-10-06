@@ -89,7 +89,7 @@ const SPIN_BOUNCE: f32 = 8000.0; // <- d_a_esa.cpp:124
 
 /// `i_this->current.angle.z = cM_rndFX(0x8000)` (`d_a_esa.cpp:96` and `:121`) - the two pitch draws.
 /// `0x8000` is half a turn and the assignment truncates the `f32` into the `s16 angle.z`.
-const PITCH_SPIN: f32 = 0x8000.0; // <- d_a_esa.cpp:96
+const PITCH_SPIN: f32 = 32768.0;
 
 /// `i_this->speedF *= cM_rndF(0.3f) + 0.3f;` (`d_a_esa.cpp:125`) - the `case 1` roll decay.
 const ROLL_LOW: f32 = 0.3; // <- d_a_esa.cpp:125

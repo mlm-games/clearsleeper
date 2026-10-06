@@ -2862,6 +2862,7 @@ pub fn control(
                     angle: [0; 3],
                     set_id: u16::MAX,
                     room,
+                    ..Default::default()
                 },
                 PresentItem { item, hidden: false },
             ));

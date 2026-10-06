@@ -1423,6 +1423,7 @@ impl AmosKnight {
                             angle: actor.angle,
                             set_id: 0,
                             room: actor.room,
+                            ..Default::default()
                         },
                         iball::Iball::spawn(),
                     ));
@@ -1457,6 +1458,7 @@ impl AmosKnight {
                 angle: actor.angle,
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             iball::Iball::spawn(),
         ));

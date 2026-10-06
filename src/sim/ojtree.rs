@@ -100,6 +100,7 @@ impl Ojtree {
                 angle: [0; 3],
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             jbaba::Baba::spawn(JBO_TYPE_NORMAL),
         ));

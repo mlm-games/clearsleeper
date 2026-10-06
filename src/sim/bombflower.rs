@@ -176,6 +176,7 @@ pub fn flower_control(
                             angle: actor.angle,
                             set_id: 0,
                             room: actor.room,
+                            ..Default::default()
                         },
                         Crawler::spawn(prm),
                     ));

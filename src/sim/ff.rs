@@ -338,6 +338,7 @@ impl Ff {
                     angle: [0; 3],
                     set_id: 0,
                     room: actor.room,
+                    ..Default::default()
                 },
                 Ff::spawn(cleared),
             ));

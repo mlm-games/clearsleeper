@@ -1270,6 +1270,7 @@ pub fn control(
                     angle: rupee.angle,
                     set_id: rupee.set_id,
                     room: rupee.room,
+                    ..Default::default()
                 },
                 Pickup::spawn(parameters),
             ))

@@ -2262,6 +2262,7 @@ impl Chuchu {
                 angle: actor.angle,
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             Pickup::spawn(parameters),
         ));

@@ -379,6 +379,7 @@ pub fn spawn(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
         angle: source.angle,
         set_id: source.set_id,
         room: source.room,
+        ..Default::default()
     };
     let tag = GyCtrl::spawn(source.parameters, source.angle[0], source.room);
     world.spawn((actor, tag)).id()

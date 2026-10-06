@@ -204,6 +204,7 @@ fn spawn_ray(commands: &mut Commands, actor: &Actor, beamos: &Bemos) -> Entity {
         angle: [beamos.pitch, yaw, 0],
         set_id: actor.set_id,
         room: actor.room,
+        ..Default::default()
     };
     commands
         .spawn((
@@ -230,6 +231,7 @@ fn shatter(actor: &Actor, beamos: &Bemos, events: &mut SimEvents, commands: &mut
             angle: [beamos.pitch, yaw, 0],
             set_id: actor.set_id,
             room: actor.room,
+            ..Default::default()
         },
         Pickup::spawn(u32::from(beamos.item)),
     ));

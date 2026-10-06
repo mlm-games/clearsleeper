@@ -375,6 +375,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         angle: source.angle,
         set_id: source.set_id,
         room: source.room,
+        ..Default::default()
     };
     if source.name == ship::SHIP_ACTOR {
         world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
@@ -671,7 +672,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
-        world.spawn((actor, scenery::Scenery)).id()
+        world
+            .spawn((actor, scenery::Scenery::spawn()))
+            .id()
     } else if tsubo::is_tsubo(&source.name) {
         let pot = tsubo::Tsubo::spawn(source.parameters);
         world.spawn((actor, pot, carry::Carryable::Tsubo)).id()
@@ -1431,6 +1434,7 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
+            (
                 (
                     flags::clear_order_flags.in_set(WwSimSet::Execute),
                     registry::control.in_set(WwSimSet::Execute),
@@ -1826,6 +1830,9 @@ pub fn build(
                 bridge::control.in_set(WwSimSet::Execute),
                 tornado::control.in_set(WwSimSet::Execute),
                 stair::control.in_set(WwSimSet::Execute),
+                )
+                .chain(),
+            (
                 vrbox2::control.in_set(WwSimSet::Execute),
                 hlift::control.in_set(WwSimSet::Execute),
                 lstair::control.in_set(WwSimSet::Execute),
@@ -1833,6 +1840,8 @@ pub fn build(
                 leaflift::control.in_set(WwSimSet::Execute),
                 mtest::control.in_set(WwSimSet::Execute),
                 dai::control.in_set(WwSimSet::Execute),
+            )
+                .chain(),
         )
             .chain(),
     );
@@ -1842,3 +1851,4 @@ pub mod auction;
 
 pub mod knob00;
 pub mod bridge;
+pub mod bgn3;

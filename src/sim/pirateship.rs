@@ -92,6 +92,7 @@ pub fn control(
                 angle: actor.angle,
                 set_id: NO_SET_ID,
                 room: actor.room,
+                ..Default::default()
             };
             pirate.catapult = Some(commands.spawn((child, Catapult { ship: entity })).id());
         }

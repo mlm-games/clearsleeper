@@ -683,6 +683,7 @@ impl Sink<'_> {
             angle,
             set_id: self.set_id,
             room: self.room,
+            ..Default::default()
         };
         let mut board = Kanban::spawn(parameters);
         if !board.create(&mut actor, Some((entity, home, home_angle))) {

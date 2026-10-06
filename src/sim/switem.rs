@@ -382,6 +382,7 @@ impl Switem {
                 angle: [0, home_angle, 0],
                 set_id: 0,
                 room,
+                ..Default::default()
             },
             Pickup::spawn(parameters),
         ));

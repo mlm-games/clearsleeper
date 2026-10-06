@@ -1436,8 +1436,7 @@ pub fn control(
     let live = env.combat.active
         && env.combat.frame >= CUT_START
         && env.combat.frame < CUT_END;
-    let player = players.iter_mut().next().map(|p| &mut *p);
-    let player = player.map(|p| {
+    let player = players.iter_mut().next().map(|p| {
         let cut = Cut {
             live,
             pos: Vec3::new(
@@ -1450,7 +1449,7 @@ pub fn control(
         (p, cut)
     });
     let (mut player, cut) = match player {
-        Some(pair) => (Some(pair.0), Some(pair.1)),
+        Some((player, cut)) => (Some(player), Some(cut)),
         None => (None, None),
     };
     let mates: Vec<(Entity, u8, Vec3, Vec3)> = bridges

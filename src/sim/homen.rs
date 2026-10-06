@@ -291,6 +291,7 @@ impl Homen {
                 angle: [0; 3],
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             Pickup::spawn(parameters),
         ));
@@ -315,6 +316,7 @@ impl Homen {
                         angle: [0; 3],
                         set_id: 0,
                         room: actor.room,
+                        ..Default::default()
                     },
                     state,
                     hit_points,

@@ -26,7 +26,12 @@ use super::tsubo;
 use super::walk::{from_s16, to_s16};
 use super::water;
 
-pub const MORTH_ACTORS: [&str; 2] = ["kuro_s", "kuro_t"];
+// `fpcNm_MORTH_e` has NO OBJNAME row in d_stage.cpp, so daMorth is never
+// stage-placed and this array is empty. It previously held kuro_s/kuro_t,
+// which d_stage.cpp:679-680 assigns to `fpcNm_KS_e` (d_a_ks.cpp) - a
+// different actor. `d_a_ks.cpp` is 1790 lines, Nonmatching == 0, and has
+// no module; it is the rightful owner of those two stage strings.
+pub const MORTH_ACTORS: [&str; 0] = [];
 
 pub fn is_morth(name: &str) -> bool {
     MORTH_ACTORS.contains(&name)
@@ -808,6 +813,7 @@ pub fn control(
                 angle: spawn.angle,
                 set_id: spawn.set_id,
                 room: spawn.room,
+                ..Default::default()
             },
             Morth::spawn(spawn.parameters),
         ));
@@ -825,6 +831,7 @@ pub fn control(
                 angle: [0; 3],
                 set_id: 0,
                 room,
+                ..Default::default()
             },
             super::pickup::Pickup::spawn(u32::from(item)),
         ));

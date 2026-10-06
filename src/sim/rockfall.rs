@@ -97,6 +97,7 @@ pub fn control(
                 angle,
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             FallRock::spawn(size),
         ));

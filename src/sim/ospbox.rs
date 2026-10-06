@@ -176,6 +176,7 @@ impl Ospbox {
                 angle: actor.angle,
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             Carryable::Pig,
         ));

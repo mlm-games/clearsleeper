@@ -581,7 +581,7 @@ impl Movebox {
         self.path_num = count;
     }
 
-    fn prm_get_sw_save(&self) -> i32 {
+    pub fn prm_get_sw_save(&self) -> i32 {
         prm(self.parameters, PRM_SWSAVE_W, PRM_SWSAVE_S)
     }
 
@@ -593,7 +593,7 @@ impl Movebox {
         prm(self.parameters, PRM_ITEMSAVE_W, PRM_ITEMSAVE_S)
     }
 
-    fn prm_get_dmy(&self) -> i32 {
+    pub fn prm_get_dmy(&self) -> i32 {
         prm(self.parameters, PRM_DMY_W, PRM_DMY_S)
     }
 
@@ -1662,6 +1662,7 @@ pub fn control(
             angle: spawn.angle,
             set_id: 0xFFFF,
             room: spawn.room,
+            ..Default::default()
         };
         commands.spawn((actor, pickup::Pickup::spawn(spawn.parameters)));
     }

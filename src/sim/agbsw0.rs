@@ -2912,6 +2912,7 @@ pub fn control(
             angle: [0; 3],
             set_id: NO_SET_ID,
             room: spawn.room,
+            ..Default::default()
         };
         let pickup = super::pickup::Pickup::spawn(u32::from(spawn.item));
         commands.spawn((item, pickup));

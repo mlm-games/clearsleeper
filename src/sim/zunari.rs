@@ -1805,6 +1805,7 @@ pub fn control(
                     angle: [0; 3],
                     set_id: u16::MAX,
                     room: actor.room,
+                    ..Default::default()
                 },
                 super::event::PresentItem {
                     item,

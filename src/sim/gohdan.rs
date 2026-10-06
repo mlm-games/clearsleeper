@@ -3873,6 +3873,7 @@ pub fn control(
             angle: spawn.angle,
             set_id: spawn.set_id,
             room: spawn.room,
+            ..Default::default()
         };
         if spawn.pickup {
             commands.spawn((actor, pickup::Pickup::spawn(spawn.parameters)));

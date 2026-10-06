@@ -182,6 +182,7 @@ impl Leaves {
                 angle: [0; 3],
                 set_id: 0,
                 room: actor.room,
+                ..Default::default()
             },
             Pickup::spawn(parameters),
         ));

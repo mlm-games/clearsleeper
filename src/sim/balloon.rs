@@ -43,6 +43,7 @@ fn drop(actor: &Actor, payload: Payload, commands: &mut Commands) {
         angle: actor.angle,
         set_id: actor.set_id,
         room: actor.room,
+        ..Default::default()
     };
     let yaw = actor.angle[1];
     match payload {

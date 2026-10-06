@@ -1112,6 +1112,7 @@ impl Auction {
                     angle: [0; 3],
                     set_id: ITEM_SET_ID,
                     room: ITEM_ROOM,
+                    ..Default::default()
                 })
                 .id(),
         );
@@ -1555,6 +1556,7 @@ impl Auction {
                     angle: [0; 3],
                     set_id: ITEM_SET_ID,
                     room: ITEM_ROOM,
+                    ..Default::default()
                 },
                 PresentItem {
                     item,

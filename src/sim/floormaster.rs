@@ -2525,6 +2525,7 @@ impl Floormaster {
                     angle: actor.angle,
                     set_id: 0,
                     room: actor.room,
+                    ..Default::default()
                 },
                 iball::Iball::spawn(),
             ));
@@ -2548,6 +2549,7 @@ impl Floormaster {
                             angle: actor.angle,
                             set_id: 0,
                             room: actor.room,
+                            ..Default::default()
                         },
                         tsubo::Tsubo::spawn(SKULL_PARAM),
                     ))

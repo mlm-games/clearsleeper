@@ -1093,6 +1093,7 @@ impl Merchant {
                     angle: [0; 3],
                     set_id: u16::MAX,
                     room: -1,
+                    ..Default::default()
                 },
                 PresentItem {
                     item,
@@ -1141,6 +1142,7 @@ impl Merchant {
                     angle: [0; 3],
                     set_id: u16::MAX,
                     room: -1,
+                    ..Default::default()
                 },
                 PresentItem {
                     item,

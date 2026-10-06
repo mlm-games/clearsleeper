@@ -175,6 +175,7 @@ pub fn spawn(world: &mut World, source: &crate::dzs::StageActor) -> Entity {
         angle: source.angle,
         set_id: source.set_id,
         room: source.room,
+        ..Default::default()
     };
     let cloud = Rcloud::spawn(source.parameters);
     world.spawn((actor, cloud)).id()

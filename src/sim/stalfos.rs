@@ -1625,6 +1625,7 @@ impl Stalfos {
                             angle: actor.angle,
                             set_id: actor.set_id,
                             room: actor.room,
+                            ..Default::default()
                         },
                         Stalfos::spawn(u32::from(BEHAVIOR_UPPER_BODY_ONLY)),
                         HitPoints(HEAD_HEALTH),

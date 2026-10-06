@@ -67,6 +67,7 @@ impl Msdan2 {
                     angle,
                     set_id: NO_SET_ID,
                     room: actor.room,
+                    ..Default::default()
                 },
                 super::msdansub2::MsdanSub2::spawn(parameters),
             ));

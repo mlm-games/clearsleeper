@@ -2143,6 +2143,7 @@ fn get_item_cut(
                         angle: [0; 3],
                         set_id: u16::MAX,
                         room: -1,
+                        ..Default::default()
                     },
                     PresentItem {
                         item,
