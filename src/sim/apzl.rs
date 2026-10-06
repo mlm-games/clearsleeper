@@ -10,7 +10,7 @@ use super::intent::{DoIntent, MoveIntent, TargetIntent};
 use super::npc_btsw::StControl;
 use super::pickup::{ITEM_ACTORS, Pickup};
 use super::player::Player;
-use super::walk::to_s16;
+use super::walk::{from_s16, to_s16};
 use crate::assets::MsgArchives;
 use crate::text::driver::TextFlags;
 use crate::text::msgbox::Msg2Box;
@@ -146,7 +146,6 @@ const MSG_GAME_CLEARED: u32 = 0x1BCF;
 const MSG_REWARD: u32 = 0x1BD0;
 
 const SELECT_YES: u8 = 0;
-const SELECT_NO: u8 = 1;
 
 const NO_MSG_STATUS: u8 = 0xFF;
 
@@ -177,7 +176,7 @@ const ITEM_PRM_ACT_SHIFT: u32 = 26;
 const RUPEE_SPAWN_POS: [f32; 3] = [0.0, 100.0, 735.0];
 const RUPEE_ANGLE_SPREAD_X: f32 = 4000.0;
 const RUPEE_ANGLE_SPREAD_Y: f32 = 6000.0;
-const RUPEE_SPIN_BASE: i16 = -0x4000;
+const RUPEE_SPIN_OFFSET: i16 = 0x4000;
 const RUPEE_FLY_MIN: f32 = 5.0;
 const RUPEE_FLY_SPAN: f32 = 15.0;
 const RUPEE_FALL: f32 = -2.1;
@@ -200,8 +199,8 @@ const SE_PUZZLE_COMPLETE: u32 = 0x08F4;
 
 const SOUND_WAIT_FRAMES: i32 = 150;
 
-const SHOCK_FRAME: i32 = 4;
-const SHOCK_POWER: i32 = 1;
+const SHOCK_PATTERN: i32 = 4;
+const SHOCK_FLAGS: i32 = 1;
 const SHOCK_DIR: [f32; 3] = [0.0, 1.0, 0.0];
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
@@ -587,7 +586,7 @@ impl Apzl {
         status
     }
 
-    pub fn set_mtx(&mut self, actor: &Actor) {
+    pub fn set_mtx(&mut self) {
         for index in 0..CELL_COUNT {
             let piece = i32::from(self.piece_pos[index]);
             let mut local = [
@@ -617,12 +616,16 @@ impl Apzl {
 
         let blank = i32::from(self.blank());
         for index in 0..ARROW_COUNT {
+            let spin = (index as i16).wrapping_mul(ARROW_SPIN);
+            let (sin, cos) = from_s16(spin).sin_cos();
             self.arrow_local[index] = [
-                (blank % 4) as f32 * BOARD_TILE_STEP - BOARD_TILE_ORIGIN,
-                BOARD_TILE_ORIGIN - (blank / 4) as f32 * BOARD_TILE_STEP - BOARD_ARROW_LIFT,
+                (blank % 4) as f32 * BOARD_TILE_STEP - BOARD_TILE_ORIGIN
+                    + BOARD_ARROW_LIFT * sin,
+                BOARD_TILE_ORIGIN - (blank / 4) as f32 * BOARD_TILE_STEP
+                    - BOARD_ARROW_LIFT * cos,
                 0.0,
             ];
-            self.arrow_spin[index] = (index as i16).wrapping_mul(ARROW_SPIN);
+            self.arrow_spin[index] = spin;
         }
 
         for index in 0..CELL_COUNT {
@@ -632,8 +635,6 @@ impl Apzl {
                 (index as f32 / 8.0 - 2.0) * BOARD_SCORE_STEP,
             ];
         }
-
-        self.eye_pos = actor.pos;
     }
 
     pub fn create_init(&mut self, actor: &Actor, statics: &mut Statics, list: &EventList) {
@@ -693,12 +694,12 @@ impl Apzl {
         }
 
         self.given_rupee_count = 0;
-        self.set_mtx(actor);
+        self.set_mtx();
     }
 
     fn stick_update(&mut self, axis: Vec2) {
         let value = axis.length().min(1.0);
-        let angle = if value.abs() < STICK_EPSILON {
+        let angle = if cm3d_is_zero(axis.x) && cm3d_is_zero(axis.y) {
             0
         } else {
             to_s16(axis.x.atan2(axis.y))
@@ -811,6 +812,10 @@ fn in_talk_range(distance: f32, from: Vec3, to: Vec3) -> bool {
     dx * dx + dz * dz < distance * distance
 }
 
+fn cm3d_is_zero(value: f32) -> bool {
+    value.abs() < STICK_EPSILON
+}
+
 struct Rupee {
     owner: Entity,
     slot: usize,
@@ -824,6 +829,8 @@ struct Rupee {
 struct Env<'a> {
     entity: Entity,
     actor_angle: [i16; 3],
+    room: i8,
+    set_id: u16,
     stick: Vec2,
     hold_a: bool,
     hold_b: bool,
@@ -923,13 +930,14 @@ impl Apzl {
     }
 
     fn private_cut(&mut self, env: &mut Env<'_>, stops: &mut Vec<Entity>, spawns: &mut Vec<Rupee>) {
-        let Some((cut, advance)) = env.active.staff_cut(env.list, STAFF_NAME) else {
+        let list = env.list;
+        let Some((cut, advance)) = env.active.staff_cut(list, STAFF_NAME) else {
             return;
         };
-        let name = env.list.cut_name(cut).unwrap_or("");
+        let name = list.cut_name(cut).unwrap_or("");
         self.act_idx = act_index(name);
         if self.act_idx < 0 {
-            env.active.end_staff_cut(env.list, env.ev_flags, STAFF_NAME);
+            env.active.end_staff_cut(list, env.ev_flags, STAFF_NAME);
             return;
         }
         if advance {
@@ -991,7 +999,7 @@ impl Apzl {
             _ => temp = true,
         }
         if temp {
-            env.active.end_staff_cut(env.list, env.ev_flags, STAFF_NAME);
+            env.active.end_staff_cut(list, env.ev_flags, STAFF_NAME);
         }
     }
 
@@ -1014,27 +1022,25 @@ impl Apzl {
         angle[0] = env.actor_angle[0].wrapping_add(self.rnd_fx(RUPEE_ANGLE_SPREAD_X) as i16);
         angle[1] = (self.rnd_fx(RUPEE_ANGLE_SPREAD_Y) as i16)
             .wrapping_add(env.actor_angle[1])
-            .wrapping_sub(RUPEE_SPIN_BASE);
+            .wrapping_sub(RUPEE_SPIN_OFFSET);
         angle[2] = ITEM_SWITCH_NO as i16;
 
-        let speed_f = self.rnd_f(RUPEE_FLY_SPAN) + RUPEE_FLY_MIN;
-        let speed_y = self.rnd_f(RUPEE_FLY_SPAN) + RUPEE_FLY_MIN;
-        let fall = RUPEE_FALL;
+        let _ = (
+            self.rnd_f(RUPEE_FLY_SPAN) + RUPEE_FLY_MIN,
+            self.rnd_f(RUPEE_FLY_SPAN) + RUPEE_FLY_MIN,
+            RUPEE_FALL,
+        );
 
+        let slot = usize::try_from(self.given_rupee_count).unwrap_or(RUPEE_MAX);
         spawns.push(Rupee {
             owner: env.entity,
-            slot: usize::try_from(self.given_rupee_count).unwrap_or(RUPEE_MAX),
+            slot,
             parameters: item_param(item),
             pos: RUPEE_SPAWN_POS,
             angle,
             room: env.room,
             set_id: env.set_id,
         });
-        self.rupee_ids
-            .get(usize::try_from(self.given_rupee_count).unwrap_or(RUPEE_MAX))
-            .copied()
-            .unwrap_or(Entity::PLACEHOLDER);
-        let _ = (speed_f, speed_y, fall);
 
         self.given_rupee_count += 1;
         self.gave_reward = true;
@@ -1042,10 +1048,11 @@ impl Apzl {
     }
 
     fn order_slot(&self, env: &mut Env<'_>, which: usize) {
+        let list = env.list;
         let index = self.event_idx.get(which).copied().unwrap_or(EVENT_IDX_NONE);
         if index >= 0 {
             let slot = usize::from(index as u16);
-            let _ = env.active.order(env.list, slot, env.entity);
+            let _ = env.active.order(list, slot, env.entity);
         }
     }
 
@@ -1066,7 +1073,6 @@ impl Apzl {
 
     fn execute(
         &mut self,
-        actor: &Actor,
         env: &mut Env<'_>,
         statics: &mut Statics,
         order_flags: &mut OrderFlags,
@@ -1121,7 +1127,7 @@ impl Apzl {
                         if self.check_clear() && self.move_timer == 0 {
                             self.show_blank_piece = true;
                             self.game_cleared = true;
-                            self.shock = Some((SHOCK_FRAME, SHOCK_POWER, SHOCK_DIR));
+                            self.shock = Some((SHOCK_PATTERN, SHOCK_FLAGS, SHOCK_DIR));
                             self.state = STATE_END;
                         } else if env.hold_b {
                             env.se(SE_PUZZLE_EXIT);
@@ -1166,7 +1172,7 @@ impl Apzl {
             self.check_arrow_draw();
         }
 
-        self.set_mtx(actor);
+        self.set_mtx();
     }
 }
 
@@ -1227,6 +1233,8 @@ pub fn control(
         let mut env = Env {
             entity,
             actor_angle: angle,
+            room,
+            set_id,
             stick: axis,
             hold_a,
             hold_b,
@@ -1242,10 +1250,7 @@ pub fn control(
             two: &mut two,
             archive,
         };
-        env.room = room;
-        env.set_id = set_id;
         board.execute(
-            actor,
             &mut env,
             &mut statics,
             &mut order_flags,
@@ -1257,27 +1262,26 @@ pub fn control(
     let mut born: Vec<(Entity, usize, Entity)> = Vec::new();
     for rupee in spawns {
         let parameters = rupee.parameters;
-        let item = commands.spawn((
-            Actor {
-                name: ITEM_ACTORS[0].to_owned(),
-                parameters,
-                pos: Vec3::from_array(rupee.pos),
-                angle: rupee.angle,
-                set_id: rupee.set_id,
-                room: rupee.room,
-            },
-            Pickup::spawn(parameters),
-        ));
+        let item = commands
+            .spawn((
+                Actor {
+                    name: ITEM_ACTORS[0].to_owned(),
+                    parameters,
+                    pos: Vec3::from_array(rupee.pos),
+                    angle: rupee.angle,
+                    set_id: rupee.set_id,
+                    room: rupee.room,
+                },
+                Pickup::spawn(parameters),
+            ))
+            .id();
         born.push((rupee.owner, rupee.slot, item));
     }
 
     for (owner, slot, item) in born {
-        if let Some((_, _, mut board)) = boards
-            .iter_mut()
-            .find(|(entity, _, _)| *entity == owner)
-        {
+        if let Some(mut entry) = boards.iter_mut().find(|(entity, _, _)| *entity == owner) {
             if slot < RUPEE_MAX {
-                board.rupee_ids[slot] = item;
+                entry.2.rupee_ids[slot] = item;
             }
         }
     }

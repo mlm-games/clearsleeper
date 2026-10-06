@@ -1227,165 +1227,114 @@ pub fn build(
     sim.add_chained_systems(
         (
             (
-                (
-                    daynight::control.in_set(WwSimSet::Execute),
-
-                    daioeye::control.in_set(WwSimSet::Execute),
-                    ssturu::control.in_set(WwSimSet::Execute),
-
-                    evsw::control.in_set(WwSimSet::Execute),
-                    kaji::control.in_set(WwSimSet::Execute),
-
-                    ikari::control.in_set(WwSimSet::Execute),
-                    gbed::control.in_set(WwSimSet::Execute),
-
-                    hami4::control.in_set(WwSimSet::Execute),
-                    vrbox::control.in_set(WwSimSet::Execute),
-
-                    tide::control.in_set(WwSimSet::Execute),
-                    pscnchg::control.in_set(WwSimSet::Execute),
-
-                    vdora::control.in_set(WwSimSet::Execute),
+                (daynight::control.in_set(WwSimSet::Execute),
+                daioeye::control.in_set(WwSimSet::Execute),
+                ssturu::control.in_set(WwSimSet::Execute),
+                evsw::control.in_set(WwSimSet::Execute),
+                kaji::control.in_set(WwSimSet::Execute),
+                ikari::control.in_set(WwSimSet::Execute),
+                gbed::control.in_set(WwSimSet::Execute),
+                hami4::control.in_set(WwSimSet::Execute),
+                vrbox::control.in_set(WwSimSet::Execute),
+                tide::control.in_set(WwSimSet::Execute),
+                pscnchg::control.in_set(WwSimSet::Execute),
+                vdora::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    otble::control.in_set(WwSimSet::Execute),
-
-                    tenmado::control.in_set(WwSimSet::Execute),
-                    omensmk::control.in_set(WwSimSet::Execute),
-
-                    mmusic::control.in_set(WwSimSet::Execute),
-                    ygush::control.in_set(WwSimSet::Execute),
-
-                    player_status::control.in_set(WwSimSet::Execute),
-                    bombflower::clear_blasts.in_set(WwSimSet::Execute),
-
-                    ajav::control.in_set(WwSimSet::Execute),
+                (otble::control.in_set(WwSimSet::Execute),
+                tenmado::control.in_set(WwSimSet::Execute),
+                omensmk::control.in_set(WwSimSet::Execute),
+                mmusic::control.in_set(WwSimSet::Execute),
+                ygush::control.in_set(WwSimSet::Execute),
+                player_status::control.in_set(WwSimSet::Execute),
+                bombflower::clear_blasts.in_set(WwSimSet::Execute),
+                ajav::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    death::freeze.in_set(WwSimSet::Execute),
-                    gy_ctrl::control.in_set(WwSimSet::Execute),
-                    obj_rcloud::control.in_set(WwSimSet::Execute),
-
-                    tori_flag::control.in_set(WwSimSet::Execute),
-
-                    carry::control.in_set(WwSimSet::Execute),
-
-                    tsubo::control.in_set(WwSimSet::Execute),
-                    koisi::control.in_set(WwSimSet::Execute),
-
-                    bomb::control.in_set(WwSimSet::Execute),
-                    bombflower::flower_control.in_set(WwSimSet::Execute),
-
-                    bombflower::crawler_control.in_set(WwSimSet::Execute),
-                    ladder::control.in_set(WwSimSet::Execute),
-
-                    arrow::control.in_set(WwSimSet::Execute),
+                (death::freeze.in_set(WwSimSet::Execute),
+                gy_ctrl::control.in_set(WwSimSet::Execute),
+                obj_rcloud::control.in_set(WwSimSet::Execute),
+                tori_flag::control.in_set(WwSimSet::Execute),
+                carry::control.in_set(WwSimSet::Execute),
+                tsubo::control.in_set(WwSimSet::Execute),
+                koisi::control.in_set(WwSimSet::Execute),
+                bomb::control.in_set(WwSimSet::Execute),
+                bombflower::flower_control.in_set(WwSimSet::Execute),
+                bombflower::crawler_control.in_set(WwSimSet::Execute),
+                ladder::control.in_set(WwSimSet::Execute),
+                arrow::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
                     hookshot::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    barrier::control.in_set(WwSimSet::Execute),
-
-                    raft::control.in_set(WwSimSet::Execute),
-                    barricade::control.in_set(WwSimSet::Execute),
-
-                    trapdoor::control.in_set(WwSimSet::Execute),
+                (barrier::control.in_set(WwSimSet::Execute),
+                raft::control.in_set(WwSimSet::Execute),
+                barricade::control.in_set(WwSimSet::Execute),
+                trapdoor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    torch::control.in_set(WwSimSet::Execute),
-                    usovmc::control.in_set(WwSimSet::Execute),
-                    obj_akabe::control.in_set(WwSimSet::Execute),
-
-                    sie_flag::control.in_set(WwSimSet::Execute),
-
-                    barrel::control.in_set(WwSimSet::Execute),
-
-                    fallrock::control.in_set(WwSimSet::Execute),
-                    windmill::control.in_set(WwSimSet::Execute),
-
-                    ice::control.in_set(WwSimSet::Execute),
-                    kytag04::control.in_set(WwSimSet::Execute),
-
-                    kytag06::control.in_set(WwSimSet::Execute),
-                    dummy::control.in_set(WwSimSet::Execute),
-
-                    spotbox::control.in_set(WwSimSet::Execute),
+                (torch::control.in_set(WwSimSet::Execute),
+                usovmc::control.in_set(WwSimSet::Execute),
+                obj_akabe::control.in_set(WwSimSet::Execute),
+                sie_flag::control.in_set(WwSimSet::Execute),
+                barrel::control.in_set(WwSimSet::Execute),
+                fallrock::control.in_set(WwSimSet::Execute),
+                windmill::control.in_set(WwSimSet::Execute),
+                ice::control.in_set(WwSimSet::Execute),
+                kytag04::control.in_set(WwSimSet::Execute),
+                kytag06::control.in_set(WwSimSet::Execute),
+                dummy::control.in_set(WwSimSet::Execute),
+                spotbox::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
                     rectangle::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    kanat::control.in_set(WwSimSet::Execute),
-
-                    seatag::control.in_set(WwSimSet::Execute),
-                    scenechange::control.in_set(WwSimSet::Execute),
-
-                    woodbox::control.in_set(WwSimSet::Execute),
-                    cafelmp::control.in_set(WwSimSet::Execute),
-
-
-                    pbka::control.in_set(WwSimSet::Execute),
-                    gntakie::control.in_set(WwSimSet::Execute),
-
-                    vmsdz::control.in_set(WwSimSet::Execute),
+                (kanat::control.in_set(WwSimSet::Execute),
+                seatag::control.in_set(WwSimSet::Execute),
+                scenechange::control.in_set(WwSimSet::Execute),
+                woodbox::control.in_set(WwSimSet::Execute),
+                cafelmp::control.in_set(WwSimSet::Execute),
+                pbka::control.in_set(WwSimSet::Execute),
+                gntakie::control.in_set(WwSimSet::Execute),
+                vmsdz::control.in_set(WwSimSet::Execute),
 
                 )
                     .chain(),
-                (
-                    kytag07::control.in_set(WwSimSet::Execute),
-
-                    kytag00::control.in_set(WwSimSet::Execute),
-                    tag_msg::control.in_set(WwSimSet::Execute),
-
-                    event_manager::control.in_set(WwSimSet::Execute),
-                    shape::control.in_set(WwSimSet::Execute),
-
-                    obj_paper::control.in_set(WwSimSet::Execute),
-                    kytag01::control.in_set(WwSimSet::Execute),
-
-                    atttag::control.in_set(WwSimSet::Execute),
-                    kytag02::control.in_set(WwSimSet::Execute),
-
-                    retag::control.in_set(WwSimSet::Execute),
-                    turu::control.in_set(WwSimSet::Execute),
-
-                    spcitem::control.in_set(WwSimSet::Execute),
+                (kytag07::control.in_set(WwSimSet::Execute),
+                kytag00::control.in_set(WwSimSet::Execute),
+                tag_msg::control.in_set(WwSimSet::Execute),
+                event_manager::control.in_set(WwSimSet::Execute),
+                shape::control.in_set(WwSimSet::Execute),
+                obj_paper::control.in_set(WwSimSet::Execute),
+                kytag01::control.in_set(WwSimSet::Execute),
+                atttag::control.in_set(WwSimSet::Execute),
+                kytag02::control.in_set(WwSimSet::Execute),
+                retag::control.in_set(WwSimSet::Execute),
+                turu::control.in_set(WwSimSet::Execute),
+                spcitem::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    ajavw::control.in_set(WwSimSet::Execute),
-
-                    dmgroom::control.in_set(WwSimSet::Execute),
-                    hotfloor::control.in_set(WwSimSet::Execute),
+                (ajavw::control.in_set(WwSimSet::Execute),
+                dmgroom::control.in_set(WwSimSet::Execute),
+                hotfloor::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    door::control.in_set(WwSimSet::Execute),
-                    tag_volcano::control.in_set(WwSimSet::Execute),
-                    andsw2::control.in_set(WwSimSet::Execute),
-
-
-                    door::jail_control.in_set(WwSimSet::Execute),
-                    bird::control.in_set(WwSimSet::Execute),
-
-                    tingle::control.in_set(WwSimSet::Execute),
-                    select::control.in_set(WwSimSet::Execute),
-
-                    canon::control.in_set(WwSimSet::Execute),
-                    mbdoor::control.in_set(WwSimSet::Execute),
-
-                    demokmm::control.in_set(WwSimSet::Execute),
-                    komore::control.in_set(WwSimSet::Execute),
-
-                    npc_pf1::control.in_set(WwSimSet::Execute),
+                (door::control.in_set(WwSimSet::Execute),
+                tag_volcano::control.in_set(WwSimSet::Execute),
+                andsw2::control.in_set(WwSimSet::Execute),
+                door::jail_control.in_set(WwSimSet::Execute),
+                bird::control.in_set(WwSimSet::Execute),
+                tingle::control.in_set(WwSimSet::Execute),
+                select::control.in_set(WwSimSet::Execute),
+                canon::control.in_set(WwSimSet::Execute),
+                mbdoor::control.in_set(WwSimSet::Execute),
+                demokmm::control.in_set(WwSimSet::Execute),
+                komore::control.in_set(WwSimSet::Execute),
+                npc_pf1::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1395,334 +1344,233 @@ pub fn build(
             )
                 .chain(),
             (
-                (
-                    adnno::control.in_set(WwSimSet::Execute),
-
-                    roten::control.in_set(WwSimSet::Execute),
-                    kanban::control.in_set(WwSimSet::Execute),
-
-                    esekh::control.in_set(WwSimSet::Execute),
-                    table::control.in_set(WwSimSet::Execute),
-
-                    vteng::control.in_set(WwSimSet::Execute),
-                    bscurtain::control.in_set(WwSimSet::Execute),
-
-                    pbco::control.in_set(WwSimSet::Execute),
+                (adnno::control.in_set(WwSimSet::Execute),
+                roten::control.in_set(WwSimSet::Execute),
+                kanban::control.in_set(WwSimSet::Execute),
+                esekh::control.in_set(WwSimSet::Execute),
+                table::control.in_set(WwSimSet::Execute),
+                vteng::control.in_set(WwSimSet::Execute),
+                bscurtain::control.in_set(WwSimSet::Execute),
+                pbco::control.in_set(WwSimSet::Execute),
 
                 )
                     .chain(),
-                (
-                    ivan::control.in_set(WwSimSet::Execute),
-
-                    morth::control.in_set(WwSimSet::Execute),
-                    kalle_demos::control.in_set(WwSimSet::Execute),
-
-                    agbsw0::control.in_set(WwSimSet::Execute),
-                    npc_tc::control.in_set(WwSimSet::Execute),
-
-                    movebox::control.in_set(WwSimSet::Execute),
-                    npc_bmsw::control.in_set(WwSimSet::Execute),
-
-                    npc_btsw::control.in_set(WwSimSet::Execute),
-                    auction::control.in_set(WwSimSet::Execute),
-
-                    kamome::control.in_set(WwSimSet::Execute),
-                    npc_mt::control.in_set(WwSimSet::Execute),
-
-                    npc_p1::control.in_set(WwSimSet::Execute),
+                (ivan::control.in_set(WwSimSet::Execute),
+                morth::control.in_set(WwSimSet::Execute),
+                kalle_demos::control.in_set(WwSimSet::Execute),
+                agbsw0::control.in_set(WwSimSet::Execute),
+                npc_tc::control.in_set(WwSimSet::Execute),
+                movebox::control.in_set(WwSimSet::Execute),
+                npc_bmsw::control.in_set(WwSimSet::Execute),
+                npc_btsw::control.in_set(WwSimSet::Execute),
+                auction::control.in_set(WwSimSet::Execute),
+                kamome::control.in_set(WwSimSet::Execute),
+                npc_mt::control.in_set(WwSimSet::Execute),
+                npc_p1::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    npc_ds1::control.in_set(WwSimSet::Execute),
-
-                    npc_ac1::control.in_set(WwSimSet::Execute),
-                    npc_uk::control.in_set(WwSimSet::Execute),
-
-                    npc_gp1::control.in_set(WwSimSet::Execute),
-                    demodk::control.in_set(WwSimSet::Execute),
-
-                    kmon::control.in_set(WwSimSet::Execute),
-                    amos_knight::control.in_set(WwSimSet::Execute),
-
-                    ganon_form3::control.in_set(WwSimSet::Execute),
+                (npc_ds1::control.in_set(WwSimSet::Execute),
+                npc_ac1::control.in_set(WwSimSet::Execute),
+                npc_uk::control.in_set(WwSimSet::Execute),
+                npc_gp1::control.in_set(WwSimSet::Execute),
+                demodk::control.in_set(WwSimSet::Execute),
+                kmon::control.in_set(WwSimSet::Execute),
+                amos_knight::control.in_set(WwSimSet::Execute),
+                ganon_form3::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    talk::control.in_set(WwSimSet::Execute),
-                    msdan2::control.in_set(WwSimSet::Execute),
-
-                    flags::control.in_set(WwSimSet::Execute),
-
-                    tbox::control.in_set(WwSimSet::Execute),
-                    clock::control.in_set(WwSimSet::Execute),
-
-                    ghostship::control.in_set(WwSimSet::Execute),
-                    volcano::control.in_set(WwSimSet::Execute),
-
-                    event::control.in_set(WwSimSet::Execute),
-                    msg::control.in_set(WwSimSet::Execute),
-
-                    sage::control.in_set(WwSimSet::Execute),
-                    servant::control.in_set(WwSimSet::Execute),
-
-                    merchant::control.in_set(WwSimSet::Execute),
+                (talk::control.in_set(WwSimSet::Execute),
+                msdan2::control.in_set(WwSimSet::Execute),
+                flags::control.in_set(WwSimSet::Execute),
+                tbox::control.in_set(WwSimSet::Execute),
+                clock::control.in_set(WwSimSet::Execute),
+                ghostship::control.in_set(WwSimSet::Execute),
+                volcano::control.in_set(WwSimSet::Execute),
+                event::control.in_set(WwSimSet::Execute),
+                msg::control.in_set(WwSimSet::Execute),
+                sage::control.in_set(WwSimSet::Execute),
+                servant::control.in_set(WwSimSet::Execute),
+                merchant::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
                     aryll::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    medli::control.in_set(WwSimSet::Execute),
-
-                    makar::control.in_set(WwSimSet::Execute),
-                    lenzo::control.in_set(WwSimSet::Execute),
-
-                    zunari::control.in_set(WwSimSet::Execute),
-                    grammarian::control.in_set(WwSimSet::Execute),
-
-                    crate::text::driver::control.in_set(WwSimSet::Execute),
+                (medli::control.in_set(WwSimSet::Execute),
+                makar::control.in_set(WwSimSet::Execute),
+                lenzo::control.in_set(WwSimSet::Execute),
+                zunari::control.in_set(WwSimSet::Execute),
+                grammarian::control.in_set(WwSimSet::Execute),
+                crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    ending::control.in_set(WwSimSet::Execute),
-
-                    tagkk1::control.in_set(WwSimSet::Execute),
-                    steamtag::control.in_set(WwSimSet::Execute),
-
-                    warpt::control.in_set(WwSimSet::Execute),
-                    wbird::control.in_set(WwSimSet::Execute),
-
-                    plant::control.in_set(WwSimSet::Execute),
-                    quake::control.in_set(WwSimSet::Execute),
-
-                    amiprop::control.in_set(WwSimSet::Execute),
-                    msdansb::control.in_set(WwSimSet::Execute),
-
-                    ritem::control.in_set(WwSimSet::Execute),
-                    qtkhd::control.in_set(WwSimSet::Execute),
-
-                    touseki::control.in_set(WwSimSet::Execute),
+                (ending::control.in_set(WwSimSet::Execute),
+                tagkk1::control.in_set(WwSimSet::Execute),
+                steamtag::control.in_set(WwSimSet::Execute),
+                warpt::control.in_set(WwSimSet::Execute),
+                wbird::control.in_set(WwSimSet::Execute),
+                plant::control.in_set(WwSimSet::Execute),
+                quake::control.in_set(WwSimSet::Execute),
+                amiprop::control.in_set(WwSimSet::Execute),
+                msdansb::control.in_set(WwSimSet::Execute),
+                ritem::control.in_set(WwSimSet::Execute),
+                qtkhd::control.in_set(WwSimSet::Execute),
+                touseki::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    ground::ground_check.in_set(WwSimSet::Execute),
-
-                    water::water_probe.in_set(WwSimSet::Execute),
-                    swim::control.in_set(WwSimSet::Execute),
-
-                    lock::control.in_set(WwSimSet::Execute),
-                    jump::control.in_set(WwSimSet::Execute),
-
-                    roll::control.in_set(WwSimSet::Execute),
-                    hop::control.in_set(WwSimSet::Execute),
-
-                    schedule::control.in_set(WwSimSet::Execute),
+                (ground::ground_check.in_set(WwSimSet::Execute),
+                water::water_probe.in_set(WwSimSet::Execute),
+                swim::control.in_set(WwSimSet::Execute),
+                lock::control.in_set(WwSimSet::Execute),
+                jump::control.in_set(WwSimSet::Execute),
+                roll::control.in_set(WwSimSet::Execute),
+                hop::control.in_set(WwSimSet::Execute),
+                schedule::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    combat::control.in_set(WwSimSet::Execute),
-
-                    tagba1::control.in_set(WwSimSet::Execute),
-
-                    qdghd::control.in_set(WwSimSet::Execute),
-
-                    syan::control.in_set(WwSimSet::Execute),
-                    item::control.in_set(WwSimSet::Execute),
-
-                    boomerang::control.in_set(WwSimSet::Execute),
-                    enemy::control.in_set(WwSimSet::Execute),
-
-                    balloon::control.in_set(WwSimSet::Execute),
-                    fire::control.in_set(WwSimSet::Execute),
-
-                    gull::control.in_set(WwSimSet::Execute),
-                    hammer::control.in_set(WwSimSet::Execute),
-
-                    hammerhit::control.in_set(WwSimSet::Execute),
+                (combat::control.in_set(WwSimSet::Execute),
+                tagba1::control.in_set(WwSimSet::Execute),
+                qdghd::control.in_set(WwSimSet::Execute),
+                syan::control.in_set(WwSimSet::Execute),
+                item::control.in_set(WwSimSet::Execute),
+                boomerang::control.in_set(WwSimSet::Execute),
+                enemy::control.in_set(WwSimSet::Execute),
+                balloon::control.in_set(WwSimSet::Execute),
+                fire::control.in_set(WwSimSet::Execute),
+                gull::control.in_set(WwSimSet::Execute),
+                hammer::control.in_set(WwSimSet::Execute),
+                hammerhit::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
                     bemos::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    swhammer::control.in_set(WwSimSet::Execute),
-
-                    shmrgrd::control.in_set(WwSimSet::Execute),
-                    statue::control.in_set(WwSimSet::Execute),
-
-                    taglight::control.in_set(WwSimSet::Execute),
-                    swlight::control.in_set(WwSimSet::Execute),
-
-                    rockfall::control.in_set(WwSimSet::Execute),
-                    wind::control.in_set(WwSimSet::Execute),
-
-                    homen::control.in_set(WwSimSet::Execute),
-                    leaves::control.in_set(WwSimSet::Execute),
-
-                    swpush::control.in_set(WwSimSet::Execute),
-                    mflft::control.in_set(WwSimSet::Execute),
-
-                    hmlif::control.in_set(WwSimSet::Execute),
+                (swhammer::control.in_set(WwSimSet::Execute),
+                shmrgrd::control.in_set(WwSimSet::Execute),
+                statue::control.in_set(WwSimSet::Execute),
+                taglight::control.in_set(WwSimSet::Execute),
+                swlight::control.in_set(WwSimSet::Execute),
+                rockfall::control.in_set(WwSimSet::Execute),
+                wind::control.in_set(WwSimSet::Execute),
+                homen::control.in_set(WwSimSet::Execute),
+                leaves::control.in_set(WwSimSet::Execute),
+                swpush::control.in_set(WwSimSet::Execute),
+                mflft::control.in_set(WwSimSet::Execute),
+                hmlif::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    kita::control.in_set(WwSimSet::Execute),
-
-                    gryw::control.in_set(WwSimSet::Execute),
-                    vgnfd::control.in_set(WwSimSet::Execute),
-
-                    ylzou::control.in_set(WwSimSet::Execute),
-                    kn::control.in_set(WwSimSet::Execute),
-
-                    chuchu::control.in_set(WwSimSet::Execute),
+                (kita::control.in_set(WwSimSet::Execute),
+                gryw::control.in_set(WwSimSet::Execute),
+                vgnfd::control.in_set(WwSimSet::Execute),
+                ylzou::control.in_set(WwSimSet::Execute),
+                kn::control.in_set(WwSimSet::Execute),
+                chuchu::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
             )
                 .chain(),
             (
-                (
-                    figure::control.in_set(WwSimSet::Execute),
-                    salvage::control.in_set(WwSimSet::Execute),
-                    obj_nest::control.in_set(WwSimSet::Execute),
-
-
-                    armos::control.in_set(WwSimSet::Execute),
-                    stalfos::control.in_set(WwSimSet::Execute),
-
-                    boko::control.in_set(WwSimSet::Execute),
-                    redead::control.in_set(WwSimSet::Execute),
-
-                    iball::control.in_set(WwSimSet::Execute),
-                    tama::control.in_set(WwSimSet::Execute),
-
-                    swatk::control.in_set(WwSimSet::Execute),                    rforce::control.in_set(WwSimSet::Execute),
-
-                    mjdoor::control.in_set(WwSimSet::Execute),
-
-                    vmsms::control.in_set(WwSimSet::Execute),
+                (figure::control.in_set(WwSimSet::Execute),
+                salvage::control.in_set(WwSimSet::Execute),
+                obj_nest::control.in_set(WwSimSet::Execute),
+                armos::control.in_set(WwSimSet::Execute),
+                stalfos::control.in_set(WwSimSet::Execute),
+                boko::control.in_set(WwSimSet::Execute),
+                redead::control.in_set(WwSimSet::Execute),
+                iball::control.in_set(WwSimSet::Execute),
+                tama::control.in_set(WwSimSet::Execute),
+                swatk::control.in_set(WwSimSet::Execute),
+                rforce::control.in_set(WwSimSet::Execute),
+                mjdoor::control.in_set(WwSimSet::Execute),
+                vmsms::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
                     objtime::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    swc00::control.in_set(WwSimSet::Execute),
-
-                    swtdoor::control.in_set(WwSimSet::Execute),
-                    tagkb::control.in_set(WwSimSet::Execute),
-
-                    switem::control.in_set(WwSimSet::Execute),
-                    nh::control.in_set(WwSimSet::Execute),
-
-                    pirateship::control.in_set(WwSimSet::Execute),
-                    helmaroc::control.in_set(WwSimSet::Execute),
+                (swc00::control.in_set(WwSimSet::Execute),
+                swtdoor::control.in_set(WwSimSet::Execute),
+                tagkb::control.in_set(WwSimSet::Execute),
+                switem::control.in_set(WwSimSet::Execute),
+                nh::control.in_set(WwSimSet::Execute),
+                pirateship::control.in_set(WwSimSet::Execute),
+                helmaroc::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    gohdan::control.in_set(WwSimSet::Execute),
-
-                    gohma::control.in_set(WwSimSet::Execute),
-                    phantom_ganon::control.in_set(WwSimSet::Execute),
-
-                    puppet_ganon::control.in_set(WwSimSet::Execute),
-                    gntakis::control.in_set(WwSimSet::Execute),
-
-                    xfuta::control.in_set(WwSimSet::Execute),
-                    gaship2::control.in_set(WwSimSet::Execute),
-
-                    eayogn::control.in_set(WwSimSet::Execute),
-                    doguud::control.in_set(WwSimSet::Execute),
-
-                    ktaruo::control.in_set(WwSimSet::Execute),
-                    gaship::control.in_set(WwSimSet::Execute),
-
-                    hhyu::control.in_set(WwSimSet::Execute),
+                (gohdan::control.in_set(WwSimSet::Execute),
+                gohma::control.in_set(WwSimSet::Execute),
+                phantom_ganon::control.in_set(WwSimSet::Execute),
+                puppet_ganon::control.in_set(WwSimSet::Execute),
+                gntakis::control.in_set(WwSimSet::Execute),
+                xfuta::control.in_set(WwSimSet::Execute),
+                gaship2::control.in_set(WwSimSet::Execute),
+                eayogn::control.in_set(WwSimSet::Execute),
+                doguud::control.in_set(WwSimSet::Execute),
+                ktaruo::control.in_set(WwSimSet::Execute),
+                gaship::control.in_set(WwSimSet::Execute),
+                hhyu::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
-                (
-                    xtower::control.in_set(WwSimSet::Execute),
-
-                    tpota::control.in_set(WwSimSet::Execute),
-                    bitem::control.in_set(WwSimSet::Execute),
-
-                    kytag03::control.in_set(WwSimSet::Execute),
-                    kytag05::control.in_set(WwSimSet::Execute),
+                (xtower::control.in_set(WwSimSet::Execute),
+                tpota::control.in_set(WwSimSet::Execute),
+                bitem::control.in_set(WwSimSet::Execute),
+                kytag03::control.in_set(WwSimSet::Execute),
+                kytag05::control.in_set(WwSimSet::Execute),
 
                 )
                     .chain(),
             )
                 .chain(),
-            (
-                pickup::control.in_set(WwSimSet::Execute),
-                    npc_ah::control.in_set(WwSimSet::Execute),
-                    npc_btsw2::control.in_set(WwSimSet::Execute),
-                    npc_jb1::control.in_set(WwSimSet::Execute),
-                    npc_tt::control.in_set(WwSimSet::Execute),
-
-                    ebomzo::control.in_set(WwSimSet::Execute),
-                    sk2::control.in_set(WwSimSet::Execute),
-
-                    rohat::control.in_set(WwSimSet::Execute),
-                    nzg::control.in_set(WwSimSet::Execute),
-
-                    smtoge::control.in_set(WwSimSet::Execute),
-                    hys::control.in_set(WwSimSet::Execute),
-
-                    ygcwp::control.in_set(WwSimSet::Execute),
-                    ygawa::control.in_set(WwSimSet::Execute),
-
-                    collision::remember_move_from.in_set(WwSimSet::Execute),
-                    walk::walk.in_set(WwSimSet::Execute),
-
-                    swim::surface.in_set(WwSimSet::Execute),
+            (pickup::control.in_set(WwSimSet::Execute),
+                npc_ah::control.in_set(WwSimSet::Execute),
+                npc_btsw2::control.in_set(WwSimSet::Execute),
+                npc_jb1::control.in_set(WwSimSet::Execute),
+                npc_tt::control.in_set(WwSimSet::Execute),
+                ebomzo::control.in_set(WwSimSet::Execute),
+                sk2::control.in_set(WwSimSet::Execute),
+                rohat::control.in_set(WwSimSet::Execute),
+                nzg::control.in_set(WwSimSet::Execute),
+                smtoge::control.in_set(WwSimSet::Execute),
+                hys::control.in_set(WwSimSet::Execute),
+                ygcwp::control.in_set(WwSimSet::Execute),
+                ygawa::control.in_set(WwSimSet::Execute),
+                collision::remember_move_from.in_set(WwSimSet::Execute),
+                walk::walk.in_set(WwSimSet::Execute),
+                swim::surface.in_set(WwSimSet::Execute),
             )
                 .chain(),
-            (
-                    ship::control.in_set(WwSimSet::Execute),
-
-                    area::clamp_to_area.in_set(WwSimSet::Execute),
-                    transition::check.in_set(WwSimSet::Execute),
-
-                    sea::sea_tick.in_set(WwSimSet::Execute),
-                    warship::control.in_set(WwSimSet::Execute),
-
-                    health::apply_damage.in_set(WwSimSet::Execute),
-                    death::check.in_set(WwSimSet::Execute),
-
-                    cleared::control.in_set(WwSimSet::Execute),
-                    frame::advance.in_set(WwSimSet::After),
+            (ship::control.in_set(WwSimSet::Execute),
+                area::clamp_to_area.in_set(WwSimSet::Execute),
+                transition::check.in_set(WwSimSet::Execute),
+                sea::sea_tick.in_set(WwSimSet::Execute),
+                warship::control.in_set(WwSimSet::Execute),
+                health::apply_damage.in_set(WwSimSet::Execute),
+                death::check.in_set(WwSimSet::Execute),
+                cleared::control.in_set(WwSimSet::Execute),
+                frame::advance.in_set(WwSimSet::After),
             )
                 .chain(),
-            (
-                yboil::control.in_set(WwSimSet::Execute),
-
+            (yboil::control.in_set(WwSimSet::Execute),
                 lamp::control.in_set(WwSimSet::Execute),
                 rflw::control.in_set(WwSimSet::Execute),
-
                 gtaki::control.in_set(WwSimSet::Execute),
                 swtact::control.in_set(WwSimSet::Execute),
-
                 warpfo::control.in_set(WwSimSet::Execute),
                 atdoor::control.in_set(WwSimSet::Execute),
-
                 npc_km1::control.in_set(WwSimSet::Execute),
                 wlvtag::control.in_set(WwSimSet::Execute),
-
                 vfan::control.in_set(WwSimSet::Execute),
                 htobi3::control.in_set(WwSimSet::Execute),
-
                 branch::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
-            (
-                hami3::control.in_set(WwSimSet::Execute),
-                    floormaster::control.in_set(WwSimSet::Execute),
-
-                    andsw0::control.in_set(WwSimSet::Execute),
-                    gnbtaki::control.in_set(WwSimSet::Execute),
+            (hami3::control.in_set(WwSimSet::Execute),
+                floormaster::control.in_set(WwSimSet::Execute),
+                andsw0::control.in_set(WwSimSet::Execute),
+                gnbtaki::control.in_set(WwSimSet::Execute),
 
             )
                 .chain(),
