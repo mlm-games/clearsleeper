@@ -185,6 +185,7 @@ pub mod retag;
 pub mod rockfall;
 pub mod roll;
 pub mod salvage;
+pub mod salvage_tbox;
 pub mod sage;
 pub mod scenery;
 pub mod scenechange;
@@ -330,6 +331,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     };
     if source.name == ship::SHIP_ACTOR {
         world.spawn((actor, ship::Ship::default(), ship::Crane::default())).id()
+    } else if salvage_tbox::is_salvage_tbox(&source.name) {
+        salvage_tbox::spawn(world, source)
     } else if andsw0::is_andsw0(&source.name) {
         andsw0::spawn(world, source)
     } else if andsw2::is_andsw2(&source.name) {
@@ -1309,6 +1312,7 @@ pub fn build(
                 tag_msg::control.in_set(WwSimSet::Execute),
                 event_manager::control.in_set(WwSimSet::Execute),
                 shape::control.in_set(WwSimSet::Execute),
+                salvage_tbox::control.in_set(WwSimSet::Execute),
                 obj_paper::control.in_set(WwSimSet::Execute),
                 kytag01::control.in_set(WwSimSet::Execute),
                 atttag::control.in_set(WwSimSet::Execute),
