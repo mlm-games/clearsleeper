@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-pub const VTENG_ACTORS: [&str; 1] = ["Vteng"];
+pub const VTENG_ACTORS: [&str; 1] = ["Vteng"]; // <- d_stage.cpp:1127
 
 /// Puppet Ganon's intro curtains. The stage string and the model's `_arcname` are both
 /// `Vteng` (`d_stage.cpp:1127`, `d_a_obj_Vteng.cpp:17`). `_execute` (`:120-126`) advances the
