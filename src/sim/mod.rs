@@ -38,6 +38,7 @@ pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
 pub mod chest;
+pub mod camera;
 pub mod carry;
 pub mod chuchu;
 pub mod cleared;
@@ -443,7 +444,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == balloon::BALLOON_ACTOR {
         let (state, hit_points) = balloon::spawn(source.parameters);
         world
-            .spawn((actor, state, hit_points, enemy::Hurt::default()))
+            .spawn((
+                actor,
+                state,
+                hit_points,
+                enemy::Hurt::default(),
+                carry::Carryable::Boss,
+            ))
             .id()
     } else if nh::is_nh(&source.name) {
         let firefly = nh::Nh::spawn(source.parameters, actor.pos);
@@ -579,7 +586,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if bwds::is_bwds(&source.name) {
         let v = bwds::Bwds::spawn(source.parameters);
-        world.spawn((actor, v)).id()
+        world.spawn((actor, v, carry::Carryable::Boss)).id()
     } else if npc_nz::is_npc_nz(&source.name) {
         let v = npc_nz::NpcNz::spawn(source.parameters);
         world.spawn((actor, v)).id()
@@ -1345,6 +1352,7 @@ pub fn build(
     sim.world.insert_resource(roll::Roll::default());
     sim.world.insert_resource(hop::Hop::default());
     sim.world.insert_resource(lock::Lock::default());
+    sim.world.insert_resource(camera::Camera::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
     sim.world.insert_resource(hammer::Cut::default());
@@ -1384,6 +1392,9 @@ pub fn build(
     sim.world.insert_resource(bridge::BridgeCamera::default());
     sim.world.insert_resource(bgn3::Bgn3Static::default());
     sim.world.insert_resource(bgn3::Bgn3Siblings::default());
+    sim.world.insert_resource(himo3::Himo3Statics::default());
+    sim.world.insert_resource(himo3::Himo3Paths::default());
+    sim.world.insert_resource(himo3::Himo3WindTouch::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1445,6 +1456,9 @@ pub fn build(
     sim.world.insert_resource(bridge::BridgeCamera::default());
     sim.world.insert_resource(bgn3::Bgn3Static::default());
     sim.world.insert_resource(bgn3::Bgn3Siblings::default());
+    sim.world.insert_resource(himo3::Himo3Statics::default());
+    sim.world.insert_resource(himo3::Himo3Paths::default());
+    sim.world.insert_resource(himo3::Himo3WindTouch::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1490,6 +1504,7 @@ pub fn build(
                     flags::clear_order_flags.in_set(WwSimSet::Execute),
                     registry::control.in_set(WwSimSet::Execute),
                     actor::snapshot.in_set(WwSimSet::Execute),
+                    camera::track.in_set(WwSimSet::Execute),
                     isle_timer::control.in_set(WwSimSet::Execute),
                     daynight::control.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
