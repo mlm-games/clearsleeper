@@ -791,6 +791,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if ospbox::is_ospbox(&source.name) {
         world.spawn((actor, ospbox::Ospbox::spawn(source.parameters))).id()
+    } else if tag_md_cb::is_tag_md_cb(&source.name) {
+        world.spawn((actor, tag_md_cb::TagMdCb::spawn(source.parameters))).id()
     } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
     } else if drift::is_drift(&source.name) {
@@ -1717,6 +1719,7 @@ pub fn build(
                 arrow::control.in_set(WwSimSet::Execute),
                 stone::control.in_set(WwSimSet::Execute),
                 wall::control.in_set(WwSimSet::Execute),
+                tag_md_cb::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
