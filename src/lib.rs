@@ -814,6 +814,13 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(ghost) = entity.get::<sim::ks::Ks>() {
+                if !ghost.drawn() {
+                    continue;
+                }
+                let (min, max) = ghost.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::morth::Morth>() {
                 if !x.drawn() {
                     continue;

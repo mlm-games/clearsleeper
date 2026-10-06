@@ -9,7 +9,7 @@ use super::boomerang;
 use super::bomb;
 use super::bombflower;
 use super::collision::Collision;
-use super::combat::{Combat, CutKind};
+use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
 use super::flags::ZoneActors;
 use super::ground;
@@ -606,8 +606,8 @@ fn cyl_touches(centre: Vec3, radius: f32, height: f32, at: Vec3, sphere: f32) ->
 pub enum At {
     Idle,
     Sword,
-    Hammer,
-    HammerJump,
+    HammerSide,
+    HammerFront,
     Bomb,
     Arrow,
     FireArrow,
@@ -623,7 +623,7 @@ impl At {
     fn at_type(self) -> u32 {
         match self {
             Self::Sword => AT_TYPE_SWORD,
-            Self::Hammer | Self::HammerJump => AT_TYPE_SKULL_HAMMER,
+            Self::HammerSide | Self::HammerFront => AT_TYPE_SKULL_HAMMER,
             Self::Bomb => 0,
             Self::Arrow | Self::Boomerang | Self::Hookshot | Self::Idle => 0,
             Self::FireArrow => AT_TYPE_FIRE_ARROW,
@@ -637,7 +637,7 @@ impl At {
     fn reach(self) -> f32 {
         match self {
             Self::Sword => 20.0,
-            Self::Hammer | Self::HammerJump => 50.0,
+            Self::HammerSide | Self::HammerFront => 50.0,
             Self::Bomb => 150.0,
             Self::Arrow | Self::FireArrow | Self::IceArrow | Self::LightArrow => 35.0,
             Self::Boomerang => 90.0,
@@ -668,7 +668,7 @@ impl Blow {
             At::FireArrow => self.fire_arrows > 0,
             At::LightArrow => self.light_arrows > 0,
             At::Idle | At::Wind | At::Unk8 => false,
-            At::Sword | At::Hammer | At::HammerJump | At::IceArrow => true,
+            At::Sword | At::HammerSide | At::HammerFront | At::IceArrow => true,
         }
     }
 
@@ -920,7 +920,11 @@ fn blow_of(watch: &Watch<'_, '_>) -> Blow {
                 hammer::CUT_HAMMER_SIDESWING | hammer::CUT_HAMMER_FRONTSWING
             )
         {
-            at = At::Hammer;
+            at = if watch.hammer.kind == hammer::CUT_HAMMER_FRONTSWING {
+                At::HammerFront
+            } else {
+                At::HammerSide
+            };
         }
         if at == At::Idle && watch.combat.active && (1..6).contains(&watch.combat.frame) {
             at = At::Sword;
@@ -1256,7 +1260,7 @@ impl Ks {
                 }
             }
             AT_TYPE_SKULL_HAMMER => {
-                if matches!(blow.at, At::Hammer | At::HammerJump) {
+                if matches!(blow.at, At::HammerSide | At::HammerFront) {
                     self.speed_f = 0.0;
                     self.gravity = 0.0;
                     self.speed = Vec3::ZERO;
@@ -2012,6 +2016,7 @@ impl Ks {
             }
         }
         self.cc_set();
+        actor.eye = self.pos;
         self.pos += self.speed;
         if self.sph.co_set() && (self.action == ACTION_DOU || self.action == ACTION_WIND) {
             self.co_move(solid);
@@ -2022,6 +2027,10 @@ impl Ks {
         }
         actor.pos = self.pos;
         actor.angle = self.angle;
+        actor.shape_angle = self.shape_angle;
+        actor.speed = self.speed;
+        actor.speed_f = self.speed_f;
+        actor.gravity = self.gravity;
         actor.room = self.room;
     }
 }

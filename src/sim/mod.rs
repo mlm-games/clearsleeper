@@ -541,6 +541,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if morth::is_morth(&source.name) {
         let morth = morth::Morth::spawn(source.parameters);
         world.spawn((actor, morth)).id()
+    } else if ks::is_ks(&source.name) {
+        let ghost = ks::Ks::spawn(source.parameters);
+        world.spawn((actor, ghost)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1442,6 +1445,7 @@ pub fn build(
     sim.world.insert_resource(himo3::Himo3Statics::default());
     sim.world.insert_resource(himo3::Himo3Paths::default());
     sim.world.insert_resource(himo3::Himo3WindTouch::default());
+    sim.world.insert_resource(ks::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1506,6 +1510,7 @@ pub fn build(
     sim.world.insert_resource(himo3::Himo3Statics::default());
     sim.world.insert_resource(himo3::Himo3Paths::default());
     sim.world.insert_resource(himo3::Himo3WindTouch::default());
+    sim.world.insert_resource(ks::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1814,6 +1819,7 @@ pub fn build(
                 hammer::control.in_set(WwSimSet::Execute),
                 hammerhit::control.in_set(WwSimSet::Execute),
                 bgn3::control.in_set(WwSimSet::Execute),
+                ks::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
