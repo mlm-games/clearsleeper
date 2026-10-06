@@ -3,6 +3,7 @@ pub mod actor;
 pub mod agbsw0;
 pub mod ajavw;
 pub mod ajav;
+pub mod apzl;
 pub mod area;
 pub mod amos_knight;
 pub mod amiprop;
@@ -211,6 +212,7 @@ pub mod sea;
 pub mod servant;
 pub mod ship;
 pub mod shmrgrd;
+pub mod stage_data;
 pub mod stalfos;
 pub mod spotbox;
 pub mod statue;
@@ -1152,6 +1154,7 @@ pub fn build(
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
+    sim.world.insert_resource(apzl::Statics::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -1159,6 +1162,7 @@ pub fn build(
     gy_ctrl::init(&mut sim.world);
     event_manager::init(&mut sim.world);
     shape::init(&mut sim.world);
+    stage_data::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(inventory::Equipped::default());
@@ -1179,6 +1183,10 @@ pub fn build(
         .and_then(|tables| crate::assets::load_event_list(tables.name()))
         .unwrap_or_default();
     sim.world.insert_resource(event_list);
+    if let Ok(root) = crate::assets::AssetRoot::from_env() {
+        let actor_table = stage_data::load_actor_table(&root).unwrap_or_default();
+        sim.world.insert_resource(actor_table);
+    }
     sim.world.insert_resource(event::ActiveEvent::default());
     sim.world.insert_resource(event::ItemPartner::default());
     sim.world.insert_resource(crate::assets::load_link_anms().unwrap_or_default());
