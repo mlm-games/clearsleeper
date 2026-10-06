@@ -992,7 +992,10 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
         return true;
     }
 
-    if follow.ramp < RAMP_FRAMES {
+    // `m388` counts up from the reset `checkGroundInfo` performs when the floor margin test
+    // fails; the counter gates the pitch convergence and the wall-up lift. `cam_bump` owns the
+    // reset, so it also owns the increment, and this stage only consumes the value.
+    if follow.ramp >= 0 && follow.ramp < RAMP_FRAMES {
         follow.ramp += 1;
         follow.ramp_ratio += (CUSHION - follow.ramp_ratio)
             * rational_bezier_ratio(follow.ramp as f32 / 80.0, RAMP_EASE);

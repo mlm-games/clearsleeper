@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 
+use super::cam_bump::Bump;
 use super::cam_follow::{self, CamSetup, Follow, FollowInput, SAngle, ViewCache};
 use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
 use super::cam_type::{TYPE_FIELD, TYPES, type_index};
@@ -167,6 +168,9 @@ pub struct Camera {
     pub yaw_trim: SAngle,
     /// The orbit yaw last folded into [`Camera::yaw_trim`], so only its movement counts.
     pub orbit_yaw: f32,
+    /// `dCamera_c::mCenter` / `mEye` / `mDirection` and the event flags `bumpCheck` keeps,
+    /// which is the camera collision pass's own state.
+    pub bump: Bump,
 }
 
 impl Default for Camera {
@@ -189,6 +193,7 @@ impl Default for Camera {
             angle_y: SAngle::ZERO,
             yaw_trim: SAngle::ZERO,
             orbit_yaw: 0.0,
+            bump: Bump::default(),
         };
         camera.set_style(TYPE_FIELD, 0);
         camera
@@ -354,6 +359,10 @@ fn row(m: &Mat4, index: usize, v: Vec3) -> f32 {
 const C_STICK_YAW: f32 = 3.0;
 const C_STICK_GATE: f32 = 0.2;
 
+/// The player's `mHeight`, which `getHeight` returns for a player and which the follow engine
+/// already measures from at `cam_follow.rs:685`, so both passes share one head point.
+const PLAYER_HEIGHT: f32 = 125.0;
+
 /// Retail's camera trails the player along `mLookat`, so the projection the scope and the
 /// `pos2camera` reads depend on where the view is actually aimed. Scheduled ahead of the
 /// actor systems so every same-tick read sees this tick's view.
@@ -362,12 +371,18 @@ const C_STICK_GATE: f32 = 0.2;
 /// view, smoothed the way `dCamera_c::followCamera` smooths them. The debug orbit and the
 /// sub-stick fold a free yaw in on top of that, which retail's pull chase then pulls back
 /// onto the player's back.
+///
+/// Around the placement run the two ends of `dCamera_c::Run`, in its order:
+/// [`Camera::ground_pass`] where `checkGroundInfo` runs at `d_camera.cpp:694`, then the
+/// engine, then [`Camera::bump_check`] where `bumpCheck` runs at `d_camera.cpp:849`.
 pub fn track(
     orbit: Res<super::intent::CameraYaw>,
     sub: Res<super::intent::CStick>,
     main: Res<super::intent::MoveIntent>,
     status: Res<super::player_status::PlayerStatus>,
     players: Query<&super::player::Player>,
+    solid: Option<Res<super::collision::Collision>>,
+    sea: Option<Res<super::sea::Sea>>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -381,6 +396,7 @@ pub fn track(
         0.0
     };
     camera.yaw_trim += SAngle::from_degrees(orbit_delta + turn);
+    camera.ground_pass(player, solid.as_deref(), PLAYER_HEIGHT);
     cam_follow::follow(
         &mut camera,
         player,
@@ -388,5 +404,12 @@ pub fn track(
             main: main.axis,
             status: &status,
         },
+    );
+    camera.bump_check(
+        player,
+        solid.as_deref(),
+        sea.as_deref(),
+        &status,
+        PLAYER_HEIGHT,
     );
 }
