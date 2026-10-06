@@ -38,7 +38,7 @@ pub const CULL_MAX: [f32; 3] = [850.0, 30.0, 850.0]; // <- d_a_amiprop.cpp:105
 /// (`:159-167`), so retail reads the uninitialised local `tmp` declared at `:157`. This sim
 /// takes no branch there and leaves `m444` set; that is the one reading which invents nothing.
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
-pub struct AmiProp {
+pub struct Amiprop {
     pub switch_no: u8,
     pub kind: u8,
     pub read: bool,
@@ -46,7 +46,7 @@ pub struct AmiProp {
     pub target: i16,
 }
 
-impl AmiProp {
+impl Amiprop {
     pub fn spawn(parameters: u32, angle: [i16; 3]) -> Self {
         Self {
             switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
@@ -112,7 +112,7 @@ pub fn is_amiprop(name: &str) -> bool {
 pub fn control(
     switches: Res<Switches>,
     mut events: ResMut<SimEvents>,
-    mut props: Query<(&mut Actor, &mut AmiProp)>,
+    mut props: Query<(&mut Actor, &mut Amiprop)>,
 ) {
     for (mut actor, mut prop) in &mut props {
         let angle = &mut actor.angle;

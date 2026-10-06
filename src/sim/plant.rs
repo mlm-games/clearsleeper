@@ -50,7 +50,7 @@ impl Plant {
         (CULL_MIN, CULL_MAX)
     }
 
-    /// `cM3d_Cross_CylSph` (`c_m3d.cpp:1389-1415`) is the test `ProcAtTgHit` runs for the
+    /// `cM3d_Cross_CylSph` (`c_m3d.cpp:1377-1420`) is the test `ProcAtTgHit` runs for the
     /// bomb sphere against the plant's `cM3dGCylS`: the horizontal span is `cyl.r + sph.r`,
     /// then the sphere must straddle the cylinder's `y .. y + h` interval.
     fn bomb_hits(centre: Vec3, origin: Vec3) -> bool {

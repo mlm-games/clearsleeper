@@ -34,12 +34,12 @@ pub const CULL_MAX: [f32; 3] = [1000.0, 1000.0, 1000.0]; // <- d_a_obj_msdan_sub
 /// the separate `fpcNm_Obj_Msdan_e` process, and `MsdanS2` (`:956`) is `Msdan2`'s sibling, not
 /// this actor.
 ///
-/// `Mthd_Execute` (`:209-211`) is `MoveBGExecute()` (`d_bg_s_movebg_actor.cpp:98-112`), which
+/// `Mthd_Execute` (`:209-211`) is `MoveBGExecute()` (`d_bg_s_movebg_actor.cpp:86-112`), which
 /// forwards to this class's virtual `Execute(Mtx**)` - so `Execute` (`:90-184`) is the real
 /// per-tick body and `*pMtx = &M_tmp_mtx` (`:182`) plus `set_mtx` (`:75-80`) are the
 /// moving-background matrix that the contract lists as confirmed-absent. `Mthd_Create`
 /// (`:51-60`) can only return `cPhs_ERROR_e` from `MoveBGCreate` on a heap or `dComIfG_Bgsp()`
-/// registration failure (`d_bg_s_movebg_actor.cpp:66-77`), never from its parameters, so there
+/// registration failure (`d_bg_s_movebg_actor.cpp:60-71`), never from its parameters, so there
 /// is no data-driven refusal to model and `Create()` (`:22-48`) always returns TRUE.
 ///
 /// `init_mtx` (`:83-87`) scales by `1.01f` and `MoveBGCreate` builds `mBgMtx` from
@@ -52,7 +52,7 @@ pub const CULL_MAX: [f32; 3] = [1000.0, 1000.0, 1000.0]; // <- d_a_obj_msdan_sub
 /// `MoveBGCreateHeap` registers a `dBgW` instead of a `dCcD`. Nothing can damage a stair, so
 /// neither `HitPoints` nor `Hurt` is attached.
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
-pub struct MsdanSb {
+pub struct Msdansb {
     pub sized: bool,
     pub switch_no: u8,
     pub obj_no: i32,
@@ -64,7 +64,7 @@ pub struct MsdanSb {
     pub shocked: bool,
 }
 
-impl MsdanSb {
+impl Msdansb {
     /// `daObjMsdanSub::Act_c::Create` (`:22-48`). `home.pos` is the placement point, so at
     /// `Create` time - before `Execute` ever runs - `home.pos.y` is still the stage y and no
     /// separate home field is needed. `m2DC = home.pos.y` (`:42`) and `m2E0 = 0.0f` (`:43`)
@@ -241,7 +241,7 @@ pub fn is_msdansb(name: &str) -> bool {
 pub fn control(
     switches: Res<Switches>,
     mut events: ResMut<SimEvents>,
-    mut stairs: Query<(&mut Actor, &mut MsdanSb)>,
+    mut stairs: Query<(&mut Actor, &mut Msdansb)>,
 ) {
     for (mut actor, mut stair) in &mut stairs {
         if let Some(sound) = stair.execute(&mut actor, &switches) {

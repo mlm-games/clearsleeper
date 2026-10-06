@@ -37,9 +37,9 @@ const REFUSE_ROOM: i8 = 0; // <- d_a_steam_tag.cpp:202
 /// with no draw call and `CreateInit` even calls `fopAcM_offDraw` (`:87`), so the vent renders
 /// nothing and needs no `actor_views` branch.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SteamTag;
+pub struct Steamtag;
 
-impl SteamTag {
+impl Steamtag {
     pub fn spawn() -> Self {
         Self
     }
@@ -59,7 +59,7 @@ pub fn control(
     stage: Res<StageName>,
     equipped: Res<Equipped>,
     collect: Res<Collect>,
-    vents: Query<(Entity, &Actor, &SteamTag)>,
+    vents: Query<(Entity, &Actor, &Steamtag)>,
     mut commands: Commands,
 ) {
     for (entity, actor, vent) in &vents {
