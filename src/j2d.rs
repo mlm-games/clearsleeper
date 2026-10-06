@@ -37,6 +37,14 @@ pub struct ScreenPane {
     pub base_position: u8,
     pub rotation: u16,
     pub texture: Option<String>,
+    pub palette: Option<String>,
+    pub color_black: u32,
+    pub color_white: u32,
+    pub corner_color: [u32; 4],
+    pub frame_textures: [Option<String>; 4],
+    pub contents_texture: Option<String>,
+    pub window_box: Bounds,
+    pub window_field: u8,
     pub font: Option<String>,
     pub char_color: u32,
     pub grad_color: u32,
@@ -65,6 +73,19 @@ impl Default for ScreenPane {
             base_position: 0,
             rotation: 0,
             texture: None,
+            palette: None,
+            color_black: 0x0000_0000,
+            color_white: 0xFFFF_FFFF,
+            corner_color: [0xFFFF_FFFF; 4],
+            frame_textures: [None; 4],
+            contents_texture: None,
+            window_box: Bounds {
+                x: 0.0,
+                y: 0.0,
+                w: 0.0,
+                h: 0.0,
+            },
+            window_field: 0,
             font: None,
             char_color: 0xFFFF_FFFF,
             grad_color: 0xFFFF_FFFF,
@@ -252,6 +273,7 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
         match kind {
             Kind::Picture => picture(reader, &mut pane),
             Kind::TextBox => text_box(reader, &mut pane),
+            Kind::Window => window(reader, &mut pane),
             _ => {}
         }
         screen.panes.push(pane);
@@ -262,18 +284,60 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
 fn picture(reader: &mut Reader<'_>, pane: &mut ScreenPane) {
     let mut count = reader.u8() as i32;
     pane.texture = resource_name(reader);
-    let _ = resource_name(reader);
+    pane.palette = resource_name(reader);
     let _ = reader.u8();
     count -= 3;
     for index in 0..count {
         match index {
-            0 | 1 => {
+            0 => {
                 let _ = reader.u8();
             }
+            1 => {
+                let _ = reader.u8();
+            }
+            2 => {
+                pane.color_black = reader.u32();
+            }
+            3 => {
+                pane.color_white = reader.u32();
+            }
             _ => {
-                let _ = reader.u32();
+                let slot = (index - 4) as usize;
+                let color = reader.u32();
+                if slot < 4 {
+                    pane.corner_color[slot] = color;
+                }
             }
         }
+    }
+}
+
+fn window(reader: &mut Reader<'_>, pane: &mut ScreenPane) {
+    let mut count = reader.u8() as i32;
+    let x0 = reader.u16() as f32;
+    let y0 = reader.u16() as f32;
+    let w = reader.u16() as f32;
+    let h = reader.u16() as f32;
+    pane.window_box = Bounds { x: x0, y: y0, w, h };
+    for slot in pane.frame_textures.iter_mut() {
+        *slot = resource_name(reader);
+    }
+    pane.palette = resource_name(reader);
+    pane.window_field = reader.u8();
+    for slot in pane.corner_color.iter_mut() {
+        *slot = reader.u32();
+    }
+    count -= 14;
+    if count > 0 {
+        pane.contents_texture = resource_name(reader);
+        count -= 1;
+    }
+    if count > 0 {
+        pane.color_black = reader.u32();
+        count -= 1;
+    }
+    if count > 0 {
+        pane.color_white = reader.u32();
     }
 }
 
