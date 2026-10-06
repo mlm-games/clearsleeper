@@ -978,6 +978,13 @@ impl App {
                 let (min, max) = v.cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::tag_md_cb::TagMdCb>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::morth::Morth>() {
                 if !x.drawn() {
                     continue;

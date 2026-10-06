@@ -90,6 +90,7 @@ pub mod fallrock;
 pub mod fan;
 pub mod ff;
 pub mod tag_hint;
+pub mod tag_md_cb;
 pub mod zouk;
 pub mod fire;
 pub mod figure;
@@ -319,7 +320,6 @@ pub mod tagetc;
 pub mod tagmk;
 pub mod tagkb;
 pub mod tag_volcano;
-pub mod tag_md_cb;
 pub mod tag_msg;
 pub mod tagkk1;
 pub mod taglight;
@@ -582,6 +582,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if tag_hint::is_tag_hint(&source.name) {
         let v = tag_hint::TagHint::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if tag_md_cb::is_tag_md_cb(&source.name) {
+        let v = tag_md_cb::TagMdCb::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -791,8 +794,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if ospbox::is_ospbox(&source.name) {
         world.spawn((actor, ospbox::Ospbox::spawn(source.parameters))).id()
-    } else if tag_md_cb::is_tag_md_cb(&source.name) {
-        world.spawn((actor, tag_md_cb::TagMdCb::spawn(source.parameters))).id()
     } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
     } else if drift::is_drift(&source.name) {
@@ -1545,6 +1546,10 @@ pub fn build(
     sim.world.insert_resource(tag_hint::TagHintMsg::default());
     sim.world.insert_resource(tag_hint::TagHintRequest::default());
     sim.world.insert_resource(tag_hint::TagHintPlayerRoom::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbHio::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbMsg::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbGlobal::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1625,6 +1630,10 @@ pub fn build(
     sim.world.insert_resource(tag_hint::TagHintMsg::default());
     sim.world.insert_resource(tag_hint::TagHintRequest::default());
     sim.world.insert_resource(tag_hint::TagHintPlayerRoom::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbHio::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbMsg::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbGlobal::default());
+    sim.world.insert_resource(tag_md_cb::TagMdCbPlayer::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1719,7 +1728,6 @@ pub fn build(
                 arrow::control.in_set(WwSimSet::Execute),
                 stone::control.in_set(WwSimSet::Execute),
                 wall::control.in_set(WwSimSet::Execute),
-                tag_md_cb::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
@@ -1894,6 +1902,7 @@ pub fn build(
                 obj_doguu::control.in_set(WwSimSet::Execute),
                 sss::control.in_set(WwSimSet::Execute),
                 tag_hint::control.in_set(WwSimSet::Execute),
+                tag_md_cb::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
