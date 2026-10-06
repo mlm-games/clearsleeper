@@ -29,7 +29,7 @@ pub fn is_npc_btsw2(name: &str) -> bool {
     NPC_BTSW2_ACTORS.contains(&name)
 }
 
-pub const STAFF_BTSW2: &str = "Btsw2";
+const STAFF_BTSW2: &str = "Btsw2";
 
 // daNpc_Btsw2_HIO_c::daNpc_Btsw2_HIO_c() - d_a_npc_btsw2.cpp:66-89
 const HIO_M04: f32 = 0.0; // <- :67
@@ -382,7 +382,7 @@ impl NpcBtsw2 {
     }
 
     /// `_create` (`:545-547`) refuses creation outright, so the actor never executes.
-    pub fn create_refused(&self, stories: &StoryBits, collect: &Collect) -> bool {
+    fn create_refused(&self, stories: &StoryBits, collect: &Collect) -> bool {
         stories.reg(REG_C203) == REG_C203_DONE || !collect.is_symbol(SYMBOL_DIN)
     }
 

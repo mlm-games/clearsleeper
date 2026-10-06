@@ -14,7 +14,7 @@ pub fn is_npc_jb1(name: &str) -> bool {
     NPC_JB1_ACTORS.contains(&name)
 }
 
-pub const STAFF_JB1: &str = "Jb1"; // <- mEventCut.setActorInfo2("Jb1", this), :64
+const STAFF_JB1: &str = "Jb1"; // <- mEventCut.setActorInfo2("Jb1", this), :64
 
 // daNpc_Jb1_HIO_c::a_prm_tbl - d_a_npc_jb1.cpp:38-47
 const HIO_ATTN_Y_OFFSET: f32 = 100.0; // <- mPrmTbl.field_0x00, :39

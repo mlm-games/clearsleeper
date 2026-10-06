@@ -29,7 +29,7 @@ pub fn is_npc_ah(name: &str) -> bool {
     NPC_AH_ACTORS.contains(&name)
 }
 
-pub const STAFF_AH: &str = "Ah"; // <- l_npc_staff_id[0], :29
+const STAFF_AH: &str = "Ah"; // <- l_npc_staff_id[0], :29
 
 // NpcDatStruct l_npc_dat - d_a_npc_ah.cpp:47-56, field order per d_a_npc_ah.h:15-49
 const DAT_MAX_HEAD_X: i16 = 0x1000; // <- mMax_head_x, :48
@@ -436,7 +436,7 @@ impl NpcAh {
     }
 
     /// `daNpcAh_c::getPrmArg0` (`:667-671`).
-    pub fn prm_arg0(&self, parameters: u32) -> u8 {
+    fn prm_arg0(&self, parameters: u32) -> u8 {
         let mask = (1u32 << PRM_SWSAVE_W) - 1;
         let raw = ((parameters >> PRM_SWSAVE_S) & mask) as u8;
         if raw >= PRM_ARG0_MAX { 0 } else { raw }
@@ -449,7 +449,7 @@ impl NpcAh {
     }
 
     /// `phase_1` (`:162-187`): the `cPhs_STOP_e` cases, which cancel creation entirely.
-    pub fn create_stopped(
+    fn create_stopped(
         &self,
         parameters: u32,
         switches: &Switches,
@@ -464,7 +464,7 @@ impl NpcAh {
     }
 
     /// `_execute` (`:361-371`): the per-frame `fopAcM_delete` switches.
-    pub fn switch_delete(&self, parameters: u32, switches: &Switches) -> bool {
+    fn switch_delete(&self, parameters: u32, switches: &Switches) -> bool {
         match self.prm_arg0(parameters) {
             2 => switches.test(SWITCH_PR2),
             5 => switches.test(SWITCH_PR5),

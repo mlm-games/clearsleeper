@@ -181,7 +181,7 @@ impl JntCtrl {
         self.trn = true;
     }
 
-    pub fn clr_trn(&mut self) {
+    fn clr_trn(&mut self) {
         self.trn = false;
     }
 

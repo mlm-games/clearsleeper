@@ -25,7 +25,7 @@ pub fn is_npc_km1(name: &str) -> bool {
     NPC_KM1_ACTORS.contains(&name)
 }
 
-pub const STAFF_KM1: &str = "Km1"; // <- mEventCut.setActorInfo2("Km1", this), :95
+const STAFF_KM1: &str = "Km1"; // <- mEventCut.setActorInfo2("Km1", this), :95
 
 // daNpc_Km1_HIO_c::a_prm_tbl - d_a_npc_km1.cpp:48-61
 const HIO_FIELD_0: i16 = 0x1FFE; // <- mPrmTbl.field_0, :49
@@ -654,7 +654,7 @@ impl Text<'_> {
         self.info.mesg_anime_tag
     }
 
-    pub fn clear_mesg_anime_tag(&mut self) {
+    fn clear_mesg_anime_tag(&mut self) {
         self.info.clear_mesg_anime_tag_info();
     }
 
