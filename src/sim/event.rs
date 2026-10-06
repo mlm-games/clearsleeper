@@ -174,6 +174,36 @@ const ZL1_MAJYU_POS: Vec3 = Vec3::new(-37927.0, 2200.0, 7852.0); // <- d_a_npc_z
 const ZL1_MAJYU_AIM: Vec3 = Vec3::new(-37978.0, 400.0, 7766.0); // <- field_0x758, :1527
 const ZL1_JMP_HALF_TURN: i16 = 0x4000; // <- current.angle.y += (s16)0x4000, :1614
 
+// `daNpc_So_c::offsetZero()` — the model-y offset triple `mB38` the soldier's
+// per-frame `cLib_addCalc2` chases. `createInit` runs it before any mode.
+// <- d_a_npc_so.cpp:519-522 mB38.x = -1.0f; mB38.y = 20.0f; mB38.z = 0.1f;
+const SO_OFFSET_X: f32 = -1.0;
+const SO_OFFSET_Y: f32 = 20.0;
+const SO_OFFSET_Z: f32 = 0.1;
+
+// `daMbdoor_c` door leaves. `field_0x2b2` is the OPEN leaf, `field_0x2b0` the bar
+// STOP_OPEN drives, and `field_0x2b4` is the shared per-tick accel that ramps to
+// a cap and then stays there — the ramp is what actually paces these cuts, not a
+// flat rate against a fixed ceiling.
+// <- d_a_mbdoor.h:49-51 field_0x2b0 / field_0x2b2 / field_0x2b4
+const MBDOOR_OPEN_ACCEL_STEP: i16 = 50; // <- d_a_mbdoor.cpp:344 field_0x2b4 += 50;
+const MBDOOR_OPEN_ACCEL_CAP: i16 = 250; // <- d_a_mbdoor.cpp:343 if (field_0x2b4 < 250)
+const MBDOOR_OPEN_LIMIT: i16 = -0x1C71; // <- d_a_mbdoor.cpp:347-348 temp < -0x1C71
+const MBDOOR_BAR_ACCEL_STEP: i16 = 40; // <- d_a_mbdoor.cpp:365 field_0x2b4 += 40;
+const MBDOOR_BAR_ACCEL_CAP: i16 = 400; // <- d_a_mbdoor.cpp:364 if (field_0x2b4 < 400)
+const MBDOOR_BAR_LIMIT: i16 = -0x3F65; // <- d_a_mbdoor.cpp:368-369 temp < -0x3F65
+
+// `daNpc_Tc_c` animation indices. `cutSetAnmProc` ends the cut on `GET` alone and
+// otherwise waits for the morph to stop, so the picked index has to be remembered.
+// <- d_a_npc_tc.h:70 ANM_PRM_IDX_WAIT01 = 1; <- d_a_npc_tc.h:84 ANM_PRM_IDX_GET = 15;
+const TC_ANM_WAIT01: i32 = 1;
+const TC_ANM_GET: i32 = 15;
+
+// `daWarpf_c::mWarpTimer` — set by the mode inits and polled by `cLib_calcTimer`.
+// <- d_a_warpf.cpp:450 mWarpTimer = 180; <- d_a_warpf.cpp:478, :499 mWarpTimer = 5;
+const WARPF_WARP_1_TIMER: i16 = 180;
+const WARPF_WARP_23_TIMER: i16 = 5;
+
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct StageEvents(pub Vec<String>);
 
@@ -293,6 +323,11 @@ struct StaffRun {
     msg_no: i32,
     get_stage: u8,
     get_msg_live: bool,
+    mb_door: i16,
+    mb_leaf: i16,
+    mb_step: i16,
+    mb_latch: bool,
+    mb_adjust: i16,
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Default)]
@@ -947,6 +982,16 @@ fn staff_cut(
     }
 }
 
+/// `daWarpf_c::demo_proc` — `d_a_warpf.cpp:375-399`. The staff's action table is
+/// `WAIT, WARP_START, WARP_1, WARP_2, WARP_3, END_WAIT` (`:379-386`) and both
+/// warp modes are pure `mWarpTimer` waits.
+///
+/// OMITTED, all RULE 3b: `set_effect_wind00` and the six-iteration burst at
+/// `mWarpTimer == 80` (`:466-472`) plus the per-stage particle spawns
+/// (`:459`, `:487`, `:508`) are the particle system, absent; `WARP_START` caches
+/// `player->current.pos` (`:440`), which is read only by those spawns; `WARP_3`'s
+/// `JA_SE_LK_BOSS_WARP_EFF_ST` and `onEndDemo()` (`:513-514`) end the boss
+/// encounter, which no `ActiveEvent` channel carries.
 fn warp_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
@@ -954,17 +999,20 @@ fn warp_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     match cut.name.as_str() {
         "WARP_1" => {
             if run.advance > 0 {
-                run.timer = 180;
+                run.timer = WARPF_WARP_1_TIMER; // <- d_a_warpf.cpp:450 initWarpMode_1
             }
-            wait_proc(run, list, flags);
+            wait_proc(run, list, flags); // <- d_a_warpf.cpp:455 cLib_calcTimer(&mWarpTimer)
         }
         "WARP_2" | "WARP_3" => {
             if run.advance > 0 {
-                run.timer = 5;
+                run.timer = WARPF_WARP_23_TIMER; // <- d_a_warpf.cpp:478, :499 initWarpMode_2/3
             }
-            wait_proc(run, list, flags);
+            wait_proc(run, list, flags); // <- d_a_warpf.cpp:483, :504 cLib_calcTimer(&mWarpTimer)
         }
-        _ => cut_end(run, list, flags),
+        // `WAIT`, `WARP_START` and `END_WAIT` are `actIdx == -1` in retail, whose
+        // `dComIfGp_evmng_cutEnd` fires immediately; `WAIT`'s own body (`:424-431`)
+        // only emits particles.
+        _ => cut_end(run, list, flags), // <- d_a_warpf.cpp:391-392
     }
 }
 
@@ -1426,17 +1474,46 @@ fn zl1_init(
     }
 }
 
+/// `daNpc_Tc_c::cutProc` — `d_a_npc_tc_cut.inc:8-90`.
+///
+/// The `SET_ANM` arm used to test `cut_text(.., "Name") == Some("GET")` on every
+/// tick, which is `cutSetAnmStart` (`:210-217`) re-read rather than
+/// `cutSetAnmProc` (`:220-228`). Retail picks the animation once on the advance
+/// tick and then ends the cut on whichever of two conditions holds; only one of
+/// them is nameable, so the other left every non-`GET` `SET_ANM` holding forever.
+///
+/// OMITTED: `if (mpMorf->isStop()) dComIfGp_evmng_cutEnd(i_staffIdx);`
+/// (`d_a_npc_tc_cut.inc:225-227`) — `isStop()` reads the BCK archive, which this
+/// checkout does not ship, so a `SET_ANM` whose `Name` is not `GET` is left
+/// running rather than invented into ending. Also omitted: `cutPayStart`'s
+/// `dComIfGp_setItemRupeeCount(-398)` (`:308`), and the three door cuts' `seStart`
+/// calls (`:278`, `:288`, `:298`).
 fn tc_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
+        // `cutSitToJumpProc`, `cutPresentProc` and `cutBackJumpProc` all end on
+        // state this cut handler cannot read: the morph, the player's item pickup
+        // and `mObjAcch`.
+        // <- d_a_npc_tc_cut.inc:98-120, :127-207, :240-252
         "SIT_TO_JUMP" | "PRESENT" | "BACKJUMP" => {}
         "SET_ANM" => {
-            if list.cut_text(run.cut as usize, "Name") == Some("GET") {
-                cut_end(run, list, flags);
+            if run.advance > 0 {
+                // <- d_a_npc_tc_cut.inc:210-217 cutSetAnmStart
+                run.phase = if list.cut_text(run.cut as usize, "Name") == Some("GET") {
+                    TC_ANM_GET
+                } else {
+                    TC_ANM_WAIT01
+                };
+            }
+            if run.phase == TC_ANM_GET {
+                cut_end(run, list, flags); // <- d_a_npc_tc_cut.inc:222-224
             }
         }
+        // EFFECT, DOOR_OPEN, DOOR_CLOSE, DOOR_CLOSE2, PAY and actIdx == -1 all end
+        // the cut on their first run tick.
+        // <- d_a_npc_tc_cut.inc:272-274, :282-284, :291-293, :302-304, :312-314, :25-26
         _ => cut_end(run, list, flags),
     }
 }
@@ -1483,38 +1560,84 @@ fn roten_cut(
     }
 }
 
+/// `daMbdoor_c::demoProc` — `d_a_mbdoor.cpp:293-400`, dispatched by
+/// `getDemoAction` (`:276-290`).
+///
+/// The two door cuts are step integrators over TWO separate `s16` fields, not a
+/// flat rate against a fixed ceiling: `field_0x2b4` ramps by a fixed amount each
+/// tick up to a cap and then holds, and the leaf it drives (`field_0x2b2` for
+/// OPEN, `field_0x2b0` for STOP_OPEN) falls by that accel until it crosses its own
+/// limit. The previous version added the step to a single register and compared
+/// that register against the limit, so the ramp cap was missing entirely and the
+/// leaves never integrated at all. Net effect: OPEN took 146 ticks instead of the
+/// 32 the ramp produces, and STOP_OPEN 406 instead of 46.
+///
+/// OMITTED per cut, all with no channel here:
+/// * `fopAcM_seStart(this, JA_SE_OBJ_MJ_GATE_OPEN, 0)` (`:312`) and
+///   `JA_SE_OBJ_MJ_GATE_BAR_OPEN` / `_BAR_STOP` (`:316`, `:372`) — the SE channel.
+/// * `calcMtx()` (`:353`, `:376`) and the `player->setPlayerPosAndAngle(...)` that
+///   rides the leaf (`:359`) — `dBgW` moving backgrounds are RULE 3b absent and
+///   this cut handler is given no owner or player query.
+/// * `ACT_ADJUSTMENT`'s angle chase and position lerp (`:382-388`), which need the
+///   player's `shape_angle.y`.
 fn mbdoor_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     match cut.name.as_str() {
-        "END" => return,
+        "END" => return, // <- case ACT_END: break; d_a_mbdoor.cpp:340-341
         "OPEN" => {
-            run.timer = run.timer.saturating_add(50);
-            if run.timer >= 7281 {
-                run.timer = 0;
-                cut_end(run, list, flags);
+            if run.advance > 0 {
+                run.mb_step = 0; // <- d_a_mbdoor.cpp:313 field_0x2b4 = 0;
+            }
+            if run.mb_step < MBDOOR_OPEN_ACCEL_CAP {
+                run.mb_step = run.mb_step.saturating_add(MBDOOR_OPEN_ACCEL_STEP);
+            }
+            let temp = run.mb_door.wrapping_sub(run.mb_step);
+            if temp < MBDOOR_OPEN_LIMIT {
+                run.mb_door = MBDOOR_OPEN_LIMIT; // <- d_a_mbdoor.cpp:348
+                cut_end(run, list, flags); // <- d_a_mbdoor.cpp:349
+            } else {
+                run.mb_door = temp; // <- d_a_mbdoor.cpp:351
             }
         }
         "STOP_OPEN" => {
-            run.timer = run.timer.saturating_add(40);
-            if run.timer >= 16229 {
-                run.timer = 0;
-                cut_end(run, list, flags);
+            if run.advance > 0 {
+                run.mb_step = 0; // <- d_a_mbdoor.cpp:317 field_0x2b4 = 0;
+                run.mb_latch = true; // <- d_a_mbdoor.cpp:318 field_0x2b6 = 1;
+            }
+            if run.mb_latch {
+                if run.mb_step < MBDOOR_BAR_ACCEL_CAP {
+                    run.mb_step = run.mb_step.saturating_add(MBDOOR_BAR_ACCEL_STEP);
+                }
+                let temp = run.mb_leaf.wrapping_sub(run.mb_step);
+                if temp < MBDOOR_BAR_LIMIT {
+                    run.mb_leaf = MBDOOR_BAR_LIMIT; // <- d_a_mbdoor.cpp:369
+                    cut_end(run, list, flags); // <- d_a_mbdoor.cpp:370
+                    run.mb_latch = false; // <- d_a_mbdoor.cpp:371
+                } else {
+                    run.mb_leaf = temp; // <- d_a_mbdoor.cpp:374
+                }
+            } else {
+                cut_end(run, list, flags); // <- d_a_mbdoor.cpp:378
             }
         }
         "ADJUSTMENT" => {
             if run.advance > 0 {
-                run.timer = list.cut_number(run.cut as usize, "Timer").unwrap_or(0) as i16;
+                run.mb_adjust = 0; // <- d_a_mbdoor.cpp:330 mAdjustmentTimer = 0;
+                if let Some(timer) = list.cut_number(run.cut as usize, "Timer") {
+                    run.mb_adjust = timer as i16; // <- d_a_mbdoor.cpp:331-334
+                }
             }
-            if run.timer > 0 {
-                run.timer -= 1;
+            if run.mb_adjust > 0 {
+                run.mb_adjust -= 1; // <- d_a_mbdoor.cpp:390
             } else {
-                cut_end(run, list, flags);
+                cut_end(run, list, flags); // <- d_a_mbdoor.cpp:392
             }
         }
-        "WAIT" => cut_end(run, list, flags),
-        _ => {}
+        // WAIT, SET_START, SET_ANGLE, SET_GOAL and SET_GOAL2 all land in the run
+        // switch's `default:` arm, which is the only unconditional cut end there.
+        _ => cut_end(run, list, flags), // <- default: dComIfGp_evmng_cutEnd; d_a_mbdoor.cpp:396-398
     }
 }
 
@@ -1819,8 +1942,15 @@ fn soldier_cut(
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
-    let step = run.offset_scale * (run.offset_target - run.model_offset);
-    run.model_offset += step.clamp(-run.offset_step, run.offset_step);
+    // `cLib_addCalc2(&mB34, mB38.x, mB38.z, mB38.y)` runs on every frame of
+    // PROC_RUN, cut or no cut, so it belongs ahead of the dispatch rather than
+    // inside the APPEAR/DIVE arms. Its `if (*pValue != target)` guard is real:
+    // without it the add-calc keeps firing once the leaf is parked on its target.
+    // <- d_a_npc_so.cpp:1563; <- c_lib.cpp:57-64 cLib_addCalc2
+    if run.model_offset != run.offset_target {
+        let step = run.offset_scale * (run.offset_target - run.model_offset);
+        run.model_offset += step.clamp(-run.offset_step, run.offset_step);
+    }
     match cut.name.as_str() {
         "WAIT" => {
             if run.advance > 0 {
@@ -2961,9 +3091,15 @@ fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
                 speed: 0.0,
                 phase: 0,
                 model_offset: 0.0,
-                offset_target: 0.0,
-                offset_step: 0.0,
-                offset_scale: 0.0,
+                // `daNpc_So_c::createInit` calls `offsetZero()` on its first line of
+                // business, which is `mB38 = (-1.0, 20.0, 0.1)`. Those three feed
+                // `cLib_addCalc2(&mB34, mB38.x, mB38.z, mB38.y)` once per frame
+                // whether or not a cut is running, so a `WAIT` cut on a fresh event
+                // starts from `offsetZero`'s target, not from zero.
+                // <- d_a_npc_so.cpp:1722 offsetZero(); <- :519-522 mB38.x/-y/-z
+                offset_target: SO_OFFSET_X,
+                offset_step: SO_OFFSET_Y,
+                offset_scale: SO_OFFSET_Z,
                 attn: Vec3::ZERO,
                 target: None,
                 talk_open: false,
@@ -2971,6 +3107,15 @@ fn start_proc(running: &mut Running, event: &Event, list: &EventList) {
                 msg_no: 0,
                 get_stage: 0,
                 get_msg_live: false,
+                // `CreateInit` zeroes both door leaves; the leaf the already-unlocked
+                // branch would pre-set to `MBDOOR_BAR_LIMIT` needs `getType()`
+                // (`home.angle.z & 0x3F`) and a room switch this cut never reads.
+                // <- d_a_mbdoor.cpp:231-232, :236-237, :241
+                mb_door: 0,
+                mb_leaf: 0,
+                mb_step: 0,
+                mb_latch: false,
+                mb_adjust: 0,
             })
         })
         .collect();

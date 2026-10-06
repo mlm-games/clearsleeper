@@ -19,8 +19,8 @@ use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgget::MsgArchive;
 use crate::text::msgproc::{
-    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs, fop_msgm_message_set,
-    fop_msgm_message_set_actor,
+    DA_EVT_MODE_NONE, FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
+    fop_msgm_message_set, fop_msgm_message_set_actor,
 };
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
@@ -238,8 +238,6 @@ const TALK_MODE_LETTER_EYE: u8 = 5;
 
 const PRESENT_ITEM_SET_ID: u16 = 0;
 const PRESENT_ITEM_ROOM: i8 = -1;
-
-const RESERVE_ITEM_BTN: usize = 0;
 
 const CYL_AT_TYPE_SRC: u32 = 0;
 const CYL_AT_ATP_SRC: u8 = 0;
@@ -868,7 +866,7 @@ impl Toripost {
                     let price = self.send_price();
                     if ctx.rupees() >= price {
                         ctx.add_rupees(-price);
-                        ctx.set_reserve_item_empty();
+                        ctx.set_reserve_item_empty(); // <- d_a_obj_toripost.cpp:462, OMITTED in Ctx
                         self.deliver_letter(ctx);
                         *msg_no = MSG_CF2;
                     } else {
@@ -1042,7 +1040,7 @@ impl Toripost {
                 self.mode_proc_init(MODE_WAIT, ctx);
             }
 
-            ctx.event_reset();
+            ctx.event_reset(); // <- modeTalk, d_a_obj_toripost.cpp:723
             self.field_0x8f4 = 0;
         }
     }
@@ -1093,14 +1091,14 @@ impl Toripost {
                 && self.talk(TALK_PARAM_GET_MSG, ctx) == STATUS_BOX_CLOSED
             {
                 self.mode_proc_init(MODE_WAIT, ctx);
-                ctx.event_reset();
+                ctx.event_reset(); // <- modeTalkXY, d_a_obj_toripost.cpp:775
                 self.field_0x8f5 = 0;
             }
         }
     }
 
     pub fn mode_receive_init(&mut self, ctx: &mut Ctx) {
-        ctx.event_reset();
+        ctx.event_reset(); // <- modeReceiveInit, d_a_obj_toripost.cpp:784
         self.event_set(EVENT_IDX_RECEIVE);
         self.set_anm(ANMPRM_POST_GET0, false, ctx);
     }
@@ -1116,7 +1114,7 @@ impl Toripost {
             let reg = self.letter_reg(self.num_readable);
             ctx.stories.set_reg(reg, LETTER_READ);
             self.num_readable = self.get_readable_letter_num(&*ctx.stories);
-            ctx.event_reset();
+            ctx.event_reset(); // <- modeReceiveDemo, d_a_obj_toripost.cpp:804
 
             if self.num_readable != 0 {
                 self.mode_proc_init(MODE_TALK, ctx);
@@ -1543,11 +1541,61 @@ impl Ctx<'_, '_, '_> {
         self.statics.pre_item_no
     }
 
-    fn set_reserve_item_empty(&mut self) {
-        self.equipped.set(RESERVE_ITEM_BTN, inventory::NO_ITEM);
-    }
+    // `dComIfGs_setReserveItemEmpty()` at d_a_obj_toripost.cpp:462.
+    //
+    // Retail forwards `dItemNo_NONE_e` into
+    // `dSv_player_bag_item_c::setReserveItemChange` (d_save.cpp:629-630), which
+    // first reads `dComIfGp_event_getTalkXYBtn()` to map the button the player
+    // pressed onto an item button, then clears the one button whose select slot
+    // falls in the reserve window 48..56 at d_save.cpp:597 and d_save.cpp:600.
+    // <- d_save.cpp:584 dComIfGp_event_getTalkXYBtn()
+    // <- d_com_inf_game.h:3501 dComIfGp_event_getTalkXYBtn()
+    // <- d_com_inf_game.h:1103-1104 dInvSlot_ReserveFirst_e = 48, dInvSlot_ReserveLast_e = 56
+    // <- d_save.cpp:597, :600 the invIdx < First / >= Last guard
+    //
+    // OMITTED, twice over, and neither omission is repairable here:
+    //
+    // 1. WHICH button holds the reserve slot is RULE 3b absent - `mTalkButton`
+    //    is written by the presenting-event channel, which this sim does not
+    //    model. d_save.cpp:586-592 returns outright when the button is not X, Y
+    //    or Z, so guessing one of the three would silently clear the wrong
+    //    button. RULE 1 forbids choosing one.
+    // <- d_event.h:170 u8 mTalkButton;
+    // 2. The reserve slots are not inventory slots at all. A reserve write lands in
+    //    `dSv_player_bag_item_c::mReserve[invIdx - 48]`, a separate eight-entry
+    //    array. <- d_com_inf_game.h:1161-1162, d_save.h:230 u8 mReserve[8]
+    //    `sim::inventory::Equipped` holds dInvSlot_ItemFirst_e ..
+    //    dInvSlot_ItemLast_e only, 0..21, so there is no index here that could name
+    //    a reserve slot - index 0 is dInvSlot_TELESCOPE_e, which is why the removed
+    //    `RESERVE_ITEM_BTN = 0` wiped the player's Telescope on every letter
+    //    purchase.
+    // <- d_com_inf_game.h:1072-1073 dInvSlot_ItemFirst_e = dInvSlot_TELESCOPE_e = 0
+    // <- d_com_inf_game.h:1095 dInvSlot_ItemLast_e = 21
+    fn set_reserve_item_empty(&mut self) {}
 
-    fn event_reset(&mut self) {}
+    // `dComIfGp_event_reset()` - d_com_inf_game.h:3525 - called from modeTalk,
+    // modeTalkXY, modeReceiveInit and modeReceiveDemo of d_a_obj_toripost.cpp.
+    //
+    // `dEvent_c::reset()` is `onEventFlag(8)`, bit 8 of `mEventFlag`.
+    // <- d_event.h:131 void reset() { onEventFlag(8); }
+    // <- d_event.h:175 u16 mEventFlag;
+    // `dEvt_control_c::check` consumes it, raising `mbEndProc`, then calls
+    // `endProc()` in the same function.
+    // <- d_event.cpp:546-549 if (chkEventFlag(8)) { mbEndProc = 1; offEventFlag(8); }
+    // <- d_event.cpp:551-554 if (runCheck() && mbEndProc == 1) { mbEndProc = 0; endProc(); }
+    // `endProc` clears the mode before running the mode-specific teardown, so the
+    // mode write is the half of `reset()` this crate models - the same half
+    // `sim::marlon` takes.
+    // <- d_event.cpp:417 mMode = dEvtMode_NONE_e;
+    // <- d_event.h:25 dEvtMode_NONE_e
+    //
+    // OMITTED: the dEvtMode_DEMO_e arm of `endProc`, `demoEnd()`, whose
+    // `PEvtManager->endProc(mEventId, 1)` and `cancelStaff("ALL")` have no channel
+    // in `sim::event::ActiveEvent`.
+    // <- d_event.cpp:407-408, d_event.cpp:330-344 demoEnd()
+    fn event_reset(&mut self) {
+        self.info.event_mode = DA_EVT_MODE_NONE; // <- d_event.cpp:417
+    }
 
     fn chk_present_end(&mut self) -> bool {
         self.manager.chk_present_end()
