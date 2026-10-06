@@ -66,6 +66,7 @@ pub mod frame;
 pub mod floormaster;
 pub mod ganon_form3;
 pub mod npc_nz;
+pub mod toripost;
 pub mod touseki;
 pub mod gaship;
 pub mod gbed;
@@ -545,6 +546,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if npc_fa1::is_npc_fa1(&source.name) {
         let v = npc_fa1::NpcFa1::spawn();
+        world.spawn((actor, v)).id()
+    } else if toripost::is_toripost(&source.name) {
+        let v = toripost::Toripost::spawn(source.parameters);
         world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
@@ -1201,6 +1205,8 @@ pub fn build(
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(door::StayRoom::default());
+    sim.world.insert_resource(npc_nz::Statics::default());
+    sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1251,6 +1257,8 @@ pub fn build(
         next_id: 1,
         ..Default::default()
     });
+    sim.world.insert_resource(npc_nz::Statics::default());
+    sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1484,6 +1492,7 @@ pub fn build(
                 npc_ho::control.in_set(WwSimSet::Execute),
                 npc_hi1::control.in_set(WwSimSet::Execute),
                 npc_fa1::control.in_set(WwSimSet::Execute),
+                toripost::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
