@@ -91,6 +91,7 @@ pub mod fallrock;
 pub mod fan;
 pub mod ff;
 pub mod obj_hha;
+pub mod shand;
 pub mod tag_hint;
 pub mod tag_md_cb;
 pub mod zouk;
@@ -596,6 +597,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if title::is_title(&source.name) {
         let v = title::Title::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if shand::is_shand(&source.name) {
+        let a = shand::Shand::spawn(source.parameters);
+        world.spawn((actor, a)).id()
     } else if kalle_demos::is_kalle_demos(&source.name) {
         let kalleDemos = kalle_demos::KalleDemos::spawn(source.parameters);
         world.spawn((actor, kalleDemos)).id()
@@ -1565,6 +1569,7 @@ pub fn build(
     sim.world.insert_resource(obj_hha::SplashSets::default());
     sim.world.insert_resource(title::TitleKirakira::default());
     sim.world.insert_resource(title::TitleScene::default());
+    sim.world.insert_resource(shand::ShandStatic::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
@@ -1653,6 +1658,7 @@ pub fn build(
     sim.world.insert_resource(obj_hha::SplashSets::default());
     sim.world.insert_resource(title::TitleKirakira::default());
     sim.world.insert_resource(title::TitleScene::default());
+    sim.world.insert_resource(shand::ShandStatic::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
     let mut area = area::Area::default();
     if let Some(stage) = stage {
@@ -1930,6 +1936,7 @@ pub fn build(
                 zelda::control.in_set(WwSimSet::Execute),
                 obj_hha::control.in_set(WwSimSet::Execute),
                 title::control.in_set(WwSimSet::Execute),
+                shand::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
