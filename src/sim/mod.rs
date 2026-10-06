@@ -83,6 +83,7 @@ pub mod ivan;
 pub mod jump;
 pub mod kalle_demos;
 pub mod kamome;
+pub mod ktaruo;
 pub mod kita;
 pub mod kn;
 pub mod komore;
@@ -787,6 +788,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, kytag03::Kytag03::spawn())).id()
     } else if tpota::is_tpota(&source.name) {
         world.spawn((actor, tpota::Tpota::spawn())).id()
+    } else if ktaruo::is_ktaruo(&source.name) {
+        world.spawn((actor, ktaruo::Ktaruo::spawn())).id()
     } else if scenechange::is_scene_change(&source.name) {
         let change = scenechange::SceneChange::spawn(actor.angle);
         world.spawn((actor, change)).id()
@@ -1138,7 +1141,8 @@ pub fn build(
                     gohma::control.in_set(WwSimSet::Execute),
                     phantom_ganon::control.in_set(WwSimSet::Execute),
                     puppet_ganon::control.in_set(WwSimSet::Execute),                    gntakis::control.in_set(WwSimSet::Execute),                    xfuta::control.in_set(WwSimSet::Execute),                    gaship2::control.in_set(WwSimSet::Execute),                    eayogn::control.in_set(WwSimSet::Execute),
-                    doguud::control.in_set(WwSimSet::Execute),                    gaship::control.in_set(WwSimSet::Execute),
+                    doguud::control.in_set(WwSimSet::Execute),                    ktaruo::control.in_set(WwSimSet::Execute),
+                    gaship::control.in_set(WwSimSet::Execute),
                     hhyu::control.in_set(WwSimSet::Execute),
                     xtower::control.in_set(WwSimSet::Execute),
                     tpota::control.in_set(WwSimSet::Execute),
