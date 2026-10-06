@@ -892,6 +892,20 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::apzl::Apzl>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::bwds::Bwds>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
             } else if let Some(robot) = entity.get::<sim::floormaster::Floormaster>() {
                 if !robot.drawn() {
                     continue;

@@ -19,6 +19,7 @@ pub mod bemos;
 pub mod barricade;
 pub mod bitem;
 pub mod bird;
+pub mod bwds;
 pub mod ebomzo;
 pub mod branch;
 pub mod boko;
@@ -514,6 +515,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if npc_btsw::is_npc_btsw(&source.name) {
         let btsw = npc_btsw::NpcBtsw::spawn(source.parameters);
         world.spawn((actor, btsw)).id()
+    } else if apzl::is_apzl(&source.name) {
+        let v = apzl::Apzl::spawn(source.parameters);
+        world.spawn((actor, v)).id()
+    } else if bwds::is_bwds(&source.name) {
+        let v = bwds::Bwds::spawn(source.parameters);
+        world.spawn((actor, v)).id()
     } else if figure::is_figure(&source.name) {
         world.spawn((actor, figure::Figure::spawn(source.parameters))).id()
     } else if scenery::is_scenery(&source.name) {
@@ -1155,6 +1162,7 @@ pub fn build(
     sim.world.insert_resource(npc_p1::StageStart::default());
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
+    sim.world.insert_resource(bwds::Statics::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -1414,6 +1422,7 @@ pub fn build(
                 lenzo::control.in_set(WwSimSet::Execute),
                 zunari::control.in_set(WwSimSet::Execute),
                 grammarian::control.in_set(WwSimSet::Execute),
+                apzl::control.in_set(WwSimSet::Execute),
                 crate::text::driver::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
@@ -1520,6 +1529,7 @@ pub fn build(
                 xfuta::control.in_set(WwSimSet::Execute),
                 gaship2::control.in_set(WwSimSet::Execute),
                 eayogn::control.in_set(WwSimSet::Execute),
+                bwds::control.in_set(WwSimSet::Execute),
                 doguud::control.in_set(WwSimSet::Execute),
                 ktaruo::control.in_set(WwSimSet::Execute),
                 gaship::control.in_set(WwSimSet::Execute),
