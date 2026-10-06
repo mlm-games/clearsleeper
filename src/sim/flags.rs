@@ -4,14 +4,9 @@ use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
 use super::player::Player;
 
-pub const EVENT_SWITCH_ACTOR: &str = "Evsw";
 pub const TAG_EVENT_ACTOR: &str = "TagEv";
 pub const TAG_ISLAND_ACTOR: &str = "TagIsl";
 
-const SWITCH_SHIFT: u32 = 0;
-const EVENT_SHIFT: u32 = 8;
-const KIND_SHIFT: u32 = 24;
-const HOLD_KIND: u32 = 1;
 const STORY_BYTES: usize = 0x100;
 pub const FLAG_BYTES: usize = 0x100;
 const SWITCH_BITS: u32 = 128;
@@ -555,27 +550,6 @@ impl ZoneActors {
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EventSwitch {
-    pub event: u16,
-    pub switch_no: u8,
-    pub hold: bool,
-}
-
-impl EventSwitch {
-    pub fn spawn(parameters: u32) -> Self {
-        Self {
-            event: ((parameters >> EVENT_SHIFT) & 0xFFFF) as u16,
-            switch_no: ((parameters >> SWITCH_SHIFT) & 0xFF) as u8,
-            hold: (parameters >> KIND_SHIFT) & 0x3 == HOLD_KIND,
-        }
-    }
-}
-
-pub fn is_event_switch(name: &str) -> bool {
-    name == EVENT_SWITCH_ACTOR
-}
-
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SwitchOn(pub u8);
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -609,7 +583,6 @@ fn letter_msg(regs: &EventReg) -> u32 {
 pub fn control(
     stories: Res<StoryBits>,
     mut switches: ResMut<Switches>,
-    actors: Query<&EventSwitch>,
     mut active: ResMut<ActiveEvent>,
     list: Res<EventList>,
     players: Query<&Player>,
@@ -626,13 +599,6 @@ pub fn control(
         talk.msg_curr = letter_msg(&stories);
         talk.msg_end = -1;
         commands.entity(entity).remove::<LetterMsg>();
-    }
-    for switch in &actors {
-        if stories.test(switch.event) {
-            switches.set(switch.switch_no);
-        } else if !switch.hold {
-            switches.clear(switch.switch_no);
-        }
     }
     if let Some(player) = players.iter().next() {
         tag_triggers(

@@ -9,7 +9,7 @@ pub const PLANT_ACTORS: [&str; 1] = ["Plant"];
 
 const CYL_RADIUS: f32 = 30.0; // <- d_a_obj_plant.cpp:37
 const CYL_HEIGHT: f32 = 200.0; // <- d_a_obj_plant.cpp:38
-const BOMB_RADIUS: f32 = 30.0; // <- d_a_bomb2.cpp:322 (Act_c::M_sph_src)
+const BOMB_RADIUS: f32 = 30.0; // <- d_a_bomb2.cpp:326 (Act_c::M_sph_src)
 const REHIT_TIMER: i16 = 0x38; // <- d_a_obj_plant.cpp:85
 const SWING_END: i16 = 0x100; // <- d_a_obj_plant.cpp:111
 const SE_SWING: u32 = 0x69E6; // <- JAZelAudio_SE.h:1998 (JA_SE_OBJ_TREE_SWING_S)

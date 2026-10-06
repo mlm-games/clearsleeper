@@ -205,8 +205,6 @@ pub mod tagkk1;
 pub mod taglight;
 pub mod trapdoor;
 pub mod table;
-pub mod tagso;
-pub mod alldie;
 pub mod talk;
 pub mod tama;
 pub mod tenmado;
@@ -320,7 +318,10 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, state)).id()
     } else if source.name == cleared::CLEARED_ACTOR {
         world
-            .spawn((actor, cleared::spawn(source.parameters, world.resource())))
+            .spawn((
+                actor,
+                cleared::spawn(source.parameters, world.resource(), source.room as i32),
+            ))
             .id()
     } else if source.name == balloon::BALLOON_ACTOR {
         let (state, hit_points) = balloon::spawn(source.parameters);
@@ -345,9 +346,6 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == talk::TALK_ACTOR {
         let speaker = talk::Talk::new(talk::message(source.angle[0]), source.room);
         world.spawn((actor, speaker)).id()
-    } else if flags::is_event_switch(&source.name) {
-        let switch = flags::EventSwitch::spawn(source.parameters);
-        world.spawn((actor, switch)).id()
     } else if lenzo::is_lenzo(&source.name) {
         let shopkeeper = lenzo::Lenzo::spawn(source.parameters);
         world.spawn((actor, shopkeeper)).id()
@@ -910,14 +908,9 @@ let v = mmusic::Mmusic::spawn(world.resource::<inventory::Equipped>(), world.res
     } else if ygush::is_ygush(&source.name) {
 world.spawn((actor, ygush::Ygush::spawn(source.parameters))).id()
     } else if evsw::is_evsw(&source.name) {
-let f = world.resource::<flags::EventFlags>();
+        let bits = *world.resource::<flags::EventFlags>();
         let mut sw = world.resource_mut::<flags::Switches>();
-        let v = evsw::Evsw::spawn(source.parameters, f, &mut sw);
-        world.spawn((actor, v)).id()
-    } else if tagso::is_tagso(&source.name) {
-world.spawn((actor, tagso::Tagso::spawn())).id()
-    } else if alldie::is_alldie(&source.name) {
-let v = alldie::Alldie::spawn(source.parameters, world.resource::<flags::Switches>());
+        let v = evsw::Evsw::spawn(source.parameters, &bits, &mut sw);
         world.spawn((actor, v)).id()
     } else if kaji::is_kaji(&source.name) {
 world.spawn((actor, kaji::Kaji::spawn())).id()
@@ -1099,8 +1092,6 @@ pub fn build(
                 (
                     daynight::control.in_set(WwSimSet::Execute),
                     evsw::control.in_set(WwSimSet::Execute),
-                    tagso::control.in_set(WwSimSet::Execute),
-                    alldie::control.in_set(WwSimSet::Execute),
                     kaji::control.in_set(WwSimSet::Execute),
                     ikari::control.in_set(WwSimSet::Execute),
                     gbed::control.in_set(WwSimSet::Execute),

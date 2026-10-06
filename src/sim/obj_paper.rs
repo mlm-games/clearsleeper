@@ -3,6 +3,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::intent::DoIntent;
+use super::msg::MsgBox;
 use super::player::Player;
 use crate::assets::MsgArchives;
 use crate::text::msgproc::{
@@ -196,7 +197,7 @@ impl Paper {
             Some(archive) => fop_msgm_message_set_actor(
                 procs,
                 info,
-                archive.as_ref(),
+                archive,
                 0,
                 msg_no,
                 None,
@@ -214,13 +215,14 @@ impl Paper {
         }
     }
 
-    pub fn mode_talk2(&mut self, procs: &mut MsgProcs, status: u8) {
-        if !self.msg_bound || status != STATUS_BOX_CLOSED {
+    pub fn mode_talk2(&mut self, procs: &mut MsgProcs, box_: &mut MsgBox) {
+        if !self.msg_bound || box_.status() != STATUS_BOX_CLOSED {
             return;
         }
         if self.msg_id != NO_MSG {
             procs.delete(self.msg_id);
         }
+        box_.set_status(STATUS_MSG_DESTROYED);
         self.msg_id = NO_MSG;
         self.msg_bound = false;
         self.mode_wait_init();
@@ -241,20 +243,19 @@ pub fn control(
     *asked = do_intent.0;
     let archive = archives.as_deref();
     let player = players.iter().next().copied();
-    let status = box_.status();
     for (actor, mut paper) in &mut papers {
         let msg_no = Paper::msg_no(actor.parameters);
         if !paper.entered {
             paper.create_init();
         }
         let ask = pressed
-            && player.is_some_and(|player| paper.in_reach(actor, player))
+            && player.is_some_and(|player| paper.in_reach(&actor, &player))
             && !box_.active();
         match paper.mode {
             MODE_WAIT => paper.mode_wait(ask),
             MODE_TALK_BEGIN => paper.mode_talk0(&mut procs, &mut info, archive, msg_no),
             MODE_GET_MSG => paper.mode_talk1(&procs),
-            _ => paper.mode_talk2(&mut procs, status),
+            _ => paper.mode_talk2(&mut procs, &mut box_),
         }
     }
 }

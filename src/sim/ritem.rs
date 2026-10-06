@@ -187,6 +187,12 @@ impl Ritem {
         (CULL_MIN, CULL_MAX)
     }
 
+    /// The `dItem_data::getH(m_itemNo)` half of `CreateInit`'s collider
+    /// (`d_a_race_item.cpp:91-98`), which is also the item's drawn height.
+    pub fn size(&self) -> f32 {
+        item_height(self.item)
+    }
+
     /// `normalItemGet`'s `switch (m_itemNo)` sound table (`d_a_race_item_static.cpp:68-108`);
     /// the decomp has no `default:` arm, so anything else is silent.
     fn item_sound(item: u8) -> Option<u32> {

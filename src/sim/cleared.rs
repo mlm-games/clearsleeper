@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use super::enemy::Enemy;
+use super::actor::Actor;
 use super::flags::Switches;
 
 pub const CLEARED_ACTOR: &str = "ALLdie";
@@ -13,28 +13,34 @@ pub struct Cleared {
     pub switch: u8,
     pub countdown: u32,
     pub done: bool,
+    pub room: i32,
 }
 
-pub fn spawn(parameters: u32, switches: &Switches) -> Cleared {
+pub fn spawn(parameters: u32, switches: &Switches, room: i32) -> Cleared {
     let switch = ((parameters >> SWITCH_SHIFT) & 0xFF) as u8;
     Cleared {
         switch,
         countdown: COUNTDOWN,
         done: switches.test(switch),
+        room,
     }
 }
 
 pub fn control(
     mut switches: ResMut<Switches>,
     mut markers: Query<&mut Cleared>,
-    foes: Query<(), With<Enemy>>,
+    foes: Query<(&Actor, Option<&super::combat::HitPoints>)>,
 ) {
-    let living = foes.iter().count();
     for mut marker in &mut markers {
         if marker.done {
             continue;
         }
-        if living > 0 {
+        let room = marker.room;
+        let living = room >= 0
+            && foes
+                .iter()
+                .any(|(other, hp)| hp.is_some() && other.room == room);
+        if living {
             marker.countdown = COUNTDOWN;
             continue;
         }

@@ -184,11 +184,11 @@ const WIND_RADIUS: f32 = 300.0;
 const WIND_RADIUS_BATTLE: f32 = 600.0;
 const HEAD_OFF_Y: f32 = -10000.0;
 
-const JOINT_ATAMA1: [f32; 3] = [0.0, 592.90, 135.00];
-const JOINT_AGO: [f32; 3] = [0.0, 577.44, 172.50];
-const JOINT_TOSAKA_A3: [f32; 3] = [0.0, 754.15, 67.96];
-const JOINT_ASHI_L3: [f32; 3] = [75.02, 129.52, 185.61];
-const JOINT_ASHI_R3: [f32; 3] = [-74.98, 129.51, 185.61];
+const JOINT_ATAMA1: [f32; 3] = [0.0, 660.47, 26.25];
+const JOINT_AGO: [f32; 3] = [0.0, 645.00, 63.75];
+const JOINT_TOSAKA_A3: [f32; 3] = [0.0, 783.76, 131.24];
+const JOINT_ASHI_L3: [f32; 3] = [75.03, 26.25, 63.74];
+const JOINT_ASHI_R3: [f32; 3] = [-74.97, 26.24, 63.74];
 
 const EMODE_NONE: u8 = 0;
 const EMODE_LOOP: u8 = 2;
@@ -314,7 +314,6 @@ const HULL_COUNT: usize = 20;
 const HULL_NON_POS: [f32; 3] = [0.0, -10000.0, 10000.0];
 const HULL_PARK: [f32; 3] = [-50000.0, -50000.0, -50000.0];
 const KAMEN_RADIUS: f32 = 70.0;
-const EFFECT_RADIUS: f32 = 100.0;
 const PLAYER_WIND_RADIUS: f32 = 30.0;
 const WIND_PUSH_SPEED: f32 = 27.0;
 const WIND_PUSH_STEP: f32 = 18.0;
@@ -333,6 +332,9 @@ const KAMEN_BLOW_SPEED: f32 = 7.0;
 const KAMEN_BLOW_SPREAD: f32 = 2000.0;
 const KAMEN_BLOW_SWAY: f32 = 200.0;
 const KAMEN_SWING_STEP: f32 = 200.0;
+const FOOT_EFF_DROP: f32 = 200.0;
+const FOOT_EFF_FLOOR: f32 = 9800.0;
+const FOOT_EFF_LIVE: f32 = 9810.0;
 
 const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -3783,7 +3785,9 @@ impl Helmaroc {
         }
         if self.nail_live != 0 {
             out.se(SE_CM_DK_NAIL);
-            if self.foot[0].y <= 9810.0 || self.at_mode == 0 {
+            if (self.foot[0].y - FOOT_EFF_DROP).max(FOOT_EFF_FLOOR) <= FOOT_EFF_LIVE
+                || self.at_mode == 0
+            {
                 self.nail_live = 0;
             }
         }

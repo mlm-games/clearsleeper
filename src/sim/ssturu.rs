@@ -137,8 +137,11 @@ impl SsTuru {
         (CULL_MIN, CULL_MAX)
     }
 
-    pub fn armed(&self) -> bool {
-        self.at_live
+    /// `draw_sub` (`d_a_ssk.cpp:41-64`) scales `mpMorf2` by `m350` and `mpMorf1` by
+    /// `actor.scale`, and `createInit` sets both to zero for a statue that has not woken
+    /// (`:418-419`), so the pair only draws once either ramp leaves zero.
+    pub fn drawn(&self) -> bool {
+        self.lid > 0.0 || self.rise > 0.0
     }
 
     /// `daSsk_Execute` recomputes `m2C4 = m2C0 + 100.0f` (`d_a_ssk.cpp:252`).

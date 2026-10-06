@@ -20,8 +20,8 @@ pub const ACT_LIFT: i32 = 2;
 
 pub const DEMO_NAMES: [&str; 2] = ["demo41", "demo41"];
 
-pub const CLOUD_STEP: f32 = -0.008928572f;
-pub const CLOUD_END: f32 = -1.0f;
+pub const CLOUD_STEP: f32 = -0.008928572;
+pub const CLOUD_END: f32 = -1.0;
 
 pub const EVENT_CLOUD_LIFTED: u32 = 0x3908;
 
@@ -66,7 +66,7 @@ impl Rcloud {
     pub fn spawn(parameters: u32) -> Self {
         Self {
             act: RcloudAct::Wait,
-            demo_index: i32::from(parameters & 0x1),
+            demo_index: (parameters & 0x1) as i32,
             progress: 0.0,
             entered: false,
         }
@@ -151,7 +151,7 @@ pub fn control(
     active: Res<ActiveEvent>,
     mut flags: ResMut<EventFlags>,
     collect: Res<Collect>,
-    info: Option<Res<super::text::msgproc::MsgGameInfo>>,
+    info: Option<Res<crate::text::msgproc::MsgGameInfo>>,
     mut clouds: Query<(Entity, &mut Rcloud)>,
     mut commands: Commands,
 ) {
