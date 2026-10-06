@@ -9,7 +9,7 @@ pub enum ShapeKind {
     Box,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shape {
     pub kind: ShapeKind,
     pub pos: glam::Vec3,
@@ -19,12 +19,26 @@ pub struct Shape {
     pub scale: glam::Vec3,
 }
 
+impl Default for Shape {
+    fn default() -> Self {
+        Self {
+            kind: ShapeKind::Sphere,
+            pos: glam::Vec3::ZERO,
+            radius: 0.0,
+            height: 0.0,
+            yaw: 0.0,
+            scale: glam::Vec3::ONE,
+        }
+    }
+}
+
 impl Shape {
     pub fn sphere(pos: glam::Vec3, radius: f32) -> Self {
         Self {
             kind: ShapeKind::Sphere,
             pos,
             radius,
+            scale: glam::Vec3::ONE,
             ..Self::default()
         }
     }
@@ -35,6 +49,7 @@ impl Shape {
             pos,
             radius,
             height,
+            scale: glam::Vec3::ONE,
             ..Self::default()
         }
     }
@@ -45,6 +60,7 @@ impl Shape {
             pos,
             radius,
             height,
+            scale: glam::Vec3::ONE,
             ..Self::default()
         }
     }

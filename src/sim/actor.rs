@@ -37,6 +37,12 @@ pub struct Actor {
     pub steal_item_bit_no: u8,
     /// `stealItemLeft`, the count of steal items still owed, the value that gates the steal.
     pub steal_item_left: i8,
+    /// `cCcD_Stts::GetWeightUc`, the collision weight byte `GetRank` buckets and `rank_tbl`
+    /// indexes with, set at the reference's `cCcD_Stts::Init` first argument. `0` and `0xFF` are
+    /// the two a correction pair early-outs on, and the reference's own player and boat take 120
+    /// and 0xF0. The per-process values are not ported, so this stands at 100, a mid-ladder weight
+    /// whose `rank_tbl` diagonal is an even split: two such actors push each other apart equally.
+    pub weight_uc: u8,
 }
 
 impl Default for Actor {
@@ -59,6 +65,7 @@ impl Default for Actor {
             item_table_idx: 0,
             steal_item_bit_no: 0,
             steal_item_left: 0,
+            weight_uc: 100,
         }
     }
 }
