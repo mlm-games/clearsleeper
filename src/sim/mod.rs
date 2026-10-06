@@ -1,6 +1,7 @@
 pub mod acorn_leaf;
 pub mod actor;
 pub mod agbsw0;
+pub mod arrowlight;
 pub mod agb;
 pub mod ajavw;
 pub mod ajav;
@@ -30,6 +31,7 @@ pub mod hole;
 pub mod bird;
 pub mod bwds;
 pub mod ebomzo;
+pub mod ep;
 pub mod branch;
 pub mod boko;
 pub mod cafelmp;
@@ -37,12 +39,15 @@ pub mod bscurtain;
 pub mod buoybarrel;
 pub mod buoyrace;
 pub mod canon;
+pub mod canon2;
 pub mod bomb;
 pub mod bombflower;
 pub mod boomerang;
 pub mod chest;
 pub mod camera;
 pub mod carry;
+pub mod coming;
+pub mod coming2;
 pub mod contact;
 pub mod chuchu;
 pub mod cleared;
@@ -69,6 +74,7 @@ pub mod demokmm;
 pub mod dummy;
 pub mod eayogn;
 pub mod esekh;
+pub mod eskban;
 pub mod esa;
 pub mod ending;
 pub mod enemy;
@@ -79,6 +85,7 @@ pub mod events;
 pub mod fallrock;
 pub mod fan;
 pub mod ff;
+pub mod zouk;
 pub mod fire;
 pub mod figure;
 pub mod flags;
@@ -224,6 +231,7 @@ pub mod npc_tc;
 pub mod npc_ho;
 pub mod npc_hi1;
 pub mod npc_fa1;
+pub mod pause;
 pub mod pbco;
 pub mod pbka;
 pub mod pedestal;
@@ -644,6 +652,11 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, lpalm::Lpalm::spawn(source.parameters))).id()
     } else if ojtree::is_ojtree(&source.name) {
         world.spawn((actor, ojtree::Ojtree::spawn(source.parameters))).id()
+    } else if canon2::is_canon2(&source.name) {
+        world.spawn((actor, canon2::Canon2::spawn())).id()
+    } else if ep::is_ep(&source.name) {
+        let v = ep::Ep::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if esa::is_esa(&source.name) {
         world.spawn((actor, esa::Esa::spawn(source.parameters))).id()
     } else if iceisland::is_iceisland(&source.name) {
@@ -728,7 +741,32 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if vmc::is_vmc(&source.name) {
         let v = vmc::Vmc::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
-    } else if machine::is_machine(&source.name) {
+} else if kui::is_kui(&source.name) {
+        world.spawn((actor, kui::Kui::spawn(source.parameters))).id()
+    } else if warpdm20::is_warpdm20(&source.name) {
+        world.spawn((actor, warpdm20::WarpDm20::spawn())).id()
+    } else if coming::is_coming(&source.name) {
+        world.spawn((actor, coming::Coming::spawn(source.parameters))).id()
+    } else if ferris::is_ferris(&source.name) {
+        world.spawn((actor, ferris::Ferris::spawn(source.parameters))).id()
+    } else if sail::is_sail(&source.name) {
+        world.spawn((actor, sail::Sail::spawn())).id()
+    } else if coming2::is_coming2(&source.name) {
+        world.spawn((actor, coming2::Coming2::spawn(actor.angle[1], actor.pos))).id()
+    } else if zouk::is_zouk(&source.name) {
+        world.spawn((actor, zouk::Zouk::spawn(source.parameters))).id()
+    } else if warpls::is_warpls(&source.name) {
+        world.spawn((actor, warpls::Warpls::spawn(source.parameters))).id()
+    } else if mshokki::is_mshokki(&source.name) {
+        world.spawn((actor, mshokki::Mshokki::spawn(source.parameters))).id()
+    } else if dk::is_dk(&source.name) {
+        world.spawn((actor, dk::Dk::spawn(source.parameters))).id()
+    } else if arrowlight::is_arrowlight(&source.name) {
+        world.spawn((actor, arrowlight::ArrowLight::spawn(source.parameters))).id()
+    } else if eskban::is_eskban(&source.name) {
+        let v = eskban::Eskban::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
+        } else if machine::is_machine(&source.name) {
         world.spawn((actor, machine::Machine::spawn())).id()
     } else if drift::is_drift(&source.name) {
         world.spawn((actor, drift::Drift::spawn(source.parameters))).id()
@@ -1420,6 +1458,9 @@ pub fn build(
     sim.world.insert_resource(camera::Camera::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
+    sim.world.insert_resource(damage_resolve::HitStop::default());
+    sim.world.insert_resource(damage_resolve::HitAudio::default());
+    sim.world.insert_resource(pause::Pause::default());
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
@@ -1763,6 +1804,8 @@ pub fn build(
                 npc_gp1::control.in_set(WwSimSet::Execute),
                 demodk::control.in_set(WwSimSet::Execute),
                 kmon::control.in_set(WwSimSet::Execute),
+                dk::control.in_set(WwSimSet::Execute),
+                kui::control.in_set(WwSimSet::Execute),
                 amos_knight::control.in_set(WwSimSet::Execute),
                 ganon_form3::control.in_set(WwSimSet::Execute),
                 )
@@ -2003,6 +2046,8 @@ pub fn build(
                 bridge::control.in_set(WwSimSet::Execute),
                 tornado::control.in_set(WwSimSet::Execute),
                 stair::control.in_set(WwSimSet::Execute),
+                sail::control.in_set(WwSimSet::Execute),
+                ferris::control.in_set(WwSimSet::Execute),
                 )
                 .chain(),
             (
@@ -2010,11 +2055,21 @@ pub fn build(
                 hlift::control.in_set(WwSimSet::Execute),
                 lstair::control.in_set(WwSimSet::Execute),
                 buoyrace::control.in_set(WwSimSet::Execute),
+                scenery::control.in_set(WwSimSet::Execute),
+                arrowice::control.in_set(WwSimSet::Execute),
                 drift::control.in_set(WwSimSet::Execute),
                 bg::control.in_set(WwSimSet::Execute),
                 leaflift::control.in_set(WwSimSet::Execute),
                 mtest::control.in_set(WwSimSet::Execute),
                 dai::control.in_set(WwSimSet::Execute),
+                zouk::control.in_set(WwSimSet::Execute),
+                warpls::control.in_set(WwSimSet::Execute),
+                mshokki::control.in_set(WwSimSet::Execute),
+                arrowlight::control.in_set(WwSimSet::Execute),
+                eskban::control.in_set(WwSimSet::Execute),
+                warpdm20::control.in_set(WwSimSet::Execute),
+                coming::control.in_set(WwSimSet::Execute),
+                coming2::control.in_set(WwSimSet::Execute),
             )
                 .chain(),
         )

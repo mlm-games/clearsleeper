@@ -152,10 +152,8 @@ pub const NAME_ST: &str = "Stal";
 
 /// `fpcNm_TSUBO_e` has twelve OBJNAME rows (`d_stage.cpp:519-530`) and they are all
 /// `daTsubo::Act_c`, so all twelve reach the tsubo branch of the name chain.
-pub const TSUBO_ACTORS: [&str; 12] = [
-    "kotubo", "ootubo1", "Kmtub", "Ktaru", "Ostool", "Odokuro", "Okioke", "Kmi02", "Ptubo",
-    "KkibaB", "Kmi00", "Hbox2S",
-];
+/// The set itself belongs to `super::tsubo`, which owns the stage claim.
+use super::tsubo::TSUBO_ACTORS;
 
 /// The `seStart` parameter argument: `0x33` for the `fpcNm_ST_e` target, `0x20` otherwise.
 const SE_ARG_ST: u32 = 0x33;
