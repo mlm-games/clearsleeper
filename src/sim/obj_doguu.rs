@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
@@ -1083,27 +1084,51 @@ impl ObjDoguu {
     }
 }
 
+#[derive(SystemParam)]
+pub struct World<'w> {
+    pub list: Res<'w, EventList>,
+    pub active: ResMut<'w, ActiveEvent>,
+    pub manager: ResMut<'w, EventManager>,
+    pub flags: ResMut<'w, EventFlags>,
+    pub collect: Res<'w, Collect>,
+    pub equipped: Res<'w, Equipped>,
+    pub events: ResMut<'w, SimEvents>,
+    pub vibration: ResMut<'w, Vibration>,
+    pub next: ResMut<'w, NextStage>,
+    pub lights: ResMut<'w, PointLights>,
+    pub allcol: ResMut<'w, AllColRatio>,
+    pub particles: ResMut<'w, ParticleSets>,
+    pub procs: ResMut<'w, MsgProcs>,
+    pub info: ResMut<'w, MsgGameInfo>,
+    pub one: ResMut<'w, Msg1Box>,
+    pub two: ResMut<'w, Msg2Box>,
+    pub archive: Option<Res<'w, MsgArchives>>,
+}
+
 pub fn control(
     mut statues: Query<(Entity, &mut Actor, &mut ObjDoguu), Without<Player>>,
     mut players: Query<&mut Player>,
-    list: Res<EventList>,
-    mut active: ResMut<ActiveEvent>,
-    mut manager: ResMut<EventManager>,
-    mut flags: ResMut<EventFlags>,
-    collect: Res<Collect>,
-    equipped: Res<Equipped>,
-    mut events: ResMut<SimEvents>,
-    mut vibration: ResMut<Vibration>,
-    mut next: ResMut<NextStage>,
-    mut lights: ResMut<PointLights>,
-    mut allcol: ResMut<AllColRatio>,
-    mut particles: ResMut<ParticleSets>,
-    mut procs: ResMut<MsgProcs>,
-    mut info: ResMut<MsgGameInfo>,
-    mut one: ResMut<Msg1Box>,
-    mut two: ResMut<Msg2Box>,
-    archive: Option<Res<MsgArchives>>,
+    world: World,
 ) {
+    let World {
+        list,
+        mut active,
+        mut manager,
+        mut flags,
+        collect,
+        equipped,
+        mut events,
+        mut vibration,
+        mut next,
+        mut lights,
+        mut allcol,
+        mut particles,
+        mut procs,
+        mut info,
+        mut one,
+        mut two,
+        archive,
+    } = world;
     let archive = archive.as_deref().map(|held| held as &dyn MsgArchive);
     allcol.ratio = 1.0;
     let mut live: Vec<LightInfluence> = Vec::new();

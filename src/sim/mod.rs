@@ -51,6 +51,7 @@ pub mod carry;
 pub mod coming;
 pub mod coming2;
 pub mod contact;
+pub mod contact_run;
 pub mod chuchu;
 pub mod cleared;
 pub mod clock;
@@ -1545,6 +1546,7 @@ pub fn build(
     sim.world.insert_resource(kanban::Statics::default());
     sim.world.insert_resource(apzl::Statics::default());
     sim.world.insert_resource(bwds::Statics::default());
+    sim.world.insert_resource(contact_run::ContactResults::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
@@ -2050,6 +2052,7 @@ pub fn build(
                 health::apply_damage.in_set(WwSimSet::Execute),
                 death::check.in_set(WwSimSet::Execute),
                 cleared::control.in_set(WwSimSet::Execute),
+                contact_run::run.in_set(WwSimSet::Execute),
                 frame::advance.in_set(WwSimSet::After),
             )
                 .chain(),
@@ -2074,6 +2077,7 @@ pub fn build(
 
             )
                 .chain(),
+            (
                 msdansub2::control.in_set(WwSimSet::Execute),
                 swpropeller::control.in_set(WwSimSet::Execute),
                 ohatch::control.in_set(WwSimSet::Execute),
@@ -2090,6 +2094,7 @@ pub fn build(
                 bita::control.in_set(WwSimSet::Execute),
                 coming3::control.in_set(WwSimSet::Execute),
                 grid::control.in_set(WwSimSet::Execute),
+            )
             )
                 .chain(),
             (
