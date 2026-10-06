@@ -742,14 +742,13 @@ impl App {
                     continue;
                 }
                 (view::ActorKind::Scenery, 0, 20.0, 10.0)
-            } else if entity.contains::<sim::wall::Wall>() {
-                if entity
-                    .get::<sim::wall::Wall>()
-                    .is_some_and(|w| w.state == sim::wall::State::Break)
-                {
+            } else if let Some(w) = entity.get::<sim::wall::Wall>() {
+                if w.state == sim::wall::State::Break {
                     continue;
                 }
-                (view::ActorKind::Scenery, 0, 40.0, 20.0)
+                let (min, max) = w.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if entity.contains::<sim::bomb::Bomb>() {
                 (view::ActorKind::Scenery, 0, 16.0, 8.0)
             } else if let Some(ladder) = entity.get::<sim::ladder::Ladder>() {

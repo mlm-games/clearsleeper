@@ -319,6 +319,7 @@ pub mod tagetc;
 pub mod tagmk;
 pub mod tagkb;
 pub mod tag_volcano;
+pub mod tag_md_cb;
 pub mod tag_msg;
 pub mod tagkk1;
 pub mod taglight;
@@ -1715,6 +1716,7 @@ pub fn build(
                 ladder::control.in_set(WwSimSet::Execute),
                 arrow::control.in_set(WwSimSet::Execute),
                 stone::control.in_set(WwSimSet::Execute),
+                wall::control.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (
