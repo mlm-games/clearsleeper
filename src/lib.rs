@@ -62,6 +62,7 @@ pub struct App {
     save_dir: PathBuf,
     name: String,
     menu_prev: HashSet<PhysicalKey>,
+    pad_prev: input::ButtonBits,
     movie: Option<movie::Movie>,
     movie_frame: usize,
     movie_clock: f32,
@@ -117,6 +118,7 @@ impl App {
             save_dir: save::slots_dir(),
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
+            pad_prev: input::ButtonBits::default(),
             movie: None,
             movie_frame: 0,
             movie_clock: 0.0,
@@ -172,7 +174,30 @@ impl App {
         self.stage_target(input::target_from_keys(held, sched.window_focused));
         self.stage_item(input::item_from_keys(held, sched.window_focused));
         self.stage_use(input::use_from_keys(held, sched.window_focused));
+        self.stage_pad(
+            input::pad_held_from_keys(held, sched.window_focused),
+            input::c_stick_from_keys(held, sched.window_focused),
+        );
         self.stage_menu(held, sched.window_focused);
+    }
+
+    /// Stage the pad's face buttons and C-stick. The trigger word is the edge against the
+    /// previous poll, so it lasts one frame whatever the fixed step then does with it and a
+    /// held button never reads as a fresh press.
+    fn stage_pad(&mut self, held: input::ButtonBits, c_stick: glam::Vec2) {
+        let prev = std::mem::replace(&mut self.pad_prev, held);
+        *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::PadButtons::default) =
+            sim::intent::PadButtons {
+                trig: input::pad_trig(held, prev),
+                hold: held,
+            };
+        self.sim
+            .world
+            .get_resource_or_insert_with(sim::intent::CStick::default)
+            .poll(c_stick);
     }
 
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
@@ -183,6 +208,7 @@ impl App {
             self.stage_target(false);
             self.stage_item(false);
             self.stage_use(false);
+            self.stage_pad_menu();
         }
         let mut cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
@@ -385,6 +411,27 @@ impl App {
 
     pub fn stage_target(&mut self, held: bool) {
         self.sim.world.resource_mut::<sim::intent::TargetIntent>().0 = held;
+    }
+
+    /// Release the pad and centre the C-stick while a menu owns the screen, leaving START
+    /// readable: retail's START is both the edge that opens a pause menu and the edge that
+    /// closes it. The previous poll is left alone, so a button still down when the menu
+    /// closes does not report a fresh press.
+    fn stage_pad_menu(&mut self) {
+        {
+            let mut pad = self
+                .sim
+                .world
+                .get_resource_or_insert_with(sim::intent::PadButtons::default);
+            let hold = pad.hold.except_start();
+            let trig = pad.trig.except_start();
+            pad.hold = hold;
+            pad.trig = trig;
+        }
+        self.sim
+            .world
+            .get_resource_or_insert_with(sim::intent::CStick::default)
+            .poll(glam::Vec2::ZERO);
     }
 
     pub fn health(&self) -> sim::health::Health {
@@ -919,6 +966,13 @@ impl App {
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(v) = entity.get::<sim::sss::Sss>() {
+                if !v.drawn() {
+                    continue;
+                }
+                let (min, max) = v.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(v) = entity.get::<sim::tag_hint::TagHint>() {
                 if !v.drawn() {
                     continue;
                 }
