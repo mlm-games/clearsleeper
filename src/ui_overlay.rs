@@ -184,6 +184,9 @@ pub struct PaneQuad {
     pub visible: bool,
     pub texture: Option<String>,
     pub text: String,
+    pub color_black: u32,
+    pub color_white: u32,
+    pub corner_color: [u32; 4],
 }
 
 #[derive(Resource, Debug, Clone, Default)]
@@ -207,7 +210,7 @@ fn picture_pane(pane: &j2d::ScreenPane) -> Pane {
         connect_parent: false,
         influenced_alpha: true,
         parent_draw_alpha: 0xFF,
-        white: 0xFFFF_FFFF,
+        white: pane.color_white,
     }
 }
 
@@ -286,6 +289,9 @@ impl PlaceName {
                 visible: pane.visible,
                 texture: pane.texture.clone(),
                 text: pane.text.clone(),
+                color_black: pane.color_black,
+                color_white: pane.color_white,
+                corner_color: pane.corner_color,
             })
             .collect()
     }
