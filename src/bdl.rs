@@ -1,3 +1,5 @@
+use glam::Mat4;
+
 const HEADER_LEN: usize = 0x20;
 const BLOCK_LEN: usize = 8;
 const MAGIC: [u8; 8] = *b"J3D2bdl4";
@@ -65,7 +67,10 @@ const PARENT_ROOT: i32 = -2;
 const JOINT_SCALE: usize = 4;
 const JOINT_ROTATION: usize = 0x10;
 const JOINT_TRANSLATION: usize = 0x18;
-const IDENTITY_SCALE: [f32; 3] = [1.0, 1.0, 1.0];
+const TRIG_SHIFT: u32 = 4;
+const TRIG_ENTRIES: f64 = 4096.0;
+const TRIG_QUARTER: u32 = 1024;
+const PARENT_NONE: u16 = 0xFFFF;
 const SHAPE_MATRIX_DIRECT: u8 = 0;
 const SHAPE_MATRIX_MULTI: u8 = 3;
 const MATRIX_INDEX_DIVISOR: u32 = 3;
@@ -134,6 +139,8 @@ pub struct RoomMesh {
     pub uv_placements: Vec<[f32; 4]>,
     pub animations: Vec<crate::btk::TextureAnimation>,
     pub joints: Vec<[f32; 3]>,
+    pub joint_matrices: Vec<Mat4>,
+    pub joint_parents: Vec<u16>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -174,6 +181,8 @@ impl RoomMesh {
         self.groups.append(&mut part.groups);
         self.textures.append(&mut part.textures);
         self.joints.append(&mut part.joints);
+        self.joint_matrices.append(&mut part.joint_matrices);
+        self.joint_parents.append(&mut part.joint_parents);
     }
 }
 
@@ -184,7 +193,7 @@ pub fn parse(
     animation: Option<&crate::btk::TextureAnimation>,
 ) -> Result<RoomMesh, BdlError> {
     let blocks = Blocks::parse(data)?;
-    let (worlds, material_nodes) = read_joints(data, &blocks)?;
+    let (worlds, matrices, parents, material_nodes) = read_joints(data, &blocks)?;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
     let envelopes = read_envelopes(data, &blocks, worlds.len())?;
     let vertices = read_vertex_arrays(data, &blocks)?;
@@ -201,6 +210,8 @@ pub fn parse(
     };
     let mut mesh = RoomMesh::default();
     mesh.joints = worlds.clone();
+    mesh.joint_matrices = matrices;
+    mesh.joint_parents = parents;
     if let Some(animation) = animation {
         mesh.animations.push(animation.clone());
     }
@@ -245,6 +256,59 @@ fn read_f32(data: &[u8], start: usize) -> Result<f32, BdlError> {
     let end = start.checked_add(4).ok_or(BdlError::Truncated)?;
     let bytes = data.get(start..end).ok_or(BdlError::Truncated)?;
     Ok(f32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn trig_entry(index: u32) -> f32 {
+    (f64::from(index) * (std::f64::consts::TAU / TRIG_ENTRIES)).sin() as f32
+}
+
+fn trig_index(value: i16) -> u32 {
+    u32::from(value as u16) >> TRIG_SHIFT
+}
+
+fn trig_sin(value: i16) -> f32 {
+    trig_entry(trig_index(value))
+}
+
+fn trig_cos(value: i16) -> f32 {
+    trig_entry(trig_index(value) + TRIG_QUARTER)
+}
+
+fn joint_matrix(
+    scale: [f32; 3],
+    rotation: [i16; 3],
+    translation: [f32; 3],
+) -> Mat4 {
+    let sx = trig_sin(rotation[0]);
+    let cx = trig_cos(rotation[0]);
+    let sy = trig_sin(rotation[1]);
+    let cy = trig_cos(rotation[1]);
+    let sz = trig_sin(rotation[2]);
+    let cz = trig_cos(rotation[2]);
+    let mut columns = [[0.0_f32; 4]; 4];
+    columns[2][0] = -sy;
+    columns[0][0] = cz * cy;
+    columns[1][0] = sz * cy;
+    columns[2][1] = cy * sx;
+    columns[2][2] = cy * cx;
+    let cxsz = cx * sz;
+    let sxcz = sx * cz;
+    columns[0][1] = sxcz * sy - cxsz;
+    columns[1][2] = cxsz * sy - sxcz;
+    let sxsz = sx * sz;
+    let cxcz = cx * cz;
+    columns[0][2] = cxcz * sy + sxsz;
+    columns[1][1] = sxsz * sy + cxcz;
+    columns[3] = [0.0, 0.0, 0.0, 1.0];
+    for column in columns.iter_mut().take(3) {
+        column[0] *= scale[0];
+        column[1] *= scale[1];
+        column[2] *= scale[2];
+    }
+    columns[0][3] = translation[0];
+    columns[1][3] = translation[1];
+    columns[2][3] = translation[2];
+    Mat4::from_cols_array_2d(&columns)
 }
 
 struct Blocks {
@@ -298,7 +362,7 @@ impl Blocks {
 fn read_joints(
     data: &[u8],
     blocks: &Blocks,
-) -> Result<(Vec<[f32; 3]>, Vec<(u16, Option<u16>)>), BdlError> {
+) -> Result<(Vec<[f32; 3]>, Vec<Mat4>, Vec<u16>, Vec<(u16, Option<u16>)>), BdlError> {
     let (joint_start, _) = blocks.find(b"JNT1")?;
     let joint_count = usize::from(read_u16(data, joint_start + 8)?);
     let init_start = at(joint_start, read_u32(data, at(joint_start, 0x0C)?)? as usize)?;
@@ -324,14 +388,12 @@ fn read_joints(
             read_i16(data, at(init, JOINT_ROTATION + 2)?)?,
             read_i16(data, at(init, JOINT_ROTATION + 4)?)?,
         ];
-        if scale != IDENTITY_SCALE || rotation != [0, 0, 0] {
-            return Err(BdlError::Transform);
-        }
-        locals.push([
+        let translation = [
             read_f32(data, at(init, JOINT_TRANSLATION)?)?,
             read_f32(data, at(init, JOINT_TRANSLATION + 4)?)?,
             read_f32(data, at(init, JOINT_TRANSLATION + 8)?)?,
-        ]);
+        ];
+        locals.push(joint_matrix(scale, rotation, translation));
     }
 
     let (hierarchy_start, hierarchy_end) = blocks.find(b"INF1")?;
@@ -384,21 +446,21 @@ fn read_joints(
         return Err(BdlError::Hierarchy);
     }
 
-    let mut worlds: Vec<Option<[f32; 3]>> = vec![None; joint_count];
+    let mut resolved_matrices: Vec<Option<Mat4>> = vec![None; joint_count];
     for joint in 0..joint_count {
-        if worlds[joint].is_some() {
+        if resolved_matrices[joint].is_some() {
             continue;
         }
         let mut chain = Vec::new();
         let mut current = joint;
         let mut world = loop {
-            if let Some(resolved) = worlds[current] {
+            if let Some(resolved) = resolved_matrices[current] {
                 break resolved;
             }
             let parent = parents[current];
             if parent == PARENT_ROOT {
                 let resolved = locals[current];
-                worlds[current] = Some(resolved);
+                resolved_matrices[current] = Some(resolved);
                 break resolved;
             }
             if parent < 0 {
@@ -408,22 +470,29 @@ fn read_joints(
             current = parent as usize;
         };
         for member in chain.iter().rev() {
-            let local = locals[*member];
-            world = [
-                world[0] + local[0],
-                world[1] + local[1],
-                world[2] + local[2],
-            ];
-            worlds[*member] = Some(world);
+            world *= locals[*member];
+            resolved_matrices[*member] = Some(world);
         }
     }
-    Ok((
-        worlds
-            .into_iter()
-            .map(|world| world.ok_or(BdlError::Hierarchy))
-            .collect::<Result<Vec<_>, BdlError>>()?,
-        material_nodes,
-    ))
+    let matrices = resolved_matrices
+        .into_iter()
+        .map(|matrix| matrix.ok_or(BdlError::Hierarchy))
+        .collect::<Result<Vec<_>, BdlError>>()?;
+    let worlds = matrices
+        .iter()
+        .map(|matrix| [matrix.w_axis.x, matrix.w_axis.y, matrix.w_axis.z])
+        .collect();
+    let joint_parents = parents
+        .iter()
+        .map(|&parent| {
+            if parent < 0 {
+                PARENT_NONE
+            } else {
+                parent as u16
+            }
+        })
+        .collect();
+    Ok((worlds, matrices, joint_parents, material_nodes))
 }
 
 #[derive(Debug, Clone, Copy)]
