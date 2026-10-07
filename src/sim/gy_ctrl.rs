@@ -17,7 +17,6 @@ use super::actor::Actor;
 use super::collision::Collision;
 use super::flags::Switches;
 use super::inventory::{Got, ITEM_BOOMERANG};
-use super::lines::Lines;
 use super::player::Player;
 use super::player_status::{STTS0_SHIP_RIDE, STTS0_SWIM, STTS0_UNK1000000, PlayerStatus};
 use super::ship::Ship;
@@ -453,7 +452,7 @@ impl GyCtrl {
                 // `cXyz sp08 = m2CC[i]; sp08.y += l_HIO.m24;` (:253-254)
                 let raised = Vec3::new(dest.x, dest.y + HIO_M24, dest.z);
                 // `if (lineCheck(&sp08, &m2CC[i])) { m312[i] = 0; } else { m312[i] = 1; }` (:258-262)
-                if let Some(hit) = Lines::cross(raised, dest, solid) {
+                if let Some(hit) = solid.and_then(|solid| solid.line_cross(raised, dest)) {
                     // `*arg2 = mLinChk.GetCross();` (:184) - the cross point REPLACES m2CC[i].
                     dest = hit.point;
                 }
@@ -498,7 +497,7 @@ impl GyCtrl {
             // `cXyz sp08 = m3EC[i]; sp08.y += l_HIO.m24;` (:213-214)
             let raised = Vec3::new(dest.x, dest.y + HIO_M24, dest.z);
             // `if (lineCheck(&sp08, &m3EC[i])) { return false; }` (:220-222)
-            if Lines::cross(raised, dest, solid).is_some() {
+            if solid.and_then(|solid| solid.line_cross(raised, dest)).is_some() {
                 return false;
             }
         }

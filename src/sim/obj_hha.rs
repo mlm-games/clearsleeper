@@ -7,7 +7,6 @@ use super::event::{ActiveEvent, EventList};
 use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
-use super::lines;
 use super::player::Player;
 use super::sea::Sea;
 use super::vibration::Vibration;
@@ -934,7 +933,11 @@ impl ObjHha {
         let off_vec = base_z_rotated(angle[1]) * WTR_CHK_FORWARD;
         chk_pos += off_vec;
         if WTR_CHK_SCALE != 0.0 {
-            if let Some(height) = lines::water_height(sea, water, chk_pos.x, chk_pos.z) {
+            let surface = match sea {
+                Some(sea) if sea.draw_contains(chk_pos.x, chk_pos.z) => Some(sea.height_at(chk_pos.x, chk_pos.z)),
+                _ => water.filter(|water| water.in_area).map(|water| water.surface),
+            };
+            if let Some(height) = surface {
                 ret = height;
             }
         }

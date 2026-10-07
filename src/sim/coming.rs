@@ -17,10 +17,12 @@ use super::collision::Collision;
 use super::door::StayRoom;
 use super::enemy::Enemy;
 use super::flags::Switches;
-use super::lines::Lines;
 use super::player::Player;
 use super::sea::Sea;
 use super::ship::Ship;
+use super::walk;
+
+type s32 = i32;
 
 /// `OBJNAME("Com_A", fpcNm_Obj_Coming_e, 255, 0)` (`d_stage.cpp:940`) - the only row for
 /// `g_profile_Obj_Coming` (`d_a_obj_coming.cpp:571-586`).
@@ -154,7 +156,7 @@ const ITEM_DATA: [u8; 21] = [
 /// `make_coming` INVERTS it (`!hasFlag`, `d_a_obj_barrel2.h:78`), so only pattern 2 has no buoy.
 const BUOY_DATA: [bool; 21] = [
     false, false, true, false, false, false, false, false, false, false, false, false, false, false, false,
-    false, false, false, false, false,
+    false, false, false, false, false, false,
 ]; // <- d_a_obj_coming.cpp:398
 /// `daObjBuoyflag::Texture_00_e = 0x0` (`d_a_obj_buoyflag.h:24`) - the texture
 /// `mode_barrel2_wait` passes to `make_coming` (`:442`).
@@ -178,6 +180,7 @@ const PRM_COMING_S: u32 = 0x1C; // <- d_a_obj_barrel2.h:85
 /// `if (switchIndex == 0xFF) { return true; } else if (fopAcM_isSwitch(this, switchIndex))` -
 /// `chk_switch` (`:199-207`). `prm_get_swSave()` is `PRM_SAVE_W = 8`, `PRM_SAVE_S = 0x10`
 /// (`d_a_obj_coming.h:61-62`), i.e. the parameter's bits 16..23.
+const SW_SAVE_WIDTH: u32 = 8;
 const SW_SAVE_SHIFT: u32 = 0x10; // <- d_a_obj_coming.h:62
 const SW_SAVE_MASK: u32 = 0xFF; // <- d_a_obj_coming.h:61
 const NO_SWITCH: u8 = 0xFF; // <- d_a_obj_coming.cpp:201
@@ -626,7 +629,7 @@ impl Coming {
     /// returns `None` when no `Collision` resource exists, so the test passes then. Documented, not
     /// worked around.
     fn chk_make_pos_wall(from: Vec3, to: Vec3, solid: Option<&Collision>) -> bool {
-        Lines::cross(from, to, solid).is_none()
+        solid.is_none_or(|solid| solid.line_cross(from, to).is_none())
     }
 
     /// `chk_make_pos_act` (`:329-342`), the actor-clearance half of `chk_make_pos`:
@@ -680,7 +683,7 @@ impl Coming {
     /// `super::ground::surface` is the merged-DZB plane query and is NOT a substitute (see the
     /// `coming3.rs`'s cull refusal, which declines the identical call). Without it `chk_make_pos`
     /// cannot be evaluated as a whole, so the ground half is reported rather than assumed to pass.
-    fn barrel2_get_param(&mut self, ctx: &Ctx<'_>) -> Option<Barrel2> {
+    fn barrel2_get_param(&mut self, ctx: &Ctx<'_, '_, '_>) -> Option<Barrel2> {
         // ```
         // if (ship != NULL && chk_ship_spd(ship) && chk_ship_range(ship)) { ... }
         // ```
@@ -750,7 +753,7 @@ impl Coming {
     /// The room test has three alternatives and only two survive: `mRoomId` is the un-queryable
     /// per-poly ground result (see [`Coming::room_id`]), while `prm_get_always()` - bit 6, the same
     /// bit as `prm_get_range()` - short-circuits it anyway whenever the flag is set.
-    fn mode_barrel2_wait(&mut self, index: usize, ctx: &mut Ctx<'_>) {
+    fn mode_barrel2_wait(&mut self, index: usize, ctx: &mut Ctx<'_, '_, '_>) {
         // `if (ctrl->m04 <= 0)` (:432)
         if self.slots[index].timer > 0 {
             return;
@@ -831,7 +834,7 @@ impl Coming {
     fn mode_barrel2_appear(
         &mut self,
         index: usize,
-        ctx: &Ctx<'_>,
+        ctx: &Ctx<'_, '_, '_>,
         barrels: &mut Query<&mut BuoyBarrel>,
     ) {
         // `if (ctrl->m04 <= 0)` (:457)
@@ -904,7 +907,7 @@ impl Coming {
     ///
     /// Returns TRUE when `fopAcM_delete(this)` fired, so `control` despawns. The `mode_proc` ROW
     /// index is `m290`, whose table has one row - see [`Coming::mode_row`].
-    fn execute(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) -> bool {
+    fn execute(&mut self, ctx: &mut Ctx<'_, '_, '_>, barrels: &mut Query<&mut BuoyBarrel>) -> bool {
         // `s32 end = attr()->m00[prm_get_makeNum()];` (:507) - `L_Attr::m00[0..3]`.
         let end = COUNT_TABLE[usize::from(self.make_num).min(COUNT_TABLE.len() - 1)];
         let mut all_done = true;
@@ -970,7 +973,7 @@ impl Coming {
 }
 
 /// Everything `execute` needs beyond the component, in one bundle - the `hbrf1` / `tagetc` shape.
-struct Ctx<'a> {
+struct Ctx<'a, 'w, 's> {
     origin: Vec3,
     ship: Option<Vec3>,
     ship_yaw: i16,
@@ -980,7 +983,7 @@ struct Ctx<'a> {
     stay: i8,
     switches: &'a Switches,
     others: &'a [(Vec3, &'static str)],
-    commands: &'a mut Commands,
+    commands: &'a mut Commands<'w, 's>,
 }
 
 pub fn is_coming(name: &str) -> bool {

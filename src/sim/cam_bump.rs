@@ -109,28 +109,17 @@ struct Hit {
     d: f32,
 }
 
-/// `dCamera_c::lineBGCheck`, `d_camera.cpp:1794-1852`. `Collision::slide` is the port's line
-/// check: it answers "is this segment blocked" and returns the point it stopped short at,
-/// but it has no triangle planes, so the wall's facing is read off which of X or Z it froze
-/// and the sign is the one pointing back at the segment's origin. A vertical segment, whose
-/// X and Z are equal, is never blocked and so never crosses. `lineBGCheckBack` `:1855` and
-/// `lineBGCheckBoth` `:1863` only add the back and front sidedness flags, and the reference
-/// calls neither.
+/// `dCamera_c::lineBGCheck`, `d_camera.cpp:1794-1852`. `Collision::line_cross` walks the
+/// segment against the stage triangles and reports the plane it landed on, so the wall's
+/// facing is the triangle's own normal rather than an axis guess. `lineBGCheckBack` `:1855`
+/// and `lineBGCheckBoth` `:1863` only add the back and front sidedness flags, and the
+/// reference calls neither.
 fn line_bg_check(from: Vec3, to: Vec3, solid: Option<&Collision>) -> Option<Hit> {
-    let solid = solid?;
-    let point = solid.slide(from, to);
-    if (point - to).length_squared() <= 1.0e-6 {
-        return None;
-    }
-    let normal = if (point.z - from.z).abs() < (to.z - from.z).abs() {
-        Vec3::new(0.0, 0.0, f32::from(from.z >= point.z) * 2.0 - 1.0)
-    } else {
-        Vec3::new(f32::from(from.x >= point.x) * 2.0 - 1.0, 0.0, 0.0)
-    };
+    let hit = solid?.line_cross(from, to)?;
     Some(Hit {
-        d: normal.dot(point),
-        point,
-        normal,
+        point: hit.point,
+        normal: hit.normal,
+        d: hit.plane_d,
     })
 }
 
