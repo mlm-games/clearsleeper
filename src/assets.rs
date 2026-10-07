@@ -1032,6 +1032,9 @@ pub struct RoomSet {
     pub collision: Option<crate::sim::collision::Collision>,
     pub mesh: Option<crate::bdl::RoomMesh>,
     pub actors: Vec<crate::dzs::StageActor>,
+    /// The per-room camera and arrow chunks, keyed by room number, which is how the reference
+    /// reaches them: `dComIfGp_getRoomCamera(i_roomNo)` (`d_camera.cpp:1484`).
+    pub cameras: Vec<(u8, crate::dzs::StageCameras)>,
 }
 
 pub fn load_room_set(
@@ -1128,6 +1131,7 @@ fn room_set_from_assets(
     let mut collision: Option<crate::sim::collision::Collision> = None;
     let mut mesh: Option<crate::bdl::RoomMesh> = None;
     let mut actors: Vec<crate::dzs::StageActor> = Vec::new();
+    let mut cameras: Vec<(u8, crate::dzs::StageCameras)> = Vec::new();
     for &room in rooms {
         let relative = room_path(tables.name(), room);
         let path = root.root().join(&relative);
@@ -1188,15 +1192,20 @@ fn room_set_from_assets(
             }
         }
         match archive.read("dzr/room.dzr") {
-            Ok(data) => match crate::dzs::room_actors(data, room as i8, layer(room)) {
-                Ok(placed) => actors.extend(placed),
-                Err(error) => {
-                    log::warn!(
-                        "clearsleeper: room {room} actor table unusable ({})",
-                        error.as_str()
-                    );
+            Ok(data) => {
+                match crate::dzs::room_actors(data, room as i8, layer(room)) {
+                    Ok(placed) => actors.extend(placed),
+                    Err(error) => {
+                        log::warn!(
+                            "clearsleeper: room {room} actor table unusable ({})",
+                            error.as_str()
+                        );
+                    }
                 }
-            },
+                if let Ok(parsed) = crate::dzs::room_cameras(data) {
+                    cameras.push((room, parsed));
+                }
+            }
             Err(AssetError::MissingEntry { .. }) => {}
             Err(error) => return Err(error),
         }
@@ -1205,6 +1214,7 @@ fn room_set_from_assets(
         collision,
         mesh,
         actors,
+        cameras,
     })
 }
 

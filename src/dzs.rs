@@ -1,3 +1,5 @@
+use glam::Vec3;
+
 const CHUNK_LEN: usize = 12;
 const MULT_LEN: usize = 0x0C;
 const ROOM_GROUP_LEN: usize = 0x08;
@@ -15,6 +17,9 @@ const PALE_LEN: usize = 0x2C;
 const VIRT_LEN: usize = 0x24;
 const ACTOR_LEN: usize = 0x20;
 const SCALED_ACTOR_LEN: usize = 0x24;
+const CAMERA_LEN: usize = 0x14;
+const ARROW_LEN: usize = 0x14;
+const CAM_TYPE_LEN: usize = 16;
 const EVENT_LEN: usize = 0x18;
 const EVENT_NAME_LEN: usize = 15;
 const ACTOR_NAME_LEN: usize = 8;
@@ -88,6 +93,33 @@ pub struct StageExit {
     pub wipe: u8,
 }
 
+/// `stage_camera2_data_class`, `d_stage.h:166-172`: one row of `CAMR` or `RCAM`. `cam_type` is the
+/// sixteen raw bytes of `m_cam_type`, NUL-terminated on entry rather than space-padded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StageCameraEntry {
+    pub cam_type: String,
+    pub arrow_idx: u8,
+    pub field_0x11: u8,
+    pub field_0x12: u8,
+    pub field_0x13: u8,
+}
+
+/// `stage_arrow_data_class`, `d_stage.h:181-186`: one row of `AROB` or `RARO`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StageArrowEntry {
+    pub position: Vec3,
+    pub angle: [i16; 3],
+    pub field_0x12: i16,
+}
+
+/// `stage_camera_class` with `stage_arrow_class`: the pair a stage or room file carries and the
+/// pair `dStage_dt_c::getCamera` and `getArrow` answer with, `d_stage.h:360-372`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StageCameras {
+    pub cameras: Vec<StageCameraEntry>,
+    pub arrows: Vec<StageArrowEntry>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StageHeader {
     pub time_h: i8,
@@ -96,6 +128,9 @@ pub struct StageHeader {
     pub schbit_sec: u8,
     pub schbit_enable: u8,
     pub far_plane: f32,
+    /// `stage_stag_info_class::mCameraMapToolID`, `d_stage.h:69`, the `CAMR` row the camera
+    /// starts on, `d_camera.cpp:203-213`.
+    pub camera_map_tool_id: u8,
 }
 
 #[derive(Debug)]
@@ -110,6 +145,7 @@ pub struct StageTables {
     actors: Vec<StageActor>,
     exits: Vec<StageExit>,
     events: Vec<String>,
+    cameras: StageCameras,
     name: String,
     has_sea: bool,
 }
@@ -158,6 +194,15 @@ fn scene_chunk(layer: u8) -> Option<u8> {
         11 => Some(b'b'),
         _ => None,
     }
+}
+
+/// `dStage_dt_c_roomLoader`'s `RCAM` and `RARO`, `d_stage.cpp:2182-2183`: the pair one room file
+/// installs on its own `dStage_roomDt_c`, which is what `dComIfGp_getRoomCamera` and
+/// `dComIfGp_getRoomArrow` return, `d_com_inf_game.cpp:644-666`. A room file without them leaves
+/// those pointers null, which the camera reads as no camera at all.
+pub fn room_cameras(data: &[u8]) -> Result<StageCameras, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    parse_camera_tables(data, |tag: &[u8; 4]| chunk_locate(&nodes, tag), b"RCAM", b"RARO")
 }
 
 pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, DzsError> {
@@ -248,6 +293,14 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_events(data, count, offset)?,
         None => Vec::new(),
     };
+    let mut stage_cameras = parse_camera_tables(data, locate, b"CAMR", b"AROB")?;
+    let room_level = parse_camera_tables(data, locate, b"RCAM", b"RARO")?;
+    if !room_level.cameras.is_empty() {
+        stage_cameras.cameras = room_level.cameras;
+    }
+    if !room_level.arrows.is_empty() {
+        stage_cameras.arrows = room_level.arrows;
+    }
     let has_sea = actors.iter().any(|actor| actor.name == SEA_ACTOR);
     Ok(StageTables {
         placements,
@@ -260,6 +313,7 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         actors,
         exits,
         events,
+        cameras: stage_cameras,
         name: String::new(),
         has_sea,
     })
@@ -369,6 +423,7 @@ fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
         schbit_sec: (type_and_schbit & 0xFF) as u8,
         schbit_enable: (enable_and_far >> 16) as u8,
         far_plane: (enable_and_far & 0xFFFF) as u16 as f32,
+        camera_map_tool_id: read_u8(data, at + 0x08)?,
     })
 }
 
@@ -401,6 +456,63 @@ fn parse_exits(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageExit>, D
         });
     }
     Ok(exits)
+}
+
+fn parse_camera_tables(
+    data: &[u8],
+    locate: impl Fn(&[u8; 4]) -> Option<(u32, u32)>,
+    camera: &[u8; 4],
+    arrow: &[u8; 4],
+) -> Result<StageCameras, DzsError> {
+    Ok(StageCameras {
+        cameras: match locate(camera) {
+            Some((count, offset)) => parse_cameras(data, count, offset)?,
+            None => Vec::new(),
+        },
+        arrows: match locate(arrow) {
+            Some((count, offset)) => parse_arrows(data, count, offset)?,
+            None => Vec::new(),
+        },
+    })
+}
+
+fn parse_cameras(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageCameraEntry>, DzsError> {
+    parse_records(data, count, offset, CAMERA_LEN, parse_camera)
+}
+
+fn parse_camera(data: &[u8], at: usize) -> Result<StageCameraEntry, DzsError> {
+    let name: [u8; CAM_TYPE_LEN] = read_array(data, at)?;
+    let stop = name
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(CAM_TYPE_LEN);
+    Ok(StageCameraEntry {
+        cam_type: String::from_utf8_lossy(&name[..stop]).into_owned(),
+        arrow_idx: read_u8(data, at + 0x10)?,
+        field_0x11: read_u8(data, at + 0x11)?,
+        field_0x12: read_u8(data, at + 0x12)?,
+        field_0x13: read_u8(data, at + 0x13)?,
+    })
+}
+
+fn parse_arrows(data: &[u8], count: u32, offset: u32) -> Result<Vec<StageArrowEntry>, DzsError> {
+    parse_records(data, count, offset, ARROW_LEN, parse_arrow)
+}
+
+fn parse_arrow(data: &[u8], at: usize) -> Result<StageArrowEntry, DzsError> {
+    Ok(StageArrowEntry {
+        position: Vec3::new(
+            read_f32(data, at)?,
+            read_f32(data, at + 4)?,
+            read_f32(data, at + 8)?,
+        ),
+        angle: [
+            read_i16(data, at + 0x0C)?,
+            read_i16(data, at + 0x0E)?,
+            read_i16(data, at + 0x10)?,
+        ],
+        field_0x12: read_i16(data, at + 0x12)?,
+    })
 }
 
 fn parse_actors(
@@ -459,6 +571,14 @@ impl StageTables {
 
     pub fn event_names(&self) -> &[String] {
         &self.events
+    }
+
+    /// The camera rows `dStage_dt_c::getCamera` answers with once the stage file is loaded. The
+    /// stage loader decodes `CAMR` and then `RCAM` through the same `setCamera`
+    /// (`d_stage.cpp:2158-2159`), so a stage file carrying both keeps the `RCAM` rows; `AROB`
+    /// and `RARO` are read the same way at `d_stage.cpp:2161-2162`.
+    pub fn cameras(&self) -> &StageCameras {
+        &self.cameras
     }
 
     pub fn exit(&self, id: u8) -> Option<&StageExit> {

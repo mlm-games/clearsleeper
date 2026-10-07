@@ -55,6 +55,7 @@ pub mod camera;
 pub mod cam_type;
 pub mod cam_bump;
 pub mod cam_follow;
+pub mod cam_room;
 pub mod cam_style;
 pub mod carry;
 pub mod coming;
@@ -1719,6 +1720,7 @@ pub fn build(
     if let Some(tables) = tables {
         weight::init(&mut sim.world);
         link_proc::init(&mut sim.world);
+        cam_room::init(&mut sim.world);
         spawn_actors(&mut sim.world, tables);
     }
     let spawn = area.spawn;

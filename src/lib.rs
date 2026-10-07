@@ -1918,6 +1918,22 @@ impl App {
         yaw: f32,
     ) {
         let has_sea = tables.has_sea_actor();
+        {
+            let tool_id = tables.stag().map_or(-1i32, |stag| {
+                i32::from(stag.camera_map_tool_id)
+            });
+            let mut room = self.sim.world.resource_mut::<sim::cam_room::CamRoom>();
+            room.set_stage(&tables);
+            let resolved = room.type_from_map_tool_id(tool_id, -1);
+            if resolved != sim::cam_room::NO_CAM_TYPE {
+                let index = usize::from(resolved);
+                let mode = self.sim.world.resource::<sim::camera::Camera>().mode;
+                self.sim
+                    .world
+                    .resource_mut::<sim::camera::Camera>()
+                    .set_style(index, mode);
+            }
+        }
         let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
         let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
         *self.sim.world.resource_mut::<sim::transition::NextStage>() =
@@ -2033,6 +2049,10 @@ impl App {
     }
 
 fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
+        self.sim
+            .world
+            .resource_mut::<sim::cam_room::CamRoom>()
+            .set_rooms(set.cameras);
         match set.collision {
             Some(collision) => {
                 let (bounds_min, bounds_max) = collision.bounds();
