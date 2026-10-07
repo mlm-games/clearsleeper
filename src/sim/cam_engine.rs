@@ -523,7 +523,7 @@ pub struct Work {
     /// `mWork.tower`, `mWork.hookshot`, `mWork.manual` and `mWork.ride`: the four arms of the
     /// union the port runs.
     pub tp: cam_tp_engines::State,
-    /// `mWork` as the event camera sees it: the thirteen arms its own twenty-eight-entry table
+    /// `mWork` as the event camera sees it: the seventeen arms its own twenty-eight-entry table
     /// selects between, which the target lays over the same union the four arms above use.
     pub ev: cam_event::State,
     /// The style [`Camera::setup_age`] and [`Camera::settled`] belong to. `onStyleChange` zeroes
