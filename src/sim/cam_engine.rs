@@ -4,6 +4,7 @@ use super::cam_follow::{self, FollowInput, SAngle, SGlobe, ViewCache};
 use super::cam_lockon;
 use super::cam_room::{CamRoom, CAM_FIELD_UNSET};
 use super::cam_style::{self, flag, param, CamEngine};
+use super::cam_tp_engines;
 use super::camera::Camera;
 use super::collision::Collision;
 use super::player::Player;
@@ -389,6 +390,9 @@ pub struct Work {
     pub fixed_pos: FixedPos,
     pub subject: Subject,
     pub event: Event,
+    /// `mWork.tower`, `mWork.hookshot`, `mWork.manual` and `mWork.ride`: the four arms of the
+    /// union the port runs.
+    pub tp: cam_tp_engines::State,
     /// The style [`Camera::setup_age`] and [`Camera::settled`] belong to. `onStyleChange` zeroes
     /// `m11C` at `d_camera.cpp:1420` and `onModeChange` zeroes `m100` through `m102` at
     /// `d_camera.cpp:1216-1218`, which is what makes a style replay its placement.
@@ -404,6 +408,7 @@ impl Default for Work {
             fixed_pos: FixedPos::default(),
             subject: Subject::default(),
             event: Event::default(),
+            tp: cam_tp_engines::State::default(),
             style: cam_style::NONE,
         }
     }
@@ -442,13 +447,13 @@ pub fn engine(
         Some(CamEngine::Event) => event(camera),
         Some(CamEngine::Lockon) => cam_lockon::lockon(camera, player, input),
         Some(CamEngine::NonOwner) => non_owner(camera),
+        Some(CamEngine::Talkto) => cam_tp_engines::talkto(camera, player, input),
+        Some(CamEngine::Tower) => cam_tp_engines::tower(camera, player, room, input),
+        Some(CamEngine::Ride) => cam_tp_engines::ride(camera, player, input),
+        Some(CamEngine::Manual) => cam_tp_engines::manual(camera, player, input),
+        Some(CamEngine::Hookshot) => cam_tp_engines::hookshot(camera, player, input),
         Some(
-            CamEngine::Talkto
-            | CamEngine::Tower
-            | CamEngine::Ride
-            | CamEngine::Hung
-            | CamEngine::Manual
-            | CamEngine::Hookshot
+            CamEngine::Hung
             | CamEngine::Tornado
             | CamEngine::Vomit
             | CamEngine::Shield,

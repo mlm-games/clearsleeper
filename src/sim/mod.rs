@@ -60,6 +60,7 @@ pub mod cam_follow;
 pub mod cam_lockon;
 pub mod cam_room;
 pub mod cam_style;
+pub mod cam_tp_engines;
 pub mod carry;
 pub mod coming;
 pub mod coming2;
