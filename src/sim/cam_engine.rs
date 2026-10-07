@@ -1,6 +1,7 @@
 use glam::{Vec2, Vec3};
 
 use super::cam_follow::{self, FollowInput, SAngle, SGlobe, ViewCache};
+use super::cam_lockon;
 use super::cam_room::{CamRoom, CAM_FIELD_UNSET};
 use super::cam_style::{self, flag, param, CamEngine};
 use super::camera::Camera;
@@ -12,13 +13,30 @@ use super::player_status::{self, PlayerStatus};
 /// and which the two fixed-placement engines divide their travel by.
 const PLAYER_HEIGHT: f32 = 125.0;
 
+/// The lock-on state `dCamera_c` carries beside the style: the one target the camera is aimed
+/// at and the two answers `dAttention_c` gives about it.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct LockInput {
+    /// `dCamera_c::mpLockonTarget`, `d_camera.h:198`, as `attentionPos` answers it at
+    /// `d_camera.cpp:1589-1591`. Retail's `Att` at `d_camera.cpp:638-650` fills it from the
+    /// attention's lock-on list, and its other three writers are the mode and type choosers.
+    pub target: Option<Vec3>,
+    /// `dAttention_c::LockonTruth`, `d_attention.cpp:1048-1051`, read at `d_camera.cpp:3331`.
+    pub truth: bool,
+    /// `chkFlag(AttnFlag_00000008) || chkFlag(AttnFlag_00000020)` at `d_camera.cpp:3348`, the
+    /// pair that restarts the placement. The port's attention keeps no flag word.
+    pub focus: bool,
+}
+
 /// What one engine call reads besides the camera: the pad the follow and subject engines want,
-/// and the stage collision the arrow engines line-check against.
+/// the lock-on target the lock-on engine is framed on, and the stage collision the arrow
+/// engines line-check against.
 pub struct EngineInput<'a> {
     pub follow: FollowInput<'a>,
     /// `CPad_GET_STICK_POS_X/Y`, the subject engine's aim and zoom stick.
     pub cstick: Vec2,
     pub collision: Option<&'a Collision>,
+    pub lockon: LockInput,
 }
 
 /// `dCamera_c::mWork.crawl`, `d_camera.h:350-361`. The tag `m378` and the spare `m39A` bytes are
@@ -361,11 +379,11 @@ impl Shake {
     }
 }
 
-/// `dCamera_c::mWork`, `d_camera.h:308-380`, narrowed to the engines the port runs. The lock-on
-/// union arm and the tag members are left out: both engines decline without an actor the sim
-/// does not publish.
+/// `dCamera_c::mWork`, `d_camera.h:308-380`, narrowed to the engines the port runs. The tag
+/// members of each arm are left out: retail writes them and reads them back nowhere.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Work {
+    pub lockon: cam_lockon::Lockon,
     pub crawl: Crawl,
     pub fixed_frame: FixedFrame,
     pub fixed_pos: FixedPos,
@@ -380,6 +398,7 @@ pub struct Work {
 impl Default for Work {
     fn default() -> Self {
         Self {
+            lockon: cam_lockon::Lockon::default(),
             crawl: Crawl::default(),
             fixed_frame: FixedFrame::default(),
             fixed_pos: FixedPos::default(),
@@ -421,7 +440,7 @@ pub fn engine(
         Some(CamEngine::FixedPosition) => fixed_position(camera, player, room),
         Some(CamEngine::Subject) => subject(camera, player, input.follow.status, input.cstick),
         Some(CamEngine::Event) => event(camera),
-        Some(CamEngine::Lockon) => lockon(camera),
+        Some(CamEngine::Lockon) => cam_lockon::lockon(camera, player, input),
         Some(CamEngine::NonOwner) => non_owner(camera),
         Some(
             CamEngine::Talkto
@@ -850,17 +869,6 @@ fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: 
 /// the guard at `d_camera.cpp:4761-4770`, which asks for a camera play and then for that play's
 /// camera staff, always holds and the engine declines, leaving the placement to the collision pass.
 fn event(camera: &mut Camera) -> bool {
-    let _ = camera;
-    false
-}
-
-/// `dCamera_c::lockonCamera`, `d_camera.cpp:3291-3640`. The function is framed on
-/// `mpLockonTarget` throughout: its attention position sets the globe at
-/// `d_camera.cpp:3366-3374`, the distance between the two actors scales the style's parameters at
-/// `d_camera.cpp:3375`, and the sight tests at `d_camera.cpp:3412-3434` and `:3491-3496` need an
-/// actor to look at. The port publishes no lock-on actor and no attention feed, so the engine
-/// declines rather than inventing one.
-fn lockon(camera: &mut Camera) -> bool {
     let _ = camera;
     false
 }

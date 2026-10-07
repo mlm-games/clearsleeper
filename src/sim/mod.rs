@@ -56,6 +56,7 @@ pub mod cam_type;
 pub mod cam_bump;
 pub mod cam_engine;
 pub mod cam_follow;
+pub mod cam_lockon;
 pub mod cam_room;
 pub mod cam_style;
 pub mod carry;
@@ -2147,6 +2148,9 @@ pub fn build(
                 swim::surface.in_set(WwSimSet::Execute),
             )
                 .chain(),
+            (bodies::attach_spawned
+                .in_set(WwSimSet::Execute)
+                .before(contact_run::run),),
             (bodies::follow
                 .in_set(WwSimSet::Execute)
                 .before(contact_run::run),),

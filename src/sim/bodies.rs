@@ -1837,6 +1837,21 @@ pub fn attach(world: &mut World, spawned: &[Entity]) {
     }
 }
 
+/// The same registration for actors a module spawned after [`attach`] ran. Retail builds a
+/// collider in the actor's own constructor, so the pendant a sign drops, the arm a Deku item
+/// leaves, a drifting barrel and a bomb-flower crawler are all hittable from their first tick.
+/// The port's [`attach`] only sees the stage's spawn list, and without this every actor born
+/// mid-step is unhittable for the rest of the game. Selection is on the absence of the component
+/// the system inserts, so it costs one archetype query once the stage has settled.
+pub fn attach_spawned(world: &mut World) {
+    let mut query = world.query_filtered::<Entity, With<Actor>>();
+    let fresh: Vec<Entity> = query
+        .iter(world)
+        .filter(|entity| world.get::<ContactBodies>(*entity).is_none())
+        .collect();
+    attach(world, &fresh);
+}
+
 /// `cCcS::MoveObj` re-registration, once per step: put every body back on the transform its owner
 /// just computed. Retail processes rebuild their colliders from `current.pos` each step, which is
 /// what keeps a head sphere above the feet after the owner moves; without this a body set at spawn

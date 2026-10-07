@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 
 use super::cam_bump::Bump;
-use super::cam_engine::{self, EngineInput};
+use super::cam_engine::{self, EngineInput, LockInput};
 use super::cam_follow::{CamSetup, Follow, FollowInput, SAngle, ViewCache};
 use super::cam_room::CamRoom;
 use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
@@ -398,6 +398,8 @@ pub fn track(
     main: Res<super::intent::MoveIntent>,
     status: Res<super::player_status::PlayerStatus>,
     players: Query<&super::player::Player>,
+    locked: Query<&super::actor::Actor>,
+    lock: Option<Res<super::lock::Lock>>,
     solid: Option<Res<super::collision::Collision>>,
     sea: Option<Res<super::sea::Sea>>,
     room: Option<Res<CamRoom>>,
@@ -425,6 +427,15 @@ pub fn track(
             },
             cstick: sub.axis,
             collision: solid.as_deref(),
+            lockon: LockInput {
+                target: lock
+                    .as_ref()
+                    .and_then(|lock| lock.lockon_target(0))
+                    .and_then(|entity| locked.get(entity).ok())
+                    .map(|actor| actor.old.pos),
+                truth: lock.as_ref().is_none_or(|lock| lock.lockon_truth()),
+                focus: false,
+            },
         },
     );
     camera.shake_pass();
