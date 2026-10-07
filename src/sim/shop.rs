@@ -104,7 +104,7 @@ const BUY_EMPTY_BOTTLE: u8 = 0x10; // <- d_shop.h:24
 const BUY_RUPEES: u8 = 0x20; // <- d_shop.h:25
 
 /// `ShopItems_c__ItemData::mMustOwnItemNo` / `mMustNotOwnItemNo` sentinel — `:36`.
-const NO_ITEM_ID: i32 = -1;
+pub const NO_ITEM_ID: i32 = -1;
 
 /// `fopAcM_seStart(this, JA_SE_SHOP_BOUGHT, 0)` — `:831`; `JAZelAudio_SE.h:136`.
 const SE_SHOP_BOUGHT: u32 = 0x087F;
@@ -132,7 +132,9 @@ const LETTER_SILVER: u16 = 0xB003;
 const LETTER_SEND: u8 = 1;
 
 /// `dItemNo_*` — `d_item_data.h`.
-const ITEM_HEART_PIECE: u8 = 0x07; // <- :11
+pub const ITEM_HEART_PIECE: u8 = 0x07;
+const ITEM_BIRD_BAIT_5: u8 = 0x82;
+const ITEM_HYOI_PEAR: u8 = 0x83; // <- :11
 const ITEM_BOMB_5: u8 = 0x0B; // <- :17
 const ITEM_BOMB_10: u8 = 0x0C; // <- :18
 const ITEM_BOMB_20: u8 = 0x0D; // <- :19
@@ -389,9 +391,9 @@ impl Stick {
             self.interval_v = STICK_WAIT;
             return;
         }
-        let a = i64::from(angle);
-        let base = i64::from(STICK_BASE);
-        let h = i64::from(STICK_HYST);
+        let a = angle;
+        let base = STICK_BASE;
+        let h = STICK_HYST;
         let mut dirs = 0u8;
         if a < base - STICK_GATE_7 + h {
             dirs |= STICK_DOWN;
@@ -679,7 +681,6 @@ impl Shop {
             actor.pos.y + HIO_ATTN_Y_OFFSET, // <- :1624
             actor.pos.z,
         );
-        self.create_shop_list();
         self.set_collision(actor);
         self.action = Action::Wait; // <- setAction(&wait_action, 0), :1565
         self.phase = ACTION_STARTING;
@@ -694,32 +695,32 @@ impl Shop {
             // :1483-1515 — the Bazaar base list, each sold-out slot replaced once
             // in this order by the bomb / arrow / potion / bomb / arrow set.
             let mut replacement: [&Entry; 4] = [
-                BOMB30_BS2,
-                ARROW30_BS2,
-                RED_BOTTLE_BS2,
-                ARROW30_BS2,
+                &BOMB30_BS2,
+                &ARROW30_BS2,
+                &RED_BOTTLE_BS2,
+                &ARROW30_BS2,
             ];
             let mut next = 0usize;
             if check_get_item(equipped, collect, ITEM_BOMB_BAG) {
                 // :1487-1489
-                replacement[0] = BOMB30_BS2;
+                replacement[0] = &BOMB30_BS2;
                 next = 1;
             }
             if has_bow(equipped) {
                 // :1491-1493
-                replacement[next] = ARROW30_BS2;
+                replacement[next] = &ARROW30_BS2;
                 next += 1;
             }
-            replacement[next] = RED_BOTTLE_BS2; // :1495-1496
+            replacement[next] = &RED_BOTTLE_BS2; // :1495-1496
             next += 1;
             if !check_get_item(equipped, collect, ITEM_BOMB_BAG) {
                 // :1497-1499
-                replacement[next] = BOMB30_BS2;
+                replacement[next] = &BOMB30_BS2;
                 next += 1;
             }
             if !has_bow(equipped) {
                 // :1501-1503
-                replacement[next] = ARROW30_BS2;
+                replacement[next] = &ARROW30_BS2;
             }
             let mut taken = 0usize;
             for (i, base) in SET_BS2.iter().enumerate() {
@@ -1728,6 +1729,7 @@ pub fn control(
             collect: &world.collect,
         };
         shop.execute(&mut ctx, player.as_ref());
+        let sound = ctx.sound;
         // `fopAcM_orderOtherEventId(this, m83A)` — :348.
         if shop.order == ORDER_GETDEMO
             && shop.get_demo != NO_EVENT
@@ -1735,7 +1737,7 @@ pub fn control(
         {
             world.active.order(&world.list, shop.get_demo, entity);
         }
-        if let Some(se) = ctx.sound {
+        if let Some(se) = sound {
             world.events.list.push(SimEvent::Se(se));
         }
     }

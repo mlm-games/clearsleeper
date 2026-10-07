@@ -191,6 +191,10 @@ pub struct Stone {
     pub broken: bool,
 }
 
+fn field(parameters: u32, shift: u32, width: u32) -> u8 {
+    ((parameters >> shift) & ((1 << width) - 1)) as u8
+}
+
 impl Stone {
     /// `Mthd_Create` (`:177-195`), `Create` (`:125-169`) and `prmZ_init` (`:86-95`), minus the
     /// archive load, the model, the moving background and the collider. What survives is the four
@@ -395,7 +399,7 @@ pub fn control(
     let solid = collision.as_deref();
     let swing = blow(&combat, players.iter().next());
     let fired: Vec<Vec3> = blasts.list.clone();
-    for (entity, actor, stone) in &mut rocks {
+    for (entity, mut actor, mut stone) in &mut rocks {
         let actor = &mut *actor;
         let stone = &mut *stone;
         // `Mthd_Create` (`:182-183`) returns `cPhs_ERROR_e` whenever `chk_appear()` is false, which

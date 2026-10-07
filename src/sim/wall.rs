@@ -193,7 +193,7 @@ pub fn control(
     blasts: Res<Blasts>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
-    walls: Query<(Entity, &Actor, &mut Wall)>,
+    mut walls: Query<(Entity, &Actor, &mut Wall)>,
     mut commands: Commands,
 ) {
     let fired: Vec<Vec3> = blasts.list.clone();

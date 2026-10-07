@@ -259,7 +259,7 @@ impl Coming2 {
         // unk_29C = (s32)cM_rndF(2.0f) & 1;
         // ```
         // (:217) - the crate's per-actor xorshift stands in for the absent global `cM_rndF`.
-        let mut seed = 0x2540_F491_u32;
+        let seed = 0x2540_F491_u32;
         let side = (((seed >> 8) as f32 / 16777216.0) * SIDE_SPAN) as i16 & 1;
         Self {
             // `unk_46E = arg1` from `coming_process_init(0)` (:566).
@@ -395,7 +395,7 @@ impl Coming2 {
         let anchor = if self.placed == 0 {
             origin
         } else {
-            let slot = (usize::from(self.placed) - 1).min(BARRELS - 1);
+            let slot = (usize::from(self.placed as u16) - 1).min(BARRELS - 1);
             self.barrels[slot].pos
         };
         // `transS(sp0C); YrotM(rot); cMtx_multVec(sp24, &sp18, &unk_4A8);` (:94-97) - RULE 5b:
@@ -545,13 +545,13 @@ impl Coming2 {
     }
 
     /// `daComing2::Act_c::coming_process_main` (`:573-586`).
-    fn process_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Barrels<'_, '_>) {
+    fn process_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) {
         // `if (unk_46E >= 0 && unk_46E < 5) { (this->*main_table[unk_46E])(); }` (:583-584)
         match self.mode {
             // `coming_clear_main` (:355-362)
             Mode::Clear => self.clear_main(ctx, barrels),
             // `coming_wait_main` (:372-394)
-            Mode::Wait => self.wait_main(ctx, barrels),
+            Mode::Wait => self.wait_main(ctx),
             // ```
             // coming_setF_main (:408-470)
             // ```
@@ -562,7 +562,7 @@ impl Coming2 {
             // `coming_checkS_main` (:479-493)
             Mode::CheckSail => self.check_sail_main(ctx, barrels),
             // `coming_game_main` (:505-550)
-            Mode::Game => self.game_main(ctx, barrels),
+            Mode::Game => self.game_main(),
         }
         // `Mode::index()` is the `main_table` index (`:575-581`); it is read so the table shape has
         // an observable use, mirroring the `arr[(unk_2A4 + unk_29C) & 1]` guard above.
@@ -578,7 +578,7 @@ impl Coming2 {
     ///     coming_process_init(1);
     /// }
     /// ```
-    fn clear_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Barrels<'_, '_>) {
+    fn clear_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) {
         // `request_all_barrel_exit()` (:356)
         if !self.request_all_barrel_exit(barrels) {
             return;
@@ -626,7 +626,7 @@ impl Coming2 {
     ///     }
     /// }
     /// ```
-    fn wait_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Barrels<'_, '_>) {
+    fn wait_main(&mut self, ctx: &mut Ctx<'_>) {
         // `if (player != NULL)` (:373) - `daPy_getPlayerActorClass()`.
         let Some(room) = ctx.player_room else {
             return;
@@ -685,7 +685,7 @@ impl Coming2 {
     ///     if (player != NULL) { unk_299 = player->current.roomNo; coming_process_init(0); }
     /// }
     /// ```
-    fn check_sail_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Barrels<'_, '_>) {
+    fn check_sail_main(&mut self, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) {
         if self.cross < CROSS_FRAMES {
             // ```
             // if (checkLineCrossXZ(&old.pos, &current.pos, &mStartBuoy[0].unk_04,
@@ -765,7 +765,7 @@ impl Coming2 {
     ///     }
     /// }
     /// ```
-    fn barrel_execute(&mut self, index: usize, ctx: &mut Ctx<'_>, barrels: &mut Barrels<'_, '_>) {
+    fn barrel_execute(&mut self, index: usize, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) {
         // `if (barrelProc != fpcM_ERROR_PROCESS_ID_e)` (:310)
         let Some(barrel) = self.barrels[index].barrel else {
             return;
@@ -837,7 +837,7 @@ impl Coming2 {
     /// ```
     ///
     /// `exit_req()` is `m474 = 1` (`d_a_obj_barrel2.h:94`), modelled by `BuoyBarrel::request_exit`.
-    fn request_barrel_exitN(&mut self, index: usize, barrels: &mut Barrels<'_, '_>) -> bool {
+    fn request_barrel_exitN(&mut self, index: usize, barrels: &mut Query<&mut BuoyBarrel>) -> bool {
         let Some(barrel) = self.barrels[index].barrel else {
             return true;
         };
@@ -855,7 +855,7 @@ impl Coming2 {
     /// for (i = 0; i < 15; i++) { if (request_barrel_exitN(i)) { count++; } }
     /// return count == 15 ? TRUE : FALSE;
     /// ```
-    fn request_all_barrel_exit(&mut self, barrels: &mut Barrels<'_, '_>) -> bool {
+    fn request_all_barrel_exit(&mut self, barrels: &mut Query<&mut BuoyBarrel>) -> bool {
         let mut count = 0usize;
         for index in 0..BARRELS {
             if self.request_barrel_exitN(index, barrels) {
@@ -880,7 +880,7 @@ impl Coming2 {
     ///     && (mStartBuoy[1].unk_00 == fpcM_ERROR_PROCESS_ID_e)) { return TRUE; }
     /// return FALSE;
     /// ```
-    fn request_all_flag_exit(&mut self, barrels: &mut Barrels<'_, '_>) -> bool {
+    fn request_all_flag_exit(&mut self, barrels: &mut Query<&mut BuoyBarrel>) -> bool {
         for index in 0..BOUYS {
             let Some(buoy) = self.buoys[index].buoy else {
                 continue;
@@ -955,7 +955,7 @@ impl Coming2 {
         &mut self,
         ctx: &mut Ctx<'_>,
         actor: &mut Actor,
-        barrels: &mut Barrels<'_, '_>,
+        barrels: &mut Query<&mut BuoyBarrel>,
     ) {
         // ```
         // daShip_c* ship = (daShip_c*)fopAcM_SearchByID(fopAcM_GetLinkId(this));
@@ -987,7 +987,7 @@ impl Coming2 {
             self.process_init(0, ctx);
         } else {
             // `} else { coming_process_main(); }` (:627)
-            self.process_main(ctx);
+            self.process_main(ctx, barrels);
         }
         // ```
         // barrel_main();   ->  for (u32 i = 0; i < 15; i++) { barrel_execute(i); }
@@ -1028,7 +1028,7 @@ struct Ctx<'a> {
 
 /// The barrels `daObjBarrel2::Act_c::make_coming` created, queried for `chk_item_give` and
 /// `exit_req`. An alias so the chain of functions that needs it reads as one word.
-type Barrels<'w, 's> = Query<'w, 's, &'static mut BuoyBarrel>;
+type Barrels<'w, 's, 'a> = Query<'w, 's, &'a mut BuoyBarrel>;
 
 pub fn is_coming2(name: &str) -> bool {
     COMING2_ACTORS.contains(&name)
@@ -1036,7 +1036,7 @@ pub fn is_coming2(name: &str) -> bool {
 
 pub fn control(
     mut courses: Query<(Entity, &mut Actor, &mut Coming2), With<Coming2>>,
-    mut barrels: Query<&mut BuoyBarrel>,
+    mut barrels: Barrels<'_, '_, '_>,
     ships: Query<(&Actor, &Ship), Without<Coming2>>,
     players: Query<&Actor, With<Player>>,
     mut regs: ResMut<EventReg>,

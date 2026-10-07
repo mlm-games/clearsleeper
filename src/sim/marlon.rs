@@ -177,14 +177,14 @@ const BCK_NULL: u8 = 0xFF; // <- d_a_npc_mn.h:71
 const CUT_NAMES: [&str; 10] = [
     "MES_SET", "GET_ITEM", "WAIT", "HATCH", "BIKKURI", "TURN", "WALK", "LOOK", "JUMP", "SWON",
 ]; // <- d_a_npc_mn.cpp:867
-const CUT_MES_SET: usize = 0; // <- d_a_npc_mn.cpp:867
-const CUT_WAIT: usize = 2; // <- d_a_npc_mn.cpp:867
-const CUT_HATCH: usize = 3; // <- d_a_npc_mn.cpp:867
-const CUT_BIKKURI: usize = 4; // <- d_a_npc_mn.cpp:867
-const CUT_TURN: usize = 5; // <- d_a_npc_mn.cpp:867
-const CUT_WALK: usize = 6; // <- d_a_npc_mn.cpp:867
-const CUT_JUMP: usize = 8; // <- d_a_npc_mn.cpp:867
-const CUT_SWON: usize = 9; // <- d_a_npc_mn.cpp:867
+const CUT_MES_SET: i8 = 0; // <- d_a_npc_mn.cpp:867
+const CUT_WAIT: i8 = 2; // <- d_a_npc_mn.cpp:867
+const CUT_HATCH: i8 = 3; // <- d_a_npc_mn.cpp:867
+const CUT_BIKKURI: i8 = 4; // <- d_a_npc_mn.cpp:867
+const CUT_TURN: i8 = 5; // <- d_a_npc_mn.cpp:867
+const CUT_WALK: i8 = 6; // <- d_a_npc_mn.cpp:867
+const CUT_JUMP: i8 = 8; // <- d_a_npc_mn.cpp:867
+const CUT_SWON: i8 = 9; // <- d_a_npc_mn.cpp:867
 
 /// The staff-record keys the cut initialisers read. Distinct from the `CUT_NAMES` ACTION strings
 /// even where the text matches ("SwOn" is both an action name at `:867` and a `WAIT` key at
@@ -1499,10 +1499,18 @@ impl Marlon {
         // setAnmTbl(&l_npc_anm_talk); case 2: setAnmTbl(&l_npc_anm_talk2); case 3:
         // setAnmTbl(&l_npc_anm_wait2); }` (:1344-1357)
         match ctx.text.mesg_anime() {
-            0 => self.set_anm_tbl(ANM_WAIT),
-            1 => self.set_anm_tbl(ANM_TALK),
-            2 => self.set_anm_tbl(ANM_TALK2),
-            3 => self.set_anm_tbl(ANM_WAIT2),
+            0 => {
+                let _ = self.set_anm_tbl(ANM_WAIT);
+            }
+            1 => {
+                let _ = self.set_anm_tbl(ANM_TALK);
+            }
+            2 => {
+                let _ = self.set_anm_tbl(ANM_TALK2);
+            }
+            3 => {
+                let _ = self.set_anm_tbl(ANM_WAIT2);
+            }
             _ => {}
         }
         // `dComIfGp_setMesgAnimeAttrInfo(0xFF);` (:1358)
@@ -1560,7 +1568,7 @@ impl Marlon {
         let angle = angle.wrapping_sub(ctx.shape_angle);
         // `if (maxDist > dist && maxAngle > abs(angle)) {` (:1419). `abs` is on an `int`, so the
         // `i16` difference widens first and RULE 10's `unsigned_abs` applies to the widened value.
-        if max_dist > dist && max_angle > i32::from(angle).unsigned_abs() {
+        if max_dist > dist && max_angle > i32::from(angle.unsigned_abs()) {
             // `mLookAtPos = dNpc_playerEyePos(l_npc_dat[mNpcNo].mPlayerEyeOfsY);` (:1420)
             self.look_at_pos = player_eye(player, DAT0_PLAYER_EYE_OFS_Y);
             // `mLookMode = LOOK_MODE_ATTN;` (:1421)
@@ -1629,7 +1637,7 @@ impl Marlon {
     /// `void daNpcMn_c::lookBack()` (`:1477-1511`).
     fn look_back(&mut self, actor: &mut Actor) {
         // `s16 maxVel = mLookAtMaxVel; s16 desiredYRot = current.angle.y;` (:1478-1479)
-        let mut max_vel = self.look_at_max_vel;
+        let max_vel = self.look_at_max_vel;
         let mut desired_y_rot = actor.angle[1];
         // `cXyz* dstTemp = NULL; cXyz dstPos = eyePos; bool headOnlyFollow = mHeadOnlyFollow;`
         // (:1481-1484)
@@ -1845,7 +1853,7 @@ impl Ctx<'_> {
 }
 
 #[derive(SystemParam)]
-pub struct World<'w> {
+pub struct World<'w, 's> {
     pub stories: ResMut<'w, StoryBits>,
     pub switches: ResMut<'w, Switches>,
     pub flags: ResMut<'w, EventFlags>,
@@ -1856,17 +1864,17 @@ pub struct World<'w> {
     pub text_flags: Res<'w, TextFlags>,
     pub archive: Option<Res<'w, MsgArchives>>,
     /// `Without<Marlon>` proves disjointness against `Msg::actors`'s `&mut Actor`.
-    pub hatches: Query<'w, 'w, &'static Actor, Without<Marlon>>,
-    pub players: Query<'w, 'w, &'static Player>,
+    pub hatches: Query<'w, 's, &'static Actor, Without<Marlon>>,
+    pub players: Query<'w, 's, &'static Player>,
 }
 
 #[derive(SystemParam)]
-pub struct Msg<'w> {
+pub struct Msg<'w, 's> {
     pub procs: ResMut<'w, MsgProcs>,
     pub info: ResMut<'w, MsgGameInfo>,
     pub one: ResMut<'w, Msg1Box>,
     pub two: ResMut<'w, Msg2Box>,
-    pub actors: Query<'w, 'w, (Entity, &'static mut Actor, &'static mut Marlon)>,
+    pub actors: Query<'w, 's, (Entity, &'static mut Actor, &'static mut Marlon)>,
 }
 
 pub fn is_marlon(name: &str) -> bool {
@@ -1874,8 +1882,8 @@ pub fn is_marlon(name: &str) -> bool {
 }
 
 pub fn control(
-    world: World,
-    mut msg: Msg,
+    mut world: World<'_, '_>,
+    mut msg: Msg<'_, '_>,
     mut commands: Commands,
     collision: Option<Res<Collision>>,
 ) {
@@ -1903,7 +1911,7 @@ pub fn control(
     let flags = &mut *world.flags;
     let list = &*world.list;
     let active = &mut *world.active;
-    for (entity, actor, marlon) in &mut msg.actors {
+    for (entity, mut actor, mut marlon) in &mut msg.actors {
         if !marlon.entered {
             marlon.create_init(&mut actor, Some(stage));
             // `phase_1`'s `cPhs_STOP_e` cancels the process during Create

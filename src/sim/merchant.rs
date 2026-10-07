@@ -1122,7 +1122,7 @@ impl Merchant {
             Some(raw) => GET_ITEM_NO
                 .get(usize::try_from(raw).unwrap_or(0))
                 .copied()
-                .unwrap_or(shop::NO_ITEM),
+                .unwrap_or(shop::NO_ITEM_ID as u8),
             None => {
                 self.on_reserve_bit(idx);
                 idx.wrapping_add(ITEM_TOWN_FLOWER)
