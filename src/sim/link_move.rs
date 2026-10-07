@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::{Vec2, Vec3};
 
+use super::anim_clock::{FrameCtrl, FrameClocks, Mode, Under};
 use super::collision::{Collision, MoveFrom, WallProbe, WallTrace};
 use super::combat::{Combat, CutKind};
 use super::ground::grounded;
@@ -213,6 +214,41 @@ const PUSH_PULL_WALL_R: f32 = 40.0;
 const CRAWL_AUTO_HOLD: i32 = 20;
 const CRAWL_AUTO_LIMIT: i32 = 300;
 
+/// The lie animation `procCrawlEnd_init` stands the player up on, `crawl.inc:675-679`: played back
+/// at `m_HIO->mCrouch.m.field_0x40` from `field_0x44` to `field_0xE`, so the stand-up runs the
+/// lie-down in reverse and stops at the first frame. `procCrawlEnd`, `crawl.inc:712`, leaves once
+/// the frame is back under `m_HIO->mCrouch.m.field_0x48`.
+const CRAWL_END_RATE: f32 = -1.0;
+const CRAWL_END_START: i16 = 0;
+const CRAWL_END_LAST: i16 = 8;
+const CRAWL_END_FRAME: f32 = 3.0;
+
+/// The slide recovery animations `procSlideFrontLand_init` and `procSlideBackLand_init` play,
+/// `main.cpp:6754` and `main.cpp:6780`: each runs from its own first frame over its own rate, and
+/// each leaves once the frame is past `m_HIO->mSlide.m.field_0x2C` or `field_0x3C`
+/// (`main.cpp:6766` and `main.cpp:6791`).
+const SLIDE_FRONT_LAND_RATE: f32 = 0.8;
+const SLIDE_FRONT_LAND_START: i16 = 2;
+const SLIDE_FRONT_LAND_LAST: i16 = 9;
+const SLIDE_FRONT_LAND_FRAME: f32 = 6.0;
+const SLIDE_BACK_LAND_RATE: f32 = 1.0;
+const SLIDE_BACK_LAND_START: i16 = 2;
+const SLIDE_BACK_LAND_LAST: i16 = 8;
+const SLIDE_BACK_LAND_FRAME: f32 = 6.0;
+
+/// `main.cpp:6761` and `main.cpp:6786`: the speed both slide recoveries run down at.
+const SLIDE_LAND_SCALE: f32 = 0.5;
+const SLIDE_LAND_MAX_STEP: f32 = 5.0;
+const SLIDE_LAND_MIN_STEP: f32 = 1.0;
+
+/// The vault `procHangClimb_init` plays, `hang.inc:559-565`: it runs from the first frame of
+/// `m_HIO->mWallCatch.m.field_0x2C` at `field_0x24` over to `field_0x4`, and `procHangClimb`,
+/// `hang.inc:576`, leaves once the frame is past `m_HIO->mWallCatch.m.field_0x38`.
+const HANG_CLIMB_RATE: f32 = 0.75;
+const HANG_CLIMB_START: i16 = 0;
+const HANG_CLIMB_LAST: i16 = 24;
+const HANG_CLIMB_FRAME: f32 = 23.0;
+
 /// What a state needs that the port cannot answer. Every guard below asks one question about the
 /// tick and reports the one thing its state cannot be entered without, rather than standing in a
 /// geometry that is not there.
@@ -220,8 +256,10 @@ const CRAWL_AUTO_LIMIT: i32 = 300;
 pub enum MoveGap {
     /// The guard asked for the state and the port answered it, so the state is entered.
     Ready,
-    /// The per-polygon frame clock the reference's frame-rate and frame-position tests run on,
-    /// which drives every transition out of a state that is otherwise pure collision.
+    /// The under-body frame cursor the reference's frame-rate and frame-position tests run on,
+    /// which drives every transition out of a state that is otherwise pure collision. The player
+    /// owns one at [`FrameClocks`], so a row still carrying this is a state whose own initialiser
+    /// has not been written: the sword, hammer and boat families are the ones left.
     FrameClock,
     /// The damage vector off the player's own collision cylinder, which the guard slip takes its
     /// facing and its speed from.
@@ -268,14 +306,14 @@ pub const SITES: &[MoveSite] = &[
     MoveSite { proc: Proc::CrawlStart, entry: "main.cpp:6530", exit: "crawl.inc:296", gap: MoveGap::Ready },
     MoveSite { proc: Proc::CrawlMove, entry: "crawl.inc:301", exit: "crawl.inc:400", gap: MoveGap::Ready },
     MoveSite { proc: Proc::CrawlAutoMove, entry: "crawl.inc:473", exit: "crawl.inc:657", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrawlEnd, entry: "crawl.inc:296", exit: "crawl.inc:712", gap: MoveGap::FrameClock },
+    MoveSite { proc: Proc::CrawlEnd, entry: "crawl.inc:296", exit: "crawl.inc:712", gap: MoveGap::Ready },
     MoveSite { proc: Proc::PushPullWait, entry: "main.cpp:4138", exit: "pushpull.inc:104", gap: MoveGap::Ready },
     MoveSite { proc: Proc::PushMove, entry: "pushpull.inc:101", exit: "pushpull.inc:137", gap: MoveGap::Ready },
     MoveSite { proc: Proc::PullMove, entry: "pushpull.inc:110", exit: "pushpull.inc:184", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SlideFront, entry: "main.cpp:4901", exit: "main.cpp:6712", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SlideBack, entry: "main.cpp:4903", exit: "main.cpp:6746", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SlideFrontLand, entry: "main.cpp:6712", exit: "main.cpp:6764", gap: MoveGap::FrameClock },
-    MoveSite { proc: Proc::SlideBackLand, entry: "main.cpp:6746", exit: "main.cpp:6789", gap: MoveGap::FrameClock },
+    MoveSite { proc: Proc::SlideFrontLand, entry: "main.cpp:6712", exit: "main.cpp:6764", gap: MoveGap::Ready },
+    MoveSite { proc: Proc::SlideBackLand, entry: "main.cpp:6746", exit: "main.cpp:6789", gap: MoveGap::Ready },
     MoveSite { proc: Proc::WaitTurn, entry: "main.cpp:4482", exit: "main.cpp:6586", gap: MoveGap::Ready },
     MoveSite { proc: Proc::MoveTurn, entry: "main.cpp:4494", exit: "main.cpp:6621", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SideRoll, entry: "main.cpp:4952", exit: "main.cpp:6964", gap: MoveGap::Ready },
@@ -284,7 +322,7 @@ pub const SITES: &[MoveSite] = &[
     MoveSite { proc: Proc::HangUp, entry: "hang.inc:374", exit: "hang.inc:410", gap: MoveGap::Ready },
     MoveSite { proc: Proc::HangWait, entry: "hang.inc:263", exit: "hang.inc:443", gap: MoveGap::Ready },
     MoveSite { proc: Proc::HangMove, entry: "hang.inc:446", exit: "hang.inc:487", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangClimb, entry: "hang.inc:259", exit: "hang.inc:576", gap: MoveGap::FrameClock },
+    MoveSite { proc: Proc::HangClimb, entry: "hang.inc:259", exit: "hang.inc:576", gap: MoveGap::Ready },
     MoveSite { proc: Proc::HangWallCatch, entry: "main.cpp:4875", exit: "hang.inc:620", gap: MoveGap::Ready },
     MoveSite { proc: Proc::ClimbUpStart, entry: "main.cpp:4835", exit: "climb.inc:270", gap: MoveGap::Ready },
     MoveSite { proc: Proc::ClimbDownStart, entry: "main.cpp:5346", exit: "climb.inc:315", gap: MoveGap::Ready },
@@ -1196,7 +1234,7 @@ fn slide_tick(player: &mut Player, probe: &Probe, back: bool) -> Option<(Proc, M
             } else {
                 Proc::SlideFrontLand
             },
-            MoveGap::FrameClock,
+            MoveGap::Ready,
         ));
     };
     player.yaw = from_s16(add_calc_angle_s(
@@ -1227,19 +1265,34 @@ fn slide_tick(player: &mut Player, probe: &Probe, back: bool) -> Option<(Proc, M
     None
 }
 
+/// `procSlideFrontLand`, `main.cpp:6759-6775`, and `procSlideBackLand`, `main.cpp:6784-6800`: the
+/// speed runs down, and the recovery animation's own cursor ends the state — its rate reads as
+/// stopped at `main.cpp:6762` and `main.cpp:6787`, and its frame past the slide table's mark at
+/// `main.cpp:6766` and `main.cpp:6791` hands the player to the dispatcher.
+fn slide_land_tick(player: &mut Player, clock: &FrameCtrl, mark: f32) -> Option<(Proc, MoveGap)> {
+    add_calc(
+        &mut player.speed,
+        0.0,
+        SLIDE_LAND_SCALE,
+        SLIDE_LAND_MAX_STEP,
+        SLIDE_LAND_MIN_STEP,
+    );
+    (clock.rate() < 0.01 || clock.frame() > mark).then_some((Proc::Wait, MoveGap::Ready))
+}
+
 /// `procCrawlStart`, `crawl.inc:285-306`, and `procCrawlMove`, `crawl.inc:356-519`: the clearance a
 /// crawl needs over its own joints, the slide face it refuses, the turn its model runs on, and the
 /// push the stage takes back out of the joint traces. The lie-down itself is a frame-rate question
 /// at `crawl.inc:297-301`, so the crawl start runs its push-out once and hands over.
 fn crawl_tick(player: &mut Player, probe: &Probe, moving: bool) -> Option<(Proc, MoveGap)> {
     if !probe.crawl_clear(player.pos, player.pos.y) {
-        return Some((Proc::CrawlEnd, MoveGap::FrameClock));
+        return Some((Proc::CrawlEnd, MoveGap::Ready));
     }
     if moving && probe.slide(player.pos).is_some() {
-        return Some((Proc::CrawlEnd, MoveGap::FrameClock));
+        return Some((Proc::CrawlEnd, MoveGap::Ready));
     }
     if !probe.crouch_button().unwrap_or(false) {
-        return Some((Proc::CrawlEnd, MoveGap::FrameClock));
+        return Some((Proc::CrawlEnd, MoveGap::Ready));
     }
     if moving && probe.stick() > STICK_GATE {
         player.face = from_s16(add_calc_angle_s(
@@ -1385,7 +1438,7 @@ fn hang_up_tick(player: &mut Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
         return None;
     }
     Some(if matches!(way, Direction::Forward) {
-        (Proc::HangClimb, MoveGap::FrameClock)
+        (Proc::HangClimb, MoveGap::Ready)
     } else {
         hang_move(player, probe, way)
             .map(|_| (Proc::HangMove, MoveGap::Ready))
@@ -1404,7 +1457,7 @@ fn hang_wait_tick(player: &mut Player, probe: &Probe) -> Option<(Proc, MoveGap)>
         return None;
     }
     match hang_direction(probe, player) {
-        Direction::Forward => Some((Proc::HangClimb, MoveGap::FrameClock)),
+        Direction::Forward => Some((Proc::HangClimb, MoveGap::Ready)),
         Direction::Back => None,
         way => hang_move(player, probe, way)
             .map(|_| (Proc::HangMove, MoveGap::Ready))
@@ -1420,7 +1473,7 @@ fn hang_move_tick(player: &mut Player, probe: &Probe) -> Option<(Proc, MoveGap)>
         return Some((next, MoveGap::Ready));
     }
     if probe.stick() > STICK_GATE && matches!(hang_direction(probe, player), Direction::Forward) {
-        return Some((Proc::HangClimb, MoveGap::FrameClock));
+        return Some((Proc::HangClimb, MoveGap::Ready));
     }
     player.speed = 0.0;
     None
@@ -1648,22 +1701,27 @@ fn back_to_crawl() -> Option<(Proc, MoveGap)> {
     Some((Proc::CrawlMove, MoveGap::Ready))
 }
 
-/// `procCrawlEnd`, `crawl.inc:708-719`: the stand-up runs on the crawl animation's own frames, so the
-/// port hands the player straight back to the crawl move rather than standing in a state whose only
-/// motion is a frame rate it cannot read. A ceiling the player no longer fits under is the one
-/// condition the reference tests here that the port can answer, and it ends the crawl outright.
-fn crawl_end_tick(player: &mut Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
+/// `procCrawlEnd`, `crawl.inc:708-719`: the stand-up runs on the lie animation played back, so it
+/// holds until the cursor is back under the crouch table's mark at `crawl.inc:712`, and a rate the
+/// animation has already stopped at `crawl.inc:710` leaves at once. A ceiling the player no longer
+/// fits under is the one condition the reference tests here that the port can answer, and it ends
+/// the crawl outright.
+fn crawl_end_tick(player: &mut Player, probe: &Probe, clock: &FrameCtrl) -> Option<(Proc, MoveGap)> {
     if !probe.crawl_clear(player.pos, player.pos.y) {
         return Some((Proc::Wait, MoveGap::Ready));
     }
-    back_to_crawl()
+    if clock.rate() > -0.01 || clock.frame() < CRAWL_END_FRAME {
+        return back_to_crawl();
+    }
+    None
 }
 
-/// `procHangClimb`, `hang.inc:573-580`: the pull-up runs on the climb animation's own frames, so the
-/// port reports the frame clock and hands the player back to the fallback rather than standing in a
-/// state with nothing to run.
-fn hang_climb_tick() -> Option<(Proc, MoveGap)> {
-    Some((Proc::Wait, MoveGap::FrameClock))
+/// `procHangClimb`, `hang.inc:573-580`: the vault's own cursor ends the state — its rate reads as
+/// stopped at `hang.inc:574`, and its frame past the wall-catch table's mark at `hang.inc:576`
+/// hands the player to the dispatcher.
+fn hang_climb_tick(clock: &FrameCtrl) -> Option<(Proc, MoveGap)> {
+    (clock.rate() < 0.01 || clock.frame() > HANG_CLIMB_FRAME)
+        .then_some((Proc::Wait, MoveGap::Ready))
 }
 
 /// `procClimbMoveUpDown`, `climb.inc:365-391`, and `procClimbMoveSide`, `climb.inc:432-465`: the wall
@@ -1697,6 +1755,7 @@ fn tick(
     state: &mut MoveState,
     proc: &LinkProc,
     reach: &mut pushable::Call,
+    clock: &FrameCtrl,
 ) -> Option<(Proc, MoveGap)> {
     match proc.current {
         Proc::Crouch => crouch_tick(player, probe),
@@ -1721,12 +1780,14 @@ fn tick(
             state.corner = Some(corner);
             next
         }
-        Proc::CrawlEnd => crawl_end_tick(player, probe),
+        Proc::CrawlEnd => crawl_end_tick(player, probe, clock),
         Proc::PushPullWait => push_pull_wait_tick(player, probe, state, reach),
         Proc::PushMove => push_tick(player, probe, state, reach),
         Proc::PullMove => pull_tick(player, probe, state, reach),
         Proc::SlideFront => slide_tick(player, probe, false),
         Proc::SlideBack => slide_tick(player, probe, true),
+        Proc::SlideFrontLand => slide_land_tick(player, clock, SLIDE_FRONT_LAND_FRAME),
+        Proc::SlideBackLand => slide_land_tick(player, clock, SLIDE_BACK_LAND_FRAME),
         Proc::WaitTurn => wait_turn_tick(player, proc),
         Proc::MoveTurn => {
             move_turn_tick(player, proc);
@@ -1741,7 +1802,7 @@ fn tick(
         }
         Proc::HangWait => hang_wait_tick(player, probe),
         Proc::HangMove => hang_move_tick(player, probe),
-        Proc::HangClimb => hang_climb_tick(),
+        Proc::HangClimb => hang_climb_tick(clock),
         Proc::ClimbUpStart | Proc::ClimbDownStart => {
             climb_correct(player, probe, false).map(|proc| (proc, MoveGap::Ready))
         }
@@ -1799,11 +1860,21 @@ fn arm_climb_down(player: &mut Player, state: &MoveState) {
 /// last argument is whether the reference's own dispatcher asked for the process rather than one of
 /// its own ticks, which is the only thing that separates `procPushPullWait_init(1)` at
 /// `main.cpp:4138` from `procPushPullWait_init(0)` at `pushpull.inc:154` and `:223`.
+///
+/// The four states whose whole length is an animation hand the cursor their own initialiser plays,
+/// through `setSingleMoveAnime` at `main.cpp:12796-12797`: a rate under zero starts the cursor at
+/// its last frame and a rate over or at zero at its first, and the loop point goes on the end the
+/// rate runs away from. The reference takes the attribute off the animation's own header, which no
+/// port can read, so each is stood up as the one shot its exit test is written against; all four
+/// leave on a frame mark inside the span, so the attribute cannot change the answer. The speed each
+/// initialiser kills or halves is written beside it: `crawl.inc:702`, `main.cpp:6755` and
+/// `hang.inc:567`.
 fn arm(
     state: &mut MoveState,
     proc: &mut LinkProc,
     probe: &Probe,
     player: &mut Player,
+    clock: &mut FrameCtrl,
     want: Proc,
     dispatched: bool,
 ) {
@@ -1828,6 +1899,43 @@ fn arm(
         Proc::ClimbDownStart => arm_climb_down(player, state),
         Proc::PushPullWait => arm_push_pull_wait(probe, state, player, dispatched),
         Proc::PushMove | Proc::PullMove => state.armed = true,
+        Proc::CrawlEnd => {
+            player.speed = 0.0;
+            clock.set_frame_ctrl(
+                Mode::None,
+                CRAWL_END_START,
+                CRAWL_END_LAST,
+                CRAWL_END_RATE,
+                f32::from(CRAWL_END_LAST) - 0.001,
+            );
+        }
+        Proc::SlideFrontLand => {
+            player.speed *= 0.5;
+            clock.set_frame_ctrl(
+                Mode::None,
+                SLIDE_FRONT_LAND_START,
+                SLIDE_FRONT_LAND_LAST,
+                SLIDE_FRONT_LAND_RATE,
+                f32::from(SLIDE_FRONT_LAND_START),
+            );
+        }
+        Proc::SlideBackLand => clock.set_frame_ctrl(
+            Mode::None,
+            SLIDE_BACK_LAND_START,
+            SLIDE_BACK_LAND_LAST,
+            SLIDE_BACK_LAND_RATE,
+            f32::from(SLIDE_BACK_LAND_START),
+        ),
+        Proc::HangClimb => {
+            player.speed = 0.0;
+            clock.set_frame_ctrl(
+                Mode::None,
+                HANG_CLIMB_START,
+                HANG_CLIMB_LAST,
+                HANG_CLIMB_RATE,
+                f32::from(HANG_CLIMB_START),
+            );
+        }
         _ => {}
     }
 }
@@ -1873,11 +1981,12 @@ fn enter(
     proc: &mut LinkProc,
     probe: &Probe,
     player: &mut Player,
+    clock: &mut FrameCtrl,
     want: Proc,
     dispatched: bool,
 ) {
     if proc.enter(want) {
-        arm(state, proc, probe, player, want, dispatched);
+        arm(state, proc, probe, player, clock, want, dispatched);
     }
 }
 
@@ -1888,6 +1997,7 @@ fn settle(
     probe: &Probe,
     state: &mut MoveState,
     proc: &mut LinkProc,
+    clock: &mut FrameCtrl,
     ask: Option<(Proc, MoveGap)>,
 ) -> bool {
     let Some((want, gap)) = ask else {
@@ -1896,7 +2006,7 @@ fn settle(
     state.asked = Some(want);
     state.gap = gap;
     if gap == MoveGap::Ready {
-        enter(state, proc, probe, player, want, false);
+        enter(state, proc, probe, player, clock, want, false);
         return true;
     }
     state.corner = None;
@@ -1921,6 +2031,7 @@ pub fn control(
     ships: Query<&Ship>,
     mut proc: ResMut<LinkProc>,
     mut state: ResMut<MoveState>,
+    mut clocks: ResMut<FrameClocks>,
     mut players: Query<&mut Player>,
 ) {
     let Modes {
@@ -1936,6 +2047,7 @@ pub fn control(
         return;
     };
     let player = &mut *player;
+    let clock = clocks.under_mut(Under::Move0);
     let entered_air = proc.changed && proc.current.in_group(super::link_proc::AIRBORNE);
     let solid = collision.as_deref();
     let mut probe = Probe {
@@ -1970,7 +2082,7 @@ pub fn control(
         match resolve(player, &probe, proc.current) {
             Some((want, MoveGap::Ready)) => {
                 state.gap = MoveGap::Ready;
-                enter(&mut state, &mut proc, &probe, player, want, true);
+                enter(&mut state, &mut proc, &probe, player, clock, want, true);
             }
             Some((want, gap)) => {
                 state.asked = Some(want);
@@ -1981,8 +2093,8 @@ pub fn control(
         return;
     }
     let standing = proc.current;
-    let ask = tick(player, &probe, &mut state, &proc, &mut reach);
-    let moved = settle(player, &probe, &mut state, &mut proc, ask);
+    let ask = tick(player, &probe, &mut state, &proc, &mut reach, clock);
+    let moved = settle(player, &probe, &mut state, &mut proc, clock, ask);
     if moved || proc.current != standing || !asks_dispatcher(standing) {
         return;
     }
@@ -1990,7 +2102,7 @@ pub fn control(
     match ask {
         Some((want, MoveGap::Ready)) => {
             state.gap = MoveGap::Ready;
-            enter(&mut state, &mut proc, &probe, player, want, true);
+            enter(&mut state, &mut proc, &probe, player, clock, want, true);
         }
         Some((want, gap)) => {
             state.asked = Some(want);

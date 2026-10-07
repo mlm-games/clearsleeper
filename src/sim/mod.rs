@@ -6,6 +6,7 @@ pub mod agb;
 pub mod ajavw;
 pub mod ajav;
 pub mod apzl;
+pub mod anim_clock;
 pub mod area;
 pub mod amos_knight;
 pub mod amiprop;
@@ -1724,6 +1725,7 @@ pub fn build(
         weight::init(&mut sim.world);
         link_proc::init(&mut sim.world);
         cam_room::init(&mut sim.world);
+        anim_clock::init(&mut sim.world);
         spawn_actors(&mut sim.world, tables);
     }
     let spawn = area.spawn;
@@ -2145,6 +2147,7 @@ pub fn build(
                 ygawa::control.in_set(WwSimSet::Execute),
                 collision::remember_move_from.in_set(WwSimSet::Execute),
                 link_move::control.in_set(WwSimSet::Execute),
+                anim_clock::advance.in_set(WwSimSet::Execute),
                 walk::walk.in_set(WwSimSet::Execute),
                 swim::surface.in_set(WwSimSet::Execute),
             )
