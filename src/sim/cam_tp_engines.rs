@@ -590,7 +590,7 @@ pub fn tower(
 
     if camera.has_flag(0x400) {
         w.drift = gap_x * (w.arrow_angle - to_arrow.longitude()).sin();
-    } else if camera.bump.flags & 0x10_0000 != 0 && status.check0(0x000A_50C0) {
+    } else if camera.event_flags & 0x10_0000 != 0 && status.check0(0x000A_50C0) {
         if input.follow.main.x < -0.2 {
             w.nudge = true;
         }
@@ -637,7 +637,7 @@ pub fn tower(
     );
     let target = match (camera.has_flag(0x800), input.lockon.target) {
         (true, Some(lockon)) => {
-            camera.bump.flags |= 0x2000;
+            camera.event_flags |= 0x2000;
             player.pos + placed.to_xyz() + (lockon - player.pos) * lockon_blend
         }
         _ => player.pos + placed.to_xyz(),
@@ -1147,7 +1147,7 @@ pub fn manual(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     );
 
     if locked {
-        camera.bump.flags |= 0x2000;
+        camera.event_flags |= 0x2000;
     }
 
     let current = cache.direction;
@@ -1314,11 +1314,11 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
         w.settle = 1.0;
         w.swung = false;
         w.airborne = false;
-        w.mode = if camera.bump.flags & 0x8000 != 0 {
+        w.mode = if camera.event_flags & 0x8000 != 0 {
             2
-        } else if camera.bump.flags & 0x20 != 0 {
+        } else if camera.event_flags & 0x20 != 0 {
             3
-        } else if camera.bump.flags & 0x1_0000 != 0 {
+        } else if camera.event_flags & 0x1_0000 != 0 {
             4
         } else if camera.has_flag(0x400) {
             5
@@ -1456,7 +1456,7 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
 
     cache.bank += (SAngle::from_degrees(bank * input.follow.main.x) - cache.bank)
         * (span.abs() * 0.01);
-    camera.bump.flags |= 0x400;
+    camera.event_flags |= 0x400;
 
     camera.work.tp.ride = w;
     camera.view_cache = cache;

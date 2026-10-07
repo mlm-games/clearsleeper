@@ -183,7 +183,7 @@ pub struct Camera {
     /// `dCamera_c::mEventFlags`, `d_camera.h:382`, the word `chkFlag`, `setFlag` and `clrFlag`
     /// all read and write, `d_camera.h:620-626`. Retail keeps one word for the whole camera, so
     /// the collision pass's four bits and the engines' bits share it; this port leaves those
-    /// four where [`Bump::flags`] already keeps them and gives every other reader this word.
+    /// four that `bumpCheck` writes are named in [`cam_bump::evflag`](super::cam_bump::evflag).
     /// Nothing outside the camera writes it except the cutscene actors that call
     /// `SubjectLockOn`, `SubjectLockOff`, `CStickUse`, `CStickUseless`, `StickUse`,
     /// `StickUseless` and `ScopeViewMsgModeOff`, `d_camera.cpp:5220-5272`, none of which the port

@@ -31,7 +31,7 @@ const CURVE_WEIGHT: f32 = 1.0;
 /// The `dCamera_c::mEventFlags` bits `subjectCamera` and `eventCamera` read or write, on
 /// [`Camera::event_flags`].
 ///
-/// The four bits `bumpCheck` writes stay on [`Bump::flags`](super::cam_bump::Bump::flags),
+/// The four bits `bumpCheck` writes are named in [`cam_bump::evflag`](super::cam_bump::evflag),
 /// because that module owns them and nothing in this file is allowed to move them.
 pub mod evflag {
     /// `setFlag(0x800)` at `d_camera.cpp:3892` from the style's `UNK080`, read at `:904`.
@@ -712,7 +712,7 @@ fn crawl(
         cache.eye = cache.center + cache.direction.to_xyz();
         if work.tight {
             cache.center.y = player.pos.y + 30.0;
-            camera.bump.flags |= 0x800;
+            camera.event_flags |= 0x800;
         }
     }
     cache.fovy += (style_fovy - cache.fovy) * 0.5;

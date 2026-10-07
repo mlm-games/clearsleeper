@@ -11,8 +11,8 @@ use super::player_status::{self, PlayerStatus};
 ///
 /// Retail keeps them in the one event word beside the collision pass's own four. This port puts
 /// every bit below on [`Camera::event_flags`](super::camera::Camera::event_flags) except
-/// [`SIGHT`], whose two bits the collision pass is the only writer of, which is where
-/// [`cam_bump::Bump::flags`] still holds them.
+/// [`SIGHT`], whose two bits the collision pass is the only writer of, which is why they are
+/// composed from [`cam_bump::evflag`] rather than listed again.
 pub mod flag {
     /// `setFlag(0x10)` at `d_camera.cpp:1240`, read at `:3439` and `:3576`: the player is
     /// aiming, which pins both cushions and the latitude rate.
@@ -27,8 +27,8 @@ pub mod flag {
     pub const CHARGE: u32 = 0x4000_000;
     /// `chkFlag(0x80080)` at `d_camera.cpp:3412`: the player must be inside the window. Both
     /// bits are the collision pass's own, `setFlag(0x80)` at `:2235` and `setFlag(0x80000)` at
-    /// `:2225`, so this mask reads [`cam_bump::Bump::flags`] and no other word.
-    pub const SIGHT: u32 = 0x80080;
+    /// `:2225`, so this mask is composed from [`cam_bump::evflag`](super::cam_bump::evflag).
+    pub const SIGHT: u32 = crate::sim::cam_bump::evflag::CORNER | crate::sim::cam_bump::evflag::PULL_IN;
 }
 
 /// `dCamera_c::mWork.lockon`, `d_camera.h:308-324`, narrowed to the members the engine reads
@@ -278,7 +278,7 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     }
 
     let mut blocked = false;
-    if camera.bump.flags & flag::SIGHT != 0 && !point_in_sight(camera, attention) {
+    if camera.event_flags & flag::SIGHT != 0 && !point_in_sight(camera, attention) {
         if work.blocked == 0 {
             work.swap = i32::from(work.side != 1);
         }

@@ -70,7 +70,7 @@ impl Default for BgChk {
 
 /// The event-flag bits the background pass reads and writes. Retail keeps them in
 /// `dCamera_c::mEventFlags` alongside bits this port does not track.
-pub mod flag {
+pub mod evflag {
     /// `setFlag(8)` at `d_camera.cpp:3239`, read at `:2244` and `:3246`: the placement's own
     /// latitude is blocked.
     pub const GROUND_PROBE: u32 = 0x8;
@@ -297,8 +297,6 @@ pub fn forward_check_angle(
 pub struct Bump {
     /// `mCamSetup.mBGChk`.
     pub chk: BgChk,
-    /// `mEventFlags`, narrowed to [`flag`].
-    pub flags: u32,
     /// `bumpCheck`'s `static int prev_hit_type`, `d_camera.cpp:2066`.
     pub hit_type: i32,
     /// `mCenter`, published at `d_camera.cpp:829-843`.
@@ -319,7 +317,6 @@ impl Default for Bump {
     fn default() -> Self {
         Self {
             chk: BgChk::default(),
-            flags: 0,
             hit_type: 0,
             center: Vec3::ZERO,
             eye: Vec3::ZERO,
@@ -392,7 +389,7 @@ impl Camera {
     ) -> bool {
         self.update_forward_angle(player, solid, status, player_height);
         self.probe_placement(solid);
-        self.bump.flags &= !0x0009_0080;
+        self.event_flags &= !0x0009_0080;
 
         let chk = self.bump.chk;
         let flags = check_flags(self);
@@ -427,7 +424,7 @@ impl Camera {
                 match corner {
                     Some((corner_eye, corner_direction)) => {
                         result |= 2;
-                        self.bump.flags |= flag::CORNER;
+                        self.event_flags |= evflag::CORNER;
                         (corner_eye, corner_direction, kind)
                     }
                     None => {
@@ -465,7 +462,7 @@ impl Camera {
         self.bump.hit_type = hit_type;
         self.bump.eye = eye;
         self.bump.direction = direction;
-        self.bump.flags &= !0x1014_9C01;
+        self.event_flags &= !0x1014_9C01;
         self.publish_bump();
         result != 0
     }
@@ -502,14 +499,14 @@ impl Camera {
             return;
         }
         let near = self.val(param::UNK11);
-        if self.bump.flags & flag::PULL_IN == 0 || !(self.bump.direction.radius() < near) {
+        if self.event_flags & evflag::PULL_IN == 0 || !(self.bump.direction.radius() < near) {
             return;
         }
         let mut want = self.view_cache.direction;
         want.set_latitude(SAngle::from_degrees(self.val(param::UNK15)));
         let centre = self.view_cache.center;
         if line_bg_check(centre, centre + want.to_xyz(), solid).is_some() {
-            self.bump.flags |= flag::GROUND_PROBE;
+            self.event_flags |= evflag::GROUND_PROBE;
         }
     }
 
@@ -597,11 +594,11 @@ impl Camera {
     ) -> (Vec3, SGlobe) {
         let chk = self.bump.chk;
         let center = self.bump.center;
-        self.bump.flags |= flag::PULL_IN;
+        self.event_flags |= evflag::PULL_IN;
         let cross = hit.point;
         let margin = comp_wall_margin(solid, center, cross, 0.5 + chk.gaze_back_margin);
 
-        let lift = self.bump.flags & flag::GROUND_PROBE != 0
+        let lift = self.event_flags & evflag::GROUND_PROBE != 0
             && flags & 0x10 != 0
             && hit_type != 4;
         let lifted = if lift {
@@ -624,7 +621,7 @@ impl Camera {
                     Some(hit) => comp_wall_margin(solid, margin, hit.point, chk.gaze_back_margin),
                     None => lifted,
                 };
-                self.bump.flags |= flag::WALL_UP;
+                self.event_flags |= evflag::WALL_UP;
                 self.bump.eye += (pulled - self.bump.eye) * chk.wall_cushion;
                 return self.finish_pull(attention);
             }
@@ -674,7 +671,7 @@ impl Camera {
         flags: u32,
         solid: Option<&Collision>,
     ) -> (Vec3, SGlobe) {
-        if self.bump.flags & flag::WALL_UP == 0 {
+        if self.event_flags & evflag::WALL_UP == 0 {
             return (cache.eye, cache.direction);
         }
         let cushion = if flags & 0x10 != 0 {
@@ -700,7 +697,7 @@ impl Camera {
         }
         let gap = (direction.latitude() - cache.direction.latitude()).degree().abs();
         if gap < 0.2 {
-            self.bump.flags &= !flag::WALL_UP;
+            self.event_flags &= !evflag::WALL_UP;
         }
         (eye, direction)
     }
