@@ -708,7 +708,7 @@ const RAMP_EASE: f32 = 1.25;
 /// port follows the call's meaning and writes the longitude. `attentionPos` is the player's own
 /// position, because the port has no `dAttention_c`; the style's `CENTER_HEIGHT_BASE` still
 /// carries the height the offset puts back.
-fn relational_pos(player: &Player, facing: SAngle, offset: Vec3) -> Vec3 {
+pub fn relational_pos(player: &Player, facing: SAngle, offset: Vec3) -> Vec3 {
     let mut globe = SGlobe::from_xyz(offset);
     globe.set_longitude(facing + globe.longitude());
     player.pos + globe.to_xyz()
@@ -1163,7 +1163,10 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
     true
 }
 
-fn publish(camera: &mut Camera) {
+/// `d_camera.cpp:808-812`, `:829-847` and `:864-872`, the three ends of `Run` that turn the
+/// placement the engine wrote into the published aim. Every engine runs it, so it lives here
+/// rather than beside the follow engine.
+pub fn publish(camera: &mut Camera) {
     let mut cache = camera.view_cache;
     cache.bank -= cache.bank * 0.05;
     let up = if cache.center.x == cache.eye.x && cache.center.z == cache.eye.z {

@@ -54,6 +54,7 @@ pub mod chest;
 pub mod camera;
 pub mod cam_type;
 pub mod cam_bump;
+pub mod cam_engine;
 pub mod cam_follow;
 pub mod cam_room;
 pub mod cam_style;

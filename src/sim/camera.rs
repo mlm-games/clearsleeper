@@ -2,7 +2,9 @@ use bevy_ecs::prelude::*;
 use glam::{Mat4, Vec3};
 
 use super::cam_bump::Bump;
-use super::cam_follow::{self, CamSetup, Follow, FollowInput, SAngle, ViewCache};
+use super::cam_engine::{self, EngineInput};
+use super::cam_follow::{CamSetup, Follow, FollowInput, SAngle, ViewCache};
+use super::cam_room::CamRoom;
 use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
 use super::cam_type::{TYPE_FIELD, TYPES, type_index};
 
@@ -155,8 +157,15 @@ pub struct Camera {
     pub follow: Follow,
     /// `dCamera_c::mCamSetup`, narrowed to what the engines read.
     pub setup: CamSetup,
-    /// `dCamera_c::m108`, the frames since the placement was last restarted.
+    /// `dCamera_c::m108`, the frames since the placement was last restarted. Every engine except
+    /// the follow pair, which spends its own inside `cam_follow::follow`, increments it through
+    /// [`cam_engine::engine`].
     pub age: u32,
+    /// `dCamera_c::m11C`, the frames since the last placement start. The fixed-placement engines
+    /// read it as their own first frame, the same way `age` reads for the others.
+    pub setup_age: u32,
+    /// `dCamera_c::m1AE`, the crawl engine's arc latch, `d_camera.cpp:4235` and `:4304`.
+    pub crawl_arc: bool,
     /// `dCamera_c::m100` with `m101` and `m102`, which `followCamera` always writes together.
     pub settled: bool,
     /// `dCamera_c::mAngleY`, the camera's own yaw channel, `d_camera.cpp:857-862`.
@@ -171,6 +180,10 @@ pub struct Camera {
     /// `dCamera_c::mCenter` / `mEye` / `mDirection` and the event flags `bumpCheck` keeps,
     /// which is the camera collision pass's own state.
     pub bump: Bump,
+    /// `dCamera_c::mWork`, the per-engine cross-frame state the engines other than follow keep.
+    pub work: cam_engine::Work,
+    /// `dCamera_c::m548` through `mBankShake`, the screen shake `shakeCamera` runs each frame.
+    pub shake: cam_engine::Shake,
 }
 
 impl Default for Camera {
@@ -190,10 +203,14 @@ impl Default for Camera {
             setup: CamSetup::default(),
             age: 0,
             settled: false,
+            setup_age: 0,
+            crawl_arc: false,
             angle_y: SAngle::ZERO,
             yaw_trim: SAngle::ZERO,
             orbit_yaw: 0.0,
             bump: Bump::default(),
+            work: cam_engine::Work::default(),
+            shake: cam_engine::Shake::default(),
         };
         camera.set_style(TYPE_FIELD, 0);
         camera
@@ -383,6 +400,7 @@ pub fn track(
     players: Query<&super::player::Player>,
     solid: Option<Res<super::collision::Collision>>,
     sea: Option<Res<super::sea::Sea>>,
+    room: Option<Res<CamRoom>>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -397,14 +415,19 @@ pub fn track(
     };
     camera.yaw_trim += SAngle::from_degrees(orbit_delta + turn);
     camera.ground_pass(player, solid.as_deref(), PLAYER_HEIGHT);
-    cam_follow::follow(
-        &mut camera,
+    camera.run_engine(
         player,
-        &FollowInput {
-            main: main.axis,
-            status: &status,
+        room.as_deref(),
+        &EngineInput {
+            follow: FollowInput {
+                main: main.axis,
+                status: &status,
+            },
+            cstick: sub.axis,
+            collision: solid.as_deref(),
         },
     );
+    camera.shake_pass();
     camera.bump_check(
         player,
         solid.as_deref(),
