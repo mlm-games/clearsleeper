@@ -662,6 +662,40 @@ pub fn load_room_mesh(stage: &str) -> Option<crate::bdl::RoomMesh> {
 
 const OBJECT_ROOT: &str = "files/res/Object";
 
+pub fn load_actor_model(archive_name: &str) -> Option<crate::bdl::RoomMesh> {
+    let path = asset_root().join(format!("{OBJECT_ROOT}/{archive_name}.arc"));
+    let bytes = std::fs::read(&path).ok()?;
+    let archive = match open_archive(bytes, path) {
+        Ok(archive) => archive,
+        Err(error) => {
+            log::warn!("clearsleeper: {archive_name} unreadable ({error})");
+            return None;
+        }
+    };
+    for entry in archive.entries() {
+        if !entry.ends_with(".bdl") {
+            continue;
+        }
+        let model = match archive.read(entry) {
+            Ok(model) => model,
+            Err(AssetError::MissingEntry { .. }) => continue,
+            Err(_) => return None,
+        };
+        match crate::bdl::parse(model, [0.0, 0.0], 0.0, None) {
+            Ok(mesh) if !mesh.joints.is_empty() => return Some(mesh),
+            Ok(_) => continue,
+            Err(error) => {
+                log::warn!(
+                    "clearsleeper: {archive_name}/{entry} unusable ({})",
+                    error.as_str()
+                );
+                return None;
+            }
+        }
+    }
+    None
+}
+
 /// The bind-pose joint frames of an actor model, which `JntHit` colliders are defined against.
 /// `res/Object/<name>.arc` holds the `bdl/*.bdl4` entry.
 pub fn load_actor_joints(archive_name: &str) -> Option<Vec<[f32; 3]>> {

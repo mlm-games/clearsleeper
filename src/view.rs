@@ -1,7 +1,12 @@
-use glam::{Vec2, Vec3};
-use repame_view3d::{BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload};
+use glam::{Mat4, Vec2, Vec3};
+use repame_view3d::{
+    BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload, SkinnedDraw,
+    SkinnedMesh,
+};
 
-use crate::bdl::{LAYER_SIZE, RoomGroup, RoomMesh};
+use crate::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
+
+pub const LINK_ARCHIVE: &str = "Link";
 
 pub const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
 const GROUND: Rgb = [0.24, 0.42, 0.22];
@@ -99,6 +104,15 @@ pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
 }
 
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
+    build_frame_with_actor(snapshot, cam, room, None)
+}
+
+pub fn build_frame_with_actor(
+    snapshot: &SceneSnapshot,
+    cam: OrbitCamera,
+    room: Option<&RoomMesh>,
+    actor: Option<&RoomMesh>,
+) -> Frame3d {
     let cam = OrbitCamera {
         target: Vec3::new(
             snapshot.player_pos.x,
@@ -150,7 +164,72 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
     }
+    if let Some(mesh) = actor.and_then(|mesh| skinned_draw(mesh, snapshot)) {
+        frame.skinned.push(mesh);
+    }
     frame
+}
+
+pub fn skinned_draw(actor: &RoomMesh, snapshot: &SceneSnapshot) -> Option<SkinnedDraw> {
+    let group = actor
+        .groups
+        .iter()
+        .find(|group| group.joint_indices.len() == group.positions.len() && !group.joint_indices.is_empty())?;
+    if actor.joint_matrices.len() != actor.joints.len() {
+        return None;
+    }
+    let inverse_bind: Vec<Mat4> = actor
+        .joint_matrices
+        .iter()
+        .map(|matrix| matrix.try_inverse().unwrap_or(Mat4::IDENTITY))
+        .collect();
+    let mut mesh = SkinnedMesh {
+        positions: group.positions.clone(),
+        normals: group.normals.clone(),
+        uvs: group.uvs.clone(),
+        colors: group.colors.clone(),
+        indices: group.indices.clone(),
+        joints: group.joint_indices.clone(),
+        weights: group.joint_weights.clone(),
+        inverse_bind,
+        joint_nodes: (0..actor.joints.len()).collect(),
+        texture_page: group.texture_page.unwrap_or(0),
+        depth_test: true,
+        ..SkinnedMesh::default()
+    };
+    mesh.name = "cl".to_string();
+    let pose = idle_pose(actor.joints.len());
+    let placed = place_actor(pose, snapshot, actor);
+    SkinnedDraw::from_matrices(&mesh, &placed)
+}
+
+fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot, actor: &RoomMesh) -> Vec<Mat4> {
+    let pivot = actor
+        .joint_matrices
+        .first()
+        .map(|matrix| matrix.w_axis.truncate())
+        .unwrap_or(Vec3::ZERO);
+    let origin = Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z);
+    let basis = Mat4::from_rotation_y(-snapshot.player_yaw);
+    let to_world = Mat4::from_translation(origin - basis.transform_point3(pivot)) * basis;
+    pose.into_iter().map(|joint| to_world * joint).collect()
+}
+
+fn idle_pose(joints: usize) -> Vec<Mat4> {
+    const SWING: [usize; 6] = [5, 6, 9, 10, 22, 23];
+    (0..joints)
+        .map(|joint| match SWING.iter().position(|slot| *slot == joint) {
+            Some(index) => {
+                let angle = 0.12 * (index + 1) as f32;
+                Mat4::from_rotation_z(angle) * Mat4::from_rotation_x(angle * 0.5)
+            }
+            None => Mat4::IDENTITY,
+        })
+        .collect()
+}
+
+pub fn skinned_influences() -> usize {
+    SKIN_INFLUENCES
 }
 
 /// One camera-facing quad per live emitter.
