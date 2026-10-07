@@ -1396,7 +1396,7 @@ pub const WALK_ALLOWED: &[Proc] = &[
 /// One player's process word and the mode word that came with it. The reference holds these on
 /// the actor and writes them in one place, `commonProcInit`, which every transition in the game
 /// funnels through: the reference has no other site that assigns the word.
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub struct LinkProc {
     /// The process the player's own tick is running.
     pub current: Proc,
@@ -1410,6 +1410,26 @@ pub struct LinkProc {
     /// True on the tick `current` was written, which is how a reader can tell a fresh transition
     /// from a settled process without comparing words.
     pub changed: bool,
+    /// `m35F0`, the height the feet were at on the tick the fall began: written at
+    /// `main.cpp:2477` on the tick `speed.y` crosses from rising to falling, re-stamped by every
+    /// jump initialiser at `main.cpp:7090` and `main.cpp:5848`, and read back as
+    /// `m35F0 - current.pos.y` by the landing dispatcher at `main.cpp:4926` and `main.cpp:3634`.
+    /// Nothing in the port kept it, so the fall bands and the drop a rolling landing asks for
+    /// had no number to compare against.
+    pub takeoff_y: f32,
+    /// `mProcVar2.mTargetAngle`, the yaw `procWaitTurn_init` latches at `main.cpp:6563` and
+    /// chases at `main.cpp:6575`.
+    pub target_angle: i16,
+    /// `mProcVar2.m34D4`, the largest step `procMoveTurn_init` arms its own turn with at
+    /// `main.cpp:6604` and `main.cpp:6610` and `procMoveTurn` chases shape angle with at
+    /// `main.cpp:6620`. The reference shares one union word between the two turn processes, so
+    /// it is two words here because the two processes never run in the same tick.
+    pub turn_step: i16,
+    /// `mProcVar3.m34D6`, the smallest step beside [`LinkProc::turn_step`].
+    pub turn_floor: i16,
+    /// `mProcVar0.m34D0`, the divisor `procMoveTurn_init` picks at `main.cpp:6606` and
+    /// `main.cpp:6612`.
+    pub turn_scale: i16,
 }
 
 impl Default for LinkProc {
@@ -1427,7 +1447,19 @@ impl LinkProc {
             flags: proc.flags(),
             frame: 0,
             changed: true,
+            takeoff_y: 0.0,
+            target_angle: 0,
+            turn_step: 0,
+            turn_floor: 0,
+            turn_scale: 0,
         }
+    }
+
+    /// `posMoveFromFootPos` at `main.cpp:2476-2478`: the tick a fall starts, which is the only
+    /// tick the reference writes the takeoff height on. Every other writer is a jump
+    /// initialiser stamping the height it launched from.
+    pub fn mark_takeoff(&mut self, pos_y: f32) {
+        self.takeoff_y = pos_y;
     }
 
     /// The one place the process word changes: the reference's `commonProcInit` resets the frame
