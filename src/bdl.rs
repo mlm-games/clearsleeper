@@ -11,11 +11,12 @@ const COLOR_STRIDE: usize = 4;
 const NORMAL_STRIDE_S16: usize = 6;
 const NORMAL_STRIDE_F32: usize = 12;
 const ATTRIBUTE_TERM: u32 = 0xFF;
+const ATTRIBUTE_MATRIX: u32 = 0;
 const ATTRIBUTE_POSITION: u32 = 9;
 const ATTRIBUTE_NORMAL: u32 = 10;
 const ATTRIBUTE_COLOR0: u32 = 11;
 const ATTRIBUTE_TEX0: u32 = 13;
-const TYPE_INDEX16: u32 = 3;
+const DESCRIPTOR_WIDTHS: [usize; 4] = [0, 1, 1, 2];
 const TYPE_S16: u32 = 3;
 const TYPE_F32: u32 = 4;
 const TYPE_RGBA8: u32 = 5;
@@ -66,6 +67,17 @@ const JOINT_ROTATION: usize = 0x10;
 const JOINT_TRANSLATION: usize = 0x18;
 const IDENTITY_SCALE: [f32; 3] = [1.0, 1.0, 1.0];
 const SHAPE_MATRIX_DIRECT: u8 = 0;
+const SHAPE_MATRIX_MULTI: u8 = 3;
+const MATRIX_INDEX_DIVISOR: u32 = 3;
+const MATRIX_UNSET: u16 = 0xFFFF;
+const SHAPE_INDEX_TABLE: usize = 0x1C;
+const SHAPE_INIT_MATRIX_SLOTS: usize = 0x02;
+const SHAPE_INIT_MATRIX_FIRST: usize = 0x04;
+const ENVELOPE_TABLE_COUNT: usize = 0x08;
+const ENVELOPE_TABLE_MIXES: usize = 0x0C;
+const ENVELOPE_TABLE_INDEX: usize = 0x10;
+const ENVELOPE_TABLE_WEIGHT: usize = 0x14;
+pub const SKIN_INFLUENCES: usize = 4;
 const COMMAND_NOP: u8 = 0x00;
 const COMMAND_QUADS: u8 = 0x80;
 const COMMAND_TRIANGLES: u8 = 0x90;
@@ -131,6 +143,8 @@ pub struct RoomGroup {
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
     pub indices: Vec<u32>,
+    pub joint_indices: Vec<[u16; SKIN_INFLUENCES]>,
+    pub joint_weights: Vec<[f32; SKIN_INFLUENCES]>,
     pub texture_page: Option<u32>,
     pub lit: bool,
     pub anim: Option<AnimBinding>,
@@ -172,6 +186,7 @@ pub fn parse(
     let blocks = Blocks::parse(data)?;
     let (worlds, material_nodes) = read_joints(data, &blocks)?;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
+    let envelopes = read_envelopes(data, &blocks, worlds.len())?;
     let vertices = read_vertex_arrays(data, &blocks)?;
     let materials = read_materials(data, &blocks)?;
     let textures = read_textures(data, &blocks)?;
@@ -194,6 +209,7 @@ pub fn parse(
         &blocks,
         &worlds,
         &draw_joints,
+        &envelopes,
         &material_nodes,
         &materials,
         textures.len(),
@@ -410,28 +426,102 @@ fn read_joints(
     ))
 }
 
+#[derive(Debug, Clone, Copy)]
+struct DrawBinding {
+    target: u16,
+    blended: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SkinBinding {
+    indices: [u16; SKIN_INFLUENCES],
+    weights: [f32; SKIN_INFLUENCES],
+}
+
 fn read_draw_joints(
     data: &[u8],
     blocks: &Blocks,
     joint_count: usize,
-) -> Result<Vec<usize>, BdlError> {
+) -> Result<Vec<DrawBinding>, BdlError> {
     let (start, _) = blocks.find(b"DRW1")?;
     let count = usize::from(read_u16(data, start + 8)?);
     let flags_start = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
     let index_start = at(start, read_u32(data, at(start, 0x10)?)? as usize)?;
-    let mut joints = Vec::new();
+    let mut joints = Vec::with_capacity(count);
     for slot in 0..count {
         let flag = *data.get(flags_start + slot).ok_or(BdlError::Truncated)?;
-        if flag != 0 {
-            return Err(BdlError::Envelope);
-        }
-        let joint = usize::from(read_u16(data, at(index_start, slot * 2)?)?);
-        if joint >= joint_count {
+        let target = read_u16(data, at(index_start, slot * 2)?)?;
+        if flag == 0 && usize::from(target) >= joint_count {
             return Err(BdlError::Range);
         }
-        joints.push(joint);
+        joints.push(DrawBinding {
+            target,
+            blended: flag != 0,
+        });
     }
     Ok(joints)
+}
+
+fn read_envelopes(
+    data: &[u8],
+    blocks: &Blocks,
+    joint_count: usize,
+) -> Result<Vec<SkinBinding>, BdlError> {
+    let Some((start, end)) = blocks.get(b"EVP1") else {
+        return Ok(Vec::new());
+    };
+    let count = usize::from(read_u16(data, at(start, ENVELOPE_TABLE_COUNT)?)?);
+    let mixes_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_MIXES)?)? as usize)?;
+    let index_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_INDEX)?)? as usize)?;
+    let weight_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_WEIGHT)?)? as usize)?;
+    let mut bindings = Vec::with_capacity(count);
+    let mut mix = 0_usize;
+    for envelope in 0..count {
+        let entries = usize::from(
+            *data
+                .get(at(mixes_at, envelope)?)
+                .ok_or(BdlError::Truncated)?,
+        );
+        if entries == 0 || entries > SKIN_INFLUENCES {
+            return Err(BdlError::Envelope);
+        }
+        let mut binding = SkinBinding::default();
+        for slot in 0..entries {
+            let joint = at(index_at, (mix + slot) * 2)?;
+            let weight = at(weight_at, (mix + slot) * 4)?;
+            if at(joint, 2)? > end || at(weight, 4)? > end {
+                return Err(BdlError::Block);
+            }
+            let index = read_u16(data, joint)?;
+            if usize::from(index) >= joint_count {
+                return Err(BdlError::Range);
+            }
+            binding.indices[slot] = index;
+            binding.weights[slot] = read_f32(data, weight)?;
+        }
+        mix += entries;
+        bindings.push(binding);
+    }
+    Ok(bindings)
+}
+
+fn skin_binding(
+    draw: u16,
+    draws: &[DrawBinding],
+    envelopes: &[SkinBinding],
+    joint_count: usize,
+) -> Result<SkinBinding, BdlError> {
+    let entry = *draws.get(usize::from(draw)).ok_or(BdlError::Range)?;
+    if !entry.blended {
+        if usize::from(entry.target) >= joint_count {
+            return Err(BdlError::Range);
+        }
+        let mut binding = SkinBinding::default();
+        binding.indices[0] = entry.target;
+        binding.weights[0] = 1.0;
+        return Ok(binding);
+    }
+    Ok(*envelopes.get(usize::from(entry.target)).ok_or(BdlError::Range)?)
 }
 
 struct VertexArrays {
@@ -1224,11 +1314,76 @@ struct ShapeContext<'a> {
     animation: Option<&'a crate::btk::TextureAnimation>,
 }
 
+struct PrimitiveLayout {
+    attributes: Vec<u32>,
+    widths: Vec<usize>,
+    stride: usize,
+    position_field: usize,
+    normal_field: Option<usize>,
+    color_field: Option<usize>,
+    texcoord_field: Option<usize>,
+    matrix_field: Option<usize>,
+}
+
+fn descriptor_width(kind: u32) -> Result<usize, BdlError> {
+    usize::try_from(kind)
+        .ok()
+        .and_then(|kind| DESCRIPTOR_WIDTHS.get(kind).copied())
+        .ok_or(BdlError::Descriptor)
+}
+
+impl PrimitiveLayout {
+    fn parse(data: &[u8], table: usize, offset: usize) -> Result<Self, BdlError> {
+        let mut attributes = Vec::new();
+        let mut widths = Vec::new();
+        let mut cursor = at(table, offset)?;
+        loop {
+            let attribute = read_u32(data, cursor)?;
+            let kind = read_u32(data, at(cursor, 4)?)?;
+            cursor += DESCRIPTOR_STRIDE;
+            if attribute == ATTRIBUTE_TERM {
+                break;
+            }
+            widths.push(descriptor_width(kind)?);
+            attributes.push(attribute);
+        }
+        let stride = widths.iter().sum();
+        let find = |wanted: u32| attributes.iter().position(|&a| a == wanted);
+        let position_field = find(ATTRIBUTE_POSITION).ok_or(BdlError::Descriptor)?;
+        let normal_field = find(ATTRIBUTE_NORMAL);
+        let color_field = find(ATTRIBUTE_COLOR0);
+        let texcoord_field = find(ATTRIBUTE_TEX0);
+        let matrix_field = find(ATTRIBUTE_MATRIX);
+        Ok(Self {
+            attributes,
+            widths,
+            stride,
+            position_field,
+            normal_field,
+            color_field,
+            texcoord_field,
+            matrix_field,
+        })
+    }
+
+    fn field_at(&self, field: usize, record: &[u8]) -> Result<usize, BdlError> {
+        let start = self.widths[..field].iter().sum::<usize>();
+        match self.widths[field] {
+            0 => Ok(0),
+            1 => Ok(usize::from(
+                *record.get(start).ok_or(BdlError::Truncated)?,
+            )),
+            _ => Ok(usize::from(read_u16(record, start)?)),
+        }
+    }
+}
+
 fn read_shapes(
     context: &ShapeContext<'_>,
     blocks: &Blocks,
     worlds: &[[f32; 3]],
-    draw_joints: &[usize],
+    draw_joints: &[DrawBinding],
+    envelopes: &[SkinBinding],
     material_nodes: &[(u16, Option<u16>)],
     materials: &[MaterialBinding],
     texture_count: usize,
@@ -1240,6 +1395,7 @@ fn read_shapes(
     let init_table = at(shape_start, read_u32(data, at(shape_start, 0x0C)?)? as usize)?;
     let index_table = at(shape_start, read_u32(data, at(shape_start, 0x10)?)? as usize)?;
     let descriptor_table = at(shape_start, read_u32(data, at(shape_start, 0x18)?)? as usize)?;
+    let mtx_table = at(shape_start, read_u32(data, at(shape_start, SHAPE_INDEX_TABLE)?)? as usize)?;
     let display_table = at(shape_start, read_u32(data, at(shape_start, 0x20)?)? as usize)?;
     let matrix_table = at(shape_start, read_u32(data, at(shape_start, 0x24)?)? as usize)?;
     let draw_table = at(shape_start, read_u32(data, at(shape_start, 0x28)?)? as usize)?;
@@ -1251,12 +1407,13 @@ fn read_shapes(
         }
         shape_materials[slot] = material;
     }
+    let mut slots: Vec<Option<SkinBinding>> = Vec::new();
 
     for shape in 0..shape_count {
         let slot = usize::from(read_u16(data, at(index_table, shape * 2)?)?);
         let init = at(init_table, slot * SHAPE_INIT_STRIDE)?;
         let matrix_type = *data.get(init).ok_or(BdlError::Truncated)?;
-        if matrix_type != SHAPE_MATRIX_DIRECT {
+        if matrix_type != SHAPE_MATRIX_DIRECT && matrix_type != SHAPE_MATRIX_MULTI {
             return Err(BdlError::Shape);
         }
         let group_count = usize::from(read_u16(data, at(init, 2)?)?);
@@ -1264,33 +1421,8 @@ fn read_shapes(
         let matrix_slot = usize::from(read_u16(data, at(init, 6)?)?);
         let draw_slot = usize::from(read_u16(data, at(init, 8)?)?);
 
-        let mut descriptor = Vec::new();
-        let mut cursor = at(descriptor_table, descriptor_offset)?;
-        loop {
-            let attribute = read_u32(data, cursor)?;
-            let kind = read_u32(data, at(cursor, 4)?)?;
-            cursor += DESCRIPTOR_STRIDE;
-            if attribute == ATTRIBUTE_TERM {
-                break;
-            }
-            if kind != TYPE_INDEX16 {
-                return Err(BdlError::Descriptor);
-            }
-            descriptor.push(attribute);
-        }
-        let position_field = descriptor
-            .iter()
-            .position(|&attribute| attribute == ATTRIBUTE_POSITION)
-            .ok_or(BdlError::Descriptor)?;
-        let normal_field = descriptor
-            .iter()
-            .position(|&attribute| attribute == ATTRIBUTE_NORMAL);
-        let color_field = descriptor
-            .iter()
-            .position(|&attribute| attribute == ATTRIBUTE_COLOR0);
-        let texcoord_field = descriptor
-            .iter()
-            .position(|&attribute| attribute == ATTRIBUTE_TEX0);
+        let layout = PrimitiveLayout::parse(data, descriptor_table, descriptor_offset)?;
+        let texcoord_field = layout.texcoord_field;
         let lit = match shape_materials[shape] {
             Some(index) if !materials.is_empty() => {
                 materials.get(usize::from(index)).ok_or(BdlError::Range)?.lit
@@ -1339,10 +1471,48 @@ fn read_shapes(
         for subgroup in 0..group_count {
             let matrix = at(matrix_table, (matrix_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
             let draw_matrix = usize::from(read_u16(data, matrix)?);
-            if draw_matrix >= draw_joints.len() {
-                return Err(BdlError::Range);
-            }
-            let world = worlds[draw_joints[draw_matrix]];
+            let (world, bindings) = match layout.matrix_field {
+                Some(_) => {
+                    let count = usize::from(read_u16(data, at(matrix, SHAPE_INIT_MATRIX_SLOTS)?)?);
+                    let first = usize::try_from(read_u32(
+                        data,
+                        at(matrix, SHAPE_INIT_MATRIX_FIRST)?,
+                    )?)
+                    .map_err(|_| BdlError::Range)?;
+                    if slots.len() < count {
+                        slots.resize(count, None);
+                    }
+                    let mut resolved = Vec::with_capacity(count);
+                    for slot in 0..count {
+                        let entry = read_u16(data, at(mtx_table, first + slot * 2)?)?;
+                        let binding = if entry == MATRIX_UNSET {
+                            slots[slot].ok_or(BdlError::Shape)?
+                        } else {
+                            let binding = skin_binding(
+                                entry,
+                                draw_joints,
+                                envelopes,
+                                worlds.len(),
+                            )?;
+                            slots[slot] = Some(binding);
+                            binding
+                        };
+                        resolved.push(binding);
+                    }
+                    ([0.0, 0.0, 0.0], resolved)
+                }
+                None => {
+                    let entry = *draw_joints.get(draw_matrix).ok_or(BdlError::Range)?;
+                    if entry.blended {
+                        return Err(BdlError::Envelope);
+                    }
+                    let joint = usize::from(entry.target);
+                    if joint >= worlds.len() {
+                        return Err(BdlError::Range);
+                    }
+                    (worlds[joint], Vec::new())
+                }
+            };
             let draw = at(draw_table, (draw_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
             let display_size = read_u32(data, draw)? as usize;
             let display_start = at(display_table, read_u32(data, at(draw, 4)?)? as usize)?;
@@ -1355,11 +1525,8 @@ fn read_shapes(
             decode_display_list(
                 context,
                 display,
-                &descriptor,
-                position_field,
-                normal_field,
-                color_field,
-                texcoord_field,
+                &layout,
+                &bindings,
                 textured,
                 world,
                 &mut group,
@@ -1393,17 +1560,14 @@ fn normalize(vector: [f32; 3]) -> [f32; 3] {
 fn decode_display_list(
     context: &ShapeContext<'_>,
     display: &[u8],
-    descriptor: &[u32],
-    position_field: usize,
-    normal_field: Option<usize>,
-    color_field: Option<usize>,
-    texcoord_field: Option<usize>,
+    layout: &PrimitiveLayout,
+    bindings: &[SkinBinding],
     textured: bool,
     world: [f32; 3],
     group: &mut RoomGroup,
 ) -> Result<(), BdlError> {
     let data = context.data;
-    let stride = descriptor.len() * 2;
+    let stride = layout.stride;
     let mut cursor = 0_usize;
     while cursor < display.len() {
         let command = display[cursor];
@@ -1445,29 +1609,32 @@ fn decode_display_list(
             let mut normal_index = None;
             let mut color_index = None;
             let mut texcoord_index = None;
-            for field in 0..descriptor.len() {
-                let index = usize::from(u16::from_be_bytes([
-                    bytes[field * 2],
-                    bytes[field * 2 + 1],
-                ]));
-                if field == position_field {
+            let mut binding = SkinBinding::default();
+            for field in 0..layout.attributes.len() {
+                let index = layout.field_at(field, bytes)?;
+                if field == layout.position_field {
                     position_index = Some(index);
                 }
-                if normal_field == Some(field) {
+                if layout.normal_field == Some(field) {
                     normal_index = Some(index);
                 }
-                if color_field == Some(field) {
+                if layout.color_field == Some(field) {
                     color_index = Some(index);
                 }
-                if texcoord_field == Some(field) {
+                if layout.texcoord_field == Some(field) {
                     texcoord_index = Some(index);
+                }
+                if layout.matrix_field == Some(field) {
+                    binding = *bindings
+                        .get(index / MATRIX_INDEX_DIVISOR as usize)
+                        .ok_or(BdlError::Range)?;
                 }
             }
             let position_index = position_index.ok_or(BdlError::Descriptor)?;
             if position_index >= context.vertices.position_count {
                 return Err(BdlError::Range);
             }
-            let color_index = match color_field {
+            let color_index = match layout.color_field {
                 Some(_) => {
                     let index = color_index.ok_or(BdlError::Descriptor)?;
                     if index >= context.vertices.color_count {
@@ -1522,7 +1689,11 @@ fn decode_display_list(
                 }
                 None => WHITE,
             });
-            if normal_field.is_some() {
+            if layout.matrix_field.is_some() {
+                group.joint_indices.push(binding.indices);
+                group.joint_weights.push(binding.weights);
+            }
+            if layout.normal_field.is_some() {
                 let index = normal_index.ok_or(BdlError::Descriptor)?;
                 if index >= context.vertices.normal_count {
                     return Err(BdlError::Range);
