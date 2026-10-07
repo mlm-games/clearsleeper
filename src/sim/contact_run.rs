@@ -7,6 +7,7 @@ use super::contact::{
     CO_SPRM_VS_GRP_ALL, CcSystem, CoHit, DivideInfo, GObjInf, GSTTS_NO_ACTOR, GStts, ObjEntry,
     ObjSet, Stts, TG_SPRM_GRP_ALL, TG_SPRM_SET,
 };
+use super::player::Player;
 use super::registry::{ActorRegistry, ERROR_PROC_ID};
 use super::shape::{Shape, Shapes};
 
@@ -158,6 +159,11 @@ pub struct ContactAtTg {
     pub set_tg: bool,
     /// The point `CrossAtTg` reported.
     pub cross: Vec3,
+    /// `dCcD_GObjTg.mRVec` (`d_cc_d.h:362`), which `SetAtTgGObjInf` fills from the attacker's own
+    /// velocity at `d_cc_s.cpp:428`. The player's own `getDamageVec` (`main.cpp:5558-5586`) reads this
+    /// word and leaves it either as it stands or as a fixed ten-unit push, and the guard slip takes
+    /// its facing and its speed from what comes back.
+    pub r_vec: Vec3,
 }
 
 /// One recorded CO contact, with the entities and bodies behind the two object slots.
@@ -204,7 +210,10 @@ impl ContactResults {
 
     /// Append one entity's bodies to the flat shape list and its hit infos to the object list, and
     /// push the two sublists the object belongs to. The whole entity's body list is copied so the
-    /// bodies that carry no hit infos still hold the next entity's base index right.
+    /// bodies that carry no hit infos still hold the next entity's base index right. `velocity` is
+    /// the owner's own `speed`, which `SetAtTgGObjInf` copies onto the reflect vector of whatever
+    /// this entity's attack objects reach (`d_cc_s.cpp:428`); an owner the registry does not know
+    /// still has one.
     fn register(
         &mut self,
         entity: Entity,
@@ -212,6 +221,7 @@ impl ContactResults {
         weight_uc: u8,
         no_crr: bool,
         owner: Option<u32>,
+        velocity: Vec3,
     ) {
         if bodies.objs.is_empty() || bodies.objs.len() > bodies.shapes.bodies.len() {
             return;
@@ -223,6 +233,7 @@ impl ContactResults {
             self.system
                 .objs
                 .push(obj.entry(base + body, weight_uc, no_crr, owner));
+            self.system.at_vec.push(velocity);
             if obj.set.chk_at_set() {
                 self.system.at.push(index);
             }
@@ -253,6 +264,7 @@ impl ContactResults {
                 set_at: hit.set_at,
                 set_tg: hit.set_tg,
                 cross: hit.cross,
+                r_vec: hit.r_vec,
             });
         }
         for hit in co {
@@ -320,6 +332,19 @@ impl ContactResults {
     }
 }
 
+/// The player's own velocity vector. An [`Actor`] carries one whole, but the player entity is a bare
+/// [`Player`] — `mod.rs` spawns it with no [`Actor`] and no [`ContactBodies`], so it never reaches
+/// the query below and this is the shape the port's own code already used wherever it needed the
+/// player's velocity whole: the sword's [`super::damage_resolve::Attacker`] is stamped with it at
+/// `combat.rs:330-334`, and `combat.rs:312-318` turns the same body facing for the blade's offset.
+pub fn player_velocity(player: &Player) -> Vec3 {
+    Vec3::new(
+        player.speed * player.yaw.sin(),
+        player.speed_y,
+        player.speed * player.yaw.cos(),
+    )
+}
+
 /// `cCcS::Move` (`c_cc_s.cpp:432-441`) for the whole world, once per step: assemble every
 /// entity's registration, calc the area, check AT against TG, check CO, run the retail move hook,
 /// then drop the registrations.
@@ -342,6 +367,7 @@ pub fn run(
             actor.weight_uc,
             actor.no_crr,
             registry.proc_id(entity),
+            actor.speed,
         );
     }
     contact::calc_area(&state.flat, &mut state.system);

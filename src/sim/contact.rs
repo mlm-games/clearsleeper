@@ -543,6 +543,13 @@ pub struct CcSystem {
     pub tg: Vec<usize>,
     /// `mpObjCo` / `mObjCoCount`.
     pub co: Vec<usize>,
+    /// `dCcD_GObjAt.mVec` (`d_cc_d.h:330`) for each entry of `objs`, index-parallel with it: the
+    /// attacking object's own velocity. Nothing in the reference writes the word, and the two
+    /// readers that do — `d_tree.cpp:106` and `d_grass.cpp:101` — treat it as the speed of the actor
+    /// that struck. Its one consumed copy is `SetAtTgGObjInf`'s `tgObjInf->SetTgRVec(*atObjInf-
+    /// >GetAtVecP())` at `d_cc_s.cpp:428`. A caller that appends to `objs` without appending here
+    /// leaves that object without a vector, and its reflect vector reads back as nothing.
+    pub at_vec: Vec<Vec3>,
 }
 
 impl CcSystem {
@@ -553,11 +560,13 @@ impl CcSystem {
         self.at.clear();
         self.tg.clear();
         self.co.clear();
+        self.at_vec.clear();
     }
 }
 
 /// One recorded `cCcS::ChkAtTg` hit: the two object indices, the `i_setAt` / `i_setTg` pair
-/// `SetAtTgCommonHitInf` derived, and the cross point it was handed.
+/// `SetAtTgCommonHitInf` derived, the cross point it was handed, and the reflect vector
+/// `SetAtTgGObjInf` left on the target.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AtTgHit {
     pub at: usize,
@@ -565,6 +574,9 @@ pub struct AtTgHit {
     pub set_at: bool,
     pub set_tg: bool,
     pub cross: Vec3,
+    /// `tgObjInf->SetTgRVec(*atObjInf->GetAtVecP())`, `d_cc_s.cpp:428`, which lands on
+    /// `dCcD_GObjTg.mRVec` (`d_cc_d.h:362`).
+    pub r_vec: Vec3,
 }
 
 /// One recorded `cCcS::ChkCo` contact: the two object indices, both shapes' `GetCoCP` contact
@@ -919,8 +931,10 @@ pub fn chk_at_tg_hit_after_cross(
 /// `cCcS::SetAtTgCommonHitInf` (`c_cc_s.cpp:208-231`).
 ///
 /// A retired pair records nothing. Otherwise the AT side takes its hit bit, the TG side takes its
-/// own and the damage, and the pair is recorded with the cross point; `SetAtTgGObjInf`'s hit-mark,
-/// hit-sound, particle and split writes belong to the mark layer and are left to the caller.
+/// own and the damage, and the pair is recorded with the cross point and with the reflect vector
+/// `SetAtTgGObjInf` copies off the attacker's own velocity when `i_setTg` was open;
+/// `SetAtTgGObjInf`'s hit-mark, hit-sound, particle and split writes belong to the mark layer and
+/// are left to the caller.
 pub fn set_at_tg_common_hit_inf(
     system: &mut CcSystem,
     at_index: usize,
@@ -955,6 +969,7 @@ pub fn set_at_tg_common_hit_inf(
         set_at,
         set_tg,
         cross,
+        r_vec: system.at_vec.get(at_index).copied().unwrap_or_default(),
     });
 }
 
