@@ -413,6 +413,7 @@ pub fn track(
     solid: Option<Res<super::collision::Collision>>,
     sea: Option<Res<super::sea::Sea>>,
     room: Option<Res<CamRoom>>,
+    mut events: Option<ResMut<super::event_manager::EventManager>>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -447,6 +448,7 @@ pub fn track(
                 focus: false,
             },
         },
+        events.as_deref_mut(),
     );
     camera.shake_pass();
     camera.bump_check(

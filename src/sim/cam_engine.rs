@@ -1,9 +1,11 @@
 use glam::{Vec2, Vec3};
 
+use super::cam_event;
 use super::cam_follow::{self, FollowInput, SAngle, SGlobe, ViewCache};
 use super::cam_lockon;
 use super::cam_room::{CamRoom, CAM_FIELD_UNSET};
 use super::cam_style::{self, flag, param, CamEngine};
+use super::event_manager::EventManager;
 use super::cam_tp_engines;
 use super::camera::Camera;
 use super::collision::Collision;
@@ -45,6 +47,19 @@ pub mod evflag {
     /// Nothing in the target's own sources writes it: it is the "an event camera is running" bit
     /// and the target gates those six sites on the event manager's camera-play query beside it.
     pub const EVENT_PLAY: u32 = 0x2000_0000;
+    /// `clrFlag(0x200000)` at `d_camera.cpp:1273` and `SetTrimTypeForce`'s own caller, read back
+    /// at `d_camera.cpp:696` and `:786`: the cut named a placement the camera is not to move out
+    /// of. `eventCamera` clears it when the camera staff changes and when a cut's first frame
+    /// runs, and raises it when the cut named `WaitAnyKey`, `d_camera.cpp:4773`, `:4803` and
+    /// `:4830`; [`cam_event`](crate::sim::cam_event) owns both writes.
+    pub const FIXED: u32 = 0x0020_0000;
+    /// `setFlag(0x400)`, `d_camera.cpp:4864` and `d_camera.cpp:808-809`: an event arm has set the
+    /// bank itself, which is what holds the bank's own decay off for that frame. Only the event
+    /// arms raise it, at `d_camera.cpp:4810-4824` and its eleven siblings.
+    pub const BANK: u32 = 0x400;
+    /// `setFlag(1)` from the pause arm's `Stay` parameter, `d_camera.cpp:488`, cleared again by
+    /// the run's own `clrFlag(0x10149C01)` at `d_camera.cpp:690` before every engine call.
+    pub const STAY: u32 = 0x1;
 }
 
 /// The lock-on state `dCamera_c` carries beside the style: the one target the camera is aimed
@@ -273,12 +288,17 @@ impl Default for EventView {
 /// `d_camera.h:193`, with the cut of `mEventData`, `d_camera.h:79-96`, the parts `eventCamera`
 /// itself touches at `d_camera.cpp:4735-4854`.
 ///
-/// `staff` and `action` are the seam the engine cannot fill itself: `staff` is
-/// `mEventData.mStaffIdx`, the event manager's `getMyStaffId("CAMERA")`, and `action` is the
-/// index its `getMyActIdx` hands back for that staff. Both default to `-1`, which is what
-/// retail's constructor writes (`d_camera.cpp:224-225`) and what makes the guard at `:4761-4770`
-/// decline. Nothing in the port calls the event manager, so the engine runs its first-frame
-/// frame and stops there.
+/// `staff` and `action` are the seam the engine dispatch cannot fill itself: `staff` is
+/// `mEventData.mStaffIdx`, the event manager's camera-play lookup, and `action` is the index its
+/// action lookup hands back for that staff. Both default to `-1`, which is what retail's
+/// constructor writes (`d_camera.cpp:224-225`) and what makes the guard at `:4761-4770` decline
+/// when no feed is published. [`cam_event`](super::cam_event) owns both, and the guard that
+/// writes them.
+///
+/// `trim`, `bg_check`, `auto_focus`, `move_bg` and `found` are the `mEventData` cut parameters
+/// `d_camera.cpp:4801-4840` reads on a cut's first frame, and `bump_flags` is the collision word
+/// `m068` the same block selects at `d_camera.cpp:4842-4855`; see
+/// [`cam_event`](super::cam_event) for what consumes each.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Event {
     pub age: u32,
@@ -290,44 +310,31 @@ pub struct Event {
     pub trim: i32,
     /// `mEventData.field_0x20`: the collision flag word the cut selects.
     pub bg_check: i32,
-    /// `m0A4[1]` and `m0A4[0]`.
+    /// `mEventData.field_0x08`: the "this cut found what it asked for" latch the style and
+    /// map-tool arms zero on their first frame, `d_camera.cpp:1925` and `:1851`.
+    pub found: i32,
+    /// `mEventData.field_0x24` as `WaitAnyKey`, `d_camera.cpp:4827`, which raises
+    /// [`evflag::FIXED`] when it is set.
+    pub wait_key: i32,
+    /// `mEventData.field_0x24` reused as `AutoForcus`, `d_camera.cpp:4834`, the same member the
+    /// wait key used one line earlier.
+    pub auto_focus: i32,
+    /// `mEventData.field_0x28`: `MoveBGCheck`, `d_camera.cpp:4839`.
+    pub move_bg: i32,
+    /// `dCamera_c::m068`, the collision word `eventCamera` selects off `bg_check` and
+    /// `bumpCheck` then runs, `d_camera.cpp:4842-4855` and `:849`.
+    pub bump_flags: i32,
+    /// `m0A4[0]` and `m0A4[1]`.
     pub saved: [EventView; 2],
 }
 
-/// `eventCamera`'s action table, `d_camera.cpp:4713-4742`, in the order `l_func` indexes it at
-/// `:4682-4710`. The sibling carries thirty-four entries against this table's twenty-eight, the
-/// extra six being `STBWAIT`, `CURRENT`, `PEEPHOLE`, `DIGHOLE`, `HINTTALK` and `BSPTRANS` between
-/// `UNIACCELE` and `MAPTOOL`.
-pub const EVENT_ACTIONS: [&str; 28] = [
-    "PAUSE",
-    "WAIT",
-    "TALK",
-    "FIXEDPOS",
-    "FIXEDFRM",
-    "UNITRANS",
-    "WATCHACTOR",
-    "RESTOREPOS",
-    "GETITEM",
-    "GAMEOVER",
-    "TURNTOACTOR",
-    "ROLLING",
-    "TACT",
-    "WINDDIR",
-    "TORNADO",
-    "STYLE",
-    "SAVE",
-    "LOAD",
-    "USEITEM0",
-    "USEITEM1",
-    "FIXEDFRMS",
-    "BSPLINE",
-    "POSSESSED",
-    "TWOACTOR0",
-    "STOKER",
-    "UNIBRAKE",
-    "UNIACCELE",
-    "MAPTOOL",
-];
+/// `eventCamera`'s action table, `d_camera.cpp:4713-4742`, which lives in
+/// [`cam_event`](super::cam_event) beside the arms it selects and is re-exported here under both
+/// the name it is declared with and the one this file used before it had a home of its own.
+pub use super::cam_event::ACTION_NAMES;
+/// The same twenty-eight entries as [`ACTION_NAMES`], the name this module first declared them
+/// under.
+pub const EVENT_ACTIONS: [&str; 28] = super::cam_event::ACTION_NAMES;
 
 /// `dCamera_c::m548` through `mBankShake`, `d_camera.h:398-407`: the shake `StartShake` loads and
 /// `shakeCamera` runs. The pattern is five bytes because the sixteen-bit read at
@@ -516,6 +523,9 @@ pub struct Work {
     /// `mWork.tower`, `mWork.hookshot`, `mWork.manual` and `mWork.ride`: the four arms of the
     /// union the port runs.
     pub tp: cam_tp_engines::State,
+    /// `mWork` as the event camera sees it: the thirteen arms its own twenty-eight-entry table
+    /// selects between, which the target lays over the same union the four arms above use.
+    pub ev: cam_event::State,
     /// The style [`Camera::setup_age`] and [`Camera::settled`] belong to. `onStyleChange` zeroes
     /// `m11C` at `d_camera.cpp:1420` and `onModeChange` zeroes `m100` through `m102` at
     /// `d_camera.cpp:1216-1218`, which is what makes a style replay its placement.
@@ -532,6 +542,7 @@ impl Default for Work {
             subject: Subject::default(),
             event: Event::default(),
             tp: cam_tp_engines::State::default(),
+            ev: cam_event::State::default(),
             style: cam_style::NONE,
         }
     }
@@ -550,6 +561,7 @@ pub fn engine(
     player: &Player,
     room: Option<&CamRoom>,
     input: &EngineInput<'_>,
+    events: Option<&mut EventManager>,
 ) -> bool {
     let kind = camera.engine();
     if camera.work.style != camera.current_style {
@@ -567,7 +579,7 @@ pub fn engine(
         Some(CamEngine::FixedFrame) => fixed_frame(camera, player, room, input.collision),
         Some(CamEngine::FixedPosition) => fixed_position(camera, player, room),
         Some(CamEngine::Subject) => subject(camera, player, input),
-        Some(CamEngine::Event) => event(camera),
+        Some(CamEngine::Event) => event(camera, player, input.collision, events),
         Some(CamEngine::Lockon) => cam_lockon::lockon(camera, player, input),
         Some(CamEngine::NonOwner) => non_owner(camera),
         Some(CamEngine::Talkto) => cam_tp_engines::talkto(camera, player, input),
@@ -1173,60 +1185,26 @@ fn subject_angle(camera: &Camera, input: &EngineInput<'_>, work: &mut Subject) {
 }
 
 /// `dCamera_c::eventCamera`, `d_camera.cpp:4679-4885`: twenty-eight named cutscene actions read
-/// off the running cutscene's camera staff.
+/// off the running cutscene's camera staff, through
+/// [`cam_event::event`](super::cam_event::event).
 ///
-/// What runs here is everything the function does before the twenty-eight arms: the two view
-/// stacks `m118 == 0` fills at `:4735-4749`, and the two-branch guard at `:4761-4789`, whose first
-/// branch asks the event manager for a camera play and then for that play's `CAMERA` staff, and
-/// whose second replays [`Event::action`] under [`evflag::EVENT_PLAY`]. The port runs no cutscene,
-/// so the first branch declines unless a feed publishes [`Event::staff`]; and even with a staff
-/// index the arms behind `:4713` all read their own parameters off it through `getEvIntData`,
-/// `getEvFloatData`, `getEvXyzData`, `getEvStringData` and `getEvActor`, all of which the
-/// target's own text leaves unmatched at `d_ev_camera.cpp:27-70`, so none of them can be written
-/// here. The names they are selected by are [`EVENT_ACTIONS`].
+/// The whole body, the two view stacks the first frame fills at `d_camera.cpp:4744-4756`, the
+/// two-branch guard at `:4761-4794`, the trim and collision block at `:4801-4855`, the
+/// twenty-eight-way dispatch at `:4871` and the trailing line check at `:4876-4881`, is
+/// [`cam_event::event`].
 ///
-/// The trim latch and the collision flag word at `:4806-4852` are ported as their defaults,
-/// [`Event::trim`] to `2` and [`Event::bg_check`] to `1`, which is what the reference's own
-/// `getEvIntData` defaults give when the cut names neither. Both sit behind the guard, so they
-/// are only reachable through a feed that publishes a staff index.
-fn event(camera: &mut Camera) -> bool {
-    let mut cut = camera.work.event;
-
-    if cut.age == 0 {
-        let view = EventView {
-            center: camera.bump.center,
-            eye: camera.bump.eye,
-            fovy: camera.view_cache.fovy,
-            bank: camera.view_cache.bank,
-            age: 0,
-        };
-        cut.saved = [view, view];
-    }
-
-    let forced = camera.event_flags & evflag::EVENT_PLAY != 0;
-    if forced {
-        cut.staff = -1;
-        if cut.age == 0 {
-            camera.setup_age = 0;
-        }
-    } else if cut.staff < 0 {
-        camera.work.event = cut;
-        return false;
-    }
-
-    if cut.age == 0 && !forced {
-        camera.event_flags &= !0x0020_0000;
-        cut.trim = 2;
-        cut.bg_check = 1;
-    }
-
-    if !(0..EVENT_ACTIONS.len() as i32).contains(&cut.action) {
-        camera.work.event = cut;
-        return false;
-    }
-
-    camera.work.event = cut;
-    false
+/// The only thing this arm withholds is the event manager, which the guard's first branch reads
+/// the camera play, the `CAMERA` staff and the cut's action name off. [`EngineInput`] is built by
+/// a struct literal in the camera's own track pass, so it has no room for one; with `None` the
+/// guard declines and the engine settles, which is what it did before [`cam_event`] existed.
+/// Passing the manager is the one wiring change needed to make the table live.
+fn event(
+    camera: &mut Camera,
+    player: &Player,
+    collision: Option<&Collision>,
+    manager: Option<&mut EventManager>,
+) -> bool {
+    cam_event::event(camera, player, collision, manager)
 }
 
 /// `dCamera_c::nonOwnerCamera`, `d_camera.cpp:4375-4427`: the placement follows whichever actor
@@ -1244,8 +1222,9 @@ impl Camera {
         player: &Player,
         room: Option<&CamRoom>,
         input: &EngineInput<'_>,
+        events: Option<&mut EventManager>,
     ) -> bool {
-        engine(self, player, room, input)
+        engine(self, player, room, input, events)
     }
 
     /// `dCamera_c::Run`'s `shakeCamera` at `d_camera.cpp:812`: once a frame, after the engine and

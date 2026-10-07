@@ -1168,7 +1168,9 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
 /// rather than beside the follow engine.
 pub fn publish(camera: &mut Camera) {
     let mut cache = camera.view_cache;
-    cache.bank -= cache.bank * 0.05;
+    if camera.event_flags & crate::sim::cam_engine::evflag::BANK == 0 {
+        cache.bank -= cache.bank * 0.05;
+    }
     let up = if cache.center.x == cache.eye.x && cache.center.z == cache.eye.z {
         Vec3::new(0.01, 1.0, 0.0)
     } else if cache.direction.latitude() >= SAngle::from_degrees(-90.0)
