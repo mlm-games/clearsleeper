@@ -106,8 +106,18 @@ pub const SHADE_ALPHA: u8 = 64;
 pub const SHADE_BLACK: [u8; 4] = [0, 0, 0, 0];
 pub const SHADE_SOLID: [u8; 4] = [0, 0, 0, 255];
 
-pub const KIND_GHOST_SHIP: u8 = 4;
 pub const KIND_TINGLE_MAP: u8 = 3;
+pub const KIND_GHOST_SHIP: u8 = 4;
+pub const KIND_TREASURE_MAP: u8 = 7;
+pub const KIND_DOCTOR_MAP: u8 = 9;
+pub const KIND_DARK_PATH_MAP: u8 = 10;
+pub const KIND_HEART_PIECE_MAP: u8 = 11;
+pub const KIND_HEART_MAP: u8 = 12;
+pub const KIND_SUBDAN_MAP: u8 = 13;
+pub const KIND_MOON_MAP: u8 = 14;
+pub const KIND_TOWER_MAP: u8 = 15;
+pub const KIND_TERRY_MAP: u8 = 16;
+pub const KIND_SUB_MARINE_MAP: u8 = 17;
 
 pub const PROC_FMAP: u8 = 0;
 pub const PROC_FMAP_CHANGE: u8 = 1;
@@ -197,19 +207,30 @@ pub const EXTRA_TAGS: [&str; EXTRA_PANES] = ["fmk1", "Rkjn", "clg2"];
 pub const TEXT_FILL_LONG: usize = 256;
 pub const TEXT_FILL_SHORT: usize = 128;
 
+pub const TINGLE_SCREEN: &str = "t_map_01.blo";
+pub const DOCTOR_SCREEN: &str = "doc_map_01.blo";
+pub const DARK_PATH_SCREEN: &str = "ys_map_1.blo";
+pub const HEART_PIECE_SCREEN: &str = "hrt_map_1.blo";
+pub const HEART_SCREEN: &str = "hm_map_1.blo";
+pub const SUBDAN_SCREEN: &str = "ir_map_1.blo";
+pub const MOON_SCREEN: &str = "mn_map_1.blo";
+pub const TOWER_SCREEN: &str = "yg_map_1.blo";
+pub const TERRY_SCREEN: &str = "terry_map_1.blo";
+pub const SUB_MARINE_SCREEN: &str = "sensui_map_1.blo";
+
 pub const SPECIAL_ARCHIVES: [(u8, &str, &str); 12] = [
-    (3, "files/res/Msg/tnmapres.arc", "t_map_01.blo"),
+    (3, "files/res/Msg/tnmapres.arc", TINGLE_SCREEN),
     (4, "files/res/Msg/gsmapres.arc", "g_map_01.blo"),
     (7, "files/res/Msg/trmapres.arc", "tr_map_1.blo"),
-    (9, "files/res/Msg/docmapres.arc", "doc_map_01.blo"),
-    (10, "files/res/Msg/ysmapres.arc", "ys_map_1.blo"),
-    (11, "files/res/Msg/heartmapres.arc", "hrt_map_1.blo"),
-    (12, "files/res/Msg/htmmapres.arc", "hm_map_1.blo"),
-    (13, "files/res/Msg/irmapres.arc", "ir_map_1.blo"),
-    (14, "files/res/Msg/moonmapres.arc", "mn_map_1.blo"),
-    (15, "files/res/Msg/ygmapres.arc", "yg_map_1.blo"),
-    (16, "files/res/Msg/terrymapres.arc", "terry_map_1.blo"),
-    (17, "files/res/Msg/submamapres.arc", "sensui_map_1.blo"),
+    (9, "files/res/Msg/docmapres.arc", DOCTOR_SCREEN),
+    (10, "files/res/Msg/ysmapres.arc", DARK_PATH_SCREEN),
+    (11, "files/res/Msg/heartmapres.arc", HEART_PIECE_SCREEN),
+    (12, "files/res/Msg/htmmapres.arc", HEART_SCREEN),
+    (13, "files/res/Msg/irmapres.arc", SUBDAN_SCREEN),
+    (14, "files/res/Msg/moonmapres.arc", MOON_SCREEN),
+    (15, "files/res/Msg/ygmapres.arc", TOWER_SCREEN),
+    (16, "files/res/Msg/terrymapres.arc", TERRY_SCREEN),
+    (17, "files/res/Msg/submamapres.arc", SUB_MARINE_SCREEN),
 ];
 
 pub const TINGLE_TAGS: [&str; 29] = [
@@ -236,6 +257,10 @@ pub const DOCTOR_TAGS: [&str; 8] = [
 
 pub const DARK_PATH_TAGS: [&str; 7] = ["ms01", "ms02", "hs04", "gddm", "sd05", "lnk", "gdgt"];
 
+pub const TERRY_TAGS: [&str; 7] = ["ms01", "ms02", "hs04", "gddm", "sd05", "lnk", "gdgt"];
+
+pub const SUB_MARINE_TAGS: [&str; 7] = ["ms01", "ms02", "hs04", "gddm", "sd05", "lnk", "gdgt"];
+
 pub const HEART_PIECE_TAGS: [&str; 12] = [
     "ms01", "ms02", "hs04", "sd05", "gddm", "mk20", "nm08", "kk12", "bh1", "bh2", "lnk", "gdgt",
 ];
@@ -257,7 +282,7 @@ pub const MOON_TAGS: [&str; 45] = [
 ];
 
 pub const TOWER_TAGS: [&str; 9] = [
-    "ms01", "ms02", "sd05", "hs04", "gddm", "ttl1", "ttl2", "lnk", "gdgt",
+    "ms01", "ms02", "hs04", "sd05", "gddm", "ttl1", "ttl2", "lnk", "gdgt",
 ];
 
 pub const UNRESOLVED_STEPS: [&str; 45] = [
@@ -533,6 +558,18 @@ pub fn decode_asset(raw: &[u8], label: &str) -> Option<Vec<u8>> {
     }
 }
 
+pub fn set_pane_on_off(screen: &mut Screen, tag: &str, visible: bool) {
+    let Some(index) = screen.panes.iter().position(|pane| pane.name == tag) else {
+        return;
+    };
+    let pane = &mut screen.panes[index];
+    if visible {
+        pane.visible = true;
+    } else {
+        pane.visible = false;
+    }
+}
+
 pub fn read_archive_entry(root: &AssetRoot, archive_rel: &str, entry: &str) -> Option<Vec<u8>> {
     let archive = root.read_archive(archive_rel).ok()?;
     let raw = archive.read(entry).ok()?;
@@ -599,6 +636,17 @@ pub fn read_map_texture_names(root: &AssetRoot) -> Vec<String> {
     }
 }
 
+pub fn chart_texture_name(grid_no: i8, salvage: i32) -> String {
+    format!(
+        "R{:02X}_col_{}.bti",
+        grid_no as u8, salvage
+    )
+}
+
+pub fn read_map_texture(root: &AssetRoot, name: &str) -> Option<Vec<u8>> {
+    read_archive_entry(root, MAP_ARCHIVE, name)
+}
+
 pub fn lookup_texture(names: &[String], name: &str) -> Option<usize> {
     names
         .iter()
@@ -653,18 +701,18 @@ pub fn special_screen_entry(kind: u8) -> Option<&'static str> {
 
 pub fn special_tags(kind: u8) -> Option<&'static [&'static str]> {
     let tags: &'static [&'static str] = match kind {
-        3 => &TINGLE_TAGS,
-        4 => &GHOST_SHIP_TAGS,
-        7 => &TREASURE_TAGS,
-        9 => &DOCTOR_TAGS,
-        10 => &DARK_PATH_TAGS,
-        11 => &HEART_PIECE_TAGS,
-        12 => &HEART_TAGS,
-        13 => &SUBDAN_TAGS,
-        14 => &MOON_TAGS,
-        15 => &TOWER_TAGS,
-        16 => &DARK_PATH_TAGS,
-        17 => &DARK_PATH_TAGS,
+        KIND_TINGLE_MAP => &TINGLE_TAGS,
+        KIND_GHOST_SHIP => &GHOST_SHIP_TAGS,
+        KIND_TREASURE_MAP => &TREASURE_TAGS,
+        KIND_DOCTOR_MAP => &DOCTOR_TAGS,
+        KIND_DARK_PATH_MAP => &DARK_PATH_TAGS,
+        KIND_HEART_PIECE_MAP => &HEART_PIECE_TAGS,
+        KIND_HEART_MAP => &HEART_TAGS,
+        KIND_SUBDAN_MAP => &SUBDAN_TAGS,
+        KIND_MOON_MAP => &MOON_TAGS,
+        KIND_TOWER_MAP => &TOWER_TAGS,
+        KIND_TERRY_MAP => &TERRY_TAGS,
+        KIND_SUB_MARINE_MAP => &SUB_MARINE_TAGS,
         _ => return None,
     };
     Some(tags)
@@ -817,6 +865,19 @@ impl Pane {
         self.pos_center.x = self.pos_center_orig.x + x;
         self.pos_center.y = self.pos_center_orig.y + y;
         self.cpos_move();
+    }
+
+    pub fn pane_scale_xy_child(&mut self, scale: f32) {
+        self.size.x = self.size_orig.x * scale;
+        self.size.y = self.size_orig.y * scale;
+        self.pos_top_left.x = self.pos_top_left_orig.x * scale;
+        self.pos_top_left.y = self.pos_top_left_orig.y * scale;
+        self.pos_center.x = self.pos_top_left.x + self.size.x / 2.0;
+        self.pos_center.y = self.pos_top_left.y + self.size.y / 2.0;
+        if self.rotate_angle != 0.0 {
+            self.rotate_origin.x = self.size.x * 0.5;
+            self.rotate_origin.y = self.size.y * 0.5;
+        }
     }
 
     pub fn pane_scale_xy(&mut self, scale: f32) {
@@ -2762,6 +2823,49 @@ impl ChartLayer {
         }
     }
 
+    pub fn get_now_chart_first_num(&self, charts: &Charts) -> i32 {
+        if self.chart_total == 0 {
+            return -1;
+        }
+        let mut index = 0;
+        while index < CHART_EXPECTED_COUNT {
+            let Some(no) = self.table.collect_map_no(index) else {
+                break;
+            };
+            if no >= 0 && charts.has(slot_of(no)) {
+                break;
+            }
+            index += 1;
+        }
+        if index > CHART_EXPECTED_COUNT {
+            return -1;
+        }
+        index
+    }
+
+    pub fn get_now_chart_next_num(&self, start: i32, step: i32, charts: &Charts) -> i32 {
+        if self.chart_total == 1 {
+            return start;
+        }
+        let mut index = start;
+        loop {
+            index += step;
+            if index < 0 {
+                index = 60;
+            }
+            if index > 60 {
+                index = 0;
+            }
+            let Some(no) = self.table.collect_map_no(index) else {
+                return index;
+            };
+            if no >= 0 && charts.has(slot_of(no)) {
+                break;
+            }
+        }
+        index
+    }
+
     pub fn chart_slot(&self, chart: i8) -> Option<usize> {
         self.table.collect_map_no(i32::from(chart)).map(slot_of)
     }
@@ -3076,20 +3180,7 @@ impl ChartLayer {
         self.tri_step = 1;
     }
 
-    pub fn set_special_screen(
-        &mut self,
-        kind: u8,
-        screen: &Screen,
-        charts: &Charts,
-        world: &WorldFacts,
-    ) {
-        let Some(tags) = special_tags(kind) else {
-            return;
-        };
-        let mut panes: Vec<Pane> = tags.iter().map(|tag| Pane::new(tag)).collect();
-        for pane in panes.iter_mut() {
-            Self::bind(screen, pane);
-        }
+    fn install_special(&mut self, kind: u8, panes: Vec<Pane>) {
         let find = |name: &str| panes.iter().position(|pane| pane.tag == name);
         let link = find("lnk").unwrap_or(usize::MAX);
         let target = find("gdgt").unwrap_or(usize::MAX);
@@ -3099,7 +3190,7 @@ impl ChartLayer {
             white: [255, 255, 255, 255],
         };
         let mut key_shade = moon_shade;
-        if kind == 4 {
+        if kind == KIND_GHOST_SHIP {
             if let Some(index) = find("tk01") {
                 moon_shade = panes[index].shade;
             }
@@ -3117,14 +3208,116 @@ impl ChartLayer {
             key_shade,
             panes,
         });
-        if kind == 4 {
-            self.ghost_ship_screen_set(world);
-        }
-        if kind == 7 {
-            self.treasure_screen_set(charts);
-        }
-        if kind != 4 {
-            self.set_player_pos();
+    }
+
+    fn bind_special_panes(&self, screen: &Screen, tags: &[&'static str]) -> Vec<Pane> {
+        tags.iter()
+            .map(|tag| {
+                let mut pane = Pane::new(tag);
+                if let Some(layout) = screen.find(&pane.tag).cloned() {
+                    pane.parts_set(&layout);
+                }
+                pane
+            })
+            .collect()
+    }
+
+    pub fn screen_set_tingle(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &TINGLE_TAGS);
+        self.install_special(KIND_TINGLE_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_doctor(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &DOCTOR_TAGS);
+        self.install_special(KIND_DOCTOR_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_dark_path(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &DARK_PATH_TAGS);
+        self.install_special(KIND_DARK_PATH_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_heart_piece(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &HEART_PIECE_TAGS);
+        self.install_special(KIND_HEART_PIECE_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_heart(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &HEART_TAGS);
+        self.install_special(KIND_HEART_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_subdan(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &SUBDAN_TAGS);
+        self.install_special(KIND_SUBDAN_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_moon(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &MOON_TAGS);
+        self.install_special(KIND_MOON_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_tower(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &TOWER_TAGS);
+        self.install_special(KIND_TOWER_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_terry(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &TERRY_TAGS);
+        self.install_special(KIND_TERRY_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn screen_set_sub_marine(&mut self, screen: &Screen) {
+        let panes = self.bind_special_panes(screen, &SUB_MARINE_TAGS);
+        self.install_special(KIND_SUB_MARINE_MAP, panes);
+        self.set_player_pos();
+    }
+
+    pub fn set_special_screen(
+        &mut self,
+        kind: u8,
+        screen: &Screen,
+        charts: &Charts,
+        world: &WorldFacts,
+    ) {
+        match kind {
+            KIND_TINGLE_MAP => self.screen_set_tingle(screen),
+            KIND_DOCTOR_MAP => self.screen_set_doctor(screen),
+            KIND_DARK_PATH_MAP => self.screen_set_dark_path(screen),
+            KIND_HEART_PIECE_MAP => self.screen_set_heart_piece(screen),
+            KIND_HEART_MAP => self.screen_set_heart(screen),
+            KIND_SUBDAN_MAP => self.screen_set_subdan(screen),
+            KIND_MOON_MAP => self.screen_set_moon(screen),
+            KIND_TOWER_MAP => self.screen_set_tower(screen),
+            KIND_TERRY_MAP => self.screen_set_terry(screen),
+            KIND_SUB_MARINE_MAP => self.screen_set_sub_marine(screen),
+            KIND_GHOST_SHIP => {
+                let Some(tags) = special_tags(kind) else {
+                    return;
+                };
+                let panes = self.bind_special_panes(screen, tags);
+                self.install_special(kind, panes);
+                self.ghost_ship_screen_set(world);
+            }
+            KIND_TREASURE_MAP => {
+                let Some(tags) = special_tags(kind) else {
+                    return;
+                };
+                let panes = self.bind_special_panes(screen, tags);
+                self.install_special(kind, panes);
+                self.treasure_screen_set(charts);
+                self.set_player_pos();
+            }
+            _ => {}
         }
     }
 

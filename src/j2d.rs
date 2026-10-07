@@ -248,10 +248,16 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
         let block_start = reader.at;
         let block_end = (block_start + size).min(reader.bytes.len());
         match magic {
-            b"EXT1" => return,
-            b"END1" => {
+            b"EXT1" => {
                 reader.at = block_end;
                 return;
+            }
+            b"END1" => {
+                reader.at = block_end;
+                if depth == 0 {
+                    return;
+                }
+                continue;
             }
             b"BGN1" => {
                 reader.at = block_end;
