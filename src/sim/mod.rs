@@ -177,6 +177,7 @@ pub mod isle_timer;
 pub mod jbaba;
 pub mod jnt_hit;
 pub const FLOORMASTER_ARCHIVE: &str = "fm";
+pub mod jpa;
 pub mod jump;
 pub mod kanban;
 pub mod npc_ah;
@@ -1625,6 +1626,7 @@ pub fn build(
     sim.world
         .insert_resource(cam_event::SplinePaths::default());
     weather::init(&mut sim.world);
+    jpa::init(&mut sim.world);
     salvage::init(&mut sim.world);
     gy_ctrl::init(&mut sim.world);
     event_manager::init(&mut sim.world);
@@ -1768,6 +1770,7 @@ pub fn build(
                     weather::control.in_set(WwSimSet::Execute),
                     weather::control_clouds.in_set(WwSimSet::Execute),
                     weather::control_draw.in_set(WwSimSet::Execute),
+                    jpa::control.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
                 ssturu::control.in_set(WwSimSet::Execute),
                 evsw::control.in_set(WwSimSet::Execute),
