@@ -180,6 +180,15 @@ pub struct Camera {
     /// `dCamera_c::mCenter` / `mEye` / `mDirection` and the event flags `bumpCheck` keeps,
     /// which is the camera collision pass's own state.
     pub bump: Bump,
+    /// `dCamera_c::mEventFlags`, `d_camera.h:382`, the word `chkFlag`, `setFlag` and `clrFlag`
+    /// all read and write, `d_camera.h:620-626`. Retail keeps one word for the whole camera, so
+    /// the collision pass's four bits and the engines' bits share it; this port leaves those
+    /// four where [`Bump::flags`] already keeps them and gives every other reader this word.
+    /// Nothing outside the camera writes it except the cutscene actors that call
+    /// `SubjectLockOn`, `SubjectLockOff`, `CStickUse`, `CStickUseless`, `StickUse`,
+    /// `StickUseless` and `ScopeViewMsgModeOff`, `d_camera.cpp:5220-5272`, none of which the port
+    /// runs, so the value starts at zero and every bit is set by the engine that owns it.
+    pub event_flags: u32,
     /// `dCamera_c::mWork`, the per-engine cross-frame state the engines other than follow keep.
     pub work: cam_engine::Work,
     /// `dCamera_c::m548` through `mBankShake`, the screen shake `shakeCamera` runs each frame.
@@ -209,6 +218,7 @@ impl Default for Camera {
             yaw_trim: SAngle::ZERO,
             orbit_yaw: 0.0,
             bump: Bump::default(),
+            event_flags: 0,
             work: cam_engine::Work::default(),
             shake: cam_engine::Shake::default(),
         };

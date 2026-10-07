@@ -7,9 +7,12 @@ use super::camera::Camera;
 use super::player::Player;
 use super::player_status::{self, PlayerStatus};
 
-/// The `dCamera_c::mEventFlags` bits `lockonCamera` reads or writes. Retail keeps them in the
-/// event word beside the collision pass's own, `d_camera.cpp:784` builds that word and
-/// `cam_bump::Bump::flags` is where this port keeps it.
+/// The `dCamera_c::mEventFlags` bits `lockonCamera` reads or writes, `d_camera.cpp:3291-3640`.
+///
+/// Retail keeps them in the one event word beside the collision pass's own four. This port puts
+/// every bit below on [`Camera::event_flags`](super::camera::Camera::event_flags) except
+/// [`SIGHT`], whose two bits the collision pass is the only writer of, which is where
+/// [`cam_bump::Bump::flags`] still holds them.
 pub mod flag {
     /// `setFlag(0x10)` at `d_camera.cpp:1240`, read at `:3439` and `:3576`: the player is
     /// aiming, which pins both cushions and the latitude rate.
@@ -17,19 +20,24 @@ pub mod flag {
     /// `setFlag(0x100)` at `d_camera.cpp:3395` and cleared at `:3352`: the placement has held
     /// long enough that the longitude span stops being scaled over the first sixty frames.
     pub const ENTERED: u32 = 0x100;
-    /// `setFlag(0x2000)` at `d_camera.cpp:3638`, read at `:4058`: the lock-on engine ran.
+    /// `setFlag(0x2000)` at `d_camera.cpp:3638`, read by the collision pass at `:2119` for the
+    /// locked-on sight radius, which this port does not run.
     pub const LOCKED: u32 = 0x2000;
     /// `setFlag(0x4000000)` at `d_camera.cpp:3563`: a charge pull-in is running.
     pub const CHARGE: u32 = 0x4000_000;
-    /// `chkFlag(0x80080)` at `d_camera.cpp:3412`: the player must be inside the window.
+    /// `chkFlag(0x80080)` at `d_camera.cpp:3412`: the player must be inside the window. Both
+    /// bits are the collision pass's own, `setFlag(0x80)` at `:2235` and `setFlag(0x80000)` at
+    /// `:2225`, so this mask reads [`cam_bump::Bump::flags`] and no other word.
     pub const SIGHT: u32 = 0x80080;
 }
 
 /// `dCamera_c::mWork.lockon`, `d_camera.h:308-324`, narrowed to the members the engine reads
-/// back. `m378`'s `'LOCK'` tag, `m37C`, `m39C`, `m39D` and `m378`'s spare bytes are left out:
-/// the first is retail's own mark and the rest are written and read by no line of the engine.
+/// back. The padding between `m378` and `m380` is left out, and so is `m38C`, which the first
+/// frame zeroes at `d_camera.cpp:3300` and which no line of the readable text reads back.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Lockon {
+    /// `m378`: the `'LOCK'` mark retail stamps on the arm when its first frame runs.
+    pub tag: i32,
     /// `m380`: the frames a charge pull-in has been held for, which spends the pull.
     pub charge_frames: i32,
     /// `m384`: the gain the unobstructed radius arm multiplies its target by, `1.0` on the
@@ -53,11 +61,19 @@ pub struct Lockon {
     pub latitude_gain: f32,
     /// `m3B8`: the eased cushion the anchor's height is walked with.
     pub cushion: f32,
+    /// `m39C`: the latch `!LockonTruth() && STTS0_BOOMERANG_WAIT` sets at `:3325-3330`.
+    /// Nothing in the target's readable text reads it back: the sibling's copy-rod arm at
+    /// `sibling d_camera.cpp:4680-4707` does, and the target dropped that whole block.
+    pub waiting: bool,
+    /// `m39D`: the latch `STTS0_UNK400` holds, so the `StartShock` at `:3339` fires once
+    /// per press. The latch is ported; the vibration has no port.
+    pub shocked: bool,
 }
 
 impl Default for Lockon {
     fn default() -> Self {
         Self {
+            tag: 0,
             charge_frames: 0,
             scale: 0.0,
             blocked: 0,
@@ -68,6 +84,8 @@ impl Default for Lockon {
             radius_gain: 0.0,
             latitude_gain: 0.0,
             cushion: 0.0,
+            waiting: false,
+            shocked: false,
         }
     }
 }
@@ -95,13 +113,19 @@ const CURVE_WEIGHT: f32 = 1.0;
 /// attention type, so this is the row's own distance and nothing else, which is the same
 /// figure the lock list measures against.
 const RELEASE: f32 = 200.0;
+/// `d_camera.cpp:3298`, `mWork.lockon.m378 = 'LOCK'`.
+const TAG: i32 = i32::from_be_bytes(*b"LOCK");
 /// `d_camera.cpp:3293`, `r28`: the frames the sight-block latch holds before it clears.
 const BLOCK_FRAMES: i32 = 60;
 /// `d_camera.cpp:3294`, `f30`: the gain on the latitude the obstructed arm eases onto, the
 /// one rate in the function that is not the setup's.
 const BLOCK_GAIN: f32 = 0.05;
-/// `d_camera.cpp:3441` and `:3577`: the cushion and the latitude rate the aiming flag forces.
-const AIM_RATE: f32 = 0.01;
+/// `d_camera.cpp:3441`: the centre-height cushion the aiming flag pins to.
+const AIM_CUSHION: f32 = 0.01;
+/// `d_camera.cpp:3577`: the rate the aiming flag's latitude converges on the style's own at.
+/// It is not the cushion's figure: the sibling reference has no arm here at all, so this is the
+/// target's own and the two differ.
+const AIM_LATITUDE: f32 = 0.05;
 /// `d_camera.cpp:3509` and `:3512`: the nudge either side of straight behind while blocked.
 const BLOCK_NUDGE: f32 = 15.0;
 /// `d_camera.cpp:3626`: the radius the obstructed arm walks the placement onto.
@@ -122,13 +146,21 @@ const LATCH_STICK: f32 = 0.1;
 /// `dCamera_c::lockonCamera(s32 style)`, `d_camera.cpp:3291-3640`.
 ///
 /// The function is framed on the lock-on target throughout: its attention point becomes the
-/// globe the eye rides (`d_camera.cpp:3366-3374`), the separation of the two actors scales
+/// globe the eye rides (`d_camera.cpp:3370-3374`), the separation of the two actors scales
 /// every style lookup (`d_camera.cpp:3375`), the sight tests at `:3412-3421` and `:3423-3426`
 /// need an actor to look at, and the frame it opens by latching the target's own state.
 ///
 /// This port has the target, and `EngineInput::lockon` carries it. Everything the readable
 /// text reaches through an actor beyond that point is listed in the notes below; none of it
 /// stands in the way of the placement itself, which is the whole of the body here.
+///
+/// Three members of the arm are now carried that the first draft left out: the `'LOCK'` tag
+/// `m378` takes, `m39C`'s latch and `m39D`'s, written at `:3298`, `:3330` and `:3339` from the
+/// pad states the port already publishes.
+///
+/// The lock-on target the port publishes is `positionOf` and not `attentionPos`, so the boss arm
+/// below and the globe at `:3370-3374` are reading the same point retail reads the second of.
+/// Nothing downstream distinguishes them.
 ///
 /// What is not ported, in the order the reference reaches it:
 ///
@@ -137,8 +169,9 @@ const LATCH_STICK: f32 = 0.1;
 ///   points, and it feeds nothing else in the readable text.
 /// - `d_camera.cpp:3328-3330`: `m31D`, the moving-background carry. Nothing in the port
 ///   publishes a moving background.
-/// - `d_camera.cpp:3338-3346`: the `StartShock` on `UNK400`. The pad states behind the other
-///   arms of the function are published, so they read; only the vibration has no port.
+/// - `d_camera.cpp:3338-3346`: the `StartShock` on `UNK400`. `m39D`'s latch is carried as
+///   [`Lockon::shocked`] and written every frame, so only the vibration itself is missing; the
+///   rising edge the reference gates it on is the port's one-frame `!shocked` read.
 /// - `d_camera.cpp:3363`: the parallel arm clears the camera's own target. The target arrives
 ///   read-only, and retail's other three writers of it are the mode and type choosers this
 ///   port does not run, so the arm is taken on its own reading and the clearing is left to
@@ -149,8 +182,10 @@ const LATCH_STICK: f32 = 0.1;
 ///   forced-lock identity retail keeps in `mLockOnActorId`.
 /// - `d_camera.cpp:3583-3592`: the boomerang arm of the latitude, which needs the player's
 ///   thrown boomerang and the map test in `m784`.
-/// - `d_camera.cpp:3596-3603`: the separation the `UNK400` arm measures into `fVar22`, which
-///   the function never reads again.
+/// - `d_camera.cpp:3596-3603`: the separation the `UNK400` arm measures into `fVar22`. The
+///   sibling writes the same member as the sight radius at `sibling d_camera.cpp:4702` and its
+///   copy-rod arm reads it back at `:4690`; the target dropped that arm, so the value lands in a
+///   member whose only later reader is the radius arm's own register reuse.
 ///
 /// One accessor does not read the way the arm around it suggests. At `d_camera.cpp:3580`
 /// the airborne arm eases the latitude toward `local_240.U()`, which under this port's
@@ -159,6 +194,16 @@ const LATCH_STICK: f32 = 0.1;
 /// own cosine. It is taken as written: the port subtracts the inclination from the latitude
 /// there, which is the one line of this engine whose shape rests on how the reference spells
 /// its accessors.
+///
+/// The radius arm at `d_camera.cpp:3604-3612` is the one place the target's own text cannot be
+/// taken literally. `DefaultRadius` leaves its radius clamped when it returns false, and the
+/// true branch then reads a `fVar22` the reference has recycled: the function's opening
+/// `mCamSetup.m0B4`, the narrow-span rate at `:3530` and the `UNK400` separation above all land
+/// there. The sibling's matching arm is readable and has a different shape again, easing toward
+/// the style's own near/far radius at two percent inside the band and toward the clamped radius
+/// at `0.4 * sp194` outside it (`sibling d_camera.cpp:5010-5016`), and the `sp194` ramp it scales
+/// by has no counterpart in the target at all. This port keeps the target's two-branch shape and
+/// its 0.05: inside the band the radius holds, outside it the radius eases onto the clamp.
 pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bool {
     let status: &PlayerStatus = input.follow.status;
     let target = input.lockon.target;
@@ -166,10 +211,11 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     let facing = SAngle::from_radians(player.face);
     let mut work = camera.work.lockon;
     let mut cache = camera.view_cache;
-    let mut flags = camera.bump.flags;
+    let mut flags = camera.event_flags;
 
     if camera.age == 0 {
         camera.settled = true;
+        work.tag = TAG;
         work.charge_frames = 0;
         work.scale = 1.0;
         work.blocked = 0;
@@ -181,6 +227,9 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
         work.side = 0;
         work.swap = 0;
     }
+
+    work.waiting = !input.lockon.truth && status.check0(player_status::STTS0_BOOMERANG_WAIT);
+    work.shocked = status.check0(player_status::STTS0_UNK400);
 
     if input.lockon.focus {
         camera.setup_age = 0;
@@ -229,7 +278,7 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     }
 
     let mut blocked = false;
-    if flags & flag::SIGHT != 0 && !point_in_sight(camera, attention) {
+    if camera.bump.flags & flag::SIGHT != 0 && !point_in_sight(camera, attention) {
         if work.blocked == 0 {
             work.swap = i32::from(work.side != 1);
         }
@@ -255,8 +304,8 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     let _ = custom_rbr_ratio(radius_ratio(camera, cache.direction.radius()), CURVE_WEIGHT);
 
     let cushion = if flags & flag::AIM != 0 {
-        work.cushion = AIM_RATE;
-        AIM_RATE
+        work.cushion = AIM_CUSHION;
+        AIM_CUSHION
     } else if !camera.bump.on_floor {
         CUSHION_JUMP
     } else {
@@ -368,7 +417,7 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     } else {
         work.charge_frames = 0;
         if flags & flag::AIM != 0 {
-            latitude += (lockon_latitude(camera, ratio) - latitude) * AIM_RATE;
+            latitude += (lockon_latitude(camera, ratio) - latitude) * AIM_LATITUDE;
         } else if !camera.bump.on_floor && !status.check0(player_status::STTS0_UNK400) {
             latitude += (held.longitude() - latitude)
                 * stick_latitude
@@ -409,7 +458,7 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     cache.fovy += (lockon_fovy(camera, ratio) - cache.fovy) * SETTLE;
     flags |= flag::LOCKED;
 
-    camera.bump.flags = flags;
+    camera.event_flags = flags;
     camera.work.lockon = work;
     camera.view_cache = cache;
     cam_follow::publish(camera);

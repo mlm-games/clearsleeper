@@ -8,11 +8,44 @@ use super::cam_tp_engines;
 use super::camera::Camera;
 use super::collision::Collision;
 use super::player::Player;
-use super::player_status::{self, PlayerStatus};
+use super::player_status;
 
 /// The player's `mHeight`, which `getHeight` answers for a player at `d_camera.cpp:1988-1994`
 /// and which the two fixed-placement engines divide their travel by.
 const PLAYER_HEIGHT: f32 = 125.0;
+
+/// `mWork.subject.m378 = 'SUBJ'`, `d_camera.cpp:3852`.
+const SUBJECT_TAG: i32 = i32::from_be_bytes(*b"SUBJ");
+/// `mWork.subject.m3A8 = 100`, `d_camera.cpp:3861`.
+const SUBJECT_COUNTER: i32 = 100;
+/// `at.y -= 25.0f`, `d_camera.cpp:4060`: how far below the target's attention point the settled
+/// arm's aim sits.
+const SUBJECT_DROP: f32 = 25.0;
+/// `mCamSetup.m030`, `d_cam_param.cpp:316`: the scoped styles' zoom gain, which
+/// `CalcSubjectAngle` folds into the style's own gate at `d_camera.cpp:3791`.
+const SUBJECT_CUSHION: f32 = 0.75;
+/// `mCamSetup.mCurveWeight`, `d_cam_param.cpp:322`, the ease `CalcSubjectAngle` and the scope's
+/// zoom both run their stick through.
+const CURVE_WEIGHT: f32 = 1.0;
+
+/// The `dCamera_c::mEventFlags` bits `subjectCamera` and `eventCamera` read or write, on
+/// [`Camera::event_flags`].
+///
+/// The four bits `bumpCheck` writes stay on [`Bump::flags`](super::cam_bump::Bump::flags),
+/// because that module owns them and nothing in this file is allowed to move them.
+pub mod evflag {
+    /// `setFlag(0x800)` at `d_camera.cpp:3892` from the style's `UNK080`, read at `:904`.
+    pub const SUBJECT: u32 = 0x800;
+    /// `setFlag(0x10000000)` at `d_camera.cpp:3895` from the style's `UNK100`, read at `:908`.
+    pub const SUBJECT_WIDE: u32 = 0x1000_0000;
+    /// `setFlag(0x3000000)` in `SubjectLockOn` / `SubjectLockOff`, `d_camera.cpp:5222-5230`.
+    /// Bit 25 is what `subjectCamera`'s settled arm tests twice, at `:4058` and `:4077`.
+    pub const SUBJECT_LOCK: u32 = 0x2000_000;
+    /// `chkFlag(0x20000000)` at `d_camera.cpp:4761`, `:388`, `:697`, `:716`, `:924` and `:1270`.
+    /// Nothing in the target's own sources writes it: it is the "an event camera is running" bit
+    /// and the target gates those six sites on the event manager's camera-play query beside it.
+    pub const EVENT_PLAY: u32 = 0x2000_0000;
+}
 
 /// The lock-on state `dCamera_c` carries beside the style: the one target the camera is aimed
 /// at and the two answers `dAttention_c` gives about it.
@@ -143,14 +176,22 @@ impl Default for FixedPos {
     }
 }
 
-/// `dCamera_c::mWork.subject`, `d_camera.h:325-349`, narrowed to the members the placement arm at
-/// `d_camera.cpp:3851-4000` reads and writes. The angle pair `m3B8` / `m3BA` and the settle term
-/// `m37C` belong to `CalcSubjectAngle` and to the settled arm, which need a lock-on target.
+/// `dCamera_c::mWork.subject`, `d_camera.h:325-349`, narrowed to the members `subjectCamera` and
+/// `CalcSubjectAngle` read and write at `d_camera.cpp:3829-4176` and `:3692-3827`.
+///
+/// `m390` and `m394` are written by the placement arm's last frame and read by no line of the
+/// readable text; `m398` is the scope's wipe target. `m3B8`, the pitch the angle source measures,
+/// is written at `:3737` and `:3740` and read nowhere, so the port does not carry it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Subject {
+    /// `m378`: the `'SUBJ'` mark retail stamps on the arm when its first frame runs.
+    pub tag: i32,
+    /// `m37C`: the settled arm's aim-source latch, read by `CalcSubjectAngle` at `:3716` and
+    /// written at `:4017`, `:4076`, `:4096` and `:4108`.
+    pub pad: bool,
     /// `m37D`: which of the two angle sources the settled arm reads.
     pub from_pad: bool,
-    /// `m380`: the style the placement belongs to.
+    /// `m380`: the style the placement belongs to, which is the row `CalcSubjectAngle` reads.
     pub style: i32,
     /// `m384`: the aim stick's horizontal contribution.
     pub aim_x: f32,
@@ -168,6 +209,8 @@ pub struct Subject {
     pub zoom_fovy: f32,
     /// `m3A0`: the scoped field of view.
     pub fovy: f32,
+    /// `m3A8`: the frames the settled arm has run, counted to ten at `:4105-4106`.
+    pub counter: i32,
     /// `m3BC`: whether the framed viewport has been taken once.
     pub framed: bool,
     /// `m3BD`: set when the player stands inside the floor margin, which pins the offset.
@@ -181,6 +224,8 @@ pub struct Subject {
 impl Default for Subject {
     fn default() -> Self {
         Self {
+            tag: 0,
+            pad: false,
             from_pad: true,
             style: i32::from(cam_style::NONE),
             aim_x: 0.0,
@@ -191,6 +236,7 @@ impl Default for Subject {
             entry: 0.0,
             zoom_fovy: 0.0,
             fovy: 0.0,
+            counter: 0,
             framed: false,
             low: false,
             source: 0,
@@ -199,12 +245,89 @@ impl Default for Subject {
     }
 }
 
+/// One of the two view stacks `eventCamera` snapshots on its first frame,
+/// `d_camera.h:168-178`: `m0A4[1]` and `m0A4[0]`, `d_camera.cpp:4735-4749`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EventView {
+    pub center: Vec3,
+    pub eye: Vec3,
+    pub fovy: f32,
+    pub bank: SAngle,
+    /// `m1E`: the frame counter the stack keeps, zeroed by the snapshot.
+    pub age: i16,
+}
+
+impl Default for EventView {
+    fn default() -> Self {
+        Self {
+            center: Vec3::ZERO,
+            eye: Vec3::ZERO,
+            fovy: 0.0,
+            bank: SAngle::ZERO,
+            age: 0,
+        }
+    }
+}
+
 /// `dCamera_c::m118`, the frame counter `eventCamera` latches its first frame on,
-/// `d_camera.h:193`.
+/// `d_camera.h:193`, with the cut of `mEventData`, `d_camera.h:79-96`, the parts `eventCamera`
+/// itself touches at `d_camera.cpp:4735-4854`.
+///
+/// `staff` and `action` are the seam the engine cannot fill itself: `staff` is
+/// `mEventData.mStaffIdx`, the event manager's `getMyStaffId("CAMERA")`, and `action` is the
+/// index its `getMyActIdx` hands back for that staff. Both default to `-1`, which is what
+/// retail's constructor writes (`d_camera.cpp:224-225`) and what makes the guard at `:4761-4770`
+/// decline. Nothing in the port calls the event manager, so the engine runs its first-frame
+/// frame and stops there.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Event {
     pub age: u32,
+    /// `mEventData.mStaffIdx`.
+    pub staff: i32,
+    /// `mEventData.field_0x18`: the cut `eventCamera` replays when no staff is running.
+    pub action: i32,
+    /// `mEventData.field_0x1c`: the trim type, latched to `2` on the cut's first frame.
+    pub trim: i32,
+    /// `mEventData.field_0x20`: the collision flag word the cut selects.
+    pub bg_check: i32,
+    /// `m0A4[1]` and `m0A4[0]`.
+    pub saved: [EventView; 2],
 }
+
+/// `eventCamera`'s action table, `d_camera.cpp:4713-4742`, in the order `l_func` indexes it at
+/// `:4682-4710`. The sibling carries thirty-four entries against this table's twenty-eight, the
+/// extra six being `STBWAIT`, `CURRENT`, `PEEPHOLE`, `DIGHOLE`, `HINTTALK` and `BSPTRANS` between
+/// `UNIACCELE` and `MAPTOOL`.
+pub const EVENT_ACTIONS: [&str; 28] = [
+    "PAUSE",
+    "WAIT",
+    "TALK",
+    "FIXEDPOS",
+    "FIXEDFRM",
+    "UNITRANS",
+    "WATCHACTOR",
+    "RESTOREPOS",
+    "GETITEM",
+    "GAMEOVER",
+    "TURNTOACTOR",
+    "ROLLING",
+    "TACT",
+    "WINDDIR",
+    "TORNADO",
+    "STYLE",
+    "SAVE",
+    "LOAD",
+    "USEITEM0",
+    "USEITEM1",
+    "FIXEDFRMS",
+    "BSPLINE",
+    "POSSESSED",
+    "TWOACTOR0",
+    "STOKER",
+    "UNIBRAKE",
+    "UNIACCELE",
+    "MAPTOOL",
+];
 
 /// `dCamera_c::m548` through `mBankShake`, `d_camera.h:398-407`: the shake `StartShake` loads and
 /// `shakeCamera` runs. The pattern is five bytes because the sixteen-bit read at
@@ -443,7 +566,7 @@ pub fn engine(
         Some(CamEngine::Crawl) => crawl(camera, player, room, input.collision),
         Some(CamEngine::FixedFrame) => fixed_frame(camera, player, room, input.collision),
         Some(CamEngine::FixedPosition) => fixed_position(camera, player, room),
-        Some(CamEngine::Subject) => subject(camera, player, input.follow.status, input.cstick),
+        Some(CamEngine::Subject) => subject(camera, player, input),
         Some(CamEngine::Event) => event(camera),
         Some(CamEngine::Lockon) => cam_lockon::lockon(camera, player, input),
         Some(CamEngine::NonOwner) => non_owner(camera),
@@ -773,18 +896,21 @@ fn fixed_position(camera: &mut Camera, player: &Player, room: Option<&CamRoom>) 
     true
 }
 
-/// `dCamera_c::subjectCamera`'s placement arm, `d_camera.cpp:3829-4001`: the state its first frame
-/// writes and the ten frames, or seven while the aim stick is held, the centre, the globe and the
-/// field of view are walked across.
+/// `dCamera_c::subjectCamera`, `d_camera.cpp:3829-4176`: the state its first frame writes, the
+/// ten frames, or seven while the aim stick is held, the placement is walked across, and then
+/// the settled arm, which is [`subject_settled`].
 ///
-/// The settled arm at `d_camera.cpp:4003-4176` is not ported. Every branch of it aims at
-/// `mpLockonTarget` or reads `mExtendedPos`, and the port carries neither: it needs a lock-on
-/// actor with its attention position and its shape angles, plus the extended position a scoped
-/// cutscene publishes. The scope's own field-of-view block at `d_camera.cpp:3944-3997` and the
-/// framed viewport at `d_camera.cpp:4007-4014` need the scope wipe scale and the clock. The engine
-/// therefore declines once the placement has finished, which leaves the published placement to the
-/// collision pass.
-fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: Vec2) -> bool {
+/// The centre source `m3C0` is chosen on the first frame at `d_camera.cpp:3865-3869`: `1` when the
+/// subject action is off and the style lacks `UNK010`, `2` under a mini-game this port does not
+/// track, and `0` otherwise. The placement arm uses the longitude accessor and the settled arm
+/// the latitude one, as each does in the target.
+///
+/// The scope's own field-of-view block inside the placement at `d_camera.cpp:3944-3997` is still
+/// out: it needs `g_dComIfG_gameInfo.play.mItemScopeWipeScale`, and the centre source `2` needs
+/// the extended position a scoped cutscene publishes.
+fn subject(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bool {
+    let status = input.follow.status;
+    let cstick = input.cstick;
     let mut offset = Vec3::new(
         camera.val(param::UNK1),
         camera.val(param::CENTER_HEIGHT_BASE),
@@ -795,16 +921,21 @@ fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: 
     let mut work = camera.work.subject;
 
     if camera.age == 0 {
+        work.tag = SUBJECT_TAG;
+        work.pad = false;
         work.from_pad = true;
         work.style = i32::from(camera.current_style);
         work.aim_x = 0.0;
         work.aim_y = 0.0;
         work.zoom = 0.0;
-        work.entry = 100.0;
+        work.counter = SUBJECT_COUNTER;
         work.framed = false;
         work.source = 0;
         work.low = player.pos.y < camera.bump.floor + 20.0;
         work.pull = if cstick.y < -0.74 { 2 } else { 0 };
+        if !status.check0(player_status::STTS0_SUBJECT) && !camera.has_flag(flag::UNK010) {
+            work.source = 1;
+        }
     }
 
     if work.low {
@@ -813,15 +944,14 @@ fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: 
     }
 
     if camera.has_flag(flag::UNK080) {
-        camera.bump.flags |= 0x800;
+        camera.event_flags |= evflag::SUBJECT;
     }
     if camera.has_flag(flag::UNK100) {
-        camera.bump.flags |= 0x1000_0000;
+        camera.event_flags |= evflag::SUBJECT_WIDE;
     }
 
     if camera.settled {
-        camera.work.subject = work;
-        return false;
+        return subject_settled(camera, player, input, work, offset, radius, fovy);
     }
 
     let end = if status.check0(player_status::STTS0_SUBJECT) {
@@ -832,12 +962,13 @@ fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: 
     let share = 1.0 / ((end - camera.age as i32) as f32);
     let facing = SAngle::from_radians(player.face);
 
-    let target = if work.source == 1 {
-        let mut globe = SGlobe::from_xyz(offset);
-        globe.set_longitude(facing + globe.longitude());
-        player.pos + Vec3::new(0.0, PLAYER_HEIGHT, 0.0) + globe.to_xyz()
-    } else {
-        cam_follow::relational_pos(player, facing, offset)
+    let target = match work.source {
+        1 => {
+            let mut globe = SGlobe::from_xyz(offset);
+            globe.set_longitude(facing + globe.longitude());
+            player.pos + Vec3::new(0.0, PLAYER_HEIGHT, 0.0) + globe.to_xyz()
+        }
+        _ => cam_follow::relational_pos(player, facing, offset),
     };
 
     let center = camera.view_cache.center;
@@ -869,12 +1000,232 @@ fn subject(camera: &mut Camera, player: &Player, status: &PlayerStatus, cstick: 
     true
 }
 
+/// `dCamera_c::subjectCamera`'s settled arm, `d_camera.cpp:4003-4176`.
+///
+/// The angle pair comes from [`subject_angle`], which is `CalcSubjectAngle`, and it is reachable
+/// here because the pitch it measures, `m3B8`, is written at `:3737` and read by nothing while
+/// `m3BA` cancels against the `+ m3BA` the return at `:3820-3822` adds. `m37D` is `1` on every
+/// frame the settled arm runs, `:4157` re-arming it after `:4017` sets it, so the actor-shape arm
+/// at `:4021-4032` is dead code in the target and the pad arm always takes it.
+///
+/// The three smoothing arms at `:4058-4110` are chosen on `mEventFlags`'s subject-lock bit and on
+/// `mLockOnActorId`. The port has neither the bit, which only `SubjectLockOn` and
+/// `SubjectLockOff` set, nor the forced-lock identity, so the first arm's guard
+/// `((mEventFlags >> 0x19) & 1) == 0 && (mLockOnActorId == -1)` always holds and the frame aims
+/// at the lock-on target. That arm dereferences `mpLockonTarget` unguarded, as the target's own
+/// text does, so with no target there is nothing to aim at and the engine declines rather than
+/// invent one.
+///
+/// The second arm at `:4077` needs `mExtendedPos`, the position a scoped cutscene publishes
+/// through `SetExtendedPosition`, `d_camera.cpp:5262-5268`, and the third at `:4090` needs the
+/// arm above, so the engine declines outright once [`evflag::SUBJECT_LOCK`] is set, the only way
+/// into either. The centre source `2`, the mini-game path at `:4044-4047`, declines for the same
+/// reason, as does its placement counterpart at `:3917-3921`. The viewport block at `:4007-4014`
+/// needs the game clock, the `setComStat` calls have no port, and the scope's `setComZoomScale` /
+/// `setComZoomForcus` / auto-focus at `:4140-4148` are the zoom block's only remaining effect, so
+/// the field of view moves and the view scale does not.
+fn subject_settled(
+    camera: &mut Camera,
+    player: &Player,
+    input: &EngineInput<'_>,
+    mut work: Subject,
+    offset: Vec3,
+    radius: f32,
+    fovy: f32,
+) -> bool {
+    let status = input.follow.status;
+    let facing = SAngle::from_radians(player.face);
+    let base_yaw = facing.inv();
+    let wide_angle = camera.val(param::LOCKON_LONGITUDE_MAX);
+    let tall_angle = camera.val(param::LOCKON_LATITUDE_MAX);
+    let rate = camera.val(param::UNK20);
+
+    if work.from_pad {
+        work.pad = true;
+        subject_angle(camera, input, &mut work);
+    }
+    let ang_x = SAngle::from_degrees(tall_angle) * work.aim_y;
+    let ang_y = SAngle::from_degrees(wide_angle) * work.aim_x;
+
+    if camera.event_flags & evflag::SUBJECT_LOCK != 0 || work.source == 2 {
+        camera.work.subject = work;
+        return false;
+    }
+
+    let Some(lockon) = input.lockon.target else {
+        camera.work.subject = work;
+        return false;
+    };
+
+    let mut cache = camera.view_cache;
+    let rotated = rotate_y(rotate_x(offset, ang_x), ang_y);
+    cache.center = if work.source == 1 {
+        let mut globe = SGlobe::from_xyz(rotated);
+        globe.set_latitude(facing + globe.longitude());
+        player.pos + Vec3::new(0.0, PLAYER_HEIGHT, 0.0) + globe.to_xyz()
+    } else {
+        cam_follow::relational_pos(player, facing, rotated)
+    };
+
+    let want = SGlobe::from_xyz(
+        cache.center - Vec3::new(lockon.x, lockon.y - SUBJECT_DROP, lockon.z),
+    );
+    let current = cache.direction.radius();
+    cache
+        .direction
+        .set_radius(current + (radius - current) * 0.04);
+    let current = cache.direction.longitude();
+    cache
+        .direction
+        .set_longitude(current + (want.longitude() - current) * 0.04);
+    let current = cache.direction.latitude();
+    cache
+        .direction
+        .set_latitude(current + (want.latitude() - current) * 0.04);
+
+    let yaw = cache.direction.longitude();
+    work.aim_x = (yaw - base_yaw).degree() / wide_angle;
+    work.aim_y = yaw.degree() / tall_angle;
+    work.counter = 0;
+    work.pad = false;
+
+    cache.eye = cache.center + cache.direction.to_xyz();
+
+    if camera.has_flag(flag::UNK010) {
+        let ease = cam_follow::rational_bezier_ratio(-input.cstick.y, CURVE_WEIGHT);
+        let next = work.zoom + camera.val(param::FOVY_UPPER) * (0.0 - ease) * 0.1;
+        work.zoom = next.clamp(0.0, 1.0);
+        let zoomed = zoom_fovy(work.zoom_fovy * 0.5, work.zoom * 8.0 + 1.0) * 2.0;
+        cache.fovy += rate * (zoomed - cache.fovy);
+    } else {
+        cache.fovy += rate * (fovy - cache.fovy);
+    }
+
+    work.from_pad = true;
+    if status.check0(player_status::STTS0_SUBJECT) {
+        if work.pull == 2 && input.cstick.y >= -0.001 {
+            work.pull = 0;
+        } else if work.pull == 1 && input.cstick.y < -0.74 {
+            work.pull = 2;
+        } else if input.cstick.y < -0.001 {
+            work.pull = 1;
+        } else {
+            work.pull = 0;
+        }
+    }
+
+    camera.work.subject = work;
+    camera.view_cache = cache;
+    cam_follow::publish(camera);
+    true
+}
+
+/// `dCamera_c::CalcSubjectAngle`, `d_camera.cpp:3692-3827`: the aim pair `m384` and `m388` the
+/// settled arm rotates the eye offset by, as the fraction of the two style angles the raw angle
+/// spans. `m384` is scaled by slot 24 and `m388` by slot 19 on the way out at `:3819-3822`, and
+/// the settled arm divides them back the same way at `:4068-4069`.
+///
+/// The three gates at `:3704-3714` are the camera play, the `'SUBJ'` tag and `m100`; the caller
+/// has already cleared the first and holds the other two. The `!m37C` arm at `:3725-3731` writes
+/// the two outputs from the stale pair and then falls through to the live computation, which
+/// writes them again at `:3819-3822`, so nothing is lost by leaving it out. `m3B8`, the pitch read
+/// at `:3736-3741`, is written and read by nothing, and `m3BA` is `shape_angle.y`, the player's
+/// facing, which cancels against the `+ m3BA` the return adds: neither is carried.
+fn subject_angle(camera: &Camera, input: &EngineInput<'_>, work: &mut Subject) {
+    let status = input.follow.status;
+    let style = work.style as i16;
+    let row = cam_style::style_by_id(style);
+    let gate = cam_style::val_by_id(style, param::LOCKON_FOVY_MAX);
+    let open = if status.check0(player_status::STTS0_SUBJECT) {
+        gate
+    } else if row.is_some_and(|s| s.flag & flag::UNK010 != 0) {
+        gate - work.zoom * (gate * SUBJECT_CUSHION)
+    } else {
+        gate
+    };
+
+    let stick_x = cam_follow::limitf(input.cstick.x / 0.7, -1.0, 1.0);
+    let mut stick_y = cam_follow::limitf(input.cstick.y / 0.7, -1.0, 1.0);
+
+    if (camera.bump.eye.y <= camera.bump.floor + 5.0
+        || camera.bump.eye.y <= camera.bump.head_ground + 5.0)
+        && ((work.aim_y >= 0.0 && stick_y > 0.0) || (work.aim_y < 0.0 && stick_y <= 0.0))
+    {
+        stick_y = 0.0;
+    }
+    if status.check0(player_status::STTS0_CRAWL) {
+        stick_y = 0.0;
+    }
+
+    if status.check0(player_status::STTS0_UNK40000) {
+        work.aim_x = 0.0;
+    } else if row.is_some_and(|s| s.flag & flag::UNK020 != 0) {
+        work.aim_x = -stick_x;
+        work.aim_y = stick_y;
+    } else {
+        let ease_x = cam_follow::rational_bezier_ratio(stick_x, CURVE_WEIGHT);
+        let ease_y = cam_follow::rational_bezier_ratio(stick_y, CURVE_WEIGHT);
+        work.aim_x = (-ease_x * open).clamp(-1.0, 1.0);
+        work.aim_y = (work.aim_y + ease_y * open).clamp(-1.0, 1.0);
+    }
+
+    work.from_pad = false;
+}
+
 /// `dCamera_c::eventCamera`, `d_camera.cpp:4679-4885`: twenty-eight named cutscene actions read
-/// off the running cutscene's camera staff. The port has no cutscene feed and no staff index, so
-/// the guard at `d_camera.cpp:4761-4770`, which asks for a camera play and then for that play's
-/// camera staff, always holds and the engine declines, leaving the placement to the collision pass.
+/// off the running cutscene's camera staff.
+///
+/// What runs here is everything the function does before the twenty-eight arms: the two view
+/// stacks `m118 == 0` fills at `:4735-4749`, and the two-branch guard at `:4761-4789`, whose first
+/// branch asks the event manager for a camera play and then for that play's `CAMERA` staff, and
+/// whose second replays [`Event::action`] under [`evflag::EVENT_PLAY`]. The port runs no cutscene,
+/// so the first branch declines unless a feed publishes [`Event::staff`]; and even with a staff
+/// index the arms behind `:4713` all read their own parameters off it through `getEvIntData`,
+/// `getEvFloatData`, `getEvXyzData`, `getEvStringData` and `getEvActor`, all of which the
+/// target's own text leaves unmatched at `d_ev_camera.cpp:27-70`, so none of them can be written
+/// here. The names they are selected by are [`EVENT_ACTIONS`].
+///
+/// The trim latch and the collision flag word at `:4806-4852` are ported as their defaults,
+/// [`Event::trim`] to `2` and [`Event::bg_check`] to `1`, which is what the reference's own
+/// `getEvIntData` defaults give when the cut names neither. Both sit behind the guard, so they
+/// are only reachable through a feed that publishes a staff index.
 fn event(camera: &mut Camera) -> bool {
-    let _ = camera;
+    let mut cut = camera.work.event;
+
+    if cut.age == 0 {
+        let view = EventView {
+            center: camera.bump.center,
+            eye: camera.bump.eye,
+            fovy: camera.view_cache.fovy,
+            bank: camera.view_cache.bank,
+            age: 0,
+        };
+        cut.saved = [view, view];
+    }
+
+    let forced = camera.event_flags & evflag::EVENT_PLAY != 0;
+    if forced {
+        cut.staff = -1;
+        if cut.age == 0 {
+            camera.setup_age = 0;
+        }
+    } else if cut.staff < 0 {
+        camera.work.event = cut;
+        return false;
+    }
+
+    if cut.age == 0 && !forced {
+        camera.event_flags &= !0x0020_0000;
+        cut.trim = 2;
+        cut.bg_check = 1;
+    }
+
+    if !(0..EVENT_ACTIONS.len() as i32).contains(&cut.action) {
+        camera.work.event = cut;
+        return false;
+    }
+
+    camera.work.event = cut;
     false
 }
 
@@ -913,6 +1264,27 @@ impl Camera {
         };
         self.shake.run(anchor);
     }
+}
+
+/// `dCamMath::xyzRotateX`, `d_cam_param.cpp:71-79`, which is `cMtx_multVec` against the matrix
+/// `mDoMtx_XrotS` builds at `m_Do_mtx.cpp:87-104`: `y' = c*y - s*z`, `z' = s*y + c*z`.
+fn rotate_x(v: Vec3, angle: SAngle) -> Vec3 {
+    let (sin, cos) = (angle.sin(), angle.cos());
+    Vec3::new(v.x, cos * v.y - sin * v.z, sin * v.y + cos * v.z)
+}
+
+/// `dCamMath::xyzRotateY`, `d_cam_param.cpp:81-89`, against `mDoMtx_YrotS` at `m_Do_mtx.cpp:116-133`:
+/// `x' = c*x + s*z`, `z' = -s*x + c*z`.
+fn rotate_y(v: Vec3, angle: SAngle) -> Vec3 {
+    let (sin, cos) = (angle.sin(), angle.cos());
+    Vec3::new(cos * v.x + sin * v.z, v.y, -sin * v.x + cos * v.z)
+}
+
+/// `dCamMath::zoomFovy`, `d_cam_param.cpp:61-64`: the angle off the horizon whose tangent is the
+/// base angle's tangent over the zoom, in degrees.
+fn zoom_fovy(degrees: f32, scale: f32) -> f32 {
+    let base = SAngle::from_degrees(degrees);
+    base.sin().atan2(base.cos() * scale).to_degrees()
 }
 
 /// `cM3d_Len3dSqPntAndSegLine`, `c_m3d.cpp:69-91`: the point of the segment nearest `pos`, and
