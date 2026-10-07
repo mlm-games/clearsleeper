@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::collision::Collision;
+use super::link_proc::{SWIM_ALLOWED, allows};
 use super::player::Player;
 use super::sea::Sea;
 use super::water::{probe, Water};
@@ -37,11 +38,15 @@ pub struct Swim {
 pub fn control(
     water: Res<Water>,
     collision: Option<Res<Collision>>,
+    proc: Option<Res<super::link_proc::LinkProc>>,
     mut swim: ResMut<Swim>,
     mut players: Query<&mut Player>,
 ) {
     for mut player in &mut players {
         let player = &mut *player;
+        if !allows(proc.as_deref(), SWIM_ALLOWED) {
+            continue;
+        }
         if !swim.active && water.in_area && water.surface - player.pos.y > MIN_DEPTH {
             enter(player, &mut swim, &water);
         }

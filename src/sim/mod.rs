@@ -206,6 +206,8 @@ pub mod lpalm;
 pub mod lwood;
 pub mod leaflift;
 pub mod lstair;
+pub mod link_move;
+pub mod link_proc;
 pub mod lock;
 pub mod magma;
 pub mod machine;
@@ -802,7 +804,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
 } else if kui::is_kui(&source.name) {
         world.spawn((actor, kui::Kui::spawn(source.parameters))).id()
-    } else if warpdm20::is_warpdm20(&source.name) {
+    } else if warpdm20::is_warp_dm20(&source.name) {
         world.spawn((actor, warpdm20::WarpDm20::spawn())).id()
     } else if coming::is_coming(&source.name) {
         world.spawn((actor, coming::Coming::spawn(source.parameters))).id()
@@ -813,7 +815,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if coming2::is_coming2(&source.name) {
         world.spawn((actor, coming2::Coming2::spawn(actor.angle[1], actor.pos))).id()
     } else if zouk::is_zouk(&source.name) {
-        world.spawn((actor, zouk::Zouk::spawn(source.parameters))).id()
+        world.spawn((actor, zouk::Zouk::spawn())).id()
     } else if warpls::is_warpls(&source.name) {
         world.spawn((actor, warpls::Warpls::spawn(source.parameters))).id()
     } else if mshokki::is_mshokki(&source.name) {
@@ -821,16 +823,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if dk::is_dk(&source.name) {
         world.spawn((actor, dk::Dk::spawn(source.parameters))).id()
     } else if arrowlight::is_arrowlight(&source.name) {
-        world.spawn((actor, arrowlight::ArrowLight::spawn(source.parameters))).id()
+        world.spawn((actor, arrowlight::ArrowLight::spawn())).id()
     } else if eskban::is_eskban(&source.name) {
         let v = eskban::Eskban::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
-        } else if bwd::is_bwd(&source.name) {
-        world.spawn((actor, bwd::Bwd::spawn())).id()
     } else if sbox::is_sbox(&source.name) {
         world.spawn((actor, sbox::Sbox::spawn())).id()
     } else if tagetc::is_tagetc(&source.name) {
-        world.spawn((actor, tagetc::Tagetc::spawn(source.parameters))).id()
+        world.spawn((actor, tagetc::TagEtc::spawn(source.parameters))).id()
     } else if warpgn::is_warpgn(&source.name) {
         world.spawn((actor, warpgn::Warpgn::spawn(source.parameters))).id()
     } else if dekuitem::is_dekuitem(&source.name) {
@@ -1718,6 +1718,7 @@ pub fn build(
     }
     if let Some(tables) = tables {
         weight::init(&mut sim.world);
+        link_proc::init(&mut sim.world);
         spawn_actors(&mut sim.world, tables);
     }
     let spawn = area.spawn;
@@ -2138,6 +2139,7 @@ pub fn build(
                 ygcwp::control.in_set(WwSimSet::Execute),
                 ygawa::control.in_set(WwSimSet::Execute),
                 collision::remember_move_from.in_set(WwSimSet::Execute),
+                link_move::control.in_set(WwSimSet::Execute),
                 walk::walk.in_set(WwSimSet::Execute),
                 swim::surface.in_set(WwSimSet::Execute),
             )

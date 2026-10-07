@@ -204,6 +204,7 @@ pub struct Sword<'w, 's> {
     lock: Res<'w, Lock>,
     held: Res<'w, super::item::Held>,
     equipped: Res<'w, super::inventory::Equipped>,
+    proc: Option<Res<'w, super::link_proc::LinkProc>>,
     ships: Query<'w, 's, &'static Ship>,
 }
 
@@ -259,11 +260,18 @@ pub fn control(
                 || gates.hop.active
                 || gates.jump.active
                 || !grounded(gates.collision.as_deref(), player.pos)
+                || !super::link_proc::allows(
+                    gates.proc.as_deref(),
+                    super::link_proc::CUT_GROUND,
+                )
             {
                 continue;
             }
             start(&mut out.combat, player, &intent, &camera, &gates.lock);
             out.events.list.push(SimEvent::Slash);
+            continue;
+        }
+        if !super::link_proc::allows(gates.proc.as_deref(), super::link_proc::CUT_AIR) {
             continue;
         }
         let (duration, lunge_base, decel_max) = cut(out.combat.kind);

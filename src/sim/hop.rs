@@ -6,6 +6,7 @@ use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, MoveIntent};
 use super::jump::Jump;
+use super::link_proc::{HOP_AIR, HOP_GROUND, allows};
 use super::player::Player;
 use super::roll::Roll;
 use super::swim::Swim;
@@ -41,6 +42,7 @@ pub fn control(
     health: Res<Health>,
     jump: Res<Jump>,
     combat: Res<Combat>,
+    proc: Option<Res<super::link_proc::LinkProc>>,
     mut hop: ResMut<Hop>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
@@ -55,6 +57,9 @@ pub fn control(
             continue;
         }
         if hop.active {
+            if !allows(proc.as_deref(), HOP_AIR) {
+                continue;
+            }
             if grounded_now {
                 hop.active = false;
                 player.speed = 0.0;
@@ -62,6 +67,9 @@ pub fn control(
             continue;
         }
         if !left_ground {
+            continue;
+        }
+        if !allows(proc.as_deref(), HOP_GROUND) {
             continue;
         }
         let Some(collision) = collision.as_deref() else {

@@ -6,6 +6,7 @@ use super::combat::HitPoints;
 use super::health::Health;
 use super::intent::{MoveIntent, TargetIntent};
 use super::jump::Jump;
+use super::link_proc::{LOCK_ALLOWED, allows};
 use super::player::Player;
 use super::ship::Ship;
 use super::swim::Swim;
@@ -142,6 +143,7 @@ pub fn control(
     health: Res<Health>,
     swim: Res<Swim>,
     jump: Res<Jump>,
+    proc: Option<Res<super::link_proc::LinkProc>>,
     actors: Query<(Entity, &Actor), (Without<Ship>, With<HitPoints>)>,
     mut lock: ResMut<Lock>,
     mut players: Query<&mut Player>,
@@ -150,6 +152,9 @@ pub fn control(
     lock.held = target_intent.0;
     for mut player in &mut players {
         let player = &mut *player;
+        if !allows(proc.as_deref(), LOCK_ALLOWED) {
+            continue;
+        }
         if health.units == 0 || swim.active {
             lock.target = None;
             lock.state = LockState::None;

@@ -15,6 +15,7 @@ use super::intent::{CameraYaw, MoveIntent};
 use super::jump::{
     BACK_GRAVITY, BACK_RISE, BACK_SPEED, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET,
 };
+use super::link_proc::{WALK_ALLOWED, allows};
 use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
@@ -208,6 +209,7 @@ pub fn walk(
     mut partner: ResMut<ItemPartner>,
     collision: Option<Res<Collision>>,
     water: Res<Water>,
+    proc: Option<Res<super::link_proc::LinkProc>>,
     ships: Query<&Ship>,
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
@@ -218,6 +220,9 @@ pub fn walk(
     }
     for mut player in &mut players {
         let player = &mut *player;
+        if !allows(proc.as_deref(), WALK_ALLOWED) {
+            continue;
+        }
         if partner.demo_fall {
             slowfall_tick(player, &mut partner, collision.as_deref(), &water);
         } else if partner.demo_backjump {

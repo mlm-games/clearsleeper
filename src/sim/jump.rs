@@ -8,6 +8,7 @@ use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
+use super::link_proc::{BACK_AIR, BACK_GROUND, allows};
 use super::lock::Lock;
 use super::player::Player;
 use super::roll::Roll;
@@ -67,6 +68,7 @@ pub fn control(
     swim: Res<Swim>,
     lock: Res<Lock>,
     combat: Res<Combat>,
+    proc: Option<Res<super::link_proc::LinkProc>>,
     mut roll: ResMut<Roll>,
     mut jump: ResMut<Jump>,
     mut players: Query<&mut Player>,
@@ -80,11 +82,17 @@ pub fn control(
             continue;
         }
         if jump.active {
+            if !allows(proc.as_deref(), BACK_AIR) {
+                continue;
+            }
             if grounded(collision.as_deref(), player.pos) && player.speed_y <= 0.0 {
                 jump.active = false;
                 player.speed = 0.0;
                 player.yaw = player.face;
             }
+            continue;
+        }
+        if !allows(proc.as_deref(), BACK_GROUND) {
             continue;
         }
         if !pressed
