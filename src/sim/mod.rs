@@ -380,6 +380,7 @@ pub mod walk;
 pub mod weight;
 pub mod wall;
 pub mod wlvtag;
+pub mod weather;
 pub mod wind;
 pub mod ygush;
 pub mod xtower;
@@ -1621,6 +1622,7 @@ pub fn build(
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
+    weather::init(&mut sim.world);
     salvage::init(&mut sim.world);
     gy_ctrl::init(&mut sim.world);
     event_manager::init(&mut sim.world);
@@ -1761,6 +1763,9 @@ pub fn build(
                     camera::track.in_set(WwSimSet::Execute),
                     isle_timer::control.in_set(WwSimSet::Execute),
                     daynight::control.in_set(WwSimSet::Execute),
+                    weather::control.in_set(WwSimSet::Execute),
+                    weather::control_clouds.in_set(WwSimSet::Execute),
+                    weather::control_draw.in_set(WwSimSet::Execute),
                 daioeye::control.in_set(WwSimSet::Execute),
                 ssturu::control.in_set(WwSimSet::Execute),
                 evsw::control.in_set(WwSimSet::Execute),
