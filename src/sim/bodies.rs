@@ -62,6 +62,7 @@ pub struct Volume {
     center: [f32; 3],
     radius: f32,
     height: f32,
+    corners: [Vec3; 3],
     set: ObjSet,
     gobj: GObjInf,
     atk: Option<AtMeta>,
@@ -76,6 +77,7 @@ impl Volume {
             ShapeKind::Cylinder => Shape::cylinder(pos, self.radius, self.height),
             ShapeKind::Capsule => Shape::capsule(pos, self.radius, self.height),
             ShapeKind::Box => Shape::capsule(pos, self.radius, self.height),
+            ShapeKind::Triangle => Shape::triangle(self.corners[0], self.corners[1], self.corners[2]),
         }
     }
 
@@ -108,6 +110,7 @@ const fn sph(
         center,
         radius,
         height: 0.0,
+        corners: [Vec3::ZERO; 3],
         set,
         gobj,
         atk,
@@ -128,6 +131,7 @@ const fn cyl(
         center,
         radius,
         height,
+        corners: [Vec3::ZERO; 3],
         set,
         gobj,
         atk,
@@ -149,6 +153,25 @@ const fn cps(
         center,
         radius,
         height,
+        corners: [Vec3::ZERO; 3],
+        set,
+        gobj,
+        atk,
+    }
+}
+
+pub fn tri(
+    corners: [Vec3; 3],
+    set: ObjSet,
+    gobj: GObjInf,
+    atk: Option<AtMeta>,
+) -> Volume {
+    Volume {
+        kind: ShapeKind::Triangle,
+        center: [0.0, 0.0, 0.0],
+        radius: 0.0,
+        height: 0.0,
+        corners,
         set,
         gobj,
         atk,

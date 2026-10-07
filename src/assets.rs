@@ -20,6 +20,15 @@ const OBJECT_ALWAYS: &str = "files/res/Object/Always.arc";
 const SEA_TEXTURE_ENTRY: &str = "tex/b_sea_tex0and2.bti";
 const BTI_IMAGE_OFFSET: usize = 0x1C;
 
+const REL_SLOT_COUNT: usize = 6;
+const REL_ENTRY_LEN: usize = 8;
+const REL_TEXT_SLOT: usize = 1;
+const REL_BSS_SLOT: usize = 6;
+const REL_ENTRY_COUNT_AT: usize = 0x0C;
+const REL_SECTION_TABLE_AT: usize = 0x10;
+const REL_BSS_SIZE_AT: usize = 0x20;
+const REL_SECTIONS: [&str; REL_SLOT_COUNT] = ["text", "ctors", "dtors", "rodata", "data", "bss"];
+
 #[derive(Debug)]
 pub enum AssetError {
     MissingRoot {
@@ -31,6 +40,10 @@ pub enum AssetError {
     MissingEntry {
         path: PathBuf,
         entry: String,
+    },
+    MissingSection {
+        path: PathBuf,
+        section: String,
     },
     BadMagic {
         path: PathBuf,
@@ -58,6 +71,9 @@ impl std::fmt::Display for AssetError {
             Self::MissingFile { path } => write!(f, "asset file not found: {}", path.display()),
             Self::MissingEntry { path, entry } => {
                 write!(f, "entry `{entry}` not found in archive {}", path.display())
+            }
+            Self::MissingSection { path, section } => {
+                write!(f, "section `{section}` missing in {}", path.display())
             }
             Self::BadMagic {
                 path,
@@ -131,6 +147,21 @@ impl AssetRoot {
         let path = self.root.join(rel);
         let bytes = self.read(rel)?;
         open_archive(bytes, path)
+    }
+
+    pub fn read_rel(&self, rel: &str) -> Result<Rel, AssetError> {
+        let path = self.root.join(rel);
+        let bytes = self.read(rel)?;
+        open_rel(bytes, path)
+    }
+}
+
+fn open_rel(bytes: Vec<u8>, path: PathBuf) -> Result<Rel, AssetError> {
+    if bytes.len() >= 4 && bytes[..4] == YAZ0_MAGIC {
+        let raw = yaz0_decode(&bytes, &path)?;
+        Rel::parse(raw, path)
+    } else {
+        Rel::parse(bytes, path)
     }
 }
 
@@ -464,6 +495,139 @@ impl Archive {
             path: self.path.clone(),
             entry: entry.to_owned(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RelSection {
+    pub name: &'static str,
+    pub offset: usize,
+    pub size: usize,
+}
+
+#[derive(Debug)]
+pub struct Rel {
+    path: PathBuf,
+    data: Vec<u8>,
+    sections: [Option<RelSection>; REL_SLOT_COUNT],
+}
+
+impl Rel {
+    pub fn parse(data: Vec<u8>, path: impl Into<PathBuf>) -> Result<Self, AssetError> {
+        let path = path.into();
+        let u32_at = |at: usize| -> Result<u32, AssetError> {
+            data.get(at..at + 4)
+                .map(|slice| u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]))
+                .ok_or_else(|| corrupt(&path, "rel truncated"))
+        };
+        let entries = u32_at(REL_ENTRY_COUNT_AT)? as usize;
+        let table = u32_at(REL_SECTION_TABLE_AT)? as usize;
+        if entries <= REL_BSS_SLOT {
+            return Err(corrupt(&path, "rel section table too short"));
+        }
+        let text_start = table
+            .checked_add(
+                entries
+                    .checked_mul(REL_ENTRY_LEN)
+                    .ok_or_else(|| corrupt(&path, "rel section table overflow"))?,
+            )
+            .ok_or_else(|| corrupt(&path, "rel section table overflow"))?;
+        if text_start > data.len() {
+            return Err(corrupt(&path, "rel section table past end of file"));
+        }
+        let bss_size = u32_at(REL_BSS_SIZE_AT)? as usize;
+        let mut sections = [None; REL_SLOT_COUNT];
+        let mut filled = text_start;
+        for slot in REL_TEXT_SLOT..=REL_BSS_SLOT {
+            let at = table + slot * REL_ENTRY_LEN;
+            let stored = u32_at(at)? as usize;
+            let size = u32_at(at + 4)? as usize;
+            if slot == REL_BSS_SLOT && (stored != 0 || size != bss_size) {
+                return Err(corrupt(&path, "rel bss section disagrees with header"));
+            }
+            if size == 0 {
+                continue;
+            }
+            let offset = if slot == REL_TEXT_SLOT {
+                if stored != text_start && stored != text_start + 1 {
+                    return Err(corrupt(&path, "rel text section misplaced"));
+                }
+                text_start
+            } else if slot == REL_BSS_SLOT {
+                0
+            } else {
+                if stored < filled {
+                    return Err(corrupt(&path, "rel sections out of order"));
+                }
+                stored
+            };
+            if slot != REL_BSS_SLOT
+                && offset
+                    .checked_add(size)
+                    .map(|end| end > data.len())
+                    .unwrap_or(true)
+            {
+                return Err(corrupt(&path, "rel section past end of file"));
+            }
+            filled = offset.saturating_add(size);
+            let index = slot - REL_TEXT_SLOT;
+            sections[index] = Some(RelSection {
+                name: REL_SECTIONS[index],
+                offset,
+                size,
+            });
+        }
+        Ok(Self {
+            path,
+            data,
+            sections,
+        })
+    }
+
+    pub fn section(&self, name: &str) -> Option<&RelSection> {
+        REL_SECTIONS
+            .iter()
+            .position(|section| *section == name)
+            .and_then(|index| self.sections[index].as_ref())
+    }
+
+    pub fn symbol(&self, section: &str, offset: usize, size: usize) -> Result<&[u8], AssetError> {
+        let found = self
+            .section(section)
+            .ok_or_else(|| AssetError::MissingSection {
+                path: self.path.clone(),
+                section: section.to_owned(),
+            })?;
+        if found.offset == 0 {
+            return Err(corrupt(&self.path, "rel section holds no file data"));
+        }
+        let end = offset
+            .checked_add(size)
+            .ok_or_else(|| corrupt(&self.path, "rel symbol range overflow"))?;
+        if end > found.size {
+            return Err(corrupt(&self.path, "rel symbol past end of section"));
+        }
+        let start = found
+            .offset
+            .checked_add(offset)
+            .ok_or_else(|| corrupt(&self.path, "rel symbol offset overflow"))?;
+        let stop = start
+            .checked_add(size)
+            .ok_or_else(|| corrupt(&self.path, "rel symbol range overflow"))?;
+        self.data
+            .get(start..stop)
+            .ok_or_else(|| corrupt(&self.path, "rel symbol past end of file"))
+    }
+
+    pub fn f32s(&self, section: &str, offset: usize, count: usize) -> Result<Vec<f32>, AssetError> {
+        let bytes = count
+            .checked_mul(4)
+            .ok_or_else(|| corrupt(&self.path, "rel symbol range overflow"))
+            .and_then(|size| self.symbol(section, offset, size))?;
+        Ok(bytes
+            .chunks_exact(4)
+            .map(|word| f32::from_bits(u32::from_be_bytes([word[0], word[1], word[2], word[3]])))
+            .collect())
     }
 }
 

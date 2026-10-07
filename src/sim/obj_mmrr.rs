@@ -3,9 +3,12 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::collision::Collision;
+use super::contact::{GObjInf, GStts, ObjSet};
+use super::contact_run::{ContactBodies, ContactObj};
 use super::damage_fx::{DamageParticle, DamageParticles};
 use super::damage_resolve::AT_TYPE_LIGHT;
 use super::events::{SimEvent, SimEvents};
+use super::shape::{Shape, tri_line_cross, tri_plane};
 use super::taglight::TagLight;
 use super::walk;
 
@@ -107,10 +110,10 @@ pub const LAMP_FLOOR: f32 = 0.0;
 pub const LAMP_TOP: f32 = 100.0;
 pub const LAMP_UNSCALE: f32 = 0.5;
 
-pub const CM3D_ABS_MIN: f32 = 3.8146973e-06;
-pub const NORMAL_FLAT_MIN: f32 = 0.02;
-pub const NORMAL_COMPONENT_MIN: f32 = 0.008;
 pub const NEAR_ZERO_SQUARED: f32 = 8e-11;
+
+pub const TRI_BODY: usize = 0;
+pub const CPS_BODY: usize = TRI_COUNT;
 
 fn turned(yaw: i16, v: Vec3) -> Vec3 {
     if yaw == 0 {
@@ -138,89 +141,6 @@ fn rot_z(v: Vec3, units: i16) -> Vec3 {
 
 fn zxy_rot_m(v: Vec3, angle: [i16; 3]) -> Vec3 {
     turned(angle[1], rot_x(rot_z(v, angle[2]), angle[0]))
-}
-
-fn cm3d_is_zero(value: f32) -> bool {
-    value.abs() < CM3D_ABS_MIN
-}
-
-fn calc_pla(tri: [Vec3; 3]) -> (Vec3, f32) {
-    let cross = (tri[1] - tri[0]).cross(tri[2] - tri[0]);
-    let mag = cross.length();
-    if mag.abs() >= NORMAL_FLAT_MIN {
-        let normal = cross / mag;
-        (normal, -normal.dot(tri[0]))
-    } else {
-        (Vec3::ZERO, 0.0)
-    }
-}
-
-fn inclusion_2d(a0: f32, a1: f32, b0: f32, b1: f32, c0: f32, c1: f32, q0: f32, q1: f32) -> bool {
-    let (mut lo, mut hi) = if a0 < b0 { (a0, b0) } else { (b0, a0) };
-    if lo > c0 {
-        lo = c0;
-    } else if hi < c0 {
-        hi = c0;
-    }
-    if lo > q0 || hi < q0 {
-        return false;
-    }
-    let (lo, hi) = if a1 < b1 { (a1, b1) } else { (b1, a1) };
-    let (lo, hi) = if lo > c1 {
-        (c1, lo)
-    } else if hi < c1 {
-        (c1, hi)
-    } else {
-        (lo, hi)
-    };
-    lo > q1 || hi < q1
-}
-
-fn lin_tri(start: Vec3, end: Vec3, tri: [Vec3; 3]) -> Option<Vec3> {
-    let (normal, d) = calc_pla(tri);
-    let start_val = d + normal.dot(start);
-    let end_val = d + normal.dot(end);
-    if start_val * end_val > 0.0 {
-        return None;
-    }
-    if cm3d_is_zero(start_val - end_val) {
-        return None;
-    }
-    let dst = start + (end - start) * (start_val / (start_val - end_val));
-    let cross_x = normal.x.abs() < NORMAL_COMPONENT_MIN
-        || inclusion_2d(
-            tri[0].y,
-            tri[0].z,
-            tri[1].y,
-            tri[1].z,
-            tri[2].y,
-            tri[2].z,
-            dst.y,
-            dst.z,
-        );
-    let cross_y = normal.y.abs() < NORMAL_COMPONENT_MIN
-        || inclusion_2d(
-            tri[0].x,
-            tri[0].z,
-            tri[1].x,
-            tri[1].z,
-            tri[2].x,
-            tri[2].z,
-            dst.x,
-            dst.z,
-        );
-    let cross_z = normal.z.abs() < NORMAL_COMPONENT_MIN
-        || inclusion_2d(
-            tri[0].x,
-            tri[0].y,
-            tri[1].x,
-            tri[1].y,
-            tri[2].x,
-            tri[2].y,
-            dst.x,
-            dst.y,
-        );
-    if cross_x && cross_y && cross_z { Some(dst) } else { None }
 }
 
 fn lamp_inside(actor_pos: Vec3, angle: [i16; 3], point: Vec3) -> bool {
@@ -422,14 +342,14 @@ impl ObjMmrr {
         } else {
             for (pos, _) in lamps.iter() {
                 for tri in self.tris.iter() {
-                    if let Some(hit) = lin_tri(self.eye_pos, *pos, *tri) {
+                    if let Some(hit) = tri_line_cross(self.eye_pos, *pos, *tri) {
                         let to_light = *pos - hit;
                         let reflect = if to_light.length_squared() < NEAR_ZERO_SQUARED {
                             Vec3::ZERO
                         } else {
                             to_light / to_light.length()
                         };
-                        let (normal, _) = calc_pla(*tri);
+                        let (normal, _) = tri_plane(*tri);
                         if normal.dot(reflect) < 0.0 {
                             ret = true;
                         }
@@ -461,6 +381,78 @@ impl ObjMmrr {
     pub fn register_cc(&mut self) {
         self.tri_registered = true;
         self.cps_registered = self.bf9;
+    }
+
+    fn tri_obj(&self) -> ContactObj {
+        let (at_type, at_sprm, tg_type, tg_sprm) = self.tri_attr();
+        ContactObj {
+            set: ObjSet {
+                at_sprm,
+                at_type,
+                at_atp: 0,
+                tg_sprm,
+                tg_type,
+                co_sprm: self.tri_co_sprm(),
+                ..ObjSet::default()
+            },
+            g_stts: Some(GStts::default()),
+            gobj_inf: Some(GObjInf::default()),
+        }
+    }
+
+    fn cps_obj(&self) -> ContactObj {
+        let (at_type, at_sprm, tg_type, tg_sprm) = self.cps_attr();
+        ContactObj {
+            set: ObjSet {
+                at_sprm,
+                at_type,
+                at_atp: 0,
+                tg_sprm,
+                tg_type,
+                co_sprm: self.cps_co_sprm(),
+                ..ObjSet::default()
+            },
+            g_stts: Some(GStts::default()),
+            gobj_inf: Some(GObjInf::default()),
+        }
+    }
+
+    pub fn init_cc_bodies(&self, bodies: &mut ContactBodies) {
+        bodies.shapes.clear();
+        bodies.objs.clear();
+        for index in 0..TRI_COUNT {
+            let tri = self.tris[index];
+            bodies.add(Shape::triangle(tri[0], tri[1], tri[2]), self.tri_obj());
+        }
+        bodies.add(self.cps_shape(), self.cps_obj());
+    }
+
+    pub fn sync_cc_bodies(&self, bodies: &mut ContactBodies) {
+        if bodies.shapes.bodies.len() != TRI_COUNT + 1 || bodies.objs.len() != TRI_COUNT + 1 {
+            self.init_cc_bodies(bodies);
+        }
+        for (index, slot) in self.tris.iter().enumerate() {
+            if let Some(body) = bodies.shapes.body_mut(TRI_BODY + index) {
+                body.shape.set_verts(slot[0], slot[1], slot[2]);
+            }
+        }
+        if self.cps_registered {
+            if let Some(body) = bodies.shapes.body_mut(CPS_BODY) {
+                body.shape = self.cps_shape();
+            }
+        } else if bodies.shapes.bodies.len() == TRI_COUNT + 1 {
+            bodies.shapes.remove(CPS_BODY);
+            bodies.objs.pop();
+        }
+    }
+
+    fn cps_shape(&self) -> Shape {
+        let delta = self.cps_end - self.cps_start;
+        Shape::capsule(
+            (self.cps_start + self.cps_end) * 0.5,
+            self.cps_radius,
+            delta.length(),
+        )
     }
 
     pub fn execute(
@@ -502,6 +494,7 @@ impl ObjMmrr {
 
 pub fn control(
     mut mirrors: Query<(&Actor, &mut ObjMmrr)>,
+    mut colliders: Query<(&ObjMmrr, &mut ContactBodies)>,
     lamps: Query<(&Actor, &TagLight)>,
     collision: Option<Res<Collision>>,
     mut events: ResMut<SimEvents>,
@@ -519,5 +512,8 @@ pub fn control(
             mirror.init_cc(actor.pos, actor.shape_angle, bg);
         }
         mirror.execute(actor, bg, &lit_lamps, &mut events, &mut particles);
+    }
+    for (mirror, mut bodies) in &mut colliders {
+        mirror.sync_cc_bodies(&mut bodies);
     }
 }

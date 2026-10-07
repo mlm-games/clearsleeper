@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 
-use super::shape::{Shape, ShapeKind, Shapes};
+use super::shape::{Shape, ShapeKind, Shapes, tri_sph_cross_point};
 
 /// `G_CM3D_F_ABS_MIN`, the constant both `cM3d_IsZero` (`c_m3d.h:135`) and `cLib_IsZero`
 /// (`c_lib.h:8`) test a scalar against.
@@ -596,6 +596,9 @@ fn radius_of(shape: &Shape) -> f32 {
     match shape.kind {
         ShapeKind::Sphere | ShapeKind::Cylinder | ShapeKind::Capsule => scaled,
         ShapeKind::Box => shape.scale.length() * 0.5,
+        ShapeKind::Triangle => shape.verts.iter().fold(0.0f32, |far, v| {
+            far.max((*v - shape.centroid()).length())
+        }),
     }
 }
 
@@ -608,7 +611,8 @@ fn core_point(shape: &Shape, from: Vec3) -> Vec3 {
             let y = (from.y - shape.pos.y).clamp(-half, half);
             Vec3::new(shape.pos.x, shape.pos.y + y, shape.pos.z)
         }
-        _ => shape.pos,
+        ShapeKind::Sphere | ShapeKind::Box => shape.pos,
+        ShapeKind::Triangle => shape.centroid(),
     }
 }
 
@@ -657,6 +661,13 @@ pub fn calc_aab_box(shape: &Shape) -> Aab {
                 ),
             }
         }
+        ShapeKind::Triangle => {
+            let mut aab = Aab::clear_for_min_max();
+            for corner in shape.verts {
+                aab.set_min_max(corner);
+            }
+            aab
+        }
     }
 }
 
@@ -665,7 +676,7 @@ pub fn calc_aab_box(shape: &Shape) -> Aab {
 pub fn co_cp(shape: &Shape) -> Vec3 {
     match shape.kind {
         ShapeKind::Sphere | ShapeKind::Cylinder => shape.pos,
-        ShapeKind::Capsule | ShapeKind::Box => Vec3::ZERO,
+        ShapeKind::Capsule | ShapeKind::Box | ShapeKind::Triangle => Vec3::ZERO,
     }
 }
 
@@ -680,13 +691,20 @@ pub fn cross_at_tg(at: &Shape, tg: &Shape, cross: &mut Vec3) -> bool {
     if !at.intersects(tg) {
         return false;
     }
-    let core = core_point(tg, at.pos);
-    let delta = at.pos - core;
-    *cross = if is_zero(delta.length()) {
-        core
-    } else {
-        core + delta.normalize() * radius_of(tg)
-    };
+    match tg.kind {
+        ShapeKind::Triangle => {
+            *cross = tri_sph_cross_point(tg.verts, at.pos, radius_of(at));
+        }
+        ShapeKind::Sphere | ShapeKind::Cylinder | ShapeKind::Capsule | ShapeKind::Box => {
+            let core = core_point(tg, at.pos);
+            let delta = at.pos - core;
+            *cross = if is_zero(delta.length()) {
+                core
+            } else {
+                core + delta.normalize() * radius_of(tg)
+            };
+        }
+    }
     true
 }
 
@@ -694,6 +712,10 @@ pub fn cross_at_tg(at: &Shape, tg: &Shape, cross: &mut Vec3) -> bool {
 /// overlap along the line between their axes, with a zero length on a grazing contact exactly as
 /// `cM3d_Cross_SphSph` (`c_m3d.cpp:1423-1446`) reports it.
 pub fn cross_co(one: &Shape, two: &Shape, cross_len: &mut f32) -> bool {
+    if one.is_triangle() || two.is_triangle() {
+        *cross_len = 0.0;
+        return false;
+    }
     let near = core_point(one, two.pos);
     let far = core_point(two, near);
     let depth = radius_of(one) + radius_of(two) - (near - far).length();
