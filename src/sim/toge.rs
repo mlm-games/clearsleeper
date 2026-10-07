@@ -43,11 +43,11 @@ const BOB_TARGET: f32 = -60.0; // <- d_a_toge.cpp:272
 /// `daToge_prm::getSwitchNo(ac) = (fopAcM_GetParam(ac) >> 0) & 0xFF` (`d_a_toge.h:49-51`) over the
 /// WHOLE u32 (`f_op_actor_mng.h:127-129`).
 const SWITCH_SHIFT: u32 = 0; // <- d_a_toge.h:50
-const SWITCH_WIDTH: u32 = 0xFF; // <- d_a_toge.h:50
+const SWITCH_MASK: u32 = 0xFF; // <- d_a_toge.h:50
 /// `daToge_prm::getSeEnabled(ac) = (fopAcM_GetParam(ac) >> 8) & 0xF` (`d_a_toge.h:53-55`) - the gate
 /// on `toge_seStart`'s `fopAcM_seStart(this, i_seNum, 0)` (`:281-283`).
 const SE_SHIFT: u32 = 8; // <- d_a_toge.h:54
-const SE_WIDTH: u32 = 0xF; // <- d_a_toge.h:54
+const SE_MASK: u32 = 0xF; // <- d_a_toge.h:54
 /// `if (mSwitchNo != 0xFF)` / `else if (mSwitchNo == 0xFF)` (`d_a_toge.cpp:178`, `:186`) - the
 /// "0xFF means wind-driven, not switch-driven" sentinel.
 const NO_SWITCH: u8 = 0xFF; // <- d_a_toge.cpp:178
@@ -143,11 +143,11 @@ impl Toge {
             // `case 0` (`:243-244`).
             spike: 0.0,
             bob: 0.0,
-            switch_no: ((parameters >> SWITCH_SHIFT) & ((1 << SWITCH_WIDTH) - 1)) as u8,
+            switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
             event_state: STATE_IDLE,
             want_out: 0,
             delay: 0,
-            se_enabled: ((parameters >> SE_SHIFT) & ((1 << SE_WIDTH) - 1)) as u8,
+            se_enabled: ((parameters >> SE_SHIFT) & SE_MASK) as u8,
             entered: false,
         }
     }

@@ -3020,7 +3020,7 @@ impl CollectScreen {
         pad: &PadInput,
         out: &mut CollectOutput,
     ) {
-        let mut step_mark = [0i16; 7];
+        let mut step_mark = [0i16; 8];
         let mut sum = 0i16;
         for index in 0..SONG_COUNT {
             sum += self.panes[P_TIT + index].user_area;

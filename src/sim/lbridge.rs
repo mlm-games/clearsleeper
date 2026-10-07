@@ -24,7 +24,7 @@ const CULL_MAX: [f32; 3] = [600.0, 100.0, 150.0]; // <- d_a_lbridge.cpp:72
 /// `daLbridge_prm::getSwitchNo(ac) = (fopAcM_GetParam(ac) >> 0) & 0xFF` (`d_a_lbridge.h:46-48`) over
 /// the WHOLE u32 (`f_op_actor_mng.h:127-129`).
 const SWITCH_SHIFT: u32 = 0; // <- d_a_lbridge.h:47
-const SWITCH_WIDTH: u32 = 0xFF; // <- d_a_lbridge.h:47
+const SWITCH_MASK: u32 = 0xFF; // <- d_a_lbridge.h:47
 /// `if (mSwitchNo == 0xFF) { return; }` (`d_a_lbridge.cpp:154`) and the identical test at `:89` -
 /// the "always visible, never switch-driven" sentinel.
 const NO_SWITCH: u8 = 0xFF; // <- d_a_lbridge.cpp:89
@@ -133,7 +133,7 @@ impl Lbridge {
     /// the bridge scale exactly 1.0, and `setBaseScale(scale)` (`:120`) is renderer work.
     pub fn spawn(parameters: u32) -> Self {
         Self {
-            switch_no: ((parameters >> SWITCH_SHIFT) & ((1 << SWITCH_WIDTH) - 1)) as u8,
+            switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
             // `mIsSw` has no initialiser, so `fopAcM_ct`'s `sBs_ClearArea` zero-fill
             // (`f_pc_base.cpp:98`) makes it FALSE until `create_init` records the real read.
             was_switch: false,

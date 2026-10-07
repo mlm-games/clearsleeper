@@ -964,7 +964,8 @@ impl GoalFlag {
                     None,
                     None,
                     None,
-                    i32::from(MGAME_STARTER_PARAM_2 << 16),
+                    (u32::from(MGAME_STARTER_PARAM_2) << 16 | u32::from(MGAME_STARTER_PARAM_1))
+                        as i32,
                 )),
             ))
             .unwrap_or(i32::MAX);

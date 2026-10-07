@@ -75,8 +75,8 @@ const WANT_CLOSE: i32 = 2; // <- d_a_shutter.cpp:238
 const SWITCH_SHIFT: u32 = 0; // <- d_a_shutter.h:60
 /// `daShutter_prm::getType(ac) = (fopAcM_GetParam(ac) >> 8) & 0x0F` (`d_a_shutter.h:61`).
 const TYPE_SHIFT: u32 = 8; // <- d_a_shutter.h:61
-const TYPE_WIDTH: u32 = 0x0F; // <- d_a_shutter.h:61
-const SWITCH_WIDTH: u32 = 0xFF; // <- d_a_shutter.h:60
+const TYPE_MASK: u32 = 0x0F; // <- d_a_shutter.h:61
+const SWITCH_MASK: u32 = 0xFF; // <- d_a_shutter.h:60
 
 /// The two-leaf sliding shutters behind `fpcNm_SHUTTER_e` - `daShutter_c`
 /// (`d_a_shutter.h:9-57`), the actor behind the stage strings `Htobi1` and `Htobi2`.
@@ -142,8 +142,8 @@ impl Shutter2 {
     /// exactly 1.0, and `set_mtx` (`:124`) is the only reader of `scale`.
     pub fn spawn(parameters: u32) -> Self {
         Self {
-            kind: ((parameters >> TYPE_SHIFT) & ((1 << TYPE_WIDTH) - 1)) as u8,
-            switch_no: ((parameters >> SWITCH_SHIFT) & ((1 << SWITCH_WIDTH) - 1)) as u8,
+            kind: ((parameters >> TYPE_SHIFT) & TYPE_MASK) as u8,
+            switch_no: ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8,
             // `mcXyz` is a `cXyz[2]` (`d_a_shutter.h:42`) whose `.y` and `.z` are never written;
             // `:77-78` set only `.x`, and `set_mtx`'s `multVec` (`:123`) is the sole reader.
             leaf_min: 0.0,
