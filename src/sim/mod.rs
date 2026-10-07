@@ -269,6 +269,7 @@ pub mod puppet_ganon;
 pub mod plant;
 pub mod player;
 pub mod pscnchg;
+pub mod pushable;
 pub mod player_status;
 pub mod ritem;
 pub mod rforce;

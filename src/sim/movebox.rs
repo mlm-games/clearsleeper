@@ -8,9 +8,12 @@ use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 use super::pickup;
 use super::player::Player;
+use super::pushable::{
+    Face, PPLABEL_HEAVY, PPLABEL_PULL, PPLABEL_PUSH_PULL, PPLABEL_UNK4, PushPulls,
+};
 use super::sea::Sea;
 use super::stream;
-use super::walk::{from_s16, to_s16};
+use super::walk::from_s16;
 use super::water;
 
 pub const MOVEBOX_ACTORS: [&str; 15] = [
@@ -75,12 +78,6 @@ const SE_OBJ_FALL_MAGMA_L: u32 = 0x691D;
 const SE_OBJ_BLOCK_FALL_NORMAL: u32 = 0x691F;
 const SE_OBJ_WBOX_FALL_NORMAL: u32 = 0x6920;
 
-const PPLABEL_PUSH: u32 = 0x01;
-const PPLABEL_PULL: u32 = 0x02;
-const PPLABEL_UNK4: u32 = 0x04;
-const PPLABEL_HEAVY: u32 = 0x08;
-const PPLABEL_PUSH_PULL: u32 = PPLABEL_PUSH | PPLABEL_PULL;
-
 const BGC_ON_GROUND: u32 = 0x01;
 const BGC_JUST_LEFT_GROUND: u32 = 0x02;
 const BGC_JUST_HIT_GROUND: u32 = 0x04;
@@ -110,8 +107,6 @@ const ITEM_MAX_BIT: i32 = 79;
 const G_CM3D_F_INF: f32 = -3.4028235e38;
 const FLOAT_MAX: f32 = 3.4028235e38;
 const MAX_FALL: f32 = -100.0;
-const PLAYER_RADIUS: f32 = 60.0;
-const SIDE_SNAP: f32 = -10.0;
 
 const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -1489,6 +1484,11 @@ pub struct Watch<'w, 's> {
     collision: Option<Res<'w, Collision>>,
     sea: Option<Res<'w, Sea>>,
     players: Query<'w, 's, &'static mut Player>,
+    /// `cBgS::m_chk_element`, which this actor's own background and its two callbacks are
+    /// registered in, `movebox.cpp:1321-1322` and `:1882-1883`. It is absent until this
+    /// actor's own first tick has put it there, which is the table `cBgS::Ct` leaves empty,
+    /// `c_bg_s.cpp:94-98`.
+    pushpull: Option<ResMut<'w, PushPulls>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1498,8 +1498,48 @@ struct Slot {
     room: i8,
 }
 
+/// `Act_c::Create`, `movebox.cpp:1321-1322`: the background this actor built for itself
+/// publishes the ride and the push and pull callbacks, and `Act_c::Delete` at `:1882-1883` takes
+/// both back, so every slot goes first and the actors still alive register against it again.
+fn register(pushpull: &mut PushPulls, slots: &[Slot]) {
+    pushpull.reset();
+    for slot in slots {
+        if slot.state.broken || !slot.state.should_appear {
+            continue;
+        }
+        pushpull.claim(slot.entity, Some(Face::of(&slot.state)), true, true);
+    }
+}
+
+/// `dBgS_Acch::GroundCheck`, `d_bg_s_acch.cpp:144`, called on the rider's own ground polygon: the
+/// background the rider stands on is the one whose ride callback answers, and a box standing on an
+/// afloat box is answered through that box's own ground, `movebox.cpp:236`.
+fn ride_player((actor, _): (Entity, Face), slots: &[Slot], platforms: &mut [Platform], feet: Vec3) {
+    let Some(slot) = slots
+        .iter()
+        .find(|slot| slot.entity == actor)
+        .filter(|slot| slot.state.state_flags & BGC_ON_GROUND != 0)
+    else {
+        return;
+    };
+    let Some(rider) = slot.state.ground_rider(platforms) else {
+        return;
+    };
+    let Some(ground) = platforms.get_mut(rider) else {
+        return;
+    };
+    let before = ground.pos;
+    Movebox::ride_call_back(
+        ground,
+        slot.state.attr(),
+        feet.x - before.x,
+        feet.z - before.z,
+        true,
+    );
+}
+
 pub fn control(
-    watch: Watch<'_, '_>,
+    mut watch: Watch<'_, '_>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
     mut boxes: Query<(Entity, &mut Actor, &mut Movebox), Without<Player>>,
@@ -1507,7 +1547,8 @@ pub fn control(
 ) {
     let solid = watch.collision.as_deref();
     let sea = watch.sea.as_deref();
-    let mut players = watch.players;
+    let players = watch.players;
+    let pending = watch.pushpull.is_none();
     let mut slots: Vec<Slot> = Vec::new();
     for (entity, actor, mut box_) in &mut boxes {
         if !box_.placed {
@@ -1526,11 +1567,7 @@ pub fn control(
             room: actor.room,
         });
     }
-    let player = players.iter().next().map(|entry| (entry.pos, entry.yaw));
-    let (player_pos, player_yaw) = match player {
-        Some(entry) => entry,
-        None => (Vec3::ZERO, 0.0),
-    };
+    let player_pos = players.iter().next().map_or(Vec3::ZERO, |entry| entry.pos);
     let mut platforms: Vec<Platform> = slots
         .iter()
         .map(|slot| Platform {
@@ -1544,8 +1581,6 @@ pub fn control(
     let mut spawns: Vec<Spawn> = Vec::new();
     let mut broken: Vec<Entity> = Vec::new();
     let mut vanished: Vec<Entity> = Vec::new();
-    let mut carry: Vec<Vec3> = Vec::new();
-    let mut push: Vec<(usize, i16)> = Vec::new();
     for index in 0..slots.len() {
         let Some(mut slot) = slots.get(index).copied() else {
             continue;
@@ -1556,9 +1591,6 @@ pub fn control(
             spawns: &mut spawns,
         };
         slot.state.execute(solid, sea, &platforms, &mut sink);
-        let mut delta = slot.state.pos - slot.state.home_pos;
-        delta.y = 0.0;
-        let flat = Vec3::new(delta.x, 0.0, delta.z);
         if let Some(target) = slots.get_mut(index) {
             target.state = slot.state;
         }
@@ -1584,38 +1616,7 @@ pub fn control(
         }
         if !slot.state.should_appear {
             vanished.push(slot.entity);
-            continue;
         }
-        let reach = slot.state.radius() + PLAYER_RADIUS;
-        let on_box = (player_pos.x - slot.state.pos.x).abs() <= reach
-            && (player_pos.z - slot.state.pos.z).abs() <= reach
-            && player_pos.y >= slot.state.pos.y + SIDE_SNAP
-            && player_pos.y <= slot.state.pos.y + slot.state.height();
-        if !on_box {
-            continue;
-        }
-        let grounded = slot.state.state_flags & BGC_ON_GROUND != 0;
-        let riding = if grounded {
-            slot.state.ground_rider(&platforms)
-        } else {
-            None
-        };
-        if let Some(rider) = riding
-            && let Some(ground) = platforms.get_mut(rider)
-        {
-            let before = ground.pos;
-            Movebox::ride_call_back(
-                ground,
-                slot.state.attr(),
-                player_pos.x - before.x,
-                player_pos.z - before.z,
-                true,
-            );
-        }
-        if flat != Vec3::ZERO {
-            carry.push(flat);
-        }
-        push.push((index, to_s16(player_yaw)));
     }
     for (index, platform) in platforms.iter().enumerate() {
         if let Some(target) = slots.get_mut(index) {
@@ -1623,6 +1624,9 @@ pub fn control(
             target.state.sway_drive_x = platform.drive_x;
             target.state.sway_drive_z = platform.drive_z;
         }
+    }
+    if !pending && let Some(pushpull) = watch.pushpull.as_deref_mut() {
+        register(pushpull, &slots);
     }
     for slot in &slots {
         if let Ok((_, mut actor, mut box_)) = boxes.get_mut(slot.entity) {
@@ -1632,18 +1636,13 @@ pub fn control(
             actor.room = slot.room;
         }
     }
-    if let Some(mut entry) = players.iter_mut().next() {
-        for step in carry {
-            entry.pos += step;
-            entry.speed_y = 0.0;
-        }
+    if let Some(pushpull) = watch.pushpull.as_deref()
+        && let Some(rider) = pushpull.standing(player_pos)
+    {
+        ride_player(rider, &slots, &mut platforms, player_pos);
     }
-    for (index, angle) in push {
-        if let Some(slot) = slots.get(index) {
-            if let Ok((_, _, mut box_)) = boxes.get_mut(slot.entity) {
-                box_.pp_call_back(angle, PPLABEL_PUSH | PPLABEL_UNK4);
-            }
-        }
+    if pending {
+        commands.insert_resource(PushPulls::new());
     }
     for entity in broken {
         let _ = commands.entity(entity).despawn();

@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use glam::{Vec2, Vec3};
 
 use super::collision::{Collision, MoveFrom, WallProbe, WallTrace};
@@ -12,6 +13,9 @@ use super::jump::{Direction, Jump, JumpKind, direction};
 use super::link_proc::{LinkProc, Proc};
 use super::lock::Lock;
 use super::player::Player;
+use super::pushable::{
+    self, PPLABEL_HEAVY, PPLABEL_NONE, PPLABEL_PULL, PPLABEL_PUSH, PPLABEL_UNK4, PushPulls,
+};
 use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::Swim;
@@ -201,6 +205,9 @@ const PULL_PROBE_UP: [f32; 2] = [30.1, 89.9];
 const PULL_GROUND_BACK: f32 = 29.0;
 /// `pushpull.inc:180`, the drop past which the pull's ground probe is refused.
 const PULL_GROUND_DROP: f32 = 30.1;
+/// `setBgCheckParam`, `main.cpp:10664-10665`: the wall radius a player in a push or pull state
+/// carries, which is the reach the front wall trace of `setFrontWallType` then runs.
+const PUSH_PULL_WALL_R: f32 = 40.0;
 /// `crawl.inc:528`, the counter `procCrawlAutoMove` holds on its corner for, and `crawl.inc:529`,
 /// the ticks the corner walk gives up after.
 const CRAWL_AUTO_HOLD: i32 = 20;
@@ -221,9 +228,6 @@ pub enum MoveGap {
     DamageVector,
     /// The crouch and guard face, which a world that stages no pad cannot report.
     CrouchButton,
-    /// A pushable actor, found through the stage's push and pull callback against the polygon the
-    /// player is standing on.
-    Pushable,
 }
 
 impl MoveGap {
@@ -234,7 +238,6 @@ impl MoveGap {
             Self::FrameClock => "the per-polygon frame clock",
             Self::DamageVector => "the damage vector off the player's cylinder",
             Self::CrouchButton => "the crouch and guard face",
-            Self::Pushable => "a pushable actor",
         }
     }
 }
@@ -266,9 +269,9 @@ pub const SITES: &[MoveSite] = &[
     MoveSite { proc: Proc::CrawlMove, entry: "crawl.inc:301", exit: "crawl.inc:400", gap: MoveGap::Ready },
     MoveSite { proc: Proc::CrawlAutoMove, entry: "crawl.inc:473", exit: "crawl.inc:657", gap: MoveGap::Ready },
     MoveSite { proc: Proc::CrawlEnd, entry: "crawl.inc:296", exit: "crawl.inc:712", gap: MoveGap::FrameClock },
-    MoveSite { proc: Proc::PushPullWait, entry: "main.cpp:4138", exit: "pushpull.inc:104", gap: MoveGap::Pushable },
-    MoveSite { proc: Proc::PushMove, entry: "pushpull.inc:101", exit: "pushpull.inc:137", gap: MoveGap::Pushable },
-    MoveSite { proc: Proc::PullMove, entry: "pushpull.inc:110", exit: "pushpull.inc:184", gap: MoveGap::Pushable },
+    MoveSite { proc: Proc::PushPullWait, entry: "main.cpp:4138", exit: "pushpull.inc:104", gap: MoveGap::Ready },
+    MoveSite { proc: Proc::PushMove, entry: "pushpull.inc:101", exit: "pushpull.inc:137", gap: MoveGap::Ready },
+    MoveSite { proc: Proc::PullMove, entry: "pushpull.inc:110", exit: "pushpull.inc:184", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SlideFront, entry: "main.cpp:4901", exit: "main.cpp:6712", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SlideBack, entry: "main.cpp:4903", exit: "main.cpp:6746", gap: MoveGap::Ready },
     MoveSite { proc: Proc::SlideFrontLand, entry: "main.cpp:6712", exit: "main.cpp:6764", gap: MoveGap::FrameClock },
@@ -340,8 +343,16 @@ pub struct MoveState {
     /// state takes its stand-off and its body yaw from.
     pub wall_yaw: i16,
     /// `m370C` of `procPushPullWait_init`, `pushpull.inc:57`: the point the player stands at while
-    /// it waits for a grab.
+    /// it waits for a grab, and from `setPushPullKeepData` on, `pushpull.inc:46`, the position
+    /// the grabbed actor stood at the last time the label was handed to it.
     pub grab: Vec3,
+    /// `mProcVar2.mPushPullPrevAngleY`, `pushpull.inc:34`: the grabbed actor's own facing the last
+    /// time its callback ran, which the delta at `pushpull.inc:37` turns the player by.
+    pub keep_yaw: i16,
+    /// `mProcVar6.m3570`, `pushpull.inc:54`: the word that holds the grab alignment until it clears
+    /// itself at `pushpull.inc:101`, raises the unknown bit of every label that carries one at
+    /// `pushpull.inc:24`, and is raised again by each moving state's initialiser at `:130` and `:173`.
+    pub armed: bool,
     /// The corner `procCrawlAutoMove` is walking, while it is walking one.
     pub corner: Option<CrawlCorner>,
 }
@@ -354,6 +365,8 @@ impl Default for MoveState {
             ledge: None,
             wall_yaw: 0,
             grab: Vec3::ZERO,
+            keep_yaw: 0,
+            armed: false,
             corner: None,
         }
     }
@@ -407,6 +420,9 @@ struct Probe<'a> {
     combat: &'a Combat,
     lock: &'a Lock,
     intent: &'a MoveIntent,
+    /// `cBgS::m_chk_element`, the table `setPushPullKeepData` dispatches through. It is absent until
+    /// the first actor that owns a background has put it there, which is nothing to push.
+    pushpull: Option<&'a PushPulls>,
     /// The words `setFrontWallType` reads off the player before it traces, rebuilt from the port's
     /// own fields each tick.
     wall: WallProbe,
@@ -448,6 +464,13 @@ impl Probe<'_> {
     /// `doTrigger`, `main.cpp:1891`: the jump face on the frame it went down.
     fn jump_trigger(&self) -> bool {
         self.pad.is_some_and(|pad| pad.trig.a)
+    }
+
+    /// `PUSH_PULL_KEEP`, the word `procPushMove` and `procPullMove` read to tell a button
+    /// that is still down from one that has just gone down, `pushpull.inc:144`. The port keeps no
+    /// such word, so the frame's own press edge stands in for it.
+    fn fresh_press(&self) -> bool {
+        self.pad.is_some_and(|pad| pad.trig.r)
     }
 
     /// `setFrontWallType`, `main.cpp:4544`: the ten words the wall, hang, climb and jump selectors
@@ -493,14 +516,108 @@ impl Probe<'_> {
             .is_some_and(|hit| hit.normal.y >= HANG_FLAT)
     }
 
-    /// A pushable actor standing in the player's grab reach. The stage's push and pull callback
-    /// reaches its actor through the room's registered handler, `d_bg_s.cpp:529`, keyed on the
-    /// polygon the player stands on, and the port has neither a room handler nor a grab-status word
-    /// to hand it, so the honest answer is that there is nothing to return rather than one of the
-    /// port's own actor types standing in for it.
-    fn pushable(&self) -> Option<Entity> {
+    /// The polygon `mPolyInfo` holds for a push or pull, `main.cpp:4616`: the front wall trace of
+    /// `setFrontWallType`, `main.cpp:4561-4567`, offered the registered backgrounds and the room's
+    /// own triangles, which is the same test the reference runs once its own geometry holds every
+    /// background rather than only the rooms'.
+    fn push_pull_poly(&self) -> Option<pushable::Poly> {
+        let collision = self.collision?;
+        let polys = self.pushpull?;
+        let ahead = facing(self.wall.shape_yaw) * (WALL_TRACE_REACH + PUSH_PULL_WALL_R);
+        for up in WALL_HEIGHTS.iter().rev() {
+            let start = self.wall.pos + Vec3::new(0.0, *up, 0.0);
+            if let Some(poly) = polys.line_cross(Some(collision), start, start + ahead) {
+                return poly.is_face().then_some(poly);
+            }
+        }
         None
     }
+
+    /// The actor `setPushPullKeepData` reaches through `dBgS::PushPullCallBack`, `d_bg_s.cpp:542`,
+    /// with the wall's own facing and the ledge point `setFrontWallType` leaves on it. `m352C` and
+    /// `m3724` are the two words every push and pull state counts its stand-off from.
+    fn pushable(&self) -> Option<Pushable> {
+        let poly = self.push_pull_poly()?;
+        let actor = self.pushpull?.push_pull_actor(poly)?;
+        Some(Pushable {
+            poly,
+            actor,
+            wall_yaw: poly.wall_yaw(),
+            ledge: Vec3::new(poly.point.x, self.wall.pos.y, poly.point.z),
+        })
+    }
+}
+
+/// The six modules above that own the player's own motion, which the reference reads off its own
+/// process word. They travel as one param because a system's own arity runs out at sixteen.
+#[derive(SystemParam)]
+pub struct Modes<'w> {
+    pub swim: Res<'w, Swim>,
+    pub jump: Res<'w, Jump>,
+    pub roll: Res<'w, Roll>,
+    pub hop: Res<'w, Hop>,
+    pub combat: Res<'w, Combat>,
+    pub lock: Res<'w, Lock>,
+}
+
+/// The push and pull state a player stands in front of: the polygon `mPolyInfo` holds, the actor
+/// the stage's dispatch answers with behind it, the wall's own facing `m352C` and the ledge point
+/// `m3724` the two counts their stand-off from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pushable {
+    pub poly: pushable::Poly,
+    pub actor: Entity,
+    pub wall_yaw: i16,
+    pub ledge: Vec3,
+}
+
+/// `setPushPullKeepData`, `pushpull.inc:18-49`: the label the caller passed with the
+/// power glove and the grab word folded in, the actor the stage's dispatch answers with, and the
+/// player's own position and facing brought onto that actor's since the last time it moved. The
+/// box's half of the call is [`pushable::Call::send`].
+fn set_push_pull_keep_data(
+    player: &mut Player,
+    state: &mut MoveState,
+    polys: Option<&PushPulls>,
+    reach: &mut pushable::Call,
+    poly: pushable::Poly,
+    label: u32,
+) -> Option<Entity> {
+    let polys = polys?;
+    let mut label = label;
+    if label != PPLABEL_NONE {
+        if reach.power_glove() {
+            label |= PPLABEL_HEAVY;
+        }
+        if state.armed {
+            label |= PPLABEL_UNK4;
+        }
+    }
+    let answer = reach.send(polys, poly, to_s16(player.face), label)?;
+    if label != PPLABEL_NONE {
+        let turned = answer.shape_yaw.wrapping_sub(state.keep_yaw);
+        if turned != 0 {
+            player.pos = turned_about(state.grab, turned, player.pos - state.grab);
+            player.face = from_s16(to_s16(player.face).wrapping_add(turned));
+            player.yaw = from_s16(to_s16(player.yaw).wrapping_add(turned));
+        }
+        player.pos.x += answer.pos.x - state.grab.x;
+        player.pos.z += answer.pos.z - state.grab.z;
+    }
+    state.grab = answer.pos;
+    state.keep_yaw = answer.shape_yaw;
+    Some(answer.actor)
+}
+
+/// `mDoMtx_stack_c::transS(m370C)` then `YrotM`, `pushpull.inc:36-38`: a point swung about the
+/// grab point by the actor's own turn since the last label.
+fn turned_about(around: Vec3, angle: i16, offset: Vec3) -> Vec3 {
+    let (sin, cos) = from_s16(angle).sin_cos();
+    around + Vec3::new(
+        offset.x * cos + offset.z * sin,
+        offset.y,
+        -offset.x * sin + offset.z * cos,
+    )
 }
 
 /// `setFrontWallType` at `main.cpp:4544` opens by reading the player, and every word it reads has a
@@ -867,13 +984,18 @@ fn want_crouch(_player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     }
 }
 
+/// `checkNextActionFromButton`'s push and pull arm, `main.cpp:4136-4138`: the button has to be
+/// down and the stage's dispatch has to answer with an actor behind the polygon the player's own
+/// front wall trace landed on. `dComIfGp_getRStatus() == dActStts_GRAB_e` has no port word, and the
+/// reference's trigger is the press edge, which a button held across a stage change would never
+/// raise again, so the level of the button is what opens the arm.
 fn want_push_pull(_player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     if probe.dead || probe.riding || probe.busy() {
         return None;
     }
-    match probe.pushable() {
-        Some(_) => Some((Proc::PushPullWait, MoveGap::Ready)),
-        None => Some((Proc::PushPullWait, MoveGap::Pushable)),
+    match probe.crouch_button() {
+        Some(true) => probe.pushable().map(|_| (Proc::PushPullWait, MoveGap::Ready)),
+        Some(false) | None => None,
     }
 }
 
@@ -1004,9 +1126,12 @@ fn want_hang(_player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     Some((Proc::HangStart, MoveGap::Ready))
 }
 
+/// `checkNextMode`, `main.cpp:4438-4444`: the slide is asked first and the button's own dispatcher
+/// next, and the push and pull arm of that dispatcher is asked before the crouch, so a player
+/// holding the button in front of a registered background pushes rather than lies down.
 const ASKS: &[for<'a> fn(&Player, &Probe<'a>) -> Option<(Proc, MoveGap)>] = &[
-    want_crouch,
     want_push_pull,
+    want_crouch,
     want_crawl,
     want_slide,
     want_wait_turn,
@@ -1353,24 +1478,26 @@ fn side_roll_tick(player: &mut Player, probe: &Probe, proc: &LinkProc) -> Option
     (proc.frame as f32 >= length).then_some((Proc::Land, MoveGap::Ready))
 }
 
-/// `procPushPullWait`, `pushpull.inc:100-146`: the button release ends it, the model turns onto the
-/// grab point and the player walks to its stand-off while the grab is being taken, and the stick
-/// then picks the push or the pull. Every word in that middle step is the grabbed actor's own
-/// transform, which the port has no actor to read, so with no actor the step is inert and the button
-/// and stick tests are the whole state.
+/// `procPushPullWait`, `pushpull.inc:82-120`: the button release ends it, the grab word holds the
+/// model turning onto the grab point and the player walking to its stand-off, and once that word is
+/// clear the stick picks the push or the pull, each of which asks the stage for the actor before it
+/// commits, `pushpull.inc:124` and `:167`.
 fn push_pull_wait_tick(
     player: &mut Player,
     probe: &Probe,
-    state: &MoveState,
+    state: &mut MoveState,
+    reach: &mut pushable::Call,
 ) -> Option<(Proc, MoveGap)> {
     if !probe.crouch_button().unwrap_or(false) {
         return Some((Proc::Wait, MoveGap::Ready));
     }
-    if probe.pushable().is_some() {
+    let pushable = probe.pushable()?;
+    if state.armed {
         let grab = state.grab;
+        let target = pushable.wall_yaw.wrapping_add(0x8000);
         player.face = from_s16(add_calc_angle_s(
             to_s16(player.face),
-            state.wall_yaw.wrapping_add(0x8000),
+            target,
             PUSH_PULL_SCALE,
             PUSH_PULL_MAX,
             PUSH_PULL_MIN,
@@ -1391,67 +1518,128 @@ fn push_pull_wait_tick(
             PUSH_PULL_CHASE_MIN_STEP,
         );
         let residual = (player.pos.x - grab.x).abs() + (player.pos.z - grab.z).abs();
-        if turn_between(to_s16(player.face), state.wall_yaw.wrapping_add(0x8000)) == 0
-            && residual < PUSH_PULL_CHASE_LIMIT
-        {
+        if turn_between(to_s16(player.face), target) == 0 && residual < PUSH_PULL_CHASE_LIMIT {
             player.pos.x = grab.x;
             player.pos.z = grab.z;
+            state.armed = false;
         }
     }
-    if probe.stick() <= STICK_GATE {
+    if state.armed || probe.stick() <= STICK_GATE {
         return None;
     }
-    Some(match direction(probe.wanted(), to_s16(player.face)) {
-        Direction::Back => (Proc::PullMove, MoveGap::Pushable),
-        _ => (Proc::PushMove, MoveGap::Pushable),
-    })
-}
-
-/// `procPushMove`, `pushpull.inc:140-163`: the stick is read against the model's own facing, and both
-/// ways out of the state go through `setPushPullKeepData`, which is the callback the port has no
-/// actor to hand the label to.
-fn push_tick(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
-    if !probe.crouch_button().unwrap_or(false) {
-        return Some((Proc::Wait, MoveGap::Ready));
-    }
-    if probe.stick() <= STICK_GATE {
-        return Some((Proc::PushPullWait, MoveGap::Pushable));
-    }
-    Some(match direction(probe.wanted(), to_s16(player.face)) {
-        Direction::Back => (Proc::PullMove, MoveGap::Pushable),
-        _ => (Proc::PushPullWait, MoveGap::Pushable),
-    })
-}
-
-/// `procPullMove`, `pushpull.inc:186-215`: the pull's two wall traces and the ground probe behind them
-/// are the part of the state that is pure geometry, and are ported here; the actor's own motion once
-/// the probe passes is the callback the port cannot make, so every branch that reaches the callback
-/// reports [`MoveGap::Pushable`].
-fn pull_tick(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
-    if !probe.crouch_button().unwrap_or(false) {
-        return Some((Proc::Wait, MoveGap::Ready));
-    }
-    if probe.stick() <= STICK_GATE {
-        return Some((Proc::PushPullWait, MoveGap::Pushable));
-    }
-    if matches!(direction(probe.wanted(), to_s16(player.face)), Direction::Forward) {
-        return Some((Proc::PushMove, MoveGap::Pushable));
-    }
-    let blocked = match probe.collision {
-        Some(collision) => {
-            let shape = facing(player.face);
-            let wall = PULL_PROBE_UP.iter().any(|up| {
-                let from = player.pos + Vec3::new(0.0, *up, 0.0);
-                collision.line_cross(from, from - shape * PULL_REACH).is_some()
-            });
-            let back =
-                player.pos + Vec3::new(0.0, PULL_PROBE_UP[1], 0.0) - shape * PULL_REACH
-                    + shape * PULL_GROUND_BACK;
-            !wall && probe.ground(back.x, back.z) - player.pos.y < -PULL_GROUND_DROP
-        }
-        None => false,
+    let want = match direction(probe.wanted(), to_s16(player.face)) {
+        Direction::Forward => Proc::PushMove,
+        Direction::Back => Proc::PullMove,
+        Direction::Left | Direction::Right => return None,
     };
-    (!blocked).then_some((Proc::PullMove, MoveGap::Pushable))
+    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_NONE)
+        .is_some()
+        .then_some((want, MoveGap::Ready))
+}
+
+/// `procPushMove`, `pushpull.inc:137-163`: the stick is read against the model's own facing on the
+/// frame the button went down, and every frame after that hands the push label to the actor behind
+/// `mPolyInfo`, which is what starts the box walking.
+fn push_tick(
+    player: &mut Player,
+    probe: &Probe,
+    state: &mut MoveState,
+    reach: &mut pushable::Call,
+) -> Option<(Proc, MoveGap)> {
+    if !probe.crouch_button().unwrap_or(false) {
+        return Some((Proc::Wait, MoveGap::Ready));
+    }
+    let pushable = probe.pushable()?;
+    if probe.fresh_press() {
+        return match direction(probe.wanted(), to_s16(player.face)) {
+            Direction::Forward => {
+                set_push_pull_keep_data(
+                    player,
+                    state,
+                    probe.pushpull,
+                    reach,
+                    pushable.poly,
+                    PPLABEL_PUSH,
+                );
+                None
+            }
+            Direction::Back => enter_move(player, state, probe, reach, Proc::PullMove),
+            Direction::Left | Direction::Right => Some((Proc::PushPullWait, MoveGap::Ready)),
+        };
+    }
+    state.armed = false;
+    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_PUSH);
+    None
+}
+
+/// `procPushMove_init` at `pushpull.inc:124` and `procPullMove_init` at `:167`: both ask the stage
+/// for the actor with no label before they commit, and a null answer leaves the player where it
+/// stands. The label the new state then sends is what starts the box walking.
+fn enter_move(
+    player: &mut Player,
+    state: &mut MoveState,
+    probe: &Probe,
+    reach: &mut pushable::Call,
+    want: Proc,
+) -> Option<(Proc, MoveGap)> {
+    let pushable = probe.pushable()?;
+    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_NONE)
+        .is_some()
+        .then_some((want, MoveGap::Ready))
+}
+
+/// `procPullMove`, `pushpull.inc:180-232`: the two wall traces behind the player and the ground
+/// probe past them come first on the frame the button went down, and only a probe that passes hands
+/// the pull label over.
+fn pull_tick(
+    player: &mut Player,
+    probe: &Probe,
+    state: &mut MoveState,
+    reach: &mut pushable::Call,
+) -> Option<(Proc, MoveGap)> {
+    if !probe.crouch_button().unwrap_or(false) {
+        return Some((Proc::Wait, MoveGap::Ready));
+    }
+    let pushable = probe.pushable()?;
+    if probe.fresh_press() {
+        return match direction(probe.wanted(), to_s16(player.face)) {
+            Direction::Back => {
+                if !pull_clear(player, probe) {
+                    set_push_pull_keep_data(
+                        player,
+                        state,
+                        probe.pushpull,
+                        reach,
+                        pushable.poly,
+                        PPLABEL_PULL,
+                    );
+                }
+                None
+            }
+            Direction::Forward => enter_move(player, state, probe, reach, Proc::PushMove),
+            Direction::Left | Direction::Right => Some((Proc::PushPullWait, MoveGap::Ready)),
+        };
+    }
+    state.armed = false;
+    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_PULL);
+    None
+}
+
+/// `procPullMove`'s two wall traces and its ground probe, `pushpull.inc:190-216`: a wall behind the
+/// player at either height, or a floor more than `30.1` below the feet further back, refuses the
+/// pull. The second trace's endpoint is the first one's shifted along the same facing, `pushpull.inc:210`.
+fn pull_clear(player: &Player, probe: &Probe) -> bool {
+    if let Some(collision) = probe.collision {
+        let shape = facing(player.face);
+        for up in PULL_PROBE_UP {
+            let from = player.pos + Vec3::new(0.0, up, 0.0);
+            if collision.line_cross(from, from - shape * PULL_REACH).is_some() {
+                return false;
+            }
+        }
+    }
+    let back = player.pos - facing(player.face) * (PULL_REACH - PULL_GROUND_BACK);
+    !(probe.ground(back.x, back.z) - player.pos.y < -PULL_GROUND_DROP)
 }
 
 /// Back into the plain crawl, which is where `procCrawlAutoMove`'s counter running out at
@@ -1508,6 +1696,7 @@ fn tick(
     probe: &Probe,
     state: &mut MoveState,
     proc: &LinkProc,
+    reach: &mut pushable::Call,
 ) -> Option<(Proc, MoveGap)> {
     match proc.current {
         Proc::Crouch => crouch_tick(player, probe),
@@ -1533,9 +1722,9 @@ fn tick(
             next
         }
         Proc::CrawlEnd => crawl_end_tick(player, probe),
-        Proc::PushPullWait => push_pull_wait_tick(player, probe, state),
-        Proc::PushMove => push_tick(player, probe),
-        Proc::PullMove => pull_tick(player, probe),
+        Proc::PushPullWait => push_pull_wait_tick(player, probe, state, reach),
+        Proc::PushMove => push_tick(player, probe, state, reach),
+        Proc::PullMove => pull_tick(player, probe, state, reach),
         Proc::SlideFront => slide_tick(player, probe, false),
         Proc::SlideBack => slide_tick(player, probe, true),
         Proc::WaitTurn => wait_turn_tick(player, proc),
@@ -1606,8 +1795,18 @@ fn arm_climb_down(player: &mut Player, state: &MoveState) {
     player.pos.y -= CLIMB_DOWN_DROP;
 }
 
-/// The words each state latches on entry, which the reference writes in its own initialiser.
-fn arm(state: &mut MoveState, proc: &mut LinkProc, probe: &Probe, player: &mut Player, want: Proc) {
+/// The words each state latches on entry, which the reference writes in its own initialiser. The
+/// last argument is whether the reference's own dispatcher asked for the process rather than one of
+/// its own ticks, which is the only thing that separates `procPushPullWait_init(1)` at
+/// `main.cpp:4138` from `procPushPullWait_init(0)` at `pushpull.inc:154` and `:223`.
+fn arm(
+    state: &mut MoveState,
+    proc: &mut LinkProc,
+    probe: &Probe,
+    player: &mut Player,
+    want: Proc,
+    dispatched: bool,
+) {
     match want {
         Proc::WaitTurn => {
             proc.target_angle = probe.wanted();
@@ -1627,18 +1826,29 @@ fn arm(state: &mut MoveState, proc: &mut LinkProc, probe: &Probe, player: &mut P
         Proc::SideRoll => player.speed = ROLL_SPEED,
         Proc::ClimbUpStart => arm_climb(player, state),
         Proc::ClimbDownStart => arm_climb_down(player, state),
-        Proc::PushPullWait => {
-            state.grab = state.ledge.map_or(Vec3::ZERO, |ledge| {
-                let wall = facing(from_s16(state.wall_yaw));
-                Vec3::new(
-                    ledge.x + PUSH_PULL_REACH * wall.x,
-                    player.pos.y,
-                    ledge.z + PUSH_PULL_REACH * wall.z,
-                )
-            });
-        }
+        Proc::PushPullWait => arm_push_pull_wait(probe, state, player, dispatched),
+        Proc::PushMove | Proc::PullMove => state.armed = true,
         _ => {}
     }
+}
+
+/// `procPushPullWait_init`, `pushpull.inc:52-79`: the grab point is the ledge point `m3724` a
+/// reach along the wall's own facing `m352C`, at the player's own height, and `mProcVar6.m3570` is
+/// the parameter of that initialiser, which the tick at `pushpull.inc:94-102` runs its alignment
+/// under and clears at `:101`. `procPushMove_init` and `procPullMove_init`, `pushpull.inc:130` and
+/// `:173`, raise that word too, which is what puts the unknown bit on the first label of either
+/// state; the grab point is the actor's own position by then, written by the keep data their
+/// initialiser ran first at `pushpull.inc:124` and `:167`.
+fn arm_push_pull_wait(probe: &Probe, state: &mut MoveState, player: &Player, dispatched: bool) {
+    state.grab = probe.pushable().map_or(Vec3::ZERO, |pushable| {
+        let wall = facing(from_s16(pushable.wall_yaw));
+        Vec3::new(
+            pushable.ledge.x + PUSH_PULL_REACH * wall.x,
+            player.pos.y,
+            pushable.ledge.z + PUSH_PULL_REACH * wall.z,
+        )
+    });
+    state.armed = dispatched;
 }
 
 /// The takeoff height, as the reference keeps it. Every grounded tick rewrites it with the height
@@ -1664,9 +1874,10 @@ fn enter(
     probe: &Probe,
     player: &mut Player,
     want: Proc,
+    dispatched: bool,
 ) {
     if proc.enter(want) {
-        arm(state, proc, probe, player, want);
+        arm(state, proc, probe, player, want, dispatched);
     }
 }
 
@@ -1685,7 +1896,7 @@ fn settle(
     state.asked = Some(want);
     state.gap = gap;
     if gap == MoveGap::Ready {
-        enter(state, proc, probe, player, want);
+        enter(state, proc, probe, player, want, false);
         return true;
     }
     state.corner = None;
@@ -1704,17 +1915,22 @@ pub fn control(
     collision: Option<Res<Collision>>,
     pad: Option<Res<PadButtons>>,
     health: Res<Health>,
-    swim: Res<Swim>,
-    jump: Res<Jump>,
-    roll: Res<Roll>,
-    hop: Res<Hop>,
-    combat: Res<Combat>,
-    lock: Res<Lock>,
+    modes: Modes<'_>,
+    polys: Option<Res<PushPulls>>,
+    mut reach: pushable::Call<'_, '_>,
     ships: Query<&Ship>,
     mut proc: ResMut<LinkProc>,
     mut state: ResMut<MoveState>,
     mut players: Query<&mut Player>,
 ) {
+    let Modes {
+        swim,
+        jump,
+        roll,
+        hop,
+        combat,
+        lock,
+    } = modes;
     let riding = ships.iter().any(|ship| ship.riding);
     let Some(mut player) = players.iter_mut().next() else {
         return;
@@ -1733,6 +1949,7 @@ pub fn control(
         combat: &combat,
         lock: &lock,
         intent: &intent,
+        pushpull: polys.as_deref(),
         wall: wall_probe(player, solid, !grounded(solid, player.pos), swim.active),
         from: from.as_deref().map_or(player.pos, |from| from.0),
         drop: proc.takeoff_y - player.pos.y,
@@ -1753,7 +1970,7 @@ pub fn control(
         match resolve(player, &probe, proc.current) {
             Some((want, MoveGap::Ready)) => {
                 state.gap = MoveGap::Ready;
-                enter(&mut state, &mut proc, &probe, player, want);
+                enter(&mut state, &mut proc, &probe, player, want, true);
             }
             Some((want, gap)) => {
                 state.asked = Some(want);
@@ -1764,7 +1981,7 @@ pub fn control(
         return;
     }
     let standing = proc.current;
-    let ask = tick(player, &probe, &mut state, &proc);
+    let ask = tick(player, &probe, &mut state, &proc, &mut reach);
     let moved = settle(player, &probe, &mut state, &mut proc, ask);
     if moved || proc.current != standing || !asks_dispatcher(standing) {
         return;
@@ -1773,7 +1990,7 @@ pub fn control(
     match ask {
         Some((want, MoveGap::Ready)) => {
             state.gap = MoveGap::Ready;
-            enter(&mut state, &mut proc, &probe, player, want);
+            enter(&mut state, &mut proc, &probe, player, want, true);
         }
         Some((want, gap)) => {
             state.asked = Some(want);
