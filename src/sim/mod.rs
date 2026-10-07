@@ -1622,6 +1622,8 @@ pub fn build(
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
     daynight::init(&mut sim.world);
+    sim.world
+        .insert_resource(cam_event::SplinePaths::default());
     weather::init(&mut sim.world);
     salvage::init(&mut sim.world);
     gy_ctrl::init(&mut sim.world);

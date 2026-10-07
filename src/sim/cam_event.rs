@@ -1,3 +1,4 @@
+use bevy_ecs::prelude::Resource;
 use glam::Vec3;
 
 use super::cam_engine::{Event, EventView, evflag};
@@ -221,13 +222,13 @@ pub enum EvActor {
 /// a feed with no manager behind it answers every read with its own default, which is what the
 /// target does when the forced flag is set and its argument table names nothing.
 ///
-/// One thing the port cannot answer at all: the two list getters. `getEvFloatListData` and
-/// `getEvXyzListData` return a pointer and a count, `sibling d_ev_camera.cpp:158-188` and
-/// `:190-220`, and the target's counterpart is not declared at all, `d_ev_camera.cpp:25-68`. The
-/// event manager exposes a count per key and one scalar, never the array behind them, so
-/// [`Feed::float_list`] and [`Feed::xyz_list`] answer the count and name the array as missing.
-/// That is what holds `fixedFramesEvCamera` and `bSplineEvCamera` at their first frame and what
-/// holds `getItemEvCamera`'s and `uniformTransEvCamera`'s list arms.
+/// One thing the port answers only one way. `getEvFloatListData` and `getEvXyzListData` return a
+/// pointer and a count, `sibling d_ev_camera.cpp:158-188` and `:190-220`, and the target's
+/// counterpart is not declared at all, `d_ev_camera.cpp:25-68`. The sibling's first arm, taken
+/// when the camera's own forced flag is set, reaches the array straight out of that camera's event
+/// argument list, `sibling d_ev_camera.cpp:163-168` and `:195-200`; the port's [`EventManager`]
+/// holds no such list, so [`Feed::floats`] and [`Feed::vecs`] answer through the manager alone,
+/// which is the sibling's second arm.
 pub struct Feed<'a> {
     manager: Option<&'a mut EventManager>,
     staff: i32,
@@ -327,15 +328,33 @@ impl<'a> Feed<'a> {
         resolve_actor(self.text_of(key).unwrap_or(fallback))
     }
 
-    /// `getEvFloatListData(f32**, char*)`, `sibling d_ev_camera.cpp:158-188`: the key count, with
-    /// the array itself unavailable. See the note on [`Feed`].
+    /// `getEvFloatListData(f32**, char*)`, `sibling d_ev_camera.cpp:158-188`: the array behind
+    /// the key and its length, which is the count the getter returns. A key the cut does not
+    /// carry answers `None`, the sibling's `0`.
+    pub fn floats(&mut self, key: &str) -> Option<Vec<f32>> {
+        self.manager
+            .as_deref_mut()
+            .and_then(|manager| manager.get_my_floats(self.staff, key))
+            .map(<[f32]>::to_vec)
+    }
+
+    /// `getEvXyzListData(cXyz**, char*)`, `sibling d_ev_camera.cpp:190-220`: the same array read
+    /// as points.
+    pub fn vecs(&mut self, key: &str) -> Option<Vec<Vec3>> {
+        self.manager
+            .as_deref_mut()
+            .and_then(|manager| manager.get_my_vecs(self.staff, key))
+    }
+
+    /// `getEvFloatListData`'s length alone, for the arms that only need the count. It is the same
+    /// count [`Feed::floats`] hands back with the array, taken straight off the substance record
+    /// so that a caller asking for the two cannot disagree about it.
     pub fn float_list(&mut self, key: &str) -> Option<usize> {
         let count = self.substance_num(key);
         (count != 0).then_some(count as usize)
     }
 
-    /// `getEvXyzListData(cXyz**, char*)`, `sibling d_ev_camera.cpp:190-220`: the key count, with
-    /// the array itself unavailable. See the note on [`Feed`].
+    /// `getEvXyzListData`'s length alone, as [`Feed::float_list`].
     pub fn xyz_list(&mut self, key: &str) -> Option<usize> {
         self.float_list(key)
     }
@@ -894,9 +913,10 @@ impl Default for Possessed {
     }
 }
 
-/// `fixedFramesEvCamera`'s state, `sibling d_camera.cpp:672-684`. Every member is latched on the
-/// first frame out of a key list, which this port cannot read, so the whole arm stays at the
-/// frame it latches and holds.
+/// `fixedFramesEvCamera`'s state, `sibling d_camera.cpp:672-684`. Every member but `choice` is
+/// latched on the first frame out of the cut's key lists, and the arm then holds that frame for
+/// as long as the timer runs. `choice` is latched and never read back, because the random pick it
+/// selects has no channel here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FixedFrames {
     /// `field_0x0` and `mTimer`: whether the cut named a timer, and the timer.
@@ -933,8 +953,9 @@ impl Default for FixedFrames {
     }
 }
 
-/// `bSplineEvCamera`'s state, `sibling d_camera.cpp:686-695`. Every member is latched out of a
-/// key list too, so the arm holds at the frame it latches.
+/// `bSplineEvCamera`'s state, `sibling d_camera.cpp:686-695`. Every member is latched out of the
+/// cut's key lists on the first frame, and the arm then walks the curve for as long as the timer
+/// runs. The lists themselves are [`SplinePaths`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BSpline {
     /// `field_0x1c`: the walk is over.
@@ -958,6 +979,39 @@ impl Default for BSpline {
             relative: false,
             spline: Spline::default(),
         }
+    }
+}
+
+/// The cut's own curve keys, latched off the running cut's staff by the three arms that take a
+/// key list: `bSplineEvCamera`'s `Centers` and `Eyes` and `Fovys`, `sibling d_ev_camera.cpp:3484-
+/// 3512`; `uniformTransEvCamera`'s `BSpPoints`, `sibling d_ev_camera.cpp:1024`; and
+/// `getItemEvCamera`'s `CurvePoints`, `sibling d_ev_camera.cpp:3180`.
+///
+/// They are the arms' own cut data rather than camera work state, and [`State`] is `Copy` because
+/// [`crate::sim::Camera`] is, so they live beside it instead of in it. What each arm needs of them
+/// as a plain number — the agreed key count, the timer — is in that arm's own [`State`] entry.
+#[derive(Resource, Debug, Clone, Default, PartialEq)]
+pub struct SplinePaths {
+    pub centers: Vec<Vec3>,
+    pub eyes: Vec<Vec3>,
+    pub fovys: Vec<f32>,
+    /// `BSpPoints`: the one field-of-view curve a transition walks when the cut names no built-in
+    /// curve number.
+    pub trans: Vec<f32>,
+    /// `CurvePoints`: the one field-of-view curve `getItemEvCamera` walks in place of its own
+    /// six-key table.
+    pub item: Vec<f32>,
+}
+
+impl SplinePaths {
+    /// `bSplineEvCamera`'s three latching tests, `sibling d_ev_camera.cpp:3484-3512`: a key that
+    /// names nothing leaves its list empty and the arm returns at once.
+    pub fn clear(&mut self) {
+        self.centers.clear();
+        self.eyes.clear();
+        self.fovys.clear();
+        self.trans.clear();
+        self.item.clear();
     }
 }
 
@@ -1457,13 +1511,17 @@ pub struct State {
 ///
 /// What the twenty arms here do not carry, named once: the varargs argument table behind
 /// `StartEventCamera`, the wolf and companion adjustments the sibling's relation arms make, the
-/// actor search behind every non-player actor name, the two key-list getters behind four of the
-/// arms, and the stage's map-event table behind `maptoolIdEvCamera`. Each is named again on the
-/// arm it stops.
+/// actor search behind every non-player actor name, and the stage's map-event table behind
+/// `maptoolIdEvCamera`. Each is named again on the arm it stops.
+///
+/// The two key-list getters are not among them: [`Feed::floats`] and [`Feed::vecs`] carry the
+/// three of the four arms that used them, and the fourth's single-array reads went through
+/// [`Feed::float_list`] already.
 pub fn event(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     manager: Option<&mut EventManager>,
 ) -> bool {
     let mut cut = camera.work.event;
@@ -1494,6 +1552,7 @@ pub fn event(
             camera,
             player,
             collision,
+            paths,
             &mut Feed::new(None, cut.staff),
             &mut cut,
         );
@@ -1531,7 +1590,7 @@ pub fn event(
         camera.work.event = cut;
         return false;
     }
-    run(camera, player, collision, &mut feed, &mut cut);
+    run(camera, player, collision, paths, &mut feed, &mut cut);
     true
 }
 
@@ -1564,6 +1623,7 @@ fn run(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     feed: &mut Feed<'_>,
     cut: &mut Event,
 ) {
@@ -1599,7 +1659,7 @@ fn run(
         _ => 9,
     };
 
-    let finished = dispatch(camera, player, collision, feed, cut);
+    let finished = dispatch(camera, player, collision, paths, feed, cut);
     camera.work.event = *cut;
 
     if cut.bg_check == 4 {
@@ -1619,6 +1679,7 @@ fn dispatch(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     feed: &mut Feed<'_>,
     cut: &mut Event,
 ) -> bool {
@@ -1628,9 +1689,9 @@ fn dispatch(
         "TALK" => talkto(camera),
         "FIXEDPOS" => fixed_position(camera, player, feed),
         "FIXEDFRM" => fixed_frame(camera, player, collision, feed),
-        "UNITRANS" => trans(camera, player, collision, feed, cut, 1),
+        "UNITRANS" => trans(camera, player, collision, paths, feed, cut, 1),
         "RESTOREPOS" => restore_pos(camera, player, collision, feed, cut),
-        "GETITEM" => get_item(camera, player, collision, feed),
+        "GETITEM" => get_item(camera, player, collision, paths, feed),
         "TURNTOACTOR" => turn_to_actor(camera),
         "ROLLING" => rolling(camera, player, collision, feed),
         "WINDDIR" => wind_direction(camera),
@@ -1638,13 +1699,13 @@ fn dispatch(
         "STYLE" => style(camera, feed, cut),
         "SAVE" => save(camera, feed, cut),
         "LOAD" => load(camera, feed, cut),
-        "FIXEDFRMS" => fixed_frames(camera, feed),
-        "BSPLINE" => b_spline(camera, feed),
+        "FIXEDFRMS" => fixed_frames(camera, player, collision, feed),
+        "BSPLINE" => b_spline(camera, player, paths, feed),
         "POSSESSED" => possessed(camera, player, feed, cut),
         "TWOACTOR0" => two_actor(camera, feed),
         "STOKER" => stoker(camera, player, feed),
-        "UNIBRAKE" => trans(camera, player, collision, feed, cut, 2),
-        "UNIACCELE" => trans(camera, player, collision, feed, cut, 3),
+        "UNIBRAKE" => trans(camera, player, collision, paths, feed, cut, 2),
+        "UNIACCELE" => trans(camera, player, collision, paths, feed, cut, 3),
         "MAPTOOL" => maptool_id(camera, feed, cut),
         "WATCHACTOR" => watch_actor(camera, player, collision, feed),
         "GAMEOVER" => game_over(camera, player, collision, feed),
@@ -2884,6 +2945,7 @@ fn trans(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     feed: &mut Feed<'_>,
     cut: &Event,
     mode: i32,
@@ -2908,13 +2970,12 @@ fn trans(
             };
             w.spline = Spline::new(keys, timer + 1);
             w.spline.step();
-        } else {
-            w.points = feed.float_list("BSpPoints").unwrap_or(0);
-            if w.points != 0 {
-                w.spline = Spline::new(w.points as i32, timer + 1);
-                w.spline.step();
-                w.curve = -1;
-            }
+        } else if let Some(points) = feed.floats("BSpPoints") {
+            paths.trans = points;
+            w.points = paths.trans.len();
+            w.spline = Spline::new(w.points as i32, timer + 1);
+            w.spline.step();
+            w.curve = -1;
         }
 
         if let Some(slot) = feed.int("EndSlot") {
@@ -2977,11 +3038,6 @@ fn trans(
         camera.settled = true;
     }
 
-    if w.curve == -1 && w.points != 0 {
-        camera.work.ev.trans = w;
-        return false;
-    }
-
     if camera.setup_age as i32 >= w.timer {
         done = true;
         blend(camera, &mut cache, &w, 1.0, player);
@@ -2991,7 +3047,7 @@ fn trans(
             (camera.setup_age as f32 + 1.0) / w.timer.max(1) as f32
         } else {
             w.spline.step();
-            curve(&w, w.curve)
+            curve(&w, w.curve, &paths.trans)
         };
         blend(camera, &mut cache, &w, ratio, player);
     }
@@ -3003,9 +3059,11 @@ fn trans(
     done
 }
 
-/// `d2DBSplinePath::Calc` over the three built-in tables, `sibling d_ev_camera.cpp:955-957`.
-fn curve(w: &Trans, index: i32) -> f32 {
+/// `d2DBSplinePath::Calc` over the three built-in tables, `sibling d_ev_camera.cpp:955-957`, and
+/// over the cut's own `BSpPoints` when `index` is `-1`, `sibling d_ev_camera.cpp:1024`.
+fn curve(w: &Trans, index: i32, own: &[f32]) -> f32 {
     let table: &[f32] = match index {
+        -1 => own,
         1 => &BSP_CURVE_A,
         2 => &BSP_CURVE_B,
         _ => &BSP_CURVE_C,
@@ -3479,12 +3537,12 @@ fn get_item(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     feed: &mut Feed<'_>,
 ) -> bool {
     let facing = facing_of(player);
     let mut w = camera.work.ev.get_item;
     let mut cache = camera.view_cache;
-    let mut own_curve = true;
 
     if camera.setup_age == 0 {
         w.item_type = feed.int_or("Type", 0);
@@ -3496,14 +3554,15 @@ fn get_item(
             return true;
         };
         w.timer = feed.int_or("Timer", row.3);
-        match feed.float_list("CurvePoints") {
-            Some(count) => {
-                own_curve = false;
-                w.keys = count as i32;
+        match feed.floats("CurvePoints") {
+            Some(points) => {
+                paths.item = points;
+                w.keys = paths.item.len() as i32;
                 w.spline = Spline::new(w.keys, w.timer + 1);
                 w.spline.step();
             }
             None => {
+                paths.item.clear();
                 w.keys = ITEM_CURVE_KEYS;
                 w.spline = Spline::new(ITEM_CURVE_KEYS, w.timer + 1);
                 w.spline.step();
@@ -3547,14 +3606,14 @@ fn get_item(
         w.want = SGlobe::from_xyz(w.dest_eye - w.dest_center);
     }
 
-    if !own_curve {
-        camera.work.ev.get_item = w;
-        return false;
-    }
-
     if (camera.setup_age as i32) < w.timer {
         w.spline.step();
-        let ratio = w.spline.calc(&ITEM_CURVE).unwrap_or(0.0);
+        let table: &[f32] = if paths.item.is_empty() {
+            &ITEM_CURVE
+        } else {
+            &paths.item
+        };
+        let ratio = w.spline.calc(table).unwrap_or(0.0);
         cache.center = w.start_center + (w.dest_center - w.start_center) * ratio;
         cache
             .direction
@@ -3673,71 +3732,145 @@ fn possessed(camera: &mut Camera, player: &Player, feed: &mut Feed<'_>, cut: &mu
 
 /// `dCamera_c::fixedFramesEvCamera`, `sibling d_ev_camera.cpp:3373-3477`.
 ///
-/// The arm is stopped at its first frame. All three of its parameters are key lists, `Centers`,
-/// `Eyes` and `Fovys`, `sibling d_ev_camera.cpp:3380-3412`, and the feed can count them but not
-/// read them, so the frame count, the chosen frame, the chosen centre and eye and the chosen
-/// field of view have no values and the arm has nothing to hold. The arm would also want the
-/// `ChkCamera` actor-collision test, `sibling d_ev_camera.cpp:3453-3454`, which is a separate
-/// collision query from the one this port has.
-fn fixed_frames(camera: &mut Camera, feed: &mut Feed<'_>) -> bool {
+/// The arm holds one frame of a cut's key lists for as long as the cut's timer runs. Three things
+/// come off the cut on its first frame and the rest of the arm only holds them: the agreed frame
+/// count, the timer and the found flag beside it.
+///
+/// Two things the sibling does that this arm does not. Its `Choice` of one starts the pick at a
+/// random frame, `sibling d_ev_camera.cpp:3459-3461`, and the global random channel that would
+/// choose it does not exist here, so the pick always starts at frame zero and `Choice` is latched
+/// and otherwise unread; where the sibling spreads the pick over the list, this arm always takes
+/// its first entry. Its rejection test pairs `lineBGCheck` with `lineCollisionCheck`,
+/// `sibling d_ev_camera.cpp:3479-3482`, and breaks only when both miss; the second has no
+/// counterpart in the target, so this arm breaks on the first alone and therefore stops on a
+/// frame the sibling would have passed over for a body in the way. The first is `dBgS::LineCross`
+/// over the line-check group flags `0x4007`, which is ground, wall and roof all on with water off
+/// and objects off; a [`Collision`] holds the static rooms' triangles and no other group, and
+/// water is a height plane rather than triangles, so this port's plain [`Collision::line_cross`] is
+/// the whole of that query.
+fn fixed_frames(
+    camera: &mut Camera,
+    player: &Player,
+    collision: Option<&Collision>,
+    feed: &mut Feed<'_>,
+) -> bool {
     let mut w = camera.work.ev.fixed_frames;
+    let mut cache = camera.view_cache;
 
     if camera.setup_age == 0 {
-        let centers = feed.xyz_list("Centers");
-        let eyes = feed.xyz_list("Eyes");
-        let fovys = feed.float_list("Fovys");
-        if centers.is_none() || eyes.is_none() || fovys.is_none() {
+        let (Some(centers), Some(eyes), Some(fovys)) = (
+            feed.vecs("Centers"),
+            feed.vecs("Eyes"),
+            feed.floats("Fovys"),
+        ) else {
             return true;
-        }
+        };
+        w.frames = centers.len().min(eyes.len()).min(fovys.len()) as i32;
         w.timer = feed.int_or("Timer", 1);
         w.found = feed.int("Timer").is_some();
         let mask = feed.string_or("RelUseMask", "oo");
         let bytes = mask.as_bytes();
         w.mask[0] = bytes.first().copied().unwrap_or(b'x');
         w.mask[1] = bytes.get(1).copied().unwrap_or(b'x');
-        w.relative = feed.actor("RelActor") != EvActor::Missing;
+        let actor = feed.actor("RelActor");
+        w.relative = actor != EvActor::Missing;
         w.choice = feed.int_or("Choice", 0);
-        w.frames = centers
-            .unwrap_or(0)
-            .min(eyes.unwrap_or(0))
-            .min(fovys.unwrap_or(0)) as i32;
+
+        let facing = facing_of(player);
+        let mut pick = 0usize;
+        for _ in 0..w.frames {
+            let centre = centers.get(pick).copied().unwrap_or(Vec3::ZERO);
+            let eye = eyes.get(pick).copied().unwrap_or(Vec3::ZERO);
+            if actor != EvActor::Missing && w.mask[0] == b'o' {
+                w.center = cam_follow::relational_pos(player, facing, centre);
+            } else {
+                w.center = centre;
+            }
+            if actor != EvActor::Missing && w.mask[1] == b'o' {
+                w.eye = cam_follow::relational_pos(player, facing, eye);
+            } else {
+                w.eye = eye;
+            }
+            w.fovy = fovys.get(pick).copied().unwrap_or(0.0);
+
+            if collision.and_then(|solid| solid.line_cross(w.center, w.eye)).is_none() {
+                break;
+            }
+            pick += 1;
+            if pick as i32 >= w.frames {
+                pick = 0;
+            }
+        }
         camera.settled = true;
     }
 
+    cache.center = w.center;
+    cache.eye = w.eye;
+    cache.fovy = w.fovy;
+    cache.direction = SGlobe::from_xyz(cache.eye - cache.center);
+    camera.view_cache = cache;
     camera.work.ev.fixed_frames = w;
-    false
+    cam_follow::publish(camera);
+    !(w.found && (camera.setup_age as i32) < w.timer)
 }
 
 /// `dCamera_c::bSplineEvCamera`, `sibling d_ev_camera.cpp:3479-3544`.
 ///
-/// The arm is stopped at its first frame for the same reason as [`fixed_frames`]: all three of
-/// its parameters are key lists, `sibling d_ev_camera.cpp:3484-3512`, and the curve it steps
-/// reads them one value at a time.
-fn b_spline(camera: &mut Camera, feed: &mut Feed<'_>) -> bool {
+/// The arm walks the cut's three key lists along a [`Spline`] for the cut's timer and stops when
+/// the curve says it has reached its last key. The lists themselves are [`SplinePaths`].
+fn b_spline(camera: &mut Camera, player: &Player, paths: &mut SplinePaths, feed: &mut Feed<'_>) -> bool {
     let mut w = camera.work.ev.b_spline;
+    let mut cache = camera.view_cache;
 
     if camera.setup_age == 0 {
-        let centers = feed.xyz_list("Centers");
-        let eyes = feed.xyz_list("Eyes");
-        let fovys = feed.float_list("Fovys");
-        if centers.is_none() || eyes.is_none() || fovys.is_none() {
+        paths.clear();
+        let (Some(centers), Some(eyes), Some(fovys)) = (
+            feed.vecs("Centers"),
+            feed.vecs("Eyes"),
+            feed.floats("Fovys"),
+        ) else {
+            w.done = true;
+            camera.work.ev.b_spline = w;
             return true;
-        }
-        w.frames = centers
-            .unwrap_or(0)
-            .min(eyes.unwrap_or(0))
-            .min(fovys.unwrap_or(0)) as i32;
+        };
+        paths.centers = centers;
+        paths.eyes = eyes;
+        paths.fovys = fovys;
+        w.frames = paths.centers.len().min(paths.eyes.len()).min(paths.fovys.len()) as i32;
         let Some(timer) = feed.int("Timer") else {
+            w.done = true;
+            camera.work.ev.b_spline = w;
             return true;
         };
         w.timer = timer;
+        w.done = false;
         w.relative = feed.actor("RelActor") != EvActor::Missing;
-        w.spline = Spline::new(w.frames as i32, w.timer);
+        w.spline = Spline::new(w.frames, w.timer);
         camera.settled = true;
     }
 
+    if !w.done && w.spline.step() {
+        let centre = w.spline.calc_xyz(&paths.centers).unwrap_or(Vec3::ZERO);
+        let eye = w.spline.calc_xyz(&paths.eyes).unwrap_or(Vec3::ZERO);
+        if w.relative {
+            let facing = facing_of(player);
+            cache.center = cam_follow::relational_pos(player, facing, centre);
+            cache.eye = cam_follow::relational_pos(player, facing, eye);
+        } else {
+            cache.center = centre;
+            cache.eye = eye;
+        }
+        cache.fovy = w.spline.calc(&paths.fovys).unwrap_or(cache.fovy);
+        cache.direction = SGlobe::from_xyz(cache.eye - cache.center);
+        if w.spline.last() {
+            w.done = true;
+        }
+    }
+
+    camera.view_cache = cache;
     camera.work.ev.b_spline = w;
-    false
+    cam_follow::publish(camera);
+    w.done
 }
 
 /// `dCamera_c::twoActor0EvCamera`, `sibling d_ev_camera.cpp:3546-3662`.

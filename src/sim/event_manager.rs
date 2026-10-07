@@ -1091,6 +1091,52 @@ impl EventManager {
         Some(Vec3::new(x, y, z))
     }
 
+    /// The whole float array behind a key rather than the one value [`EventManager::get_my_float`]
+    /// reads off its front, which is what the event camera's `getEvFloatListData` reaches for. A
+    /// key that declares more floats than the pool holds stops at the pool's end rather than
+    /// reading past it.
+    pub fn get_my_floats(&self, staff_idx: i32, name: &str) -> Option<&[f32]> {
+        let data = self.get_my_data(staff_idx, name, 0)?;
+        if !Self::substance_ok(data) {
+            return None;
+        }
+        self.float_range(data)
+    }
+
+    /// The same array read three floats at a time, which is what the event camera's
+    /// `getEvXyzListData` reaches for, and here the count that spans it is in points, not floats.
+    /// Neither game has that camera getter's own body, so the unit is read off its one caller
+    /// that iterates: `bSplineEvCamera` hands the substance count straight to the curve as its
+    /// key count, `sibling d_ev_camera.cpp:3487` and `:3497`, and the curve reads that list as
+    /// points, `d_spline_path.cpp:65-72`. So the span is three floats per count. A key whose
+    /// trailing group is short keeps its floats and drops the remainder, which is all the
+    /// reference's unchecked read can do here.
+    pub fn get_my_vecs(&self, staff_idx: i32, name: &str) -> Option<Vec<Vec3>> {
+        let data = self.get_my_data(staff_idx, name, 0)?;
+        if !Self::substance_ok(data) {
+            return None;
+        }
+        let count = data.substance_size.max(0) as usize;
+        let floats = self.float_span(data, count.checked_mul(3)?)?;
+        Some(
+            floats
+                .chunks_exact(3)
+                .map(|group| Vec3::new(group[0], group[1], group[2]))
+                .collect(),
+        )
+    }
+
+    fn float_span(&self, data: &DataRecord, span: usize) -> Option<&[f32]> {
+        let index = usize::try_from(data.index).ok()?;
+        let end = index.checked_add(span)?;
+        self.floats.get(index..end.min(self.floats.len()))
+    }
+
+    fn float_range(&self, data: &DataRecord) -> Option<&[f32]> {
+        let span = data.substance_size.max(0) as usize;
+        self.float_span(data, span)
+    }
+
     pub fn get_my_int(&self, staff_idx: i32, name: &str) -> Option<i32> {
         let data = self.get_my_data(staff_idx, name, 0)?;
         if !Self::substance_ok(data) {

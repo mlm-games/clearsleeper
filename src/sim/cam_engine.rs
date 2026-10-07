@@ -1,6 +1,6 @@
 use glam::{Vec2, Vec3};
 
-use super::cam_event;
+use super::cam_event::{self, SplinePaths};
 use super::cam_follow::{self, FollowInput, SAngle, SGlobe, ViewCache};
 use super::cam_lockon;
 use super::cam_room::{CamRoom, CAM_FIELD_UNSET};
@@ -561,6 +561,7 @@ pub fn engine(
     player: &Player,
     room: Option<&CamRoom>,
     input: &EngineInput<'_>,
+    paths: &mut SplinePaths,
     events: Option<&mut EventManager>,
 ) -> bool {
     let kind = camera.engine();
@@ -579,7 +580,7 @@ pub fn engine(
         Some(CamEngine::FixedFrame) => fixed_frame(camera, player, room, input.collision),
         Some(CamEngine::FixedPosition) => fixed_position(camera, player, room),
         Some(CamEngine::Subject) => subject(camera, player, input),
-        Some(CamEngine::Event) => event(camera, player, input.collision, events),
+        Some(CamEngine::Event) => event(camera, player, input.collision, paths, events),
         Some(CamEngine::Lockon) => cam_lockon::lockon(camera, player, input),
         Some(CamEngine::NonOwner) => non_owner(camera),
         Some(CamEngine::Talkto) => cam_tp_engines::talkto(camera, player, input),
@@ -1202,9 +1203,10 @@ fn event(
     camera: &mut Camera,
     player: &Player,
     collision: Option<&Collision>,
+    paths: &mut SplinePaths,
     manager: Option<&mut EventManager>,
 ) -> bool {
-    cam_event::event(camera, player, collision, manager)
+    cam_event::event(camera, player, collision, paths, manager)
 }
 
 /// `dCamera_c::nonOwnerCamera`, `d_camera.cpp:4375-4427`: the placement follows whichever actor
@@ -1222,9 +1224,10 @@ impl Camera {
         player: &Player,
         room: Option<&CamRoom>,
         input: &EngineInput<'_>,
+        paths: &mut SplinePaths,
         events: Option<&mut EventManager>,
     ) -> bool {
-        engine(self, player, room, input, events)
+        engine(self, player, room, input, paths, events)
     }
 
     /// `dCamera_c::Run`'s `shakeCamera` at `d_camera.cpp:812`: once a frame, after the engine and

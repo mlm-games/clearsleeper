@@ -414,6 +414,7 @@ pub fn track(
     sea: Option<Res<super::sea::Sea>>,
     room: Option<Res<CamRoom>>,
     mut events: Option<ResMut<super::event_manager::EventManager>>,
+    mut paths: ResMut<super::cam_event::SplinePaths>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -448,6 +449,7 @@ pub fn track(
                 focus: false,
             },
         },
+        paths.as_mut(),
         events.as_deref_mut(),
     );
     camera.shake_pass();
