@@ -760,6 +760,28 @@ pub struct MemCard {
     pub format_frames: u8,
     pub format_result: i32,
     pub written: Vec<usize>,
+    /// What each slot's file held when the card was read, which is what separates a slot the card
+    /// has never been written to from one whose file will not parse. The card's `status` names one
+    /// state for the whole card, `CARD_STAT_CREATE`, and retail reaches it from
+    /// `mDoMemCd_Ctrl_c::LoadSync`'s "not state three" arm, `m_Do_MemCard.cpp:198-200`, which is a
+    /// per-load failure rather than a per-card truth. Retail's own reader
+    /// `mDoMemCdRWm_Restore` is what tells the two apart, and it is in
+    /// `m_Do_MemCardRWmng.cpp`.
+    pub slot_state: [SlotState; SLOTS],
+}
+
+/// One slot's file as [`crate::save::read_slot_in`] found it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SlotState {
+    /// No file, or one that is not a save at all: the card offers to create here.
+    #[default]
+    Absent,
+    /// A file that would not parse. This is the slot the erase prompt is for, and it is what the
+    /// file select's `data_broken` reports, so it has to survive the read rather than collapse
+    /// into [`SlotState::Absent`].
+    Corrupt,
+    /// A save, kept so a copy can rewrite it without a second parse.
+    Loaded,
 }
 
 impl Default for MemCard {
@@ -794,6 +816,7 @@ impl Default for MemCard {
             format_frames: 0,
             format_result: 1,
             written: Vec::new(),
+            slot_state: [SlotState::Absent; SLOTS],
         }
     }
 }
@@ -914,10 +937,79 @@ impl MemCard {
         if self.load_result == 2 {
             return 2;
         }
-        for slot in 0..SLOTS {
-            self.slots[slot] = crate::save::read_slot_in(&self.dir, slot);
-        }
+        self.restore();
         1
+    }
+
+    /// `mDoMemCd_Ctrl_c::restore`, `m_Do_MemCard.cpp`, which reads the card's file and leaves
+    /// `field_0x1660` at three, the loaded state `LoadSync` then answers from.
+    ///
+    /// The port reads the slots rather than the card's one `gczelda` file, so this is also where
+    /// the card's `status` comes from: `status_after_read` is the `CARDOpen` of `:143-144`. Retail
+    /// reaches three only through `mDoMemCdRWm_Restore`, which is in `m_Do_MemCardRWmng.cpp` and
+    /// which the port's per-slot read stands in for.
+    pub fn restore(&mut self) {
+        self.slots = std::array::from_fn(|_| None);
+        self.checksum = [0; SLOTS];
+        self.slot_state = [SlotState::Absent; SLOTS];
+        for slot in 0..SLOTS {
+            self.read_slot(slot);
+        }
+        self.status = self.status_after_read();
+    }
+
+    /// The read behind [`MemCard::load_sync`], which is also what a card that was never loaded
+    /// through the two-frame handshake needs: `mDoMemCd_Ctrl_c::LoadSync` hands back two when the
+    /// card is not in its loaded state, `m_Do_MemCard.cpp:203`, and the port's two arms are the
+    /// same wait and the same answer.
+    ///
+    /// `read_slot_in` answers one `Option`, which cannot say whether the file was absent or
+    /// unreadable, and the two mean opposite things to the file select: absent offers a new file,
+    /// unreadable offers an erase. So the file is read here rather than through
+    /// `read_slot_in`, and the two failures are kept apart.
+    pub fn read_slot(&mut self, slot: usize) {
+        let Some(slot) = usize::try_from(slot).ok().filter(|&slot| slot < SLOTS) else {
+            return;
+        };
+        let path = crate::save::slot_path_in(&self.dir, slot);
+        let state = match std::fs::read_to_string(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => SlotState::Absent,
+            Err(_) => SlotState::Corrupt,
+            Ok(text) => match serde_json::from_str::<SaveGame>(&text) {
+                Ok(save) => {
+                    self.slots[slot] = Some(save);
+                    SlotState::Loaded
+                }
+                Err(_) => SlotState::Corrupt,
+            },
+        };
+        if state == SlotState::Absent {
+            self.slots[slot] = None;
+        }
+        self.slot_state[slot] = state;
+        if state == SlotState::Loaded {
+            self.set_checksum_game_data(slot);
+        }
+    }
+
+    /// The status the card reports once every slot has been read.
+    ///
+    /// `CARD_STAT_CREATE` is a per-card truth, not a per-slot one, and retail reaches it from one
+    /// `CARDOpen` of `gczelda`, `m_Do_MemCard.cpp:143-144`. It means the card holds no game file,
+    /// and the name scene's answer to it is not an error: it sets the picture pointer and loads,
+    /// `d_s_name.cpp:748-751`, so the screen proceeds to offer a new game. So a card with no
+    /// readable save in it is in the create state and one holding any save is not; a card whose
+    /// slots are all unreadable is still a card with no readable save in it.
+    pub fn status_after_read(&self) -> u8 {
+        if self
+            .slot_state
+            .iter()
+            .all(|state| *state != SlotState::Loaded)
+        {
+            CARD_STAT_CREATE
+        } else {
+            CARD_STAT_WAIT
+        }
     }
 
     pub fn save(&mut self) {

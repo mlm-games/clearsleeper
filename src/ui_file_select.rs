@@ -5,7 +5,7 @@ use crate::save::{SLOTS, SaveGame};
 use crate::sim::daynight::{DayNight, TIME_WRAP};
 use crate::ui_menu_option::value_increase;
 use crate::ui_menu_save::{
-    blank_save, Color, MemCard, Pane, Particles, PadInput as SavePadInput, StickControl,
+    blank_save, Color, MemCard, Pane, Particles, PadInput as SavePadInput, SlotState, StickControl,
 };
 
 pub const SCREEN_LABEL: &str = "file_select.blo";
@@ -1222,7 +1222,53 @@ impl FileSelect {
             name_pane.pane_trans(0.0, 0.0);
 
             let save = card.slots[index].clone();
+            let broken = card.slot_state[index] == SlotState::Corrupt;
             match save {
+                _ if broken => {
+                    self.change_broken_color(index);
+                    self.panes.slots.info[index][1].pane_scale_xy(IDX_54);
+                    self.panes.slots.info[index][1]
+                        .set_font_size(base.0 * 0.9, base.1 * IDX_54);
+                    let trans_x = self.panes.slots.info[index][1].pos_top_left_orig.x
+                        - self.panes.slots.info[index][1].pos_top_left.x;
+                    let trans_y = self.panes.slots.info[index][1].pos_top_left_orig.y
+                        - self.panes.slots.info[index][1].pos_top_left.y
+                        + IDX_58;
+                    self.panes.slots.info[index][1].pane_trans(trans_x, trans_y);
+                    self.text_name[index] = SLOT_BROKEN_NAME.to_string();
+                    self.text_date[index].clear();
+                    self.data_new[index] = 0;
+                    self.data_broken[index] = 1;
+                    self.summary[index] = SlotSummary {
+                        name: SLOT_BROKEN_NAME.to_string(),
+                        broken: true,
+                        ..Default::default()
+                    };
+                }
+                None => {
+                    self.panes.slots.info[index][1].pane_scale_xy(IDX_54);
+                    self.panes.slots.info[index][1].set_font_size(
+                        base.0 * IDX_54,
+                        base.1 * IDX_54,
+                    );
+                    let trans_x = self.panes.slots.info[index][1].pos_top_left_orig.x
+                        - self.panes.slots.info[index][1].pos_top_left.x;
+                    let trans_y = self.panes.slots.info[index][1].pos_top_left_orig.y
+                        - self.panes.slots.info[index][1].pos_top_left.y
+                        + IDX_58;
+                    self.panes.slots.info[index][1].pane_trans(trans_x, trans_y);
+                    self.text_name[index] = SLOT_NEW_NAME.to_string();
+                    self.text_date[index].clear();
+                    self.data_new[index] = 1;
+                    self.data_broken[index] = 0;
+                    self.data_extra[index] = 0;
+                    self.data_extra_link[index] = 0;
+                    self.summary[index] = SlotSummary {
+                        name: SLOT_NEW_NAME.to_string(),
+                        new_game: true,
+                        ..Default::default()
+                    };
+                }
                 Some(ref save) if card.test_checksum_game_data(index) => {
                     if card.clear_count[index] != 0 {
                         self.data_extra[index] = 1;
@@ -1286,7 +1332,6 @@ impl FileSelect {
                     };
                 }
             }
-
             self.panes.slots.info[index][1].set_string(&self.text_name[index].clone());
             self.panes.slots.info[index][2].set_string(&self.text_date[index].clone());
         }
