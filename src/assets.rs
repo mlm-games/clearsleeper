@@ -662,7 +662,30 @@ pub fn load_room_mesh(stage: &str) -> Option<crate::bdl::RoomMesh> {
 
 const OBJECT_ROOT: &str = "files/res/Object";
 
+/// The character model `dComIfG_getObjectRes` hands the player, `res/Object/Link.arc`'s `cl.bdl`.
+///
+/// `Link.arc` is a parts archive, not a body: its 54 `bdl` entries are the weapons, the shield, the
+/// hat and the `hands`, and `cl` is the only one whose joint tree is the player. Every `bdl` entry
+/// carries the `J3D2bdl4` magic and a `JNT1` block, so the name is the only thing that picks the
+/// body out, which is why taking the first `bdl` that parses returns `binarify`-scale sub-models
+/// rather than Link.
+pub const LINK_MODEL_ENTRY: &str = "cl.bdl";
+
+/// The body `res/Object/<name>.arc` carries, read by entry name where one is named.
+///
+/// Object archives are named for what they hold, and a character archive holds several `bdl`
+/// entries, so the first one that parses is not the character. An archive with no named match
+/// falls back to the first `bdl` with a joint tree, which is what an archive of one body wants.
 pub fn load_actor_model(archive_name: &str) -> Option<crate::bdl::RoomMesh> {
+    actor_model_entry(archive_name, None)
+}
+
+/// [`load_actor_model`] for an archive whose body entry is known.
+pub fn load_actor_model_entry(archive_name: &str, entry_name: &str) -> Option<crate::bdl::RoomMesh> {
+    actor_model_entry(archive_name, Some(entry_name))
+}
+
+fn actor_model_entry(archive_name: &str, entry_name: Option<&str>) -> Option<crate::bdl::RoomMesh> {
     let path = asset_root().join(format!("{OBJECT_ROOT}/{archive_name}.arc"));
     let bytes = std::fs::read(&path).ok()?;
     let archive = match open_archive(bytes, path) {
@@ -672,11 +695,28 @@ pub fn load_actor_model(archive_name: &str) -> Option<crate::bdl::RoomMesh> {
             return None;
         }
     };
-    for entry in archive.entries() {
-        if !entry.ends_with(".bdl") {
-            continue;
-        }
-        let model = match archive.read(entry) {
+    let entries: Vec<String> = archive
+        .entries()
+        .into_iter()
+        .filter(|entry| entry.ends_with(".bdl"))
+        .map(str::to_owned)
+        .collect();
+    if entries.is_empty() {
+        log::warn!("clearsleeper: {archive_name} holds no bdl model");
+        return None;
+    }
+    let ordered = match entry_name {
+        Some(wanted) => match entries.iter().find(|entry| entry.as_str() == wanted) {
+            Some(found) => vec![found.clone()],
+            None => {
+                log::warn!("clearsleeper: {archive_name} has no {wanted}");
+                return None;
+            }
+        },
+        None => entries.clone(),
+    };
+    for entry in ordered {
+        let model = match archive.read(entry.as_str()) {
             Ok(model) => model,
             Err(AssetError::MissingEntry { .. }) => continue,
             Err(_) => return None,
@@ -697,43 +737,14 @@ pub fn load_actor_model(archive_name: &str) -> Option<crate::bdl::RoomMesh> {
 }
 
 /// The bind-pose joint frames of an actor model, which `JntHit` colliders are defined against.
-/// `res/Object/<name>.arc` holds the `bdl/*.bdl4` entry.
+/// `res/Object/<name>.arc` holds the `bdl` entry.
 pub fn load_actor_joints(archive_name: &str) -> Option<Vec<[f32; 3]>> {
-    let path = asset_root().join(format!("{OBJECT_ROOT}/{archive_name}.arc"));
-    let bytes = std::fs::read(&path).ok()?;
-    let archive = match open_archive(bytes, path.clone()) {
-        Ok(archive) => archive,
-        Err(error) => {
-            log::warn!("clearsleeper: {} unreadable ({error})", archive_name);
-            return None;
-        }
-    };
-    let entries: Vec<String> = archive
-        .entries()
-        .into_iter()
-        .filter(|name| name.ends_with(".bdl4"))
-        .map(str::to_owned)
-        .collect();
-    for entry in entries {
-        let model = match archive.read(entry.as_str()) {
-            Ok(model) => model,
-            Err(AssetError::MissingEntry { .. }) => continue,
-            Err(_) => return None,
-        };
-        match crate::bdl::parse(model, [0.0, 0.0], 0.0, None) {
-            Ok(mesh) if !mesh.joints.is_empty() => return Some(mesh.joints),
-            Ok(_) => continue,
-            Err(error) => {
-                log::warn!(
-                    "clearsleeper: {}/{entry} bind pose unusable ({})",
-                    archive_name,
-                    error.as_str()
-                );
-                return None;
-            }
-        }
-    }
-    None
+    Some(load_actor_model(archive_name)?.joints)
+}
+
+/// [`load_actor_joints`] for an archive whose body entry is known.
+pub fn load_actor_joints_entry(archive_name: &str, entry_name: &str) -> Option<Vec<[f32; 3]>> {
+    Some(load_actor_model_entry(archive_name, entry_name)?.joints)
 }
 
 pub fn load_event_list(stage: &str) -> Option<crate::sim::event::EventList> {
