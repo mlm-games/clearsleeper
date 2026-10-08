@@ -199,7 +199,7 @@ const EAT_TIMER_SET: i32 = 2; // <- field_0x906 = 2, :230
 const IS_ZERO: f32 = 8e-11; // <- cLib_IsZero, c_lib.h:8-10
 // cutKillAllStart - d_a_npc_nz_cut.inc:257-265
 const KILL_OFFSET: f32 = 250.0; // <- pos.x += sin(home.angle.y) * 250.0f, :261-262
-const KILL_ANGLE: i16 = 0x8000; // <- home.angle.y + 0x8000, :260
+const KILL_ANGLE: i16 = -0x8000; // <- home.angle.y + 0x8000, :260
 // cutGoHomeProc - d_a_npc_nz_cut.inc:360-375
 const HOME_TURN_SCALE: i16 = 4; // <- cLib_addCalcAngleS2 scale, :362
 const HOME_TURN_MAX: i16 = 0x1000; // <- maxStep, :362
@@ -1474,12 +1474,11 @@ pub struct Env<'w> {
 }
 
 #[derive(SystemParam)]
-pub struct Msg<'w, 's> {
+pub struct Msg<'w> {
     pub procs: ResMut<'w, MsgProcs>,
     pub info: ResMut<'w, MsgGameInfo>,
     pub one: ResMut<'w, Msg1Box>,
     pub two: ResMut<'w, Msg2Box>,
-    pub players: Query<'w, 's, &'static Player>,
 }
 
 pub fn control(
@@ -1498,7 +1497,7 @@ pub fn control(
         .archive
         .as_deref()
         .map(|held| held as &dyn MsgArchive);
-    let player = msg.players.iter().next().copied();
+    let player = links.iter().next().map(|link| *link);
     let targets: Vec<Target> = others
         .iter()
         .map(|(_, actor)| Target {

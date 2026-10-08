@@ -495,7 +495,7 @@ impl Zelda {
     /// `daNpc_Zl1_c::eventOrder` — `:1053-1064`.
     fn event_order(&mut self) -> Option<usize> {
         if self.order >= ORDER_FIRST_EVENT {
-            self.event_slot = usize::from(self.order - EVENT_BASE); // <- :1060
+            self.event_slot = (self.order - EVENT_BASE) as usize; // <- :1060
             return self.event_idx.get(self.event_slot).copied(); // <- :1061
         }
         None
@@ -595,8 +595,8 @@ impl Zelda {
     /// `daNpc_Zl1_c::wait_1` — `:2157-2182`.
     fn wait_1(&mut self, actor: &mut Actor) {
         if self.kind == STT_TURN {
-            walk::add_calc_angle_s(
-                &mut actor.angle[1],
+            actor.angle[1] = walk::add_calc_angle_s(
+                actor.angle[1],
                 self.home_angle,
                 TURN_SCALE,
                 TURN_MAX,
@@ -905,7 +905,7 @@ pub fn control(
         .map(|held| held as &dyn MsgArchive);
     let player = cast.players.iter().next().copied();
     let do_now = do_intent.0;
-    for (entity, actor, mut zelda) in &mut zeldas {
+    for (entity, mut actor, mut zelda) in &mut zeldas {
         if zelda.refused {
             // `decideType` returned false, so `_create` returned `cPhs_ERROR_e`
             // — :2884-2886 — and the process was cancelled during Create. The
@@ -940,6 +940,7 @@ pub fn control(
             // instead. The gate is transcribed and fed false.
             demo_accept: false,
         };
+        let actor = &mut *actor;
         if !zelda.entered {
             zelda.create_init(actor, &world.list, &mut ctx);
         }

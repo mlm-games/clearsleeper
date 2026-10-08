@@ -1381,7 +1381,7 @@ impl Bwds {
             let step = chain.apply([0.0, 0.0, SEG_CHAIN_Z]);
 
             self.m03e0[i - 1][1] = s_var2;
-            self.m03e0[i - 1][0] = s_var1.wrapping_add(0x8000);
+            self.m03e0[i - 1][0] = s_var1.wrapping_add(-0x8000);
 
             self.m043c[i] = self.m032c[i];
             self.m032c[i] = [

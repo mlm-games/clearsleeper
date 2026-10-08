@@ -1074,7 +1074,7 @@ impl Collision {
             return wall;
         }
         let facing = atan2s(face.normal.x, face.normal.z);
-        let behind = to_s16(probe.shape_yaw).wrapping_add(0x8000);
+        let behind = to_s16(probe.shape_yaw).wrapping_add(-0x8000);
         if angle_distance(facing, behind) > WALL_YAW_LIMIT {
             return wall;
         }
