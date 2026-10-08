@@ -493,8 +493,13 @@ impl ObjMmrr {
 }
 
 pub fn control(
-    mut mirrors: Query<(&Actor, &mut ObjMmrr)>,
-    mut colliders: Query<(&ObjMmrr, &mut ContactBodies)>,
+    // Mirrors are driven, then their contact bodies are synced, so the two
+    // passes never run at the same time. `ParamSet` states that; two plain
+    // queries would be a B0001 because both touch `ObjMmrr`.
+    mut passes: ParamSet<(
+        Query<(&Actor, &mut ObjMmrr)>,
+        Query<(&ObjMmrr, &mut ContactBodies)>,
+    )>,
     lamps: Query<(&Actor, &TagLight)>,
     collision: Option<Res<Collision>>,
     mut events: ResMut<SimEvents>,
@@ -506,14 +511,14 @@ pub fn control(
         .map(|(actor, _)| (actor.pos, actor.angle))
         .collect();
     let bg = collision.as_deref();
-    for (actor, mut mirror) in &mut mirrors {
+    for (actor, mut mirror) in passes.p0() {
         if !mirror.started {
             mirror.started = true;
             mirror.init_cc(actor.pos, actor.shape_angle, bg);
         }
         mirror.execute(actor, bg, &lit_lamps, &mut events, &mut particles);
     }
-    for (mirror, mut bodies) in &mut colliders {
+    for (mirror, mut bodies) in passes.p1() {
         mirror.sync_cc_bodies(&mut bodies);
     }
 }
