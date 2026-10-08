@@ -2138,7 +2138,13 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
 
     fn install_room_actors(&mut self, actors: Vec<dzs::StageActor>) {
         for entity in std::mem::take(&mut self.room_actors) {
-            let _ = self.sim.world.despawn(entity);
+            let world = &mut self.sim.world;
+            if world.resource_entities().iter().any(|(_, held)| held == entity) {
+                continue;
+            }
+            if world.entities().contains(entity) {
+                let _ = world.despawn(entity);
+            }
         }
         let zones = *self.sim.world.resource::<sim::flags::ZoneActors>();
         self.room_actors = actors
