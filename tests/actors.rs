@@ -96,6 +96,7 @@ fn golden_sim_spawns_stage_actors() {
             angle: [0, 0, 0],
             set_id: 0xFFFF,
             room: -1,
+            weight_uc: 0xF0,
             ..Default::default()
         }
     );
