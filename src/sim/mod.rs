@@ -1523,6 +1523,8 @@ pub fn build(
     sim.world.insert_resource(frame::CurrentFrame(0));
     sim.world.insert_resource(intent::MoveIntent::default());
     sim.world.insert_resource(intent::CameraYaw::default());
+    sim.world.insert_resource(intent::CStick::default());
+    sim.world.insert_resource(intent::PadButtons::default());
     sim.world.insert_resource(intent::DamageIntent::default());
     sim.world.insert_resource(intent::DoIntent::default());
     sim.world.insert_resource(intent::TargetIntent::default());
