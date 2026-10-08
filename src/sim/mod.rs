@@ -1742,10 +1742,10 @@ pub fn build(
         let sea_tables = sea::SeaTables::new(|room| tables.wave_max(room));
         sim.world.insert_resource(sea::Sea::new(sea_tables));
     }
+    cam_room::init(&mut sim.world);
     if let Some(tables) = tables {
         weight::init(&mut sim.world);
         link_proc::init(&mut sim.world);
-        cam_room::init(&mut sim.world);
         anim_clock::init(&mut sim.world);
         spawn_actors(&mut sim.world, tables);
     }
