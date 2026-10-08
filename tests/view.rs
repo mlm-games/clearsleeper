@@ -1,8 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
 
-use clearsleeper::bdl::{AnimBinding, RoomGroup, RoomMesh, RoomTexture};
-use clearsleeper::btk::{Entry, Key, TextureAnimation};
+use clearsleeper::j3d::bdl::{AnimBinding, RoomGroup, RoomMesh, RoomTexture};
+use clearsleeper::j3d::btk::{Entry, Key, TextureAnimation};
 use clearsleeper::view::{
     ActorKind, ActorView, SceneSnapshot, SeaView, build_frame, sim_yaw_for_camera,
 };

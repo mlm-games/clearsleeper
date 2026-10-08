@@ -16,10 +16,10 @@ use repose_ui::{Image, ImageExt, Spacer, ViewExt, ZStack};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+pub mod archive;
 pub mod assets;
 pub mod audio;
-pub mod bdl;
-pub mod btk;
+pub mod j3d;
 pub mod config;
 pub mod dzs;
 pub mod hud;
@@ -54,7 +54,7 @@ pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
-    pub room: Option<bdl::RoomMesh>,
+    pub room: Option<j3d::bdl::RoomMesh>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,

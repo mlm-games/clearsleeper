@@ -1,4 +1,4 @@
-use clearsleeper::btk::{self, BtkError, TexSrt, UvMatrix};
+use clearsleeper::j3d::btk::{self, BtkError, TexSrt, UvMatrix};
 
 fn put_u16(data: &mut [u8], at: usize, value: u16) {
     data[at..at + 2].copy_from_slice(&value.to_be_bytes());

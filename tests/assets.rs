@@ -5,7 +5,7 @@ use clearsleeper::assets::{
     Archive, AssetError, AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, msg_table_from_bmg, stage_spawn,
     yaz0_decode,
 };
-use clearsleeper::btk::TexSrt;
+use clearsleeper::j3d::btk::TexSrt;
 use clearsleeper::sim::msg::MsgTable;
 use glam::Vec3;
 

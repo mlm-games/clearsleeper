@@ -4,7 +4,7 @@ use repame_view3d::{
     SkinnedMesh,
 };
 
-use crate::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
+use crate::j3d::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
 
 pub const LINK_ARCHIVE: &str = "Link";
 

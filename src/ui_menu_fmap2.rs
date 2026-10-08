@@ -1,7 +1,8 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 
-use crate::assets::{Archive, AssetRoot, yaz0_decode};
+use crate::archive::{yaz0_decode, Archive};
+use crate::assets::AssetRoot;
 use crate::j2d::{Kind, Screen, ScreenPane};
 use crate::sim::daynight::DayNight;
 use crate::sim::flags::{Arrivals, Charts, EventReg, REG_GHOST_SHIP};

@@ -1,4 +1,4 @@
-use clearsleeper::bdl::{BdlError, parse};
+use clearsleeper::j3d::bdl::{BdlError, parse};
 
 struct Synthetic {
     bytes: Vec<u8>,
