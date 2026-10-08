@@ -2216,6 +2216,7 @@ pub fn run() {
     let mut last = Instant::now();
     let root = move |sched: &mut repose_core::runtime::Scheduler,
                      ctx: &repose_core::RenderContext| {
+        repose_core::request_frame();
         let now = Instant::now();
         let dt = now.duration_since(last).min(Duration::from_secs_f32(0.25));
         last = now;
