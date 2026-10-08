@@ -1574,6 +1574,12 @@ pub fn build(
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(knob00::NameEntry::default());
+    sim.world.insert_resource(anim_clock::FrameClocks::default());
+    // `Wait` is not a `MoveState` site, so `link_move::control` takes the
+    // `!MoveState::owns(..)` branch on its first tick and resolves the real
+    // process from the input intent.
+    sim.world.insert_resource(link_proc::LinkProc::new(link_proc::Proc::Wait));
+    sim.world.insert_resource(link_move::MoveState::default());
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
