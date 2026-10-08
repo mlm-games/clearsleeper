@@ -89,7 +89,7 @@ fn named_cut(
 }
 
 fn record(name: &str, kind: u32, index: u32, next: i32) -> Vec<u8> {
-    let mut out = vec![0_u8; 176];
+    let mut out = vec![0_u8; DATA_LEN];
     out[..32].copy_from_slice(&name32(name));
     out[0x24..0x28].copy_from_slice(&kind.to_be_bytes());
     out[0x28..0x2C].copy_from_slice(&index.to_be_bytes());
