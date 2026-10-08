@@ -168,6 +168,14 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
                     entry.pos_center.y - entry.pos_center_orig.y,
                 ]
             });
+            if std::env::var_os("FS_TRACE").is_some()
+                && (own_shift[0].abs() > 0.5 || own_shift[1].abs() > 0.5)
+            {
+                eprintln!(
+                    "  RESIDUAL {:>10} shift=({:.1},{:.1}) drawn_at=({:.1},{:.1})",
+                    node.name, own_shift[0], own_shift[1], origin[index][0], origin[index][1]
+                );
+            }
             // The parent's global origin already carries the parent's own shift,
             // so the child adds only its own translation on top of the offset.
             // Accumulating the parent's shift here would apply it twice.
