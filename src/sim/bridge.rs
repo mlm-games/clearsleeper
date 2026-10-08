@@ -89,7 +89,7 @@ const SEG_LEN_CHAIN_END: f32 = -50.0;
 const SEG_LEN_CHAIN_MID: f32 = -40.0;
 const SEG_LEN_VTX: f32 = -40.0;
 
-const HALF_TURN: i16 = 0x8000; // <- d_a_bridge.cpp:518
+const HALF_TURN: i16 = -0x8000; // <- d_a_bridge.cpp:518
 const QUARTER_TURN: i16 = 0x4000; // <- d_a_bridge.cpp:78
 const EIGHTH_TURN: i16 = 0x2000; // <- d_a_bridge.cpp:79
 

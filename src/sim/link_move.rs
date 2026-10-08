@@ -921,7 +921,7 @@ fn climb_correct(player: &mut Player, probe: &Probe, moving: bool) -> Option<Pro
     let wall = facing(from_s16(wall_yaw));
     player.pos.x = hit.point.x + CLIMB_STANDOFF * wall.x;
     player.pos.z = hit.point.z + CLIMB_STANDOFF * wall.z;
-    let turned = from_s16(wall_yaw.wrapping_add(0x8000));
+    let turned = from_s16(wall_yaw.wrapping_add(-0x8000));
     player.yaw += turned - player.face;
     player.face = turned;
     None
@@ -1244,7 +1244,7 @@ fn slide_tick(player: &mut Player, probe: &Probe, back: bool) -> Option<(Proc, M
         SLIDE_TURN_MAX,
         SLIDE_TURN_MIN,
     ));
-    let shape = to_s16(player.yaw).wrapping_add(if back { 0x8000 } else { 0 });
+    let shape = to_s16(player.yaw).wrapping_add(if back { -0x8000 } else { 0 });
     player.face = from_s16(add_calc_angle_s(
         to_s16(player.face),
         shape,
@@ -1386,7 +1386,7 @@ fn stand_on_ledge(player: &mut Player, state: &MoveState, stand: Option<Vec3>) {
     if let Some(stand) = stand {
         player.pos = stand;
     }
-    player.face = from_s16(state.wall_yaw.wrapping_add(0x8000));
+    player.face = from_s16(state.wall_yaw.wrapping_add(-0x8000));
     player.yaw = player.face;
     player.speed = 0.0;
     player.speed_y = 0.0;
@@ -1547,7 +1547,7 @@ fn push_pull_wait_tick(
     let pushable = probe.pushable()?;
     if state.armed {
         let grab = state.grab;
-        let target = pushable.wall_yaw.wrapping_add(0x8000);
+        let target = pushable.wall_yaw.wrapping_add(-0x8000);
         player.face = from_s16(add_calc_angle_s(
             to_s16(player.face),
             target,
@@ -1840,7 +1840,7 @@ fn arm_climb(player: &mut Player, state: &MoveState) {
         player.pos.x = ledge.x + CLIMB_START_REACH * wall.x;
         player.pos.z = ledge.z + CLIMB_START_REACH * wall.z;
     }
-    player.face = from_s16(state.wall_yaw.wrapping_add(0x8000));
+    player.face = from_s16(state.wall_yaw.wrapping_add(-0x8000));
     player.yaw = player.face;
     player.speed = 0.0;
     player.speed_y = 0.0;

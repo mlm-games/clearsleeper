@@ -1890,7 +1890,7 @@ impl ChartLayer {
         self.player_valid = 1;
         self.player_x = origin.player_x;
         self.player_z = origin.player_z;
-        let angle = i16::wrapping_add(origin.player_angle, 0x8000) as f32;
+        let angle = i16::wrapping_add(origin.player_angle, -0x8000) as f32;
         self.player_heading = angle * 180.0 / 32768.0;
         if start_stage == "sea" {
             let (gx, gy) = point_to_grid(self.player_x, self.player_z);

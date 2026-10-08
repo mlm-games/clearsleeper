@@ -609,7 +609,7 @@ impl Sss {
                 damage_resolve::at_power_check(&mut at_info, &cut);
                 if at_info.m_resulting_attack_type == damage_resolve::RESULT_WIND {
                     self.knock = REG6_F6 + 300.0;
-                    self.knock_angle = angle_to(actor.pos, ctx.player.pos).wrapping_add(0x8000);
+                    self.knock_angle = angle_to(actor.pos, ctx.player.pos).wrapping_add(-0x8000);
                     return;
                 }
             }
@@ -645,7 +645,7 @@ impl Sss {
             if power > REG6_F1 + PULL_CAP {
                 power = REG6_F1 + PULL_CAP;
             }
-            let want = angle_to(actor.pos, ctx.player.pos).wrapping_add(0x8000);
+            let want = angle_to(actor.pos, ctx.player.pos).wrapping_add(-0x8000);
             ctx.throw_player(power, want);
         }
         mv.sp74 = ctx.player.pos + Vec3::new(0.0, GRAB_LIFT, 0.0);
