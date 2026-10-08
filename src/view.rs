@@ -198,34 +198,60 @@ pub fn skinned_draw(actor: &RoomMesh, snapshot: &SceneSnapshot) -> Option<Skinne
         ..SkinnedMesh::default()
     };
     mesh.name = "cl".to_string();
-    let pose = idle_pose(actor.joints.len());
-    let placed = place_actor(pose, snapshot, actor);
+    let placed = place_actor(idle_pose(actor), snapshot);
     SkinnedDraw::from_matrices(&mesh, &placed)
 }
 
-fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot, actor: &RoomMesh) -> Vec<Mat4> {
-    let pivot = actor
-        .joint_matrices
-        .first()
-        .map(|matrix| matrix.w_axis.truncate())
-        .unwrap_or(Vec3::ZERO);
+/// Places a posed actor at the player, in world space.
+///
+/// `pose` holds one animated **world** matrix per joint: the bind chain from
+/// `RoomMesh::joint_matrices` with the animated locals applied on the right of
+/// each one. `SkinnedDraw::from_matrices` then multiplies each by that joint's
+/// `inverse_bind`, so the bind chain cancels and what survives is the animated
+/// delta — which is the identity at rest, and therefore the bind pose on screen.
+///
+/// Passing local rotations here instead would leave `bindWorld * inverse(bindWorld)`
+/// unreduced on the right of every joint and displace the actor by the negated
+/// bind translations.
+fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot) -> Vec<Mat4> {
     let origin = Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z);
-    let basis = Mat4::from_rotation_y(-snapshot.player_yaw);
-    let to_world = Mat4::from_translation(origin - basis.transform_point3(pivot)) * basis;
+    let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
     pose.into_iter().map(|joint| to_world * joint).collect()
 }
 
-fn idle_pose(joints: usize) -> Vec<Mat4> {
+/// World matrix per joint for the bind pose with a small idle swing layered on.
+///
+/// Starts from the bind chain and applies each swing as a **local** delta
+/// composed onto the joint's own parent world, which is how J3D builds an
+/// animated world matrix: `world = parentWorld * bindLocal * animDelta`.
+fn idle_pose(actor: &RoomMesh) -> Vec<Mat4> {
     const SWING: [usize; 6] = [5, 6, 9, 10, 22, 23];
-    (0..joints)
-        .map(|joint| match SWING.iter().position(|slot| *slot == joint) {
-            Some(index) => {
+    let locals = actor.joint_locals();
+    let bind = &actor.joint_matrices;
+    let parents = &actor.joint_parents;
+    let mut world = vec![Mat4::IDENTITY; bind.len()];
+    let mut resolved = vec![false; bind.len()];
+    for joint in 0..bind.len() {
+        let swing = SWING
+            .iter()
+            .position(|slot| *slot == joint)
+            .map(|index| {
                 let angle = 0.12 * (index + 1) as f32;
                 Mat4::from_rotation_z(angle) * Mat4::from_rotation_x(angle * 0.5)
-            }
-            None => Mat4::IDENTITY,
-        })
-        .collect()
+            })
+            .unwrap_or(Mat4::IDENTITY);
+        let local = locals.get(joint).copied().unwrap_or(Mat4::IDENTITY);
+        let animated = local * swing;
+        let parent = parents
+            .get(joint)
+            .copied()
+            .filter(|parent| *parent < joint as u16 && resolved[*parent as usize])
+            .map(|parent| world[parent as usize])
+            .unwrap_or(Mat4::IDENTITY);
+        world[joint] = parent * animated;
+        resolved[joint] = true;
+    }
+    world
 }
 
 pub fn skinned_influences() -> usize {

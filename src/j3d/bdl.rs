@@ -139,8 +139,35 @@ pub struct RoomMesh {
     pub uv_placements: Vec<[f32; 4]>,
     pub animations: Vec<crate::j3d::btk::TextureAnimation>,
     pub joints: Vec<[f32; 3]>,
+    /// Bind-pose world matrix per joint, each the product of its ancestors'
+    /// locals. [`RoomMesh::joint_locals`] recovers the per-joint factor these
+    /// were composed from, which is what an animation delta multiplies against.
     pub joint_matrices: Vec<Mat4>,
     pub joint_parents: Vec<u16>,
+}
+
+impl RoomMesh {
+    /// Per-joint bind local, recovered as `joint_matrices[j] * inverse(parent_world)`.
+    /// The root's local is its own world matrix.
+    pub fn joint_locals(&self) -> Vec<Mat4> {
+        let inverse = |world: &Mat4| world.try_inverse().unwrap_or(Mat4::IDENTITY);
+        self.joint_matrices
+            .iter()
+            .enumerate()
+            .map(|(joint, world)| {
+                let parent = self.joint_parents.get(joint).copied().unwrap_or(u16::MAX);
+                match usize::try_from(parent) {
+                    // bdl.rs walks parents top-down, so a parent always sorts
+                    // before its child and the bind chain is already built.
+                    Ok(parent) if parent < joint => {
+                        let parent_world = self.joint_matrices[parent];
+                        *world * inverse(&parent_world)
+                    }
+                    _ => *world,
+                }
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
