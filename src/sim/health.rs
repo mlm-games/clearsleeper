@@ -33,6 +33,8 @@ pub fn apply_damage(
 ) {
     if intent.0 > 0 {
         health.damage(intent.0);
-        events.list.push(SimEvent::Hurt);
+        if health.units > 0 {
+            events.list.push(SimEvent::Hurt);
+        }
     }
 }
