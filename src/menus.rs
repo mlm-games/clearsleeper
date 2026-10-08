@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use repose_core::input::PhysicalKey;
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
-use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
+use repose_ui::{Center, Column, Image, ImageExt, Row, Spacer, Text, TextStyle, ViewExt};
 
 use crate::config::Settings;
 use crate::hud;
@@ -69,7 +69,7 @@ pub enum Action {
     Quit,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct Menu {
     pub screen: Screen,
     pub slot: usize,
@@ -78,6 +78,11 @@ pub struct Menu {
     pub quit_index: usize,
     pub settings_index: usize,
     pub settings: Settings,
+    pub fs: crate::ui_file_select::FileSelect,
+    pub card: crate::ui_menu_save::MemCard,
+    pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
+    pub uploaded: std::cell::Cell<u64>,
+    pub revision: std::cell::Cell<u64>,
 }
 
 impl Default for Menu {
@@ -96,7 +101,32 @@ impl Menu {
             quit_index: 0,
             settings_index: 0,
             settings: Settings::defaults(),
+            fs: crate::ui_file_select::FileSelect::default(),
+            card: crate::ui_menu_save::MemCard::default(),
+            shot: std::cell::Cell::new(None),
+            uploaded: std::cell::Cell::new(u64::MAX),
+            revision: std::cell::Cell::new(0),
         }
+    }
+
+    /// Binds the J2D screen, reads the card and pushes it into the panes so the
+    /// file select compositor has something to draw.
+    pub fn open_file_select(&mut self) {
+        self.fs.delete();
+        let Some(assets) = crate::panes::load() else {
+            return;
+        };
+        self.fs.create(assets.screen.clone());
+        for slot in 0..SLOTS {
+            self.card.slots[slot] = crate::save::read_slot_in(&self.card.dir, slot);
+        }
+        self.fs.set_save_data(&self.card);
+    }
+
+    /// Follows the menu cursor so the highlighted slot matches the drawn pane.
+    pub fn sync_file_select_cursor(&mut self) {
+        self.revision.set(self.revision.get().wrapping_add(1));
+        self.fs.select_num = self.slot as u8;
     }
 
     pub fn step(&mut self, cmds: &[Cmd]) -> Option<Action> {
@@ -272,7 +302,29 @@ pub fn quit_confirm_view(menu: &Menu) -> View {
     panel(children)
 }
 
-pub fn file_select_view(menu: &Menu) -> View {
+pub fn file_select_view(menu: &Menu, ctx: &repose_core::RenderContext) -> View {
+    let Some(assets) = crate::panes::load() else {
+        return Spacer();
+    };
+    let handle = match menu.shot.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            menu.shot.set(Some(handle));
+            handle
+        }
+    };
+    if menu.uploaded.get() != menu.revision.get() {
+        let mut canvas = crate::text::raster::Canvas::new(640, 480);
+        crate::panes::draw_file_select(&mut canvas, &menu.fs.panes, assets);
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        menu.uploaded.set(menu.revision.get());
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(repose_core::ImageFit::Contain)
+}
+
+#[allow(dead_code)]
+fn file_select_placeholder(menu: &Menu) -> View {
     let mut children = vec![
         Text("Select a file")
             .size(Sp(28.0))

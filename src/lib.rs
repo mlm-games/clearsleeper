@@ -235,6 +235,10 @@ impl App {
                 })
                 .collect();
             self.menu.slots = slots;
+            self.menu.open_file_select();
+        }
+        if self.menu.screen == menus::Screen::FileSelect {
+            self.menu.sync_file_select_cursor();
         }
         match action {
             Some(menus::Action::Load(slot)) => match self.read_slot(slot) {
@@ -2220,7 +2224,7 @@ pub fn root_view(
             None => ZStack(Modifier::new().fill_max_size())
                 .child([title_movie(app, ctx), menus::title_view(&app.menu)]),
         },
-        menus::Screen::FileSelect => menus::file_select_view(&app.menu),
+        menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
         menus::Screen::Settings => menus::settings_view(&app.menu),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),

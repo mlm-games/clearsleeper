@@ -122,6 +122,15 @@ fn with_fonts<R>(assets: &Assets, run: impl FnOnce(&mut FontBank) -> R) -> R {
 }
 
 pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &Assets) {
+    // The BACK pane binds `sky_cloth.bti`, which the retail game generates at
+    // runtime: `dScnName_c::cloth_create` builds an 11x11 vertex grid from trig
+    // (`d_menu_cloth.cpp:161`) and the J2D pane binds the mesh it registers. No
+    // such file exists on disc, so nothing here can supply it. Until that mesh
+    // is ported, paint the canvas opaque so the stage does not show through.
+    // The colour is a neutral placeholder, not a decomp-derived constant: the
+    // real one arrives via daCLOTH_ChildHIO_c, whose constructor is empty and
+    // whose values come from HIO game data.
+    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [16, 18, 32, 255]);
     let live = live_table(panes);
     let nodes = &assets.screen.panes;
     let mut origin = vec![[0.0f32; 2]; nodes.len()];
