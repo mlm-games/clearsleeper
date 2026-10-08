@@ -2711,18 +2711,6 @@ pub struct Watch<'w, 's> {
     shafts: Query<'w, 's, &'static arrow::Arrow>,
     bolts: Query<'w, 's, &'static boomerang::Boomerang>,
     chains: Query<'w, 's, &'static hookshot::Hookshot>,
-    pots: Query<
-        'w,
-        's,
-        (Entity, &'static Actor, &'static tsubo::Tsubo),
-        (With<tsubo::Tsubo>, Without<Floormaster>),
-    >,
-    bombs: Query<
-        'w,
-        's,
-        (Entity, &'static Actor),
-        (With<bombflower::Crawler>, Without<Floormaster>),
-    >,
 }
 
 pub fn control(
@@ -2734,8 +2722,16 @@ pub fn control(
         (Entity, &mut Actor, &mut Floormaster),
         (With<Floormaster>, Without<Player>),
     >,
-    mut loot_actors: Query<&mut Actor, (Without<Floormaster>, Without<Player>, Without<Ship>)>,
-    mut pots: Query<&mut tsubo::Tsubo, Without<Floormaster>>,
+    // Carryables are read to build the loot list and later written when the boss
+    // releases one, so the two passes never overlap in time but do touch the same
+    // entities. `ParamSet` states that; separate queries are a B0001 on both
+    // `Actor` and `Tsubo`.
+    mut carry: ParamSet<(
+        Query<(Entity, &Actor, &tsubo::Tsubo), (With<tsubo::Tsubo>, Without<Floormaster>)>,
+        Query<(Entity, &Actor), (With<bombflower::Crawler>, Without<Floormaster>)>,
+        Query<&mut Actor, (Without<Floormaster>, Without<Player>, Without<Ship>)>,
+        Query<&mut tsubo::Tsubo, Without<Floormaster>>,
+    )>,
     mut commands: Commands,
 ) {
     let solid = watch.collision.as_deref();
@@ -2744,8 +2740,8 @@ pub fn control(
     let busy = watch.combat.active || watch.roll.active || watch.jump.active || watch.hop.active;
     let blasts: Vec<Vec3> = watch.blasts.list.clone();
     let hammer_side = watch.hammer.kind == hammer::CUT_HAMMER_SIDESWING;
-    let loot: Vec<Loot> = watch
-        .pots
+    let pot_loot: Vec<Loot> = carry
+        .p0()
         .iter()
         .map(|(entity, actor, pot)| Loot {
             entity,
@@ -2754,15 +2750,20 @@ pub fn control(
             sub: pot.kind,
             is_actor: true,
         })
-        .chain(watch.bombs.iter().map(|(entity, actor)| Loot {
+        .collect();
+    let bomb_loot: Vec<Loot> = carry
+        .p1()
+        .iter()
+        .map(|(entity, actor)| Loot {
             entity,
             pos: actor.pos,
             flag: TARGET_BOMB,
             sub: 0,
             is_actor: true,
-        }))
+        })
         .collect();
-    let carry_bomb = carried.is_some_and(|id| watch.bombs.get(id).is_ok());
+    let loot: Vec<Loot> = pot_loot.into_iter().chain(bomb_loot).collect();
+    let carry_bomb = carried.is_some_and(|id| carry.p1().get(id).is_ok());
     let at = {
         let mut found = At::Idle;
         if watch
@@ -2875,12 +2876,12 @@ pub fn control(
         };
         boss.execute(actor, ctx, &mut commands);
         if let Some(release) = boss.release.take() {
-            if let Ok(mut pot) = pots.get_mut(release.target) {
+            if let Ok(mut pot) = carry.p3().get_mut(release.target) {
                 if TSKU_DROP_KINDS.contains(&pot.kind) {
                     pot.speed_y = release.dropspeed;
                 }
             }
-            if let Ok(mut item) = loot_actors.get_mut(release.target) {
+            if let Ok(mut item) = carry.p2().get_mut(release.target) {
                 item.angle[1] = release.yaw;
                 item.shape_angle[1] = release.yaw;
                 item.speed_f = release.speed_f;

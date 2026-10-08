@@ -320,7 +320,7 @@ pub fn control(
     switches: Res<Switches>,
     mut ev_flags: ResMut<EventFlags>,
     mut events: ResMut<SimEvents>,
-    foes: Query<&Actor, With<Enemy>>,
+    foes: Query<&Actor, (With<Enemy>, Without<Htobi3>)>,
     mut shutters: Query<(Entity, &mut Actor, &mut Htobi3)>,
 ) {
     let mut enemies: Vec<i8> = Vec::new();

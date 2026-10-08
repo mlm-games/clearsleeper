@@ -317,7 +317,7 @@ pub fn control(
     info: Res<MsgGameInfo>,
     players: Query<&Player>,
     mut tornadoes: Query<(Entity, &mut Actor, &mut Tornado)>,
-    ships: Query<&Actor>,
+    ships: Query<&Actor, Without<Tornado>>,
     mut commands: Commands,
 ) {
     let player = players.iter().next().map(|link| link.pos);

@@ -995,7 +995,7 @@ pub fn control(
     mut barrels: Query<&mut BuoyBarrel>,
     ships: Query<(&Actor, &Ship), Without<Coming>>,
     players: Query<&Player>,
-    foes: Query<&Actor, With<Enemy>>,
+    foes: Query<&Actor, (With<Enemy>, Without<Coming>)>,
     sea: Option<Res<Sea>>,
     solid: Option<Res<Collision>>,
     switches: Res<Switches>,
