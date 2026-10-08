@@ -143,8 +143,19 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
                 .get(node.name.as_str())
                 .copied()
                 .filter(|entry| bound_to(entry, node));
-            let parent_origin = node.parent.map_or([0.0f32; 2], |p| origin[p]);
-            let parent_shift = node.parent.map_or([0.0f32; 2], |p| shift[p]);
+            // J2DPane::update offsets a child by `parent.globalOrigin -
+            // parent.boundsOrigin` (J2DPane.cpp:268), not by the parent's whole
+            // origin. Where the parent's global origin already equals its bounds
+            // origin that difference is zero, so the child's bounds stay
+            // absolute -- which is how the file select's rck0..rck4 9-slice
+            // pieces tile a box from (16,0) to (517,188) while nested.
+            let parent_offset = node.parent.map_or([0.0f32; 2], |p| {
+                let parent_node = &nodes[p];
+                [
+                    origin[p][0] - parent_node.bounds.x,
+                    origin[p][1] - parent_node.bounds.y,
+                ]
+            });
             let parent_alpha = if node.influenced_alpha {
                 node.parent.map_or(1.0f32, |p| alpha[p])
             } else {
@@ -157,13 +168,13 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
                     entry.pos_center.y - entry.pos_center_orig.y,
                 ]
             });
-            shift[index] = [
-                parent_shift[0] + own_shift[0],
-                parent_shift[1] + own_shift[1],
-            ];
+            // The parent's global origin already carries the parent's own shift,
+            // so the child adds only its own translation on top of the offset.
+            // Accumulating the parent's shift here would apply it twice.
+            shift[index] = own_shift;
             origin[index] = [
-                parent_origin[0] + node.bounds.x + shift[index][0],
-                parent_origin[1] + node.bounds.y + shift[index][1],
+                parent_offset[0] + node.bounds.x + shift[index][0],
+                parent_offset[1] + node.bounds.y + shift[index][1],
             ];
             alpha[index] = parent_alpha * own_alpha(node, pane);
             shown[index] = parent_shown && node.visible && own_visible(node, pane);
