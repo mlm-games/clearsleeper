@@ -84,6 +84,8 @@ fn dzb(verts: &[[f32; 3]], tris: &[[u16; 3]]) -> Vec<u8> {
         for &id in tri {
             out.extend_from_slice(&id.to_be_bytes());
         }
+        out.extend_from_slice(&0_u16.to_be_bytes());
+        out.extend_from_slice(&0_u16.to_be_bytes());
     }
     out
 }
