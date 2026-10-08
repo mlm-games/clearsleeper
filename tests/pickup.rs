@@ -37,6 +37,7 @@ fn spawn_pickup(app: &mut App, pos: Vec3, item: u8) -> Entity {
                 angle: [0; 3],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             Pickup::spawn(u32::from(item)),
         ))

@@ -42,6 +42,7 @@ fn spawn_enemy(app: &mut App, pos: Vec3, yaw: i16, parameters: u32) -> Entity {
                 angle: [0, yaw, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,
@@ -83,6 +84,7 @@ fn spawn_lance(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
                 angle: [0, yaw, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,
@@ -122,6 +124,7 @@ fn spawn_lance_with_hurt(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
                 angle: [0, yaw, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,

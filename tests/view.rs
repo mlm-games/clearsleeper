@@ -120,6 +120,7 @@ fn room_mesh_replaces_placeholder_ground() {
             texture_page: Some(2),
             lit: false,
             anim: None,
+            ..Default::default()
         }],
         textures: (0..3)
             .map(|_| RoomTexture {
@@ -175,6 +176,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
         texture_page: None,
         lit,
         anim: None,
+        ..Default::default()
     };
     let room = RoomMesh {
         groups: vec![group(true), group(false)],
@@ -278,6 +280,7 @@ fn room_group_applies_texture_animation_to_uvs() {
                 texture_page: Some(0),
                 lit: false,
                 anim: Some(AnimBinding { set: 0, track: 0 }),
+                ..Default::default()
             },
             RoomGroup {
                 positions: vec![[2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [2.0, 0.0, 1.0]],
@@ -288,6 +291,7 @@ fn room_group_applies_texture_animation_to_uvs() {
                 texture_page: Some(0),
                 lit: false,
                 anim: None,
+                ..Default::default()
             },
         ],
         textures: vec![RoomTexture {
@@ -297,6 +301,7 @@ fn room_group_applies_texture_animation_to_uvs() {
         }],
         uv_placements: vec![[2.0, 1.0, 0.1, 0.0]],
         animations: vec![animation],
+        ..Default::default()
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 

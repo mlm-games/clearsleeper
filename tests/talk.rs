@@ -100,6 +100,7 @@ fn spawn_talker(app: &mut App, pos: Vec3, angle_x: i16, room: i8) -> Entity {
                 angle: [angle_x, 0, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             Talk::new(talk::message(angle_x), room),
         ))

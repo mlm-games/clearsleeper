@@ -16,7 +16,7 @@ fn tick(app: &mut App) {
 
 fn marker(app: &mut App, switch: u32) {
     let parameters = 0xFFFF0000 | (switch << cleared::SWITCH_SHIFT);
-    let state = cleared::spawn(parameters, app.sim.world.resource::<Switches>());
+    let state = cleared::spawn(parameters, app.sim.world.resource::<Switches>(), -1);
     app.sim.world.spawn((
         Actor {
             name: cleared::CLEARED_ACTOR.to_owned(),
@@ -25,6 +25,7 @@ fn marker(app: &mut App, switch: u32) {
             angle: [0, 0, 0],
             set_id: 0,
             room: -1,
+            ..Default::default()
         },
         state,
     ));
@@ -42,6 +43,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
                 angle: [0, 0, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,

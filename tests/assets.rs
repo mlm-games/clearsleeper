@@ -1,9 +1,9 @@
 use std::io::Write as _;
 use std::time::Duration;
 
+use clearsleeper::archive::{yaz0_decode, Archive, AssetError};
 use clearsleeper::assets::{
-    Archive, AssetError, AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, msg_table_from_bmg, stage_spawn,
-    yaz0_decode,
+    AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, msg_table_from_bmg, stage_spawn,
 };
 use clearsleeper::j3d::btk::TexSrt;
 use clearsleeper::sim::msg::MsgTable;

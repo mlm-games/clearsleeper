@@ -86,6 +86,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
                 angle: [0, 0, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,

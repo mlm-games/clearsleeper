@@ -55,6 +55,7 @@ fn spawn_balloon(app: &mut App, pos: Vec3, parameters: u32) -> bevy_ecs::entity:
                 angle: [0, 0, 0],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             state,
             hit_points,

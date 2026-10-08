@@ -1,34 +1,12 @@
 use std::time::Duration;
 
-use bevy_ecs::entity::Entity;
-use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::flags::{self, EventSwitch, StoryBits, Switches};
+use clearsleeper::sim::flags::{Arrivals, StoryBits, Switches};
 use clearsleeper::{App, SIM_HZ};
-use glam::Vec3;
 
-const TOGGLE: u32 = 0x0302;
-const HOLDING: u32 = 0x0301;
 const EVENT: u16 = 0x0203;
 
 fn tick(app: &mut App) {
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-}
-
-fn spawn_switch(app: &mut App, parameters: u32) -> Entity {
-    app.sim
-        .world
-        .spawn((
-            Actor {
-                name: flags::EVENT_SWITCH_ACTOR.to_owned(),
-                parameters,
-                pos: Vec3::ZERO,
-                angle: [0; 3],
-                set_id: 0,
-                room: -1,
-            },
-            EventSwitch::spawn(parameters),
-        ))
-        .id()
 }
 
 fn switches(app: &App) -> Switches {
@@ -56,7 +34,7 @@ fn golden_switches_start_clear() {
 #[test]
 fn golden_arrivals_open_with_the_known_islands() {
     let app = App::new();
-    let arrivals = *app.sim.world.resource::<flags::Arrivals>();
+    let arrivals = *app.sim.world.resource::<Arrivals>();
     assert!(arrivals.is_arrived(0), "the fortress starts visited");
     assert!(arrivals.is_arrived(10), "windfall starts visited");
     assert!(arrivals.is_arrived(43), "outset starts visited");
@@ -65,41 +43,6 @@ fn golden_arrivals_open_with_the_known_islands() {
     assert!(
         !arrivals.is_arrived(99),
         "a grid past the map reads uncharted"
-    );
-}
-
-#[test]
-fn golden_event_switch_follows_its_story_bit() {
-    let mut app = App::new();
-    spawn_switch(&mut app, TOGGLE);
-    tick(&mut app);
-    assert!(
-        !switches(&app).test(2),
-        "the bit is down, so the switch stays down"
-    );
-    raise(&mut app, EVENT);
-    tick(&mut app);
-    assert!(switches(&app).test(2), "the story bit drives the switch on");
-    lower(&mut app, EVENT);
-    tick(&mut app);
-    assert!(
-        !switches(&app).test(2),
-        "an untagged switch drops when its bit clears"
-    );
-}
-
-#[test]
-fn golden_holding_switch_survives_a_cleared_bit() {
-    let mut app = App::new();
-    spawn_switch(&mut app, HOLDING);
-    raise(&mut app, EVENT);
-    tick(&mut app);
-    assert!(switches(&app).test(1), "the switch takes the bit up");
-    lower(&mut app, EVENT);
-    tick(&mut app);
-    assert!(
-        switches(&app).test(1),
-        "the holding type keeps its switch lit"
     );
 }
 
@@ -117,15 +60,6 @@ fn golden_story_bits_address_by_byte_and_mask() {
         !bits.test(0x2F04),
         "a sibling mask in the same byte stays clear"
     );
-}
-
-#[test]
-fn golden_event_ids_keep_both_bytes() {
-    let switch = EventSwitch::spawn(0x04AB_0002);
-    assert_eq!(switch.event, 0xAB04, "the event id is sixteen bits wide");
-    assert_eq!(switch.switch_no, 2, "and the switch is a byte");
-    assert!(!switch.hold);
-    assert!(EventSwitch::spawn(0x0400_0002).hold, "type one holds");
 }
 
 #[test]

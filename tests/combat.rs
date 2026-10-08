@@ -37,6 +37,7 @@ fn spawn_target(app: &mut App, pos: Vec3) -> Entity {
                 angle: [0; 3],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             HitPoints::default(),
         ))
@@ -173,6 +174,7 @@ fn golden_swing_breaks_targets() {
                 angle: [0; 3],
                 set_id: 0,
                 room: -1,
+                ..Default::default()
             },
             Ship::default(),
         ))

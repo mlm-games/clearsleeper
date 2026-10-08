@@ -32,6 +32,7 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
         name: name.to_string(),
         tick,
         camera_yaw: 0.5,
+        get_bag: 0,
         player: SavedPlayer {
             pos: [3.0, 4.0, 5.0],
             yaw: 1.0,

@@ -189,6 +189,7 @@ fn talker(app: &mut App) -> Entity {
                 angle: [0; 3],
                 set_id: 0,
                 room: 0,
+                ..Default::default()
             },
             Talk::new(0, 0),
         ))
@@ -880,6 +881,7 @@ fn golden_soldier_turn_and_move_cuts_turn_then_walk_to_the_player() {
             angle: [0; 3],
             set_id: 0,
             room: 0,
+            ..Default::default()
         })
         .id();
     app.sim
@@ -948,6 +950,7 @@ fn golden_soldier_offset_and_mapopen_cuts_resolve_through_the_ship() {
         angle: [0; 3],
         set_id: 0,
         room: 0,
+        ..Default::default()
     });
     let soldier = app
         .sim
@@ -959,6 +962,7 @@ fn golden_soldier_offset_and_mapopen_cuts_resolve_through_the_ship() {
             angle: [0; 3],
             set_id: 0,
             room: 0,
+            ..Default::default()
         })
         .id();
     app.sim

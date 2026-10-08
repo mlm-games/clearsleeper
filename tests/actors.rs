@@ -96,6 +96,7 @@ fn golden_sim_spawns_stage_actors() {
             angle: [0, 0, 0],
             set_id: 0xFFFF,
             room: -1,
+            ..Default::default()
         }
     );
     assert_eq!(
@@ -107,6 +108,7 @@ fn golden_sim_spawns_stage_actors() {
             angle: [0, -3094, 0],
             set_id: 0xFFFF,
             room: -1,
+            ..Default::default()
         }
     );
 
