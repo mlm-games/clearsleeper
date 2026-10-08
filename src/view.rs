@@ -11,13 +11,8 @@ pub const LINK_ARCHIVE: &str = "Link";
 pub const SKY: [f32; 4] = [0.44, 0.70, 0.94, 1.0];
 const GROUND: Rgb = [0.24, 0.42, 0.22];
 const WALL: Rgb = [0.48, 0.20, 0.20];
-const BODY: Rgb = [0.87, 0.85, 0.78];
-const NOSE: Rgb = [0.82, 0.55, 0.20];
-
 const WALL_HEIGHT: f32 = 30.0;
 const WALL_THICKNESS: f32 = 8.0;
-const PLAYER_HALF: f32 = 8.0;
-const PLAYER_HEIGHT: f32 = 32.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActorKind {
@@ -157,7 +152,6 @@ pub fn build_frame_with_actor(
     if snapshot.walls {
         frame.push(walls_group(snapshot, eye));
     }
-    frame.push(player_group(snapshot, eye));
     if !snapshot.actors.is_empty() {
         frame.push(actors_group(snapshot, eye));
     }
@@ -530,35 +524,6 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
         WALL_HEIGHT,
         depth + WALL_THICKNESS,
         WALL,
-        eye,
-    );
-    group.depth_test = true;
-    group
-}
-
-fn player_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
-    let mut group = MeshGroup::default();
-    let (px, pz) = (snapshot.player_pos.x, snapshot.player_pos.z);
-    group.push_box(
-        px,
-        snapshot.ground_y,
-        pz,
-        PLAYER_HALF * 2.0,
-        PLAYER_HEIGHT,
-        PLAYER_HALF * 2.0,
-        BODY,
-        eye,
-    );
-    let (sin, cos) = snapshot.player_face.sin_cos();
-    let nose = PLAYER_HALF + 2.0;
-    group.push_box(
-        px + sin * nose,
-        snapshot.ground_y + 8.0,
-        pz + cos * nose,
-        6.0,
-        12.0,
-        6.0,
-        NOSE,
         eye,
     );
     group.depth_test = true;

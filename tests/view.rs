@@ -28,7 +28,7 @@ fn golden_snapshot_builds_world_frame() {
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
-    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups.len(), 2);
     assert!(frame.groups.iter().all(|group| group.depth_test));
     assert!(frame.background.is_some());
     assert_eq!(frame.cam.target, Vec3::new(40.0, 0.0, -25.0));
@@ -47,25 +47,6 @@ fn golden_snapshot_builds_world_frame() {
     let walls = frame.groups[1].bounds().expect("walls have geometry");
     assert!(walls.0[0] <= -800.0 && walls.1[0] >= 800.0, "{walls:?}");
     assert!(walls.0[2] <= -600.0 && walls.1[2] >= 600.0, "{walls:?}");
-
-    let (sin, cos) = snapshot.player_yaw.sin_cos();
-    let body_max = 8.0 * (sin.abs() + cos.abs());
-    let nose_max = 10.0 + 3.0 * (sin.abs() + cos.abs());
-    let facing = Vec2::new(sin, cos);
-    let origin = snapshot.player_pos.x * facing.x + snapshot.player_pos.z * facing.y;
-    let max_projection = frame.groups[2]
-        .positions
-        .iter()
-        .map(|[x, _, z]| x * facing.x + z * facing.y)
-        .fold(f32::MIN, f32::max);
-    assert!(
-        max_projection > origin + (body_max + nose_max) * 0.5,
-        "facing nose beyond body: {max_projection} vs body {body_max}"
-    );
-    assert!(
-        max_projection <= origin + nose_max + 1e-3,
-        "nose bound: {max_projection}"
-    );
 }
 
 #[test]
@@ -133,7 +114,7 @@ fn room_mesh_replaces_placeholder_ground() {
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 
-    assert_eq!(frame.groups.len(), 2);
+    assert_eq!(frame.groups.len(), 1);
     let ground = &frame.groups[0];
     assert_eq!(ground.tri_count(), 1);
     assert_eq!(ground.positions, room.groups[0].positions);
@@ -185,7 +166,7 @@ fn lit_room_group_carries_normals_and_unlit_drops_them() {
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), Some(&room));
 
-    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups.len(), 2);
     assert_eq!(frame.groups[0].normals, normals);
     assert!(frame.groups[1].normals.is_empty());
 }
@@ -341,7 +322,7 @@ fn golden_sea_view_builds_wave_mesh() {
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
-    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups.len(), 2);
     assert_eq!(frame.background, Some(snapshot.sky));
     let group = &frame.groups[1];
     assert_eq!(group.tri_count(), 8);
@@ -393,7 +374,7 @@ fn sea_group_culls_beyond_the_far_plane() {
     };
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
-    assert_eq!(frame.groups.len(), 3);
+    assert_eq!(frame.groups.len(), 2);
     assert_eq!(frame.groups[1].tri_count(), 0);
 }
 
@@ -438,7 +419,7 @@ fn golden_actor_layer_draws_every_kind() {
 
     let frame = build_frame(&snapshot, OrbitCamera::default(), None);
 
-    assert_eq!(frame.groups.len(), 4, "the actor layer joins the frame");
+    assert_eq!(frame.groups.len(), 3, "the actor layer joins the frame");
     let actors = frame.groups.last().expect("actor layer");
     assert!(actors.tri_count() > 0, "each actor puts geometry on screen");
     let (min, max) = actors.bounds().expect("actors have geometry");
