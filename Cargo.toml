@@ -62,5 +62,8 @@ categories = ["android.intent.category.LAUNCHER"]
 min_sdk_version = 26
 target_sdk_version = 35
 
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 [profile.dev]
 opt-level = 1
