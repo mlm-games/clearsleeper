@@ -255,7 +255,7 @@ fn rejects_truncated_and_unsupported_models() {
     synthetic.bytes[synthetic.matrix_type_at] = matrix_type;
 
     let texture_format = synthetic.bytes[synthetic.texture_format_at];
-    synthetic.bytes[synthetic.texture_format_at] = 6;
+    synthetic.bytes[synthetic.texture_format_at] = 7;
     assert_eq!(
         parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).unwrap_err(),
         BdlError::Texture

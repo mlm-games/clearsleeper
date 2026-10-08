@@ -31,6 +31,11 @@ const NORMAL_FORM_F32: (u32, u32) = (0, TYPE_F32);
 const TEXCOORD_STRIDE: usize = 4;
 const TEXTURE_STRIDE: usize = 0x20;
 const TEXTURE_IMAGE_OFFSET: usize = 0x1C;
+const TLUT_FORMAT_OFFSET: usize = 0x09;
+const TLUT_COUNT_OFFSET: usize = 0x0A;
+const TLUT_PALETTE_OFFSET: usize = 0x0C;
+const TLUT_IA8: u8 = 0;
+const TLUT_RGB565: u8 = 1;
 const MATERIAL_INIT_STRIDE: usize = 0x14C;
 const MATERIAL_TEX_NO: usize = 0x084;
 const MATERIAL_COLOR_CHAN_NUM: usize = 0x002;
@@ -48,9 +53,6 @@ const TEX_GEN_MAX: u8 = 8;
 const TEV_STAGE_MAX: u8 = 16;
 const GX_TEXMTX0: u8 = 30;
 const GX_IDENTITY: u8 = 60;
-const FORMAT_I4: u8 = 0;
-const FORMAT_IA4: u8 = 2;
-const FORMAT_CMPR: u8 = 0xE;
 const WRAP_CLAMP: u8 = 0;
 const WRAP_REPEAT: u8 = 1;
 const WRAP_MIRROR: u8 = 2;
@@ -1065,12 +1067,34 @@ fn texture_size(format: u8, width: usize, height: usize) -> Result<usize, BdlErr
     if width == 0 || height == 0 {
         return Err(BdlError::Texture);
     }
-    let blocks_wide = width.div_ceil(8);
-    match format {
-        FORMAT_I4 | FORMAT_CMPR => Ok(blocks_wide * height.div_ceil(8) * 32),
-        FORMAT_IA4 => Ok(blocks_wide * height.div_ceil(4) * 32),
-        _ => Err(BdlError::Texture),
+    crate::assets::gc_texture_bytes(format, width, height).ok_or(BdlError::Texture)
+}
+
+fn texture_palette(data: &[u8], entry: usize) -> Result<Vec<[u8; 4]>, BdlError> {
+    let tlut_format = *data.get(entry + TLUT_FORMAT_OFFSET).ok_or(BdlError::Truncated)?;
+    let count = usize::from(read_u16(data, at(entry, TLUT_COUNT_OFFSET)?)?);
+    let offset = read_u32(data, at(entry, TLUT_PALETTE_OFFSET)?)? as usize;
+    if count == 0 || offset == 0 {
+        return Ok(Vec::new());
     }
+    let base = at(entry, offset)?;
+    let mut out = Vec::with_capacity(count);
+    for index in 0..count {
+        let at_index = at(base, index * 2)?;
+        if at_index + 2 > data.len() {
+            return Err(BdlError::Truncated);
+        }
+        let texel = u16::from_be_bytes([data[at_index], data[at_index + 1]]);
+        out.push(match tlut_format {
+            TLUT_IA8 => {
+                let intensity = (texel >> 8) as u8;
+                [intensity, intensity, intensity, texel as u8]
+            }
+            TLUT_RGB565 => crate::assets::rgb565_to_rgba(texel),
+            _ => crate::assets::rgb5a3_to_rgba(texel),
+        });
+    }
+    Ok(out)
 }
 
 fn read_textures(data: &[u8], blocks: &Blocks) -> Result<Vec<NativeTexture>, BdlError> {
@@ -1100,12 +1124,13 @@ fn read_textures(data: &[u8], blocks: &Blocks) -> Result<Vec<NativeTexture>, Bdl
         if image_end > end {
             return Err(BdlError::Block);
         }
+        let palette = texture_palette(data, entry)?;
         textures.push(NativeTexture {
             width,
             height,
             wrap_s,
             wrap_t,
-            rgba: decode_texture(format, width, height, &data[image_at..image_end])?,
+            rgba: decode_texture(format, width, height, &data[image_at..image_end], &palette)?,
         });
     }
     Ok(textures)
@@ -1116,147 +1141,10 @@ fn decode_texture(
     width: usize,
     height: usize,
     source: &[u8],
+    palette: &[[u8; 4]],
 ) -> Result<Vec<u8>, BdlError> {
-    let mut rgba = vec![0_u8; width * height * 4];
-    match format {
-        FORMAT_I4 => decode_i4(width, height, source, &mut rgba)?,
-        FORMAT_IA4 => decode_ia4(width, height, source, &mut rgba)?,
-        FORMAT_CMPR => decode_cmpr(width, height, source, &mut rgba)?,
-        _ => return Err(BdlError::Texture),
-    }
-    Ok(rgba)
-}
-
-fn decode_i4(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
-    let mut cursor = 0_usize;
-    for block_y in (0..height).step_by(8) {
-        for block_x in (0..width).step_by(8) {
-            for row in 0..8 {
-                let y = block_y + row;
-                for pair in 0..4 {
-                    let value = *source.get(cursor).ok_or(BdlError::Truncated)?;
-                    cursor += 1;
-                    if y >= height {
-                        continue;
-                    }
-                    for half in 0..2 {
-                        let x = block_x + pair * 2 + half;
-                        if x >= width {
-                            continue;
-                        }
-                        let level = if half == 0 { value >> 4 } else { value & 0xF };
-                        let level = (level << 4) | level;
-                        let at = (y * width + x) * 4;
-                        rgba[at..at + 4].copy_from_slice(&[level, level, level, level]);
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn decode_ia4(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
-    let mut cursor = 0_usize;
-    for block_y in (0..height).step_by(4) {
-        for block_x in (0..width).step_by(8) {
-            for row in 0..4 {
-                let y = block_y + row;
-                for column in 0..8 {
-                    let value = *source.get(cursor).ok_or(BdlError::Truncated)?;
-                    cursor += 1;
-                    if y >= height {
-                        continue;
-                    }
-                    let x = block_x + column;
-                    if x >= width {
-                        continue;
-                    }
-                    let alpha = value >> 4;
-                    let level = value & 0xF;
-                    let alpha = (alpha << 4) | alpha;
-                    let level = (level << 4) | level;
-                    let at = (y * width + x) * 4;
-                    rgba[at..at + 4].copy_from_slice(&[level, level, level, alpha]);
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn decode_cmpr(width: usize, height: usize, source: &[u8], rgba: &mut [u8]) -> Result<(), BdlError> {
-    let mut cursor = 0_usize;
-    for block_y in (0..height).step_by(8) {
-        for block_x in (0..width).step_by(8) {
-            for sub in [[0, 0], [4, 0], [0, 4], [4, 4]] {
-                let block = source
-                    .get(cursor..cursor + 8)
-                    .ok_or(BdlError::Truncated)?;
-                cursor += 8;
-                decode_dxt(
-                    block,
-                    block_x + sub[0],
-                    block_y + sub[1],
-                    width,
-                    height,
-                    rgba,
-                );
-            }
-        }
-    }
-    Ok(())
-}
-
-fn decode_dxt(
-    block: &[u8],
-    origin_x: usize,
-    origin_y: usize,
-    width: usize,
-    height: usize,
-    rgba: &mut [u8],
-) {
-    let c1 = u16::from_be_bytes([block[0], block[1]]);
-    let c2 = u16::from_be_bytes([block[2], block[3]]);
-    let r1 = ((c1 >> 11) & 0x1F) as u8;
-    let g1 = ((c1 >> 5) & 0x3F) as u8;
-    let b1 = (c1 & 0x1F) as u8;
-    let r2 = ((c2 >> 11) & 0x1F) as u8;
-    let g2 = ((c2 >> 5) & 0x3F) as u8;
-    let b2 = (c2 & 0x1F) as u8;
-    let r1 = (r1 << 3) | (r1 >> 2);
-    let g1 = (g1 << 2) | (g1 >> 4);
-    let b1 = (b1 << 3) | (b1 >> 2);
-    let r2 = (r2 << 3) | (r2 >> 2);
-    let g2 = (g2 << 2) | (g2 >> 4);
-    let b2 = (b2 << 3) | (b2 >> 2);
-    let blend = |first: u8, second: u8| {
-        ((u16::from(first) * 3 + u16::from(second) * 5) >> 3) as u8
-    };
-    let average = |first: u8, second: u8| ((u16::from(first) + u16::from(second)) / 2) as u8;
-    let mut colors = [[0_u8; 4]; 4];
-    colors[0] = [r1, g1, b1, 255];
-    colors[1] = [r2, g2, b2, 255];
-    if c1 > c2 {
-        colors[2] = [blend(r2, r1), blend(g2, g1), blend(b2, b1), 255];
-        colors[3] = [blend(r1, r2), blend(g1, g2), blend(b1, b2), 255];
-    } else {
-        colors[2] = [average(r1, r2), average(g1, g2), average(b1, b2), 255];
-        colors[3] = [average(r1, r2), average(g1, g2), average(b1, b2), 0];
-    }
-    for row in 0..4 {
-        let bits = block[4 + row];
-        for column in 0..4 {
-            let x = origin_x + column;
-            let y = origin_y + row;
-            if x >= width || y >= height {
-                continue;
-            }
-            let index = usize::from((bits >> (6 - column * 2)) & 3);
-            let at = (y * width + x) * 4;
-            rgba[at..at + 4].copy_from_slice(&colors[index]);
-        }
-    }
+    crate::assets::gc_texture_to_rgba(format, width, height, source, palette)
+        .ok_or(BdlError::Texture)
 }
 
 fn wrap_index(index: i64, dim: i64, wrap: Wrap) -> i64 {
