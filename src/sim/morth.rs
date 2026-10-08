@@ -802,21 +802,6 @@ pub fn control(
             }
         }
     }
-    for spawn in issued {
-        let name = MORTH_ACTORS[1];
-        commands.spawn((
-            Actor {
-                name: name.to_owned(),
-                parameters: spawn.parameters,
-                pos: spawn.pos,
-                angle: spawn.angle,
-                set_id: spawn.set_id,
-                room: spawn.room,
-                ..Default::default()
-            },
-            Morth::spawn(spawn.parameters),
-        ));
-    }
     for (entity, room, set_id, _drop, _pos) in pending {
         zones.mark_done(room, set_id);
         let _ = commands.entity(entity).despawn();

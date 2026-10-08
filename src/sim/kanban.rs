@@ -591,7 +591,7 @@ fn cut_index(cut: u8) -> Option<i16> {
 }
 
 pub fn is_shock_bomb(name: &str, life: bomb::Life) -> bool {
-    if name != bomb::BOMB_ACTORS[0] && name != bomb::BOMB_ACTORS[1] {
+    if name != bomb::BOMB_ACTORS[0] {
         return false;
     }
     life == bomb::Life::Spent
