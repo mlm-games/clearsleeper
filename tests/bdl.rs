@@ -126,7 +126,7 @@ fn synthetic() -> Synthetic {
     mat3[0x40..0x44].copy_from_slice(&0x54_u32.to_be_bytes());
     mat3[0xD4..0xD6].copy_from_slice(&0_u16.to_be_bytes());
 
-    let mut tex1 = vec![0_u8; 0x58];
+    let mut tex1 = vec![0_u8; 0x38];
     tex1[0..2].copy_from_slice(&1_u16.to_be_bytes());
     tex1[4..8].copy_from_slice(&0x20_u32.to_be_bytes());
     tex1[0x18] = 0;

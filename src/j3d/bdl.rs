@@ -149,7 +149,7 @@ pub struct RoomMesh {
 }
 
 impl RoomMesh {
-    /// Per-joint bind local, recovered as `joint_matrices[j] * inverse(parent_world)`.
+    /// Per-joint bind local, recovered as `inverse(parent_world) * joint_matrices[j]`.
     /// The root's local is its own world matrix.
     pub fn joint_locals(&self) -> Vec<Mat4> {
         let inverse = |world: &Mat4| world.try_inverse().unwrap_or(Mat4::IDENTITY);
@@ -163,7 +163,7 @@ impl RoomMesh {
                     // before its child and the bind chain is already built.
                     Ok(parent) if parent < joint => {
                         let parent_world = self.joint_matrices[parent];
-                        *world * inverse(&parent_world)
+                        inverse(&parent_world) * *world
                     }
                     _ => *world,
                 }
@@ -314,30 +314,30 @@ fn joint_matrix(
     let cy = trig_cos(rotation[1]);
     let sz = trig_sin(rotation[2]);
     let cz = trig_cos(rotation[2]);
-    let mut columns = [[0.0_f32; 4]; 4];
-    columns[2][0] = -sy;
-    columns[0][0] = cz * cy;
-    columns[1][0] = sz * cy;
-    columns[2][1] = cy * sx;
-    columns[2][2] = cy * cx;
+    let mut rows = [[0.0_f32; 4]; 4];
+    rows[2][0] = -sy;
+    rows[0][0] = cz * cy;
+    rows[1][0] = sz * cy;
+    rows[2][1] = cy * sx;
+    rows[2][2] = cy * cx;
     let cxsz = cx * sz;
     let sxcz = sx * cz;
-    columns[0][1] = sxcz * sy - cxsz;
-    columns[1][2] = cxsz * sy - sxcz;
+    rows[0][1] = sxcz * sy - cxsz;
+    rows[1][2] = cxsz * sy - sxcz;
     let sxsz = sx * sz;
     let cxcz = cx * cz;
-    columns[0][2] = cxcz * sy + sxsz;
-    columns[1][1] = sxsz * sy + cxcz;
-    columns[3] = [0.0, 0.0, 0.0, 1.0];
-    for column in columns.iter_mut().take(3) {
-        column[0] *= scale[0];
-        column[1] *= scale[1];
-        column[2] *= scale[2];
+    rows[0][2] = cxcz * sy + sxsz;
+    rows[1][1] = sxsz * sy + cxcz;
+    rows[3] = [0.0, 0.0, 0.0, 1.0];
+    for row in rows.iter_mut().take(3) {
+        row[0] *= scale[0];
+        row[1] *= scale[1];
+        row[2] *= scale[2];
     }
-    columns[0][3] = translation[0];
-    columns[1][3] = translation[1];
-    columns[2][3] = translation[2];
-    Mat4::from_cols_array_2d(&columns)
+    rows[0][3] = translation[0];
+    rows[1][3] = translation[1];
+    rows[2][3] = translation[2];
+    Mat4::from_cols_array_2d(&rows).transpose()
 }
 
 struct Blocks {

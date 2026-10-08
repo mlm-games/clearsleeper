@@ -168,13 +168,7 @@ impl JntHit {
     /// into the actor's frame.
     fn frames_in_place(&self, actor: &super::actor::Actor) -> Vec<Mat4> {
         let yaw = f32::from(actor.shape_angle[1]) * (core::f32::consts::PI / 32768.0);
-        let (sin, cos) = yaw.sin_cos();
-        let base = Mat4::from_cols_array_2d(&[
-            [cos, 0.0, -sin, actor.pos.x],
-            [0.0, 1.0, 0.0, actor.pos.y],
-            [sin, 0.0, cos, actor.pos.z],
-            [0.0, 0.0, 0.0, 1.0],
-        ]);
+        let base = Mat4::from_translation(actor.pos) * Mat4::from_rotation_y(yaw);
         self.frames.iter().map(|frame| base * *frame).collect()
     }
 
