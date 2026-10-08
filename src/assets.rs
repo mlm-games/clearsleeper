@@ -7,7 +7,7 @@ pub const ASSETS_ENV: &str = "CS_ASSETS";
 
 const STAGE_ROOT: &str = "files/res/Stage";
 pub const STAGE_SPAWN_POINT: u8 = 128;
-const STAGE_START_ROOM: u8 = 44;
+pub const STAGE_START_ROOM: u8 = 44;
 pub const SEA_STAGE: &str = "sea";
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
@@ -800,4 +800,336 @@ fn read_f32(data: &[u8], at: usize) -> Option<f32> {
 fn read_i16(data: &[u8], at: usize) -> Option<i16> {
     let bytes = data.get(at..at + 2)?;
     Some(i16::from_be_bytes([bytes[0], bytes[1]]))
+}
+
+pub const GX_TF_I4: u8 = 0x0;
+pub const GX_TF_I8: u8 = 0x1;
+pub const GX_TF_IA4: u8 = 0x2;
+pub const GX_TF_IA8: u8 = 0x3;
+pub const GX_TF_RGB565: u8 = 0x4;
+pub const GX_TF_RGB5A3: u8 = 0x5;
+pub const GX_TF_RGBA8: u8 = 0x6;
+pub const GX_TF_CI4: u8 = 0x8;
+pub const GX_TF_CI8: u8 = 0x9;
+pub const GX_TF_C4X2: u8 = 0xA;
+pub const GX_TF_CMPR: u8 = 0xE;
+
+pub const BDL_MAGIC: [u8; 8] = *b"J3D2bdl4";
+pub const BDL_HEADER_LEN: usize = 0x20;
+pub const BDL_CHUNK_COUNT_OFFSET: usize = 0x0C;
+pub const BDL_CHUNK_STRIDE: usize = 8;
+
+pub fn bdl_chunk_count(data: &[u8]) -> Option<usize> {
+    if data.len() < BDL_HEADER_LEN || data[..8] != BDL_MAGIC {
+        return None;
+    }
+    Some(read_u32(data, BDL_CHUNK_COUNT_OFFSET)? as usize)
+}
+
+pub fn bdl_sections(data: &[u8]) -> Option<Vec<([u8; 4], std::ops::Range<usize>)>> {
+    let count = bdl_chunk_count(data)?;
+    if count > (data.len() - BDL_HEADER_LEN) / BDL_CHUNK_STRIDE {
+        return None;
+    }
+    let mut sections = Vec::with_capacity(count);
+    let mut cursor = BDL_HEADER_LEN;
+    for _ in 0..count {
+        let size = read_u32(data, cursor + 4)? as usize;
+        if size < BDL_CHUNK_STRIDE {
+            return None;
+        }
+        let end = cursor.checked_add(size)?;
+        if end > data.len() {
+            return None;
+        }
+        sections.push(([data[cursor], data[cursor + 1], data[cursor + 2], data[cursor + 3]], cursor..end));
+        cursor = end;
+    }
+    if cursor != data.len() {
+        return None;
+    }
+    Some(sections)
+}
+
+pub fn bdl_section<'a>(data: &'a [u8], tag: &[u8; 4]) -> Option<&'a [u8]> {
+    let sections = bdl_sections(data)?;
+    let (_, range) = sections.iter().find(|(candidate, _)| candidate == tag)?;
+    Some(&data[range.start..range.end])
+}
+
+pub fn rgb565_to_rgba(texel: u16) -> [u8; 4] {
+    [
+        expand_to_8(5, u32::from(texel >> 11)),
+        expand_to_8(6, u32::from(texel >> 5)),
+        expand_to_8(5, u32::from(texel)),
+        0xFF,
+    ]
+}
+
+pub fn rgb5a3_to_rgba(texel: u16) -> [u8; 4] {
+    if texel & 0x8000 != 0 {
+        [
+            expand_to_8(5, u32::from(texel >> 10)),
+            expand_to_8(5, u32::from(texel >> 5)),
+            expand_to_8(5, u32::from(texel)),
+            0xFF,
+        ]
+    } else {
+        [
+            expand_to_8(4, u32::from(texel >> 8)),
+            expand_to_8(4, u32::from(texel >> 4)),
+            expand_to_8(4, u32::from(texel)),
+            expand_to_8(3, u32::from(texel >> 12)),
+        ]
+    }
+}
+
+pub fn expand_to_8(bits: u32, value: u32) -> u8 {
+    let value = value & ((1 << bits) - 1);
+    if bits == 3 {
+        ((value << 5) | (value << 2) | (value >> 1)) as u8
+    } else {
+        (((value << (8 - bits)) | (value >> (bits * 2 - 8))) & 0xFF) as u8
+    }
+}
+
+fn s3tc_blend(first: u8, second: u8) -> u8 {
+    ((u16::from(first) * 3 + u16::from(second) * 5) >> 3) as u8
+}
+
+fn half_blend(first: u8, second: u8) -> u8 {
+    ((u16::from(first) + u16::from(second)) >> 1) as u8
+}
+
+fn cmpr_block(source: &[u8], at: usize, table: &mut [[u8; 4]; 4]) {
+    let color1 = u16::from_be_bytes([source[at], source[at + 1]]);
+    let color2 = u16::from_be_bytes([source[at + 2], source[at + 3]]);
+    table[0] = [
+        expand_to_8(5, u32::from(color1 >> 11)),
+        expand_to_8(6, u32::from(color1 >> 5)),
+        expand_to_8(5, u32::from(color1)),
+        0xFF,
+    ];
+    table[1] = [
+        expand_to_8(5, u32::from(color2 >> 11)),
+        expand_to_8(6, u32::from(color2 >> 5)),
+        expand_to_8(5, u32::from(color2)),
+        0xFF,
+    ];
+    if color1 > color2 {
+        table[2] = [
+            s3tc_blend(table[1][0], table[0][0]),
+            s3tc_blend(table[1][1], table[0][1]),
+            s3tc_blend(table[1][2], table[0][2]),
+            0xFF,
+        ];
+        table[3] = [
+            s3tc_blend(table[0][0], table[1][0]),
+            s3tc_blend(table[0][1], table[1][1]),
+            s3tc_blend(table[0][2], table[1][2]),
+            0xFF,
+        ];
+    } else {
+        let midway = [
+            half_blend(table[0][0], table[1][0]),
+            half_blend(table[0][1], table[1][1]),
+            half_blend(table[0][2], table[1][2]),
+            0xFF,
+        ];
+        table[2] = midway;
+        table[3] = [midway[0], midway[1], midway[2], 0];
+    }
+}
+
+pub fn cmpr_to_rgba(width: usize, height: usize, source: &[u8]) -> Option<Vec<u8>> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let blocks_wide = width.div_ceil(8);
+    let blocks_high = height.div_ceil(8);
+    let needed = blocks_wide.checked_mul(blocks_high)?.checked_mul(32)?;
+    if source.len() < needed {
+        return None;
+    }
+    let mut out = vec![0_u8; width.checked_mul(height)?.checked_mul(4)?];
+    let mut cursor = 0_usize;
+    let mut table = [[0_u8; 4]; 4];
+    for block_y in 0..blocks_high {
+        for block_x in 0..blocks_wide {
+            for sub in 0..4 {
+                let base_x = block_x * 8 + (sub & 1) * 4;
+                let base_y = block_y * 8 + (sub >> 1) * 4;
+                cmpr_block(source, cursor, &mut table);
+                cursor += 4;
+                for row in 0..4 {
+                    let bits = source[cursor + row];
+                    for column in 0..4 {
+                        let x = base_x + column;
+                        let y = base_y + row;
+                        if x >= width || y >= height {
+                            continue;
+                        }
+                        let entry = table[usize::from(bits >> (6 - column * 2)) & 3];
+                        let at = (y * width + x) * 4;
+                        out[at..at + 4].copy_from_slice(&entry);
+                    }
+                }
+                cursor += 4;
+            }
+        }
+    }
+    Some(out)
+}
+
+fn gc_tiled<F>(
+    width: usize,
+    height: usize,
+    block_w: usize,
+    block_h: usize,
+    row_bytes: usize,
+    source: &[u8],
+    mut read_texel: F,
+) -> Option<Vec<u8>>
+where
+    F: FnMut(&[u8], usize) -> [u8; 4],
+{
+    if width == 0 || height == 0 || block_w == 0 || block_h == 0 {
+        return None;
+    }
+    let blocks_wide = width.div_ceil(block_w);
+    let blocks_high = height.div_ceil(block_h);
+    let needed = blocks_wide.checked_mul(blocks_high)?.checked_mul(row_bytes)?.checked_mul(block_h)?;
+    if source.len() < needed {
+        return None;
+    }
+    let mut out = vec![0_u8; width.checked_mul(height)?.checked_mul(4)?];
+    let mut cursor = 0_usize;
+    for block_y in 0..blocks_high {
+        let base_y = block_y * block_h;
+        let rows = (height - base_y).min(block_h);
+        for block_x in 0..blocks_wide {
+            let base_x = block_x * block_w;
+            let columns = (width - base_x).min(block_w);
+            for row in 0..rows {
+                let line = source.get(cursor..cursor + row_bytes)?;
+                for column in 0..columns {
+                    let entry = read_texel(line, column);
+                    let at = ((base_y + row) * width + base_x + column) * 4;
+                    out[at..at + 4].copy_from_slice(&entry);
+                }
+                cursor += row_bytes;
+            }
+            cursor += row_bytes * (block_h - rows);
+        }
+    }
+    Some(out)
+}
+
+fn gc_geometry(format: u8) -> Option<(usize, usize, usize)> {
+    Some(match format {
+        GX_TF_I4 => (8, 8, 4),
+        GX_TF_I8 => (8, 4, 8),
+        GX_TF_IA4 => (8, 4, 8),
+        GX_TF_IA8 => (4, 4, 8),
+        GX_TF_RGB565 | GX_TF_RGB5A3 => (4, 4, 8),
+        GX_TF_RGBA8 => (4, 4, 16),
+        GX_TF_CI4 => (8, 8, 4),
+        GX_TF_CI8 => (8, 4, 8),
+        GX_TF_C4X2 => (4, 4, 8),
+        GX_TF_CMPR => (8, 8, 4),
+        _ => return None,
+    })
+}
+
+pub fn gc_texture_bytes(format: u8, width: usize, height: usize) -> Option<usize> {
+    let (block_w, block_h, row_bytes) = gc_geometry(format)?;
+    width
+        .checked_add(block_w - 1)?
+        .checked_div(block_w)?
+        .checked_mul(height.checked_add(block_h - 1)?.checked_div(block_h)?)?
+        .checked_mul(row_bytes)?
+        .checked_mul(block_h)
+}
+
+pub fn gc_texture_to_rgba(
+    format: u8,
+    width: usize,
+    height: usize,
+    source: &[u8],
+    palette: &[[u8; 4]],
+) -> Option<Vec<u8>> {
+    if format == GX_TF_CMPR {
+        return cmpr_to_rgba(width, height, source);
+    }
+    let (block_w, block_h, row_bytes) = gc_geometry(format)?;
+    let indexed = matches!(format, GX_TF_CI4 | GX_TF_CI8 | GX_TF_C4X2);
+    if indexed && palette.is_empty() {
+        return None;
+    }
+    let entry = |index: u32| palette.get(index as usize).copied().unwrap_or([0, 0, 0, 0]);
+    match format {
+        GX_TF_I4 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let level = expand_to_8(4, u32::from(line[x / 2] >> (if x & 1 == 0 { 4 } else { 0 })));
+            [level, level, level, level]
+        }),
+        GX_TF_I8 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let level = line[x];
+            [level, level, level, level]
+        }),
+        GX_TF_IA4 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let value = line[x];
+            let level = expand_to_8(4, u32::from(value & 0x0F));
+            [level, level, level, expand_to_8(4, u32::from(value >> 4))]
+        }),
+        GX_TF_IA8 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let at = x * 2;
+            let value = u16::from_be_bytes([line[at], line[at + 1]]);
+            let level = (value >> 8) as u8;
+            [level, level, level, value as u8]
+        }),
+        GX_TF_RGB5A3 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let at = x * 2;
+            let value = u16::from_be_bytes([line[at], line[at + 1]]);
+            if value & 0x8000 != 0 {
+                [
+                    expand_to_8(5, u32::from(value >> 10)),
+                    expand_to_8(5, u32::from(value >> 5)),
+                    expand_to_8(5, u32::from(value)),
+                    0xFF,
+                ]
+            } else {
+                [
+                    expand_to_8(4, u32::from(value >> 8)),
+                    expand_to_8(4, u32::from(value >> 4)),
+                    expand_to_8(4, u32::from(value)),
+                    expand_to_8(3, u32::from(value >> 12)),
+                ]
+            }
+        }),
+        GX_TF_RGB565 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let at = x * 2;
+            let value = u16::from_be_bytes([line[at], line[at + 1]]);
+            [
+                expand_to_8(5, u32::from(value >> 11)),
+                expand_to_8(6, u32::from(value >> 5)),
+                expand_to_8(5, u32::from(value)),
+                0xFF,
+            ]
+        }),
+        GX_TF_RGBA8 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let at = x * 4;
+            [line[at], line[at + 1], line[at + 2], line[at + 3]]
+        }),
+        GX_TF_CI4 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            entry(u32::from(line[x / 2] >> (if x & 1 == 0 { 4 } else { 0 }) & 0x0F))
+        }),
+        GX_TF_CI8 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            entry(u32::from(line[x]))
+        }),
+        GX_TF_C4X2 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
+            let at = x * 2;
+            entry(u32::from(u16::from_be_bytes([line[at], line[at + 1]]) & 0x3FFF))
+        }),
+        _ => None,
+    }
 }
