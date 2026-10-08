@@ -123,10 +123,12 @@ impl Menu {
         self.fs.set_save_data(&self.card);
     }
 
-    /// Follows the menu cursor so the highlighted slot matches the drawn pane.
+    /// Follows the menu cursor so the highlighted slot matches the drawn pane,
+    /// and drives the slide-in transition that `create` left mid-flight.
     pub fn sync_file_select_cursor(&mut self) {
         self.revision.set(self.revision.get().wrapping_add(1));
         self.fs.select_num = self.slot as u8;
+        self.fs.open();
     }
 
     pub fn step(&mut self, cmds: &[Cmd]) -> Option<Action> {

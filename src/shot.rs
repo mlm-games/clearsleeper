@@ -18,9 +18,9 @@ pub fn file_select_rgba(frames: u32) -> anyhow::Result<Vec<u8>> {
     menu.open_file_select();
 
     let mut settled = 0;
-    while !menu.fs.open() && settled < frames {
-        settled += 1;
+    while settled < frames {
         menu.sync_file_select_cursor();
+        settled += 1;
     }
 
     let ctx = RenderContext::new();
