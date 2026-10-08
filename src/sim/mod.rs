@@ -1574,6 +1574,7 @@ pub fn build(
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
     sim.world.insert_resource(knob00::NameEntry::default());
+    sim.world.insert_resource(link_move::MoveState::default());
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());

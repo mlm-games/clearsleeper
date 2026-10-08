@@ -1038,7 +1038,7 @@ pub fn control(
     mut courses: Query<(Entity, &mut Actor, &mut Coming2), With<Coming2>>,
     mut barrels: Barrels<'_, '_, '_>,
     ships: Query<(&Actor, &Ship), Without<Coming2>>,
-    players: Query<&Actor, With<Player>>,
+    players: Query<&Actor, (With<Player>, Without<Coming2>)>,
     mut regs: ResMut<EventReg>,
     info: Res<crate::text::msgproc::MsgGameInfo>,
 ) {
