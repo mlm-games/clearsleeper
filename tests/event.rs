@@ -39,7 +39,8 @@ fn name32(text: &str) -> Vec<u8> {
 }
 
 fn staff(name: &str, kind: u32, first_cut: u32) -> Vec<u8> {
-    let mut out = name32(name);
+    let mut out = vec![0_u8; STAFF_LEN];
+    out[..32].copy_from_slice(&name32(name));
     out[0x2C..0x30].copy_from_slice(&kind.to_be_bytes());
     out[0x30..0x34].copy_from_slice(&first_cut.to_be_bytes());
     out
@@ -88,7 +89,8 @@ fn named_cut(
 }
 
 fn record(name: &str, kind: u32, index: u32, next: i32) -> Vec<u8> {
-    let mut out = name32(name);
+    let mut out = vec![0_u8; 176];
+    out[..32].copy_from_slice(&name32(name));
     out[0x24..0x28].copy_from_slice(&kind.to_be_bytes());
     out[0x28..0x2C].copy_from_slice(&index.to_be_bytes());
     out[0x30..0x34].copy_from_slice(&next.to_be_bytes());
