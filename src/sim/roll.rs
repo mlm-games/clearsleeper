@@ -5,7 +5,7 @@ use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
-use super::link_proc::{ROLL_AIR, ROLL_GROUND, allows};
+use super::link_proc::{Proc, ROLL_AIR, ROLL_GROUND, allows};
 use super::lock::Lock;
 use super::player::Player;
 use super::swim::Swim;
@@ -38,7 +38,7 @@ pub fn control(
     combat: Res<Combat>,
     dialogue: Res<Dialogue>,
     collision: Option<Res<Collision>>,
-    proc: Option<Res<super::link_proc::LinkProc>>,
+    mut proc: Option<ResMut<super::link_proc::LinkProc>>,
     mut roll: ResMut<Roll>,
     mut players: Query<&mut Player>,
 ) {
@@ -53,6 +53,9 @@ pub fn control(
             roll.frame += ROLL_RATE;
             if roll.frame >= ROLL_END {
                 roll.active = false;
+                if let Some(state) = proc.as_deref_mut() {
+                    state.enter(Proc::Move);
+                }
                 if intent.axis.length() <= ROLL_IDLE {
                     player.speed -= ROLL_SPEED_MIN;
                 }
@@ -79,5 +82,8 @@ pub fn control(
             .clamp(ROLL_SPEED_MIN, ROLL_SPEED_MAX);
         roll.active = true;
         roll.frame = 0.0;
+        if let Some(state) = proc.as_deref_mut() {
+            state.enter(Proc::FrontRoll);
+        }
     }
 }
