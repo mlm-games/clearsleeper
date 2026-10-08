@@ -641,7 +641,7 @@ impl Collision {
         let mut min = Vec2::splat(f32::INFINITY);
         let mut max = Vec2::splat(f32::NEG_INFINITY);
         for vert in &self.verts {
-            let xz = vert.truncate();
+            let xz = Vec2::new(vert.x, vert.z);
             min = min.min(xz);
             max = max.max(xz);
         }
