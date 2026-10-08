@@ -260,7 +260,7 @@ pub fn control(
             if lit.0 && !torch.state.lit() {
                 torch.state = State::Wake;
             }
-            commands.entity(entity).remove::<super::fire::FireLit>();
+            commands.entity(entity).try_remove::<super::fire::FireLit>();
         }
         torch.tick_burn();
         torch.tick_clip();

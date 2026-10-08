@@ -607,12 +607,12 @@ pub fn control(
 ) {
     for (entity, on) in &forced {
         switches.set(on.0);
-        commands.entity(entity).remove::<SwitchOn>();
+        commands.entity(entity).try_remove::<SwitchOn>();
     }
     for (entity, _, mut talk) in &mut posts {
         talk.msg_curr = letter_msg(&stories);
         talk.msg_end = -1;
-        commands.entity(entity).remove::<LetterMsg>();
+        commands.entity(entity).try_remove::<LetterMsg>();
     }
     if let Some(player) = players.iter().next() {
         tag_triggers(
