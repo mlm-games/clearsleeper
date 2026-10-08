@@ -86,6 +86,7 @@ pub struct IntroStage {
     pub intro: intro::Intro,
     screen: j2d::Screen,
     fonts: text::font::FontBank,
+    archives: assets::MsgArchives,
     canvas: text::raster::Canvas,
     image: Cell<Option<repose_core::ImageHandle>>,
     uploaded: Cell<u64>,
@@ -298,6 +299,7 @@ impl App {
             intro: machine,
             screen,
             fonts,
+            archives,
             canvas: text::raster::Canvas::new(640, 480),
             image: Cell::new(None),
             uploaded: Cell::new(0),
@@ -311,16 +313,20 @@ impl App {
     }
 
     fn step_intro(&mut self) {
+        let done = {
+            let Some(stage) = self.intro.as_mut() else {
+                return;
+            };
+            stage.intro.step(&mut stage.fonts, &stage.archives);
+            stage.intro.done
+        };
+        if done {
+            self.enter_play();
+            return;
+        }
         let Some(stage) = self.intro.as_mut() else {
             return;
         };
-        let Ok(root) = assets::AssetRoot::from_env() else {
-            self.intro = None;
-            self.enter_play();
-            return;
-        };
-        let archives = assets::MsgArchives::load(&root);
-        stage.intro.step(&mut stage.fonts, &archives);
         stage.canvas = text::raster::Canvas::new(640, 480);
         let IntroStage {
             intro,
@@ -1866,7 +1872,9 @@ impl App {
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
-        if self.menu.screen == menus::Screen::Title {
+        if self.intro.is_some() {
+            self.step_intro();
+        } else if self.menu.screen == menus::Screen::Title {
             self.step_movie(dt);
         } else if self.movie_sound {
             self.audio.stop_cue(audio::MOVIE_CUE);
