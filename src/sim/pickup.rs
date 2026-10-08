@@ -196,7 +196,7 @@ pub fn control(
             }
         }
         if marker.is_some() {
-            commands.entity(entity).remove::<super::chest::ChestOpen>();
+            commands.entity(entity).try_remove::<super::chest::ChestOpen>();
         }
         chest.opened = true;
         chest_flags.open(super::chest::stage_of(&chest), chest.index);

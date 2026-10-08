@@ -847,6 +847,7 @@ dependencies = [
  "anyhow",
  "bevy_ecs",
  "glam 0.33.12",
+ "image",
  "jpeg-decoder",
  "log",
  "repame-audio",

@@ -58,7 +58,7 @@ pub fn control(
     for (entity, actor, mut fire) in &mut fires {
         if let Ok(lit) = forced.get(entity) {
             fire.lit = lit.0;
-            commands.entity(entity).remove::<FireLit>();
+            commands.entity(entity).try_remove::<FireLit>();
         } else if fire.switch != 0xFF && switches.test(fire.switch) {
             fire.lit = false;
             continue;

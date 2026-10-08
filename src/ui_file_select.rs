@@ -1154,10 +1154,15 @@ impl FileSelect {
             1,
             0,
         );
+        // The collect, triforce, shard and heart group sits at its bound
+        // position from the start: `field_0x44` (500) is the slide-in offset for
+        // `recInfoPaneMove` and the message panes only (d_file_select.cpp:332),
+        // and nothing ever eases this group back, so offsetting it here would
+        // strand every one of those panes 500px off-screen.
         self.pane_trance_rec_base(
             self.timer,
             IDX_2f,
-            IDX_44 as f32,
+            0.0,
             0.0,
             0.0,
             0.0,

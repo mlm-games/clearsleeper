@@ -32,12 +32,16 @@ pub struct ScreenPane {
     pub name: String,
     pub kind: Kind,
     pub visible: bool,
+    pub parent: Option<usize>,
     pub bounds: Bounds,
     pub alpha: u8,
     pub base_position: u8,
     pub rotation: u16,
+    pub influenced_alpha: bool,
     pub texture: Option<String>,
     pub palette: Option<String>,
+    pub pic_binding: u8,
+    pub pic_mirror: u8,
     pub color_black: u32,
     pub color_white: u32,
     pub corner_color: [u32; 4],
@@ -63,6 +67,7 @@ impl Default for ScreenPane {
             name: String::new(),
             kind: Kind::Pane,
             visible: true,
+            parent: None,
             bounds: Bounds {
                 x: 0.0,
                 y: 0.0,
@@ -72,8 +77,11 @@ impl Default for ScreenPane {
             alpha: 0xFF,
             base_position: 0,
             rotation: 0,
+            influenced_alpha: false,
             texture: None,
             palette: None,
+            pic_binding: 0,
+            pic_mirror: 0,
             color_black: 0x0000_0000,
             color_white: 0xFFFF_FFFF,
             corner_color: [0xFFFF_FFFF; 4],
@@ -207,6 +215,10 @@ fn pane_stream(reader: &mut Reader<'_>) -> ScreenPane {
         pane.alpha = reader.u8();
         size -= 1;
     }
+    if size != 0 {
+        pane.influenced_alpha = reader.u8() != 0;
+        size -= 1;
+    }
     reader.align(4);
     pane
 }
@@ -234,10 +246,11 @@ pub fn parse(bytes: &[u8]) -> Option<Screen> {
 }
 
 fn hierarchy(reader: &mut Reader<'_>, screen: &mut Screen) {
-    group(reader, screen, 0);
+    group(reader, screen, None, 0);
 }
 
-fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
+fn group(reader: &mut Reader<'_>, screen: &mut Screen, parent: Option<usize>, depth: u32) {
+    let mut pending = parent;
     loop {
         if reader.at_end() || reader.at + 8 > reader.bytes.len() {
             return;
@@ -248,20 +261,15 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
         let block_start = reader.at;
         let block_end = (block_start + size).min(reader.bytes.len());
         match magic {
-            b"EXT1" => {
+            b"EXT1" => return,
+            b"END1" => {
                 reader.at = block_end;
                 return;
             }
-            b"END1" => {
-                reader.at = block_end;
-                if depth == 0 {
-                    return;
-                }
-                continue;
-            }
             b"BGN1" => {
                 reader.at = block_end;
-                group(reader, screen, depth + 1);
+                group(reader, screen, pending, depth + 1);
+                pending = None;
                 continue;
             }
             _ => {}
@@ -276,12 +284,14 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, depth: u32) {
         };
         let mut pane = pane_stream(reader);
         pane.kind = kind;
+        pane.parent = parent;
         match kind {
             Kind::Picture => picture(reader, &mut pane),
             Kind::TextBox => text_box(reader, &mut pane),
             Kind::Window => window(reader, &mut pane),
             _ => {}
         }
+        pending = Some(screen.panes.len());
         screen.panes.push(pane);
         reader.at = block_end;
     }
@@ -291,12 +301,12 @@ fn picture(reader: &mut Reader<'_>, pane: &mut ScreenPane) {
     let mut count = reader.u8() as i32;
     pane.texture = resource_name(reader);
     pane.palette = resource_name(reader);
-    let _ = reader.u8();
+    pane.pic_binding = reader.u8();
     count -= 3;
     for index in 0..count {
         match index {
             0 => {
-                let _ = reader.u8();
+                pane.pic_mirror = reader.u8();
             }
             1 => {
                 let _ = reader.u8();
