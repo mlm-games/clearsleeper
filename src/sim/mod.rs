@@ -177,6 +177,9 @@ pub mod isle_timer;
 pub mod jbaba;
 pub mod jnt_hit;
 pub const FLOORMASTER_ARCHIVE: &str = "fm";
+/// `fm.arc`'s body entry. Its other `bdl` is `ypit00`, the pit it drops into, which has three
+/// joints against the body's sixteen, so the entry name is what tells them apart.
+pub const FLOORMASTER_MODEL_ENTRY: &str = "fm.bdl";
 pub mod jpa;
 pub mod jump;
 pub mod kanban;
@@ -570,7 +573,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, grandma)).id()
     } else if floormaster::is_floormaster(&source.name) {
         let robot = floormaster::Floormaster::spawn(source.parameters);
-        match crate::assets::load_actor_joints(FLOORMASTER_ARCHIVE) {
+        match crate::assets::load_actor_joints_entry(FLOORMASTER_ARCHIVE, FLOORMASTER_MODEL_ENTRY) {
             Some(bind_pose) => {
                 let colliders = jnt_hit::JntHit::new(&jnt_hit::floormaster_colliders(), &bind_pose);
                 world.spawn((actor, robot, colliders)).id()
