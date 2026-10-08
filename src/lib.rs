@@ -57,7 +57,8 @@ pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
-    pub room: Option<j3d::bdl::RoomMesh>,
+pub room: Option<j3d::bdl::RoomMesh>,
+    pub actor_model: Option<j3d::bdl::RoomMesh>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
@@ -79,6 +80,11 @@ pub struct App {
     movie_done: bool,
     pub intro: Option<IntroStage>,
     pending_slot: Option<usize>,
+    dialogue_canvas: text::raster::Canvas,
+    dialogue_live: bool,
+    dialogue_image: Cell<Option<repose_core::ImageHandle>>,
+    dialogue_uploaded: Cell<u64>,
+    dialogue_revision: u64,
     quit: quit::Quit,
 }
 
@@ -116,6 +122,7 @@ impl App {
             cam: signal(OrbitCamera::default()),
             audio,
             room: None,
+            actor_model: None,
             menu: menus::Menu::new(),
             stage: None,
             rooms: Vec::new(),
@@ -137,9 +144,19 @@ impl App {
             movie_done: false,
             intro: None,
             pending_slot: None,
+            dialogue_canvas: text::raster::Canvas::new(640, 480),
+            dialogue_live: false,
+            dialogue_image: Cell::new(None),
+            dialogue_uploaded: Cell::new(0),
+            dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
         app.movie = movie::Movie::open(&movie::title_path()).ok();
+        app.actor_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
+        if app.actor_model.is_none() {
+            log::warn!("clearsleeper: actor model unavailable");
+        }
         app.reset_world();
         app
     }
@@ -217,6 +234,10 @@ impl App {
             self.stage_item(false);
             self.stage_use(false);
             self.stage_pad_menu();
+        }
+        if self.intro.is_some() {
+            self.menu_prev.clone_from(held);
+            return;
         }
         let cmds = if window_focused {
             menus::cmds_from(held, &self.menu_prev)
@@ -310,6 +331,11 @@ impl App {
     fn enter_play(&mut self) {
         self.intro = None;
         self.menu.screen = menus::Screen::Playing;
+        if let Some(slot) = self.pending_slot.take() {
+            if let Err(e) = self.write_slot(slot) {
+                log::warn!("clearsleeper: slot {slot} write failed ({e})");
+            }
+        }
     }
 
     fn step_intro(&mut self) {
@@ -462,6 +488,24 @@ impl App {
 
     pub fn dialogue(&self) -> sim::talk::Dialogue {
         *self.sim.world.resource::<sim::talk::Dialogue>()
+    }
+
+    fn pump_dialogue(&mut self) {
+        let live = self
+            .sim
+            .world
+            .get_resource::<text::driver::TextDriver>()
+            .is_some_and(|driver| driver.live);
+        if !live {
+            self.dialogue_live = false;
+            return;
+        }
+        let overlay = text::overlay::render(&mut self.sim.world, 640, 480);
+        self.dialogue_live = overlay.live;
+        if overlay.live {
+            self.dialogue_canvas = overlay.canvas;
+            self.dialogue_revision = self.dialogue_revision.wrapping_add(1);
+        }
     }
 
     /// Take every sim event waiting for presentation.
@@ -1874,7 +1918,7 @@ impl App {
     pub fn advance(&mut self, dt: Duration) -> u32 {
         if self.intro.is_some() {
             self.step_intro();
-        } else if self.menu.screen == menus::Screen::Title {
+} else if self.menu.screen == menus::Screen::Title {
             self.step_movie(dt);
         } else if self.movie_sound {
             self.audio.stop_cue(audio::MOVIE_CUE);
@@ -1889,6 +1933,7 @@ impl App {
         }
         self.apply_exit();
         self.sync_rooms();
+        self.pump_dialogue();
         steps
     }
 
@@ -2206,7 +2251,12 @@ pub fn root_view(
     if app.quit.latched() {
         return quit::Quit::parked();
     }
-    let frame = view::build_frame(&app.snapshot(), app.cam.get(), app.room.as_ref());
+    let frame = view::build_frame_with_actor(
+        &app.snapshot(),
+        app.cam.get(),
+        app.room.as_ref(),
+        app.actor_model.as_ref(),
+    );
     let cam = app.cam.clone();
     let viewport = Viewport3d(
         frame,
@@ -2241,7 +2291,7 @@ pub fn root_view(
     if app.intro.is_some() {
         return intro_view(app, ctx);
     }
-    ZStack(Modifier::new().fill_max_size()).child([viewport, overlay])
+    ZStack(Modifier::new().fill_max_size()).child([viewport, overlay, dialogue_view(app, ctx)])
 }
 
 fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
@@ -2262,6 +2312,25 @@ fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View 
     if stage.uploaded.get() != stage.revision {
         ctx.set_image_rgba8(handle, 640, 480, stage.canvas.pixels.clone(), true);
         stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+fn dialogue_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    if !app.dialogue_live || app.dialogue_canvas.pixels.is_empty() {
+        return Spacer();
+    }
+    let handle = match app.dialogue_image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            app.dialogue_image.set(Some(handle));
+            handle
+        }
+    };
+    if app.dialogue_uploaded.get() != app.dialogue_revision {
+        ctx.set_image_rgba8(handle, 640, 480, app.dialogue_canvas.pixels.clone(), true);
+        app.dialogue_uploaded.set(app.dialogue_revision);
     }
     Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
 }
