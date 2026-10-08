@@ -825,7 +825,8 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if sail::is_sail(&source.name) {
         world.spawn((actor, sail::Sail::spawn())).id()
     } else if coming2::is_coming2(&source.name) {
-        world.spawn((actor, coming2::Coming2::spawn(actor.angle[1], actor.pos))).id()
+        let (yaw, pos) = (actor.angle[1], actor.pos);
+        world.spawn((actor, coming2::Coming2::spawn(yaw, pos))).id()
     } else if zouk::is_zouk(&source.name) {
         world.spawn((actor, zouk::Zouk::spawn())).id()
     } else if warpls::is_warpls(&source.name) {
@@ -1572,6 +1573,7 @@ pub fn build(
     sim.world.insert_resource(flags::Collect::default());
     sim.world.insert_resource(flags::MemBits::default());
     sim.world.insert_resource(morth::Statics::default());
+    sim.world.insert_resource(knob00::NameEntry::default());
     sim.world.insert_resource(door::StayRoom::default());
     sim.world.insert_resource(toripost::Statics::default());
     sim.world.insert_resource(majuu_flag::Statics::default());
