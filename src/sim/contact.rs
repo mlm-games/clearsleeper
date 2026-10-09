@@ -1151,7 +1151,12 @@ pub fn set_pos_correct(
     set_co_g_correct_proc();
     let correct_y = first.set.chk_co_sph_3d_crr() && second.set.chk_co_sph_3d_crr();
     let (weight1, weight2) = (stts1.weight_uc, stts2.weight_uc);
-    if (weight1 == 0 && weight2 == 0) || (weight1 == 0xFF && weight2 == 0xFF) {
+    // `cCcS::SetPosCorrect`'s weight gate (`c_cc_s.cpp:284-299` with `cCcS::GetWt`,
+    // `c_cc_s.h:31-45`): the reference buckets a weight byte into three types, `0xFF` alone for
+    // `WeightType_0` and `0xFE` for `WeightType_1`, and two `WeightType_0` objects return before
+    // either is moved. A zero byte is `WeightType_2` there, so it corrects normally and only the
+    // all-`0xFF` pair is dropped here.
+    if (weight1 == 0xFF && weight2 == 0xFF) {
         return None;
     }
     let rank = RANK_TBL[get_rank(weight1)][get_rank(weight2)];
