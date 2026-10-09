@@ -1025,6 +1025,44 @@ where
     Some(out)
 }
 
+fn gc_rgba8(width: usize, height: usize, source: &[u8]) -> Option<Vec<u8>> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let blocks_wide = width.div_ceil(4);
+    let blocks_high = height.div_ceil(4);
+    let needed = blocks_wide.checked_mul(blocks_high)?.checked_mul(64)?;
+    if source.len() < needed {
+        return None;
+    }
+    let mut out = vec![0_u8; width.checked_mul(height)?.checked_mul(4)?];
+    let mut cursor = 0_usize;
+    for block_y in 0..blocks_high {
+        let base_y = block_y * 4;
+        let rows = (height - base_y).min(4);
+        for block_x in 0..blocks_wide {
+            let base_x = block_x * 4;
+            let columns = (width - base_x).min(4);
+            let block = &source[cursor..cursor + 64];
+            for row in 0..rows {
+                for column in 0..columns {
+                    let ar = row * 8 + column * 2;
+                    let gb = 32 + row * 8 + column * 2;
+                    let at = ((base_y + row) * width + base_x + column) * 4;
+                    out[at..at + 4].copy_from_slice(&[
+                        block[ar + 1],
+                        block[gb],
+                        block[gb + 1],
+                        block[ar],
+                    ]);
+                }
+            }
+            cursor += 64;
+        }
+    }
+    Some(out)
+}
+
 fn gc_geometry(format: u8) -> Option<(usize, usize, usize)> {
     Some(match format {
         GX_TF_I4 => (8, 8, 4),
@@ -1116,10 +1154,7 @@ pub fn gc_texture_to_rgba(
                 0xFF,
             ]
         }),
-        GX_TF_RGBA8 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
-            let at = x * 4;
-            [line[at], line[at + 1], line[at + 2], line[at + 3]]
-        }),
+        GX_TF_RGBA8 => gc_rgba8(width, height, source),
         GX_TF_CI4 => gc_tiled(width, height, block_w, block_h, row_bytes, source, |line, x| {
             entry(u32::from(line[x / 2] >> (if x & 1 == 0 { 4 } else { 0 }) & 0x0F))
         }),
