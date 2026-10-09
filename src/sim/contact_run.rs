@@ -127,6 +127,11 @@ pub struct ContactBodies {
     pub shapes: Shapes,
     /// One [`ContactObj`] per body, in body order, so the two lists stay index-parallel.
     pub objs: Vec<ContactObj>,
+    /// Each body's position as its source constant wrote it, in the actor's own frame, so
+    /// `bodies::follow` can re-place it every step without reading the world position back as the
+    /// offset: the world position is what the last step wrote, and using it compounds the actor's
+    /// own position into the body on every tick.
+    locals: Vec<glam::Vec3>,
 }
 
 impl ContactBodies {
@@ -135,7 +140,13 @@ impl ContactBodies {
     /// contact pass.
     pub fn add(&mut self, shape: Shape, obj: ContactObj) -> usize {
         self.objs.push(obj);
+        self.locals.push(shape.pos);
         self.shapes.add(shape)
+    }
+
+    /// The body's position in the actor's own frame, the one `add` was handed.
+    pub fn local(&self, body: usize) -> Option<glam::Vec3> {
+        self.locals.get(body).copied()
     }
 
     /// Keep one body on its owner, the way a process re-registers its colliders from the transform

@@ -1795,7 +1795,10 @@ pub fn bodies_for(name: &str) -> ContactBodies {
     bodies
 }
 
-fn default_obj() -> ContactObj {
+/// The collider set a body with no authored row carries: a pure target, whose `tg_type` is the
+/// reference's `AT_TYPE_ALL & ~AT_TYPE_WATER & ~AT_TYPE_UNK20000 & ~AT_TYPE_UNK400000 &
+/// ~AT_TYPE_LIGHT` (`d_a_ki.cpp:1318`), so every attack type reaches it.
+pub fn default_obj() -> ContactObj {
     ContactObj {
         set: set(0x00, 0x00, 0, 0x03, 0xFFFF_FFBF, 0x75),
         g_stts: Some(GStts::default()),
@@ -1805,10 +1808,7 @@ fn default_obj() -> ContactObj {
 
 fn anchor(bodies: &mut ContactBodies, pos: Vec3) {
     for index in 0..bodies.shapes.bodies.len() {
-        let offset = bodies
-            .shapes
-            .body(index)
-            .map_or(Vec3::ZERO, |body| body.shape.pos);
+        let offset = bodies.local(index).unwrap_or(Vec3::ZERO);
         bodies.follow(index, pos + offset);
     }
 }

@@ -90,6 +90,21 @@ fn is_finisher(kind: CutKind) -> bool {
     kind == CutKind::EA || kind == CutKind::EB
 }
 
+/// The process the reference stands up for each cut, which is the state the blade's own tick
+/// runs under: `CUT_AIR` admits exactly these, so the cut only advances while the player is in
+/// one of them.
+fn cut_proc(kind: CutKind) -> super::link_proc::Proc {
+    use super::link_proc::Proc;
+    match kind {
+        CutKind::A => Proc::CutA,
+        CutKind::F => Proc::CutF,
+        CutKind::R => Proc::CutR,
+        CutKind::L => Proc::CutL,
+        CutKind::EA => Proc::CutEa,
+        CutKind::EB => Proc::CutEb,
+    }
+}
+
 /// `setNormalCutAtParam` and `setFinishCutAtParam` both branch on `checkNormalSwordEquip`,
 /// which reads the C-button selection: one heart for Hero's Sword, two for the Master Sword,
 /// and the finisher doubles it.
@@ -159,6 +174,7 @@ fn start(
     intent: &MoveIntent,
     camera: &CameraYaw,
     lock: &Lock,
+    proc: Option<&mut super::link_proc::LinkProc>,
 ) {
     combat.combo += 1;
     let stick = intent.axis.length().min(1.0);
@@ -190,6 +206,9 @@ fn start(
     combat.active = true;
     combat.frame = 1;
     combat.queued = false;
+    if let Some(state) = proc {
+        state.enter(cut_proc(combat.kind));
+    }
     player.yaw = player.face;
 }
 
@@ -204,7 +223,7 @@ pub struct Sword<'w, 's> {
     lock: Res<'w, Lock>,
     held: Res<'w, super::item::Held>,
     equipped: Res<'w, super::inventory::Equipped>,
-    proc: Option<Res<'w, super::link_proc::LinkProc>>,
+    proc: Option<ResMut<'w, super::link_proc::LinkProc>>,
     ships: Query<'w, 's, &'static Ship>,
 }
 
@@ -221,7 +240,7 @@ pub fn control(
     item: Res<ItemIntent>,
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
-    gates: Sword<'_, '_>,
+    mut gates: Sword<'_, '_>,
     mut actors: Query<
         (
             Entity,
@@ -267,7 +286,14 @@ pub fn control(
             {
                 continue;
             }
-            start(&mut out.combat, player, &intent, &camera, &gates.lock);
+            start(
+                &mut out.combat,
+                player,
+                &intent,
+                &camera,
+                &gates.lock,
+                gates.proc.as_deref_mut(),
+            );
             out.events.list.push(SimEvent::Slash);
             continue;
         }
@@ -287,7 +313,14 @@ pub fn control(
             && grounded(gates.collision.as_deref(), player.pos)
         {
             player.speed = 0.0;
-            start(&mut out.combat, player, &intent, &camera, &gates.lock);
+            start(
+                &mut out.combat,
+                player,
+                &intent,
+                &camera,
+                &gates.lock,
+                gates.proc.as_deref_mut(),
+            );
             continue;
         }
         if pressed && !is_finisher(out.combat.kind) {
@@ -339,13 +372,11 @@ pub fn control(
                 registry.proc_id(player_entity).unwrap_or(ERROR_PROC_ID),
             );
             let crossings = {
-                let tg: Vec<TgObj<'_>> = actors
-                    .iter()
-                    .filter_map(|(entity, actor, bodies, hp, _)| {
-                        if hp.is_none() {
-                            return None;
-                        }
-                        Some(TgObj::new(
+                let tg: Vec<TgObj<'_>> = actors.iter().filter_map(|(entity, actor, bodies, hp, _)| {
+                    if hp.is_none() {
+                        return None;
+                    }
+                    Some(TgObj::new(
                             entity,
                             bodies?,
                             actor.weight_uc,
@@ -354,8 +385,7 @@ pub fn control(
                     })
                     .collect();
                 crate::sim::contact_hit::at_tg(std::slice::from_ref(&at), &tg)
-            };
-            let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
+            };            let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for crossing in crossings {
                 let Ok((entity, actor, _, hp, mut hurt)) = actors.get_mut(crossing.target) else {
                     continue;
