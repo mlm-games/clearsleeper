@@ -9,7 +9,7 @@ use super::door::StayRoom;
 use super::event::{ActiveEvent, EventList};
 use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
-use super::flags::{Collect, EventFlags, MemBits, OrderFlags, Switches};
+use super::flags::{Collect, EventFlags, EventReg, MemBits, OrderFlags, Switches};
 use super::intent::DoIntent;
 use super::inventory::{self, Equipped};
 use super::movebox::Movebox;
@@ -52,8 +52,7 @@ pub const EVENT_3C01: u32 = 0x3C01; // <- d_save_event_flag.inc:464
 pub const EVENT_3F20: u32 = 0x3F20; // <- d_save_event_flag.inc:482
 pub const EVENT_4020: u32 = 0x4020; // <- d_save_event_flag.inc:488
 pub const EVENT_A507: u32 = 0xA507; // <- d_save_event_flag.inc:542
-pub const EVENT_REG_PAGE: u8 = 0xA5; // <- d_save.cpp:1209 (UNK_A507 >> 8)
-pub const EVENT_REG_MASK: u8 = 0x07; // <- d_save.cpp:1209 (UNK_A507 & 0xFF)
+pub const EVENT_REG_ID: u16 = 0xA507; // <- d_save.cpp:1209 (UNK_A507)
 
 pub const TMP_0304: u32 = 0x0304; // <- d_save_event_tmp_flag.inc:30
 pub const TMP_0308: u32 = 0x0308; // <- d_save_event_tmp_flag.inc:29
@@ -487,6 +486,7 @@ pub struct Ctx<'a> {
     pub stay_room: i8,
     pub boxes: &'a [(Vec3, Vec3)],
     pub flags: &'a mut EventFlags,
+    pub regs: &'a mut EventReg,
     pub switches: &'a mut Switches,
     pub tmp: &'a mut TagHintTmp,
     pub list: &'a EventList,
@@ -555,12 +555,11 @@ impl Ctx<'_> {
         inventory::check_get_item(self.equip, self.collect, item)
     }
 
+    /// `dComIfGs_getEventReg(dSv_event_flag_c::UNK_A507)` masked to its low three bits
+    /// (`d_save.cpp:1209`): an EventReg, which the retail keeps in its own storage rather than in
+    /// the EventBit words.
     fn event_reg(&self) -> u8 {
-        let byte = usize::from(EVENT_REG_PAGE);
-        match self.flags.words().get(byte) {
-            Some(value) => value & EVENT_REG_MASK,
-            None => 0,
-        }
+        self.regs.reg(EVENT_REG_ID)
     }
 
     fn event_run_check(&self) -> bool {
@@ -1092,6 +1091,7 @@ pub struct Watch<'w, 's> {
     manager: ResMut<'w, EventManager>,
     events: ResMut<'w, SimEvents>,
     flags: ResMut<'w, EventFlags>,
+    regs: ResMut<'w, EventReg>,
     switches: ResMut<'w, Switches>,
     tmp: ResMut<'w, TagHintTmp>,
     light: ResMut<'w, TagHintLight>,
@@ -1148,6 +1148,7 @@ pub fn control(mut watch: Watch<'_, '_>) {
                 room: actor.room,
                 boxes: &boxes,
                 flags: &mut watch.flags,
+                regs: &mut watch.regs,
                 switches: &mut watch.switches,
                 tmp: &mut watch.tmp,
                 list: &watch.list,

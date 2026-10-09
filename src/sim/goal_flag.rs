@@ -7,7 +7,7 @@ use super::area::StageName;
 use super::event::{ActiveEvent, EventList};
 use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
-use super::flags::{EventFlags, OrderFlags};
+use super::flags::{EventReg, OrderFlags};
 use super::intent::{DoIntent, UseIntent};
 use super::isle_timer::IsleTimer;
 use super::player::Player;
@@ -49,7 +49,7 @@ pub const CREATED_WARMUP_FRAMES: i32 = 20;
 
 pub const TIME_LIMIT_DEFAULT: u32 = 240;
 pub const TIME_LIMIT_EVENT_MULT: u32 = 10;
-pub const EVENT_REG_TIME_LIMIT: u32 = 0xAAFF;
+pub const EVENT_REG_TIME_LIMIT: u16 = 0xAAFF;
 
 pub const MINI_GAME_TYPE_BOAT_RACE: i32 = 1;
 pub const MINI_GAME_WIN: i32 = 1;
@@ -847,7 +847,6 @@ pub const ACTION_NAMES: [&str; 5] = [
 ];
 
 pub const STAFF_TAG_ID: i32 = 0;
-pub const EVENT_REG_BYTE_AA: usize = 0xAA;
 pub const EVT_CND_UNK2: u16 = 0x0002;
 pub const ISLE_ROOM_BOATING_COURSE: u8 = 48;
 pub const PROC_ID_NONE: i32 = -1;
@@ -1295,8 +1294,11 @@ impl GoalFlag {
     }
 }
 
-fn event_reg_aa_ff(flags: &EventFlags) -> u8 {
-    flags.words().get(EVENT_REG_BYTE_AA).copied().unwrap_or(0)
+/// `dComIfGs_getEventReg(dSv_event_flag_c::UNK_AAFF)` (`d_a_goal_flag.cpp:567`), read as the
+/// byte register `EventReg::reg` answers with: the retail keeps EventRegs in their own storage,
+/// separate from the EventBit words, so this never comes out of `EventFlags`.
+fn event_reg_aa_ff(regs: &EventReg) -> u8 {
+    regs.reg(EVENT_REG_TIME_LIMIT)
 }
 #[derive(SystemParam)]
 pub struct Watch<'w, 's> {
@@ -1313,7 +1315,7 @@ pub struct Watch<'w, 's> {
 #[derive(SystemParam)]
 pub struct World<'w> {
     counters: ResMut<'w, Counters>,
-    ev_flags: ResMut<'w, EventFlags>,
+    ev_regs: ResMut<'w, EventReg>,
     order_flags: ResMut<'w, OrderFlags>,
     events: ResMut<'w, SimEvents>,
     procs: ResMut<'w, MsgProcs>,
@@ -1338,7 +1340,7 @@ pub fn control(
     let trig_a = watch.do_intent.0;
     let trig_b = watch.use_intent.0;
     let trig_start = false;
-    let event_reg = event_reg_aa_ff(&world.ev_flags);
+    let event_reg = event_reg_aa_ff(&world.ev_regs);
     let stage_point = watch.start_point.0;
     let mut spawns: Vec<BuoyRaceSpawn> = Vec::new();
 
