@@ -264,11 +264,11 @@ impl Default for EventFlags {
 
 impl EventFlags {
     fn slot(&self, flag: u32) -> Option<(usize, u8)> {
-        let byte = (flag >> 8) as usize;
+        let byte = (flag / 32) as usize;
         if byte >= FLAG_BYTES {
             return None;
         }
-        Some((byte, (flag & 0xFF) as u8))
+        Some((byte, 1_u8 << (flag & 0x1F)))
     }
 
     pub fn test(&self, flag: u32) -> bool {
