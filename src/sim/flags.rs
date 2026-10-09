@@ -263,31 +263,51 @@ impl Default for EventFlags {
 }
 
 impl EventFlags {
-    fn slot(&self, flag: u32) -> Option<(usize, u8)> {
-        let byte = (flag / 32) as usize;
-        if byte >= FLAG_BYTES {
-            return None;
-        }
-        Some((byte, 1_u8 << (flag & 0x1F)))
+    /// `dEvDtFlag_c::flagCheck` (`d_event_data.cpp:56-65`): the reference indexes an array of
+    /// 32-bit words with `flag_id / 0x20` and tests `1 << (flag_id & 0x1F)` as a word mask, so a
+    /// mask can reach bit 31. The save keeps the flags as 256 bytes, so the word is read big-endian
+    /// out of that array: four bytes per word, which holds the reference's layout for every flag
+    /// whose word still fits. `None` is the reference's `flagMaxCheck` reject.
+    fn slot(&self, flag: u32) -> Option<(usize, u32)> {
+        let word = (flag / 32) as usize;
+        let at = word.checked_mul(4)?;
+        let bytes = self.bytes.get(at..at + 4)?;
+        let mask = 1_u32 << (flag & 0x1F);
+        Some((at, mask))
     }
 
     pub fn test(&self, flag: u32) -> bool {
         match self.slot(flag) {
-            Some((byte, mask)) => self.bytes[byte] & mask != 0,
+            Some((at, mask)) => self.word(at) & mask != 0,
             None => false,
         }
     }
 
     pub fn set(&mut self, flag: u32) {
-        if let Some((byte, mask)) = self.slot(flag) {
-            self.bytes[byte] |= mask;
+        if let Some((at, mask)) = self.slot(flag) {
+            let word = self.word(at) | mask;
+            self.write_word(at, word);
         }
     }
 
     pub fn clear(&mut self, flag: u32) {
-        if let Some((byte, mask)) = self.slot(flag) {
-            self.bytes[byte] &= !mask;
+        if let Some((at, mask)) = self.slot(flag) {
+            let word = self.word(at) & !mask;
+            self.write_word(at, word);
         }
+    }
+
+    fn word(&self, at: usize) -> u32 {
+        u32::from_be_bytes([
+            self.bytes[at],
+            self.bytes[at + 1],
+            self.bytes[at + 2],
+            self.bytes[at + 3],
+        ])
+    }
+
+    fn write_word(&mut self, at: usize, word: u32) {
+        self.bytes[at..at + 4].copy_from_slice(&word.to_be_bytes());
     }
 
     pub fn words(&self) -> &[u8; FLAG_BYTES] {
