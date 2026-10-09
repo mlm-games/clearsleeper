@@ -245,7 +245,9 @@ impl App {
             Vec::new()
         };
         self.menu_prev.clone_from(held);
-        if self.menu.screen == menus::Screen::Playing || cmds.is_empty() {
+        if self.menu.screen == menus::Screen::Playing
+            || (cmds.is_empty() && !self.menu.has_pending_click())
+        {
             return;
         }
         let before = self.menu.screen;

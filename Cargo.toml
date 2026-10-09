@@ -12,6 +12,7 @@ repame-audio = "0.3"
 repame-view3d = "0.3.4"
 repose-core = "0.31"
 repose-ui = "0.31"
+repose-material = "0.31"
 repose-render-wgpu = "0.31"
 repose-text = "0.31"
 bevy_ecs = { version = "0.19", features = ["debug"] }

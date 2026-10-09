@@ -1,7 +1,10 @@
+use std::cell::Cell;
 use std::collections::HashSet;
+use std::rc::Rc;
 
 use repose_core::input::PhysicalKey;
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
+use repose_material::material3::{Button, ButtonConfig, TextButton};
 use repose_ui::{Center, Column, Image, ImageExt, Row, Spacer, Text, TextStyle, ViewExt};
 
 use crate::config::Settings;
@@ -83,6 +86,7 @@ pub struct Menu {
     pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
     pub uploaded: std::cell::Cell<u64>,
     pub revision: std::cell::Cell<u64>,
+    pub title_click: Rc<Cell<Option<usize>>>,
 }
 
 impl Default for Menu {
@@ -106,6 +110,7 @@ impl Menu {
             shot: std::cell::Cell::new(None),
             uploaded: std::cell::Cell::new(u64::MAX),
             revision: std::cell::Cell::new(0),
+            title_click: Rc::new(Cell::new(None)),
         }
     }
 
@@ -131,7 +136,17 @@ impl Menu {
         self.fs.open();
     }
 
+    pub fn has_pending_click(&self) -> bool {
+        self.title_click.get().is_some()
+    }
+
     pub fn step(&mut self, cmds: &[Cmd]) -> Option<Action> {
+        if self.screen == Screen::Title
+            && let Some(index) = self.title_click.take()
+        {
+            self.title_index = index.min(TITLE_ITEMS.len().saturating_sub(1));
+            return self.confirm_title();
+        }
         for cmd in cmds {
             match (self.screen, cmd) {
                 (Screen::Title, Cmd::Up) => self.title_index = self.title_index.saturating_sub(1),
@@ -139,19 +154,7 @@ impl Menu {
                     let last = TITLE_ITEMS.len().saturating_sub(1);
                     self.title_index = (self.title_index + 1).min(last);
                 }
-                (Screen::Title, Cmd::Confirm) => match self.title_index {
-                    0 => self.screen = Screen::FileSelect,
-                    1 => {
-                        self.settings = Settings::load();
-                        self.settings_index = 0;
-                        self.screen = Screen::Settings;
-                    }
-                    2 => {
-                        self.quit_index = 0;
-                        self.screen = Screen::QuitConfirm;
-                    }
-                    _ => {}
-                },
+                (Screen::Title, Cmd::Confirm) => return self.confirm_title(),
                 (Screen::Settings, Cmd::Up) => {
                     self.settings_index = self.settings_index.saturating_sub(1);
                 }
@@ -203,6 +206,23 @@ impl Menu {
                 }
                 _ => {}
             }
+        }
+        None
+    }
+
+    fn confirm_title(&mut self) -> Option<Action> {
+        match self.title_index {
+            0 => self.screen = Screen::FileSelect,
+            1 => {
+                self.settings = Settings::load();
+                self.settings_index = 0;
+                self.screen = Screen::Settings;
+            }
+            2 => {
+                self.quit_index = 0;
+                self.screen = Screen::QuitConfirm;
+            }
+            _ => {}
         }
         None
     }
@@ -266,16 +286,41 @@ pub fn play_time(tick: u64) -> String {
 }
 
 pub fn title_view(menu: &Menu) -> View {
+    let mut items = Vec::with_capacity(TITLE_ITEMS.len());
+    for (index, label) in TITLE_ITEMS.iter().enumerate() {
+        let target = menu.title_click.clone();
+        items.push(title_button(
+            menu.title_index == index,
+            move || target.set(Some(index)),
+            label,
+        ));
+    }
     let mut children = vec![
         Text("ClearSleeper")
-            .size(Sp(48.0))
+            .size(Sp(56.0))
             .color(Color::from_hex(TITLE_HEX)),
     ];
-    for (index, label) in TITLE_ITEMS.iter().enumerate() {
-        children.push(menu_item(index == menu.title_index, *label));
-    }
+    children.push(Column(Modifier::new().gap(12.0.dp())).child(items));
     children.push(hint("Up/Down: move    Space: choose"));
+    children.push(
+        Text(format!("Version {}", env!("CARGO_PKG_VERSION")))
+            .size(Sp(14.0))
+            .color(Color::from_hex(DIM_HEX)),
+    );
     overlay(children)
+}
+
+fn title_button(selected: bool, on_click: impl Fn() + 'static, label: &str) -> View {
+    let config = ButtonConfig {
+        modifier: Modifier::new().width(300.0.dp()),
+        ..Default::default()
+    };
+    let content = || Text(label.to_owned()).size(Sp(20.0));
+    if selected {
+        Button(Modifier::new(), on_click, config, content)
+    } else {
+        TextButton(Modifier::new(), on_click, config, content)
+    }
 }
 
 pub fn settings_view(menu: &Menu) -> View {

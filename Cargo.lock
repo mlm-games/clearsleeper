@@ -856,6 +856,7 @@ dependencies = [
  "repame-sim",
  "repame-view3d",
  "repose-core",
+ "repose-material",
  "repose-render-wgpu",
  "repose-text",
  "repose-ui",
@@ -3708,6 +3709,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "repose-material"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53ea4e1f8e5eee9843b97631bdc34208a3f2dc3856136afb4da42f08254587e8"
+dependencies = [
+ "repose-canvas",
+ "repose-core",
+ "repose-text",
+ "repose-tree",
+ "repose-ui",
+ "web-time",
 ]
 
 [[package]]
