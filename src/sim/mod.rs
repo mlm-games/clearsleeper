@@ -1986,6 +1986,7 @@ pub fn build(
                     .chain(),
                 (
                     aryll::control.in_set(WwSimSet::Execute),
+                    aryll::grant_sword.in_set(WwSimSet::Execute),
                 )
                     .chain(),
                 (medli::control.in_set(WwSimSet::Execute),

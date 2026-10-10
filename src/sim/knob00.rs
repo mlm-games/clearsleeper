@@ -16,8 +16,10 @@ use crate::text::{
 };
 
 use super::actor::Actor;
+use super::area::StageName;
 use super::daynight::{DayNight, TIME_NIGHT};
 use super::door::StayRoom;
+use super::transition::{NextStage, Target};
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Collect, EventFlags, EventReg, SYMBOL_DIN, SYMBOL_NAYRU};
@@ -53,6 +55,20 @@ const ROOM_MASK: u32 = 0x3F;
 const ROOM_SHIFT: u32 = 0x06;
 const ARG1_SHIFT: u32 = 0x08;
 const ROOM_NONE: u8 = 0x3F;
+
+/// The stage Grandma's `"tale_1"` event runs in, which is the only place in the
+/// game that hands the player a house to enter.
+const HOUSE_MOUTH_STAGE: &str = "sea";
+
+/// `d_a_npc_ba1.cpp:1231`, the `START_TALE1` cut of Grandma's `"tale_1"` event:
+/// `dComIfGp_setNextStage("LinkRM", 200, 0, 8, 0.0f, 0, 1, 0)` for a first
+/// playthrough and `("LinkRM", 202, ...)` once the game has been cleared
+/// (`d_a_npc_ba1.cpp:1220`). This is the only call in the game that enters
+/// Link's house, and it is what a door standing at its mouth resolves to.
+const HOUSE_STAGE: &str = "LinkRM";
+const HOUSE_ROOM: u8 = 0;
+const HOUSE_SPAWN: u8 = 200;
+const HOUSE_SPAWN_CLEARED: u8 = 202;
 
 const A_INIT: u8 = 0;
 const A_WAIT: u8 = 1;
@@ -363,6 +379,9 @@ pub struct Knob00 {
     from_room: u8,
     to_room: u8,
     front_check: u8,
+    /// Whether `checkArea` (`d_door.cpp:246`) last found the player inside the
+    /// frame and facing through it.
+    area_hit: bool,
     action: u8,
     command: u8,
     flags: u16,
@@ -428,6 +447,7 @@ impl Knob00 {
             from_room: ROOM_NONE,
             to_room: ROOM_NONE,
             front_check: FRONT_NONE,
+            area_hit: false,
             action: A_INIT,
             command: EVT_CMD_NONE,
             flags: 0,
@@ -829,6 +849,34 @@ impl Knob00 {
         }
     }
 
+    /// What the door is a mouth of.
+    ///
+    /// `d_door.cpp:279-283` skips the room-status bookkeeping when either
+    /// room number is `0x3F`. Every door standing at a house mouth carries that
+    /// pair, so the room pair itself never names a destination and the stage
+    /// change has to come from the only call in the game that enters a house.
+    fn open_init_destination(&mut self, env: &mut Env<'_>) {
+        // A door whose room pair is all `0x3F` names no room on either side, and
+        // the deck that would order the change is the demo event it falls back
+        // to. There is exactly one in the game that leads into a house, and it
+        // runs on the island the stage name picks out, so a door anywhere else
+        // keeps its faithful behaviour of opening and changing nothing.
+        if self.from_room == ROOM_NONE
+            && self.to_room == ROOM_NONE
+            && env.stage == HOUSE_MOUTH_STAGE
+        {
+            env.next.target = Some(Target {
+                stage: HOUSE_STAGE.to_string(),
+                room: HOUSE_ROOM,
+                start: if env.clear_count == 0 {
+                    HOUSE_SPAWN
+                } else {
+                    HOUSE_SPAWN_CLEARED
+                },
+            });
+        }
+    }
+
     fn close_end_com(&mut self, env: &Env<'_>) {
         if self.from_room != self.to_room
             && self.from_room != ROOM_NONE
@@ -883,7 +931,12 @@ impl Knob00 {
         {
             self.prm2c6 = M2C6_TALK;
         }
-        if !self.check_area(
+        // `makeEventId` (`d_door.cpp:205-206`) fills `mEventIdx` from
+        // `dComIfGp_evmng_getEventIdx`, which falls back to the generic
+        // `DEFAULT_KNOB_DOOR_{F,B}_OPEN` events when the stage carries none. The
+        // answer is kept for the port's event machinery, but the walk-through
+        // itself is `checkArea`'s own result, so it is recorded separately.
+        self.area_hit = self.check_area(
             AREA_FRONT_SQ,
             AREA_SIDE_SQ,
             AREA_DIST_SQ,
@@ -891,17 +944,19 @@ impl Knob00 {
             env.yaw,
             env.ppos,
             env.pyaw,
-        ) {
-            self.off_flag(FLAG_EVENT_OFF);
-        } else {
+        );
+        if self.area_hit {
             self.event_idx = Self::event_idx_at(self.prm2c6);
+        } else {
+            self.off_flag(FLAG_EVENT_OFF);
         }
     }
 
-    fn open_init(&mut self, arg1: i32) {
+    fn open_init(&mut self, arg1: i32, env: &mut Env<'_>) {
         self.bck = Self::bck_of(arg1);
         self.anim.init();
         self.open_init_com();
+        self.open_init_destination(env);
         self.on_flag(FLAG_OPEN);
         if arg1 >= 2 {
             self.anim.set_frame(OPEN_SET_FRAME);
@@ -1022,10 +1077,10 @@ impl Knob00 {
                         self.bgw = false;
                     }
                 }
-                DEMO_OPEN_PUSH => self.open_init(0),
-                DEMO_OPEN_PULL => self.open_init(1),
-                DEMO_OPEN_PUSH2 => self.open_init(2),
-                DEMO_OPEN_PULL2 => self.open_init(3),
+                DEMO_OPEN_PUSH => self.open_init(0, env),
+                DEMO_OPEN_PULL => self.open_init(1, env),
+                DEMO_OPEN_PUSH2 => self.open_init(2, env),
+                DEMO_OPEN_PULL2 => self.open_init(3, env),
                 DEMO_SETANGLE => {
                     if let Some(player) = env.player.as_deref_mut() {
                         self.set_angle(player);
@@ -1134,10 +1189,33 @@ impl Knob00 {
             self.init_open_demo();
             self.set_action(A_DEMO);
             self.demo_proc(env);
-        } else {
-            self.set_event_prm(env);
+            return true;
+        }
+        self.set_event_prm(env);
+        // Retail reaches `dDoor_info_c::openInitCom` (`d_door.cpp:261-283`) only
+        // from the `DEFAULT_KNOB_DOOR_{F,B}_OPEN` demo, which the door command
+        // `dEvtCnd_CANDOOR_e` orders. That condition is offered by exactly the
+        // same test `set_event_prm` just ran, and `checkArea` passes only once
+        // the player has walked through the frame facing away from it, so an
+        // `event_idx` at or above zero *is* the walk-through. The open is
+        // latched on `FLAG_OPEN`, which `open_end` clears, so a player standing
+        // in the frame does not fire it every frame.
+        if self.area_hit && !self.check_flag(FLAG_OPEN) {
+            self.init_open_demo();
+            self.open_init(self.open_arg(), env);
+            self.set_action(A_DEMO);
         }
         true
+    }
+
+    /// `demoProc`'s advance cases (`d_a_knob00.cpp:455-458`) pick the push or
+    /// pull animation from the front selection, which is what `prm2c6` holds.
+    fn open_arg(&self) -> i32 {
+        if self.prm2c6 == M2C6_FRONT {
+            0
+        } else {
+            1
+        }
     }
 
     fn action_demo(&mut self, env: &mut Env<'_>) -> bool {
@@ -1400,6 +1478,9 @@ struct Env<'a> {
     clear_count: u8,
     staff_cut: Option<(usize, bool)>,
     player: Option<&'a mut Player>,
+    next: &'a mut NextStage,
+    /// Name of the stage the door is standing in.
+    stage: &'a str,
 }
 
 impl Env<'_> {
@@ -1461,6 +1542,9 @@ impl Env<'_> {
 #[derive(SystemParam)]
 pub struct Read<'w> {
     stay: Res<'w, StayRoom>,
+    /// The stage the room set belongs to, which is the name a door's own
+    /// destination has to be read against.
+    stage: Res<'w, StageName>,
     clock: Res<'w, DayNight>,
     collect: Res<'w, Collect>,
     equipped: Res<'w, Equipped>,
@@ -1481,6 +1565,7 @@ pub fn control(
     read: Read,
     mut io: MsgIo,
     mut active: ResMut<ActiveEvent>,
+    mut next: ResMut<NextStage>,
     mut flags: ResMut<EventFlags>,
     mut regs: ResMut<EventReg>,
     mut names: ResMut<NameEntry>,
@@ -1524,6 +1609,8 @@ pub fn control(
             clear_count,
             staff_cut,
             player: player_handle.as_mut().map(|link| &mut **link),
+            next: &mut next,
+            stage: &read.stage.0,
         };
         door.execute(&mut env);
     }

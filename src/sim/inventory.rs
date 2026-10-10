@@ -141,6 +141,14 @@ pub const ITEM_EARTH_GODS_LYRIC: u8 = 0x70;
 pub const ITEM_WIND_GODS_ARIA: u8 = 0x71;
 pub const ITEM_SONG_OF_PASSING: u8 = 0x72;
 
+/// `dComIfGs_onCollect(0x0, 0)`, the write both `item_func_sword` (`d_item.cpp:853-857`) and
+/// `dComIfGs_setSelectEquip` for a sword (`d_com_inf_game.cpp:1789-1793`) perform. The sword
+/// takes no save-inventory slot in retail, so this collect bit is its whole state:
+/// `ui_menu_collect.rs:4479` renders it and `d_a_npc_ba1.cpp:729-732` reads the same byte to
+/// choose Grandma's line.
+pub const SWORD_COLLECT_BYTE: u8 = 0;
+pub const SWORD_COLLECT_LEVEL: u8 = 0;
+
 pub fn check_get_item(
     equipped: &Equipped,
     collect: &super::flags::Collect,

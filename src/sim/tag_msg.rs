@@ -22,7 +22,7 @@ const ACTION_ARRIVAL: u8 = 1;
 const ACTION_HUNT: u8 = 2;
 const ACTION_EVENT: u8 = 3;
 
-#[derive(Resource, Debug, Clone, Copy)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct TagMsg {
     pub swbit: u8,
     pub swbit2: u8,

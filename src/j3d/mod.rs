@@ -14,3 +14,7 @@
 pub mod bck;
 pub mod bdl;
 pub mod btk;
+pub mod fifo;
+pub mod present;
+pub mod replay;
+pub mod vtxfmt;

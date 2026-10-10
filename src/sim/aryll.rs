@@ -7,7 +7,7 @@ use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Collect, StoryBits};
 use super::frame::CurrentFrame;
-use super::inventory::{Equipped, check_get_item};
+use super::inventory::{Equipped, SWORD_COLLECT_BYTE, SWORD_COLLECT_LEVEL, check_get_item};
 use super::player::Player;
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 use crate::assets::MsgArchives;
@@ -2919,5 +2919,20 @@ pub fn control(
             }
         }
         aryll.execute(actor, &mut ctx, &others);
+    }
+}
+
+/// The Hero's Sword, handed over once the Helmaroc King has carried Aryll off. Retail gives it
+/// in the cutscene that follows the attack and the give is only two writes:
+/// `item_func_sword` (`d_item.cpp:853-857`) is `dComIfGs_onCollect(0x0, 0)` plus
+/// `dComIfGs_setSelectEquip(0x0, dItemNo_SWORD_e)`, and `dComIfGs_setSelectEquip` writes that
+/// same collect bit for a sword on its own (`d_com_inf_game.cpp:1789-1793`).
+/// `dItemNo_SWORD_e` is `0x38` (`d_item_data.h:63`). `zelda_fly` ends by setting the kidnapping
+/// bit (`d_a_npc_ls1.cpp:1615-1622`), so that bit is the trigger here; the C-button half is left
+/// out because the port already parks the telescope in the select slot the sword would take
+/// (`inventory.rs:16`).
+pub fn grant_sword(stories: Res<StoryBits>, mut collect: ResMut<Collect>) {
+    if stories.test(EVENT_BIT_0001) {
+        collect.set(SWORD_COLLECT_BYTE, SWORD_COLLECT_LEVEL);
     }
 }

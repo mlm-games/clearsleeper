@@ -22,7 +22,9 @@ pub mod audio;
 pub mod bti;
 pub mod j3d;
 pub mod config;
+pub mod dff;
 pub mod dzs;
+pub mod gx_decode;
 pub mod hud;
 pub mod input;
 pub mod intro;
@@ -59,6 +61,9 @@ pub struct App {
     pub audio: repame_audio::Audio,
 pub room: Option<j3d::bdl::RoomMesh>,
     pub actor_model: Option<j3d::bdl::RoomMesh>,
+    /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
+    /// are its own, so it is presented alone rather than mixed into a room.
+    dff: Option<j3d::present::Presented>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
@@ -123,6 +128,7 @@ impl App {
             audio,
             room: None,
             actor_model: None,
+            dff: None,
             menu: menus::Menu::new(),
             stage: None,
             rooms: Vec::new(),
@@ -151,6 +157,7 @@ impl App {
             dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
+        app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
         app.movie = movie::Movie::open(&movie::title_path()).ok();
         app.actor_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
@@ -2260,12 +2267,15 @@ pub fn root_view(
     if app.quit.latched() {
         return quit::Quit::parked();
     }
-    let frame = view::build_frame_with_actor(
-        &app.snapshot(),
-        app.cam.get(),
-        app.room.as_ref(),
-        app.actor_model.as_ref(),
-    );
+    let frame = match &app.dff {
+        Some(presented) => j3d::present::frame(presented, app.cam.get()),
+        None => view::build_frame_with_actor(
+            &app.snapshot(),
+            app.cam.get(),
+            app.room.as_ref(),
+            app.actor_model.as_ref(),
+        ),
+    };
     let cam = app.cam.clone();
     let viewport = Viewport3d(
         frame,
