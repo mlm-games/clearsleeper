@@ -31,6 +31,10 @@ Release artifacts: `cargo build --release`, `trunk build --release`,
 (or `package.metadata.android.signing.release`); keystores stay
 untracked.
 
+Disclaimer: This does not provide any copyrighted assets. You need to bring your own copy of the game.
+
 `CS_ASSETS` points the archive loader at an extracted game disc root
-(`files/`, `sys/`); the data stays outside this repository. Headless sim
+(`files/`, `sys/`). the data stays outside this repository. Headless sim
 tests never touch it.
+
+Mainly uses dusklight as a reference, and the code of tww for the decomp.
