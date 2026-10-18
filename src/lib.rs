@@ -37,6 +37,7 @@ pub mod menus;
 pub mod movie;
 pub mod panes;
 pub mod quit;
+pub mod report;
 pub mod save;
 pub mod shot;
 pub mod sim;

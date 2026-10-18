@@ -117,11 +117,30 @@
 
     let installing = false;
 
+    // The Rust side reports a panic here before the wasm build aborts, so the status line keeps
+    // the reason a bare trap would hide.
+    let panicReport = "";
+    window.__clearsleeperPanic = (text) => {
+      panicReport = text;
+      say(text, "error");
+    };
+
     async function install(picked) {
       if (installing) {
         return;
       }
       installing = true;
+      const bindings = await bindingsReady();
+      // A page the browser served from cache before this export existed reads as no limit.
+      const limit =
+        typeof bindings.discImageLimit === "function" ? bindings.discImageLimit() : Infinity;
+      if (picked.size > limit) {
+        const size = (picked.size / 1048576).toFixed(0);
+        const most = (limit / 1048576).toFixed(0);
+        say(`${picked.name} is ${size} MB; this build reads images up to ${most} MB`, "error");
+        installing = false;
+        return;
+      }
       say(`Reading ${picked.name} (${(picked.size / 1048576).toFixed(0)} MB)…`);
       let bytes;
       try {
@@ -131,23 +150,24 @@
         installing = false;
         return;
       }
-      const bindings = await bindingsReady();
       say(`Checking ${picked.name}…`);
       let summary;
+      panicReport = "";
       try {
         summary = bindings.installDiscImage(bytes);
       } catch (error) {
         // The Rust side answers with the typed failure for this image.
-        say(`${error}`, "error");
+        say(panicReport || `${error}`, "error");
         installing = false;
         return;
       }
       bytes = null;
       say(`Starting ClearSleeper on ${summary}…`);
+      panicReport = "";
       try {
         bindings.boot();
       } catch (error) {
-        say(`ClearSleeper failed to start: ${error}`, "error");
+        say(`ClearSleeper failed to start: ${panicReport || error}`, "error");
         installing = false;
         return;
       }

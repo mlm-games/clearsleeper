@@ -39,6 +39,34 @@ use std::sync::{Arc, Mutex};
 
 use nod::{PartitionBase, PartitionKind};
 
+/// The web build's wasm memory ceiling. `.cargo/config.toml` hands this number to the linker as
+/// `--max-memory`, which the threaded build must declare: a shared memory needs a maximum, and
+/// wasm32 cannot address beyond 4 GiB. `tests/disc.rs` keeps the two in step.
+pub const WASM_MEMORY_CEILING: usize = 4 << 30;
+
+/// Room the session keeps inside that ceiling for the assets it decodes out of the image, so a
+/// full disc's working set is not competing with the image itself.
+pub const SESSION_HEADROOM: usize = 2 << 30;
+
+/// The largest image this build accepts. Both containers are read whole: an ISO is sliced in
+/// place and an RVZ is handed to `nod` as one `Arc<Vec<u8>>`. An image over the limit is refused
+/// here rather than left to fail inside the allocation that copies it in.
+pub const MAX_IMAGE_BYTES: usize = WASM_MEMORY_CEILING - SESSION_HEADROOM;
+
+/// Whether an image of this length fits. [`DiscImage::open`] asks before it reads anything, and
+/// the web entry hands the same limit to the page, which checks the picked file against it before
+/// the bytes are copied into wasm memory.
+pub fn image_len_ok(len: usize) -> Result<(), DiscError> {
+    if len > MAX_IMAGE_BYTES {
+        Err(DiscError::TooLarge {
+            len,
+            limit: MAX_IMAGE_BYTES,
+        })
+    } else {
+        Ok(())
+    }
+}
+
 const BOOT_HEADER_LEN: usize = 0x440;
 const WII_MAGIC_AT: usize = 0x18;
 const GAME_MAGIC_AT: usize = 0x1C;
@@ -69,6 +97,8 @@ const WIND_WAKER_IDS: [&str; 4] = ["GZLE01", "GZLP01", "GZLJ01", "D44J01"];
 pub enum DiscError {
     /// The image is shorter than the boot header it would have to carry.
     Truncated { len: usize },
+    /// The image is larger than this build holds in memory ([`MAX_IMAGE_BYTES`]).
+    TooLarge { len: usize, limit: usize },
     /// The magic at `0x1C` is not the GameCube one.
     BadMagic { actual: [u8; 4] },
     /// The image is a Wii disc, which stores its files under a partition this port does not read.
@@ -93,6 +123,10 @@ impl std::fmt::Display for DiscError {
             Self::Truncated { len } => write!(
                 f,
                 "the image is {len} bytes, too short for a GameCube boot header"
+            ),
+            Self::TooLarge { len, limit } => write!(
+                f,
+                "the image is {len} bytes; this build holds images up to {limit} bytes in memory"
             ),
             Self::BadMagic { actual } => write!(
                 f,
@@ -396,6 +430,7 @@ pub struct DiscImage {
 impl DiscImage {
     /// Read a disc image: an ISO/GCM as it is, or an RVZ through `nod`.
     pub fn open(bytes: Vec<u8>) -> Result<Self, DiscError> {
+        image_len_ok(bytes.len())?;
         if bytes.len() < WII_MAGIC_AT + 4 {
             return Err(DiscError::Truncated { len: bytes.len() });
         }
