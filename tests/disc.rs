@@ -151,10 +151,10 @@ fn the_image_limit_leaves_room_inside_the_wasm_memory_ceiling() {
         .split("--max-memory=")
         .nth(1)
         .and_then(|rest| rest.split(|c: char| c == '"' || c.is_whitespace()).next())
-        .and_then(|value| value.parse::<usize>().ok())
+        .and_then(|value| value.parse::<u64>().ok())
         .expect("a --max-memory link argument");
     assert_eq!(ceiling, WASM_MEMORY_CEILING);
-    assert!(MAX_IMAGE_BYTES < ceiling);
+    assert!((MAX_IMAGE_BYTES as u64) < ceiling);
 
     // A full GameCube dump, the largest image the port can be handed.
     assert!(image_len_ok(1_459_978_240).is_ok());

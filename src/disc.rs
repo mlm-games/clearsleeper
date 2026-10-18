@@ -41,17 +41,18 @@ use nod::{PartitionBase, PartitionKind};
 
 /// The web build's wasm memory ceiling. `.cargo/config.toml` hands this number to the linker as
 /// `--max-memory`, which the threaded build must declare: a shared memory needs a maximum, and
-/// wasm32 cannot address beyond 4 GiB. `tests/disc.rs` keeps the two in step.
-pub const WASM_MEMORY_CEILING: usize = 4 << 30;
+/// wasm32 cannot address beyond 4 GiB. `u64` because the ceiling itself does not fit wasm32's
+/// `usize`; `tests/disc.rs` keeps the two in step.
+pub const WASM_MEMORY_CEILING: u64 = 4 << 30;
 
 /// Room the session keeps inside that ceiling for the assets it decodes out of the image, so a
 /// full disc's working set is not competing with the image itself.
-pub const SESSION_HEADROOM: usize = 2 << 30;
+pub const SESSION_HEADROOM: u64 = 2 << 30;
 
 /// The largest image this build accepts. Both containers are read whole: an ISO is sliced in
 /// place and an RVZ is handed to `nod` as one `Arc<Vec<u8>>`. An image over the limit is refused
 /// here rather than left to fail inside the allocation that copies it in.
-pub const MAX_IMAGE_BYTES: usize = WASM_MEMORY_CEILING - SESSION_HEADROOM;
+pub const MAX_IMAGE_BYTES: usize = (WASM_MEMORY_CEILING - SESSION_HEADROOM) as usize;
 
 /// Whether an image of this length fits. [`DiscImage::open`] asks before it reads anything, and
 /// the web entry hands the same limit to the page, which checks the picked file against it before
