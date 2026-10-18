@@ -47,7 +47,6 @@ path = "src/main.rs"
 package = "org.mlm.clearsleeper"
 apk_name = "cs"
 build_targets = ["aarch64-linux-android"]
-assets = "packaging/assets"
 strip = "strip"
 
 [package.metadata.android.application]
