@@ -253,7 +253,10 @@ impl ActorTable {
     }
 
     pub fn normal_item_row(&self, slot: usize) -> i32 {
-        self.index_normal_item.get(slot).copied().unwrap_or(INDEX_NONE)
+        self.index_normal_item
+            .get(slot)
+            .copied()
+            .unwrap_or(INDEX_NONE)
     }
 
     pub fn percent_row(&self) -> i32 {

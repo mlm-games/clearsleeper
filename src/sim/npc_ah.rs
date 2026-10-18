@@ -429,12 +429,7 @@ impl NpcAh {
     }
 
     /// `phase_1` (`:162-187`): the `cPhs_STOP_e` cases, which cancel creation entirely.
-    fn create_stopped(
-        &self,
-        parameters: u32,
-        switches: &Switches,
-        flags: &EventFlags,
-    ) -> bool {
+    fn create_stopped(&self, parameters: u32, switches: &Switches, flags: &EventFlags) -> bool {
         match self.prm_arg0(parameters) {
             2 => switches.test(SWITCH_PR2) || !flags.test(FLAG_0520),
             5 => switches.test(SWITCH_PR5),
@@ -637,11 +632,7 @@ impl NpcAh {
             self.msg_id = MSG_AH[index];
             self.msg_cursor = true;
         }
-        if self.msg_cursor {
-            self.msg_id
-        } else {
-            0
-        }
+        if self.msg_cursor { self.msg_id } else { 0 }
     }
 
     /// `daNpcAh_c::next_msgStatus` (`:608-627`). Every `l_msg_ah_*` chain is exactly
@@ -838,19 +829,11 @@ impl NpcAh {
         let attn = actor.pos
             + rot_y(
                 actor.angle[1],
-                Vec3::new(
-                    DAT_ATTN_POS_OFS_X,
-                    DAT_ATTN_POS_OFS_Y,
-                    DAT_ATTN_POS_OFS_Z,
-                ),
+                Vec3::new(DAT_ATTN_POS_OFS_X, DAT_ATTN_POS_OFS_Y, DAT_ATTN_POS_OFS_Z),
             );
         let _ = attn;
         // `eyePos.set(current.pos.x, current.pos.y + l_npc_dat.field_0x24, current.pos.z);` (:392)
-        self.eye_pos = Vec3::new(
-            actor.pos.x,
-            actor.pos.y + DAT_EYE_POS_OFS_Y,
-            actor.pos.z,
-        );
+        self.eye_pos = Vec3::new(actor.pos.x, actor.pos.y + DAT_EYE_POS_OFS_Y, actor.pos.z);
         self.look_back(actor, ctx);
     }
 }
@@ -977,10 +960,7 @@ pub fn control(
     let clear_count = world.text_flags.clear_count;
     let event_run = msg.info.event_run_check();
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut ah) in &mut actors {
         if !ah.entered && ah.create_stopped(actor.parameters, &world.switches, &world.flags) {
             let _ = commands.entity(entity).despawn();

@@ -4,8 +4,8 @@ use glam::{Quat, Vec3};
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::carry;
 use super::collision::Collision;
 use super::combat::{Combat, CutKind};
@@ -788,8 +788,7 @@ impl Armos {
             self.shapes.weak_hit = touches(self.weak, WEAK_RADIUS, origin, reach);
         }
         if self.shapes.body_tg && at != At::Light {
-            self.shapes.body_hit =
-                cyl_touches(actor.pos, BODY_RADIUS, BODY_HEIGHT, origin, reach);
+            self.shapes.body_hit = cyl_touches(actor.pos, BODY_RADIUS, BODY_HEIGHT, origin, reach);
         }
         if self.shapes.needle_at {
             self.shapes.needle_hit = cyl_touches(
@@ -848,12 +847,7 @@ impl Armos {
         true
     }
 
-    fn medama_atari_check(
-        &mut self,
-        at: At,
-        switches: &Switches,
-        events: &mut SimEvents,
-    ) -> bool {
+    fn medama_atari_check(&mut self, at: At, switches: &Switches, events: &mut SimEvents) -> bool {
         if self.dormant(switches) {
             return false;
         }
@@ -1120,8 +1114,7 @@ impl Armos {
                             self.gravity = GRAVITY_HARD;
                             self.speed.y = LIFT_HIGH;
                             self.countup[CU_LANDED] = 0;
-                            if !self.line_check(actor, rot_offset, solid) || self.damage_wait != 0
-                            {
+                            if !self.line_check(actor, rot_offset, solid) || self.damage_wait != 0 {
                                 self.speed_f = 0.0;
                             }
                             self.countup[CU_HOPS] += 1;
@@ -1340,8 +1333,7 @@ impl Armos {
                 ITAI_FLINCH => {
                     self.clear_countup();
                     self.shapes.needle_sheath();
-                    self.target_angle =
-                        search_angle(actor.pos, player.pos).wrapping_add(HALF_TURN);
+                    self.target_angle = search_angle(actor.pos, player.pos).wrapping_add(HALF_TURN);
                     self.heading = self.target_angle;
                     self.speed_f = SPEED_WINDUP;
                     events.list.push(SimEvent::Se(SE_DAMAGE));
@@ -1672,15 +1664,9 @@ pub fn control(
         statue.spike(&mut health);
         let from = actor.pos;
         match statue.step {
-            Step::Dousa => statue.action_dousa(
-                actor,
-                &player,
-                solid,
-                wet,
-                blow,
-                &switches,
-                &mut events,
-            ),
+            Step::Dousa => {
+                statue.action_dousa(actor, &player, solid, wet, blow, &switches, &mut events)
+            }
             Step::Mahi => {
                 statue.action_mahi(actor, &player, solid, wet, blow, &switches, &mut events)
             }

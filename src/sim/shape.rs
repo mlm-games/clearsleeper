@@ -95,10 +95,9 @@ impl Shape {
     pub fn centroid(&self) -> glam::Vec3 {
         match self.kind {
             ShapeKind::Triangle => (self.verts[0] + self.verts[1] + self.verts[2]) * (1.0 / 3.0),
-            ShapeKind::Sphere
-            | ShapeKind::Cylinder
-            | ShapeKind::Capsule
-            | ShapeKind::Box => self.pos,
+            ShapeKind::Sphere | ShapeKind::Cylinder | ShapeKind::Capsule | ShapeKind::Box => {
+                self.pos
+            }
         }
     }
 
@@ -109,9 +108,7 @@ impl Shape {
 
     pub fn contains(&self, point: glam::Vec3) -> bool {
         match self.kind {
-            ShapeKind::Sphere => {
-                (point - self.pos).length() <= self.radius * self.scale.x
-            }
+            ShapeKind::Sphere => (point - self.pos).length() <= self.radius * self.scale.x,
             ShapeKind::Cylinder => {
                 let dx = point.x - self.pos.x;
                 let dz = point.z - self.pos.z;
@@ -190,9 +187,10 @@ impl Shape {
                 (self.height * 0.5 * self.scale.y).max(self.radius * self.scale.x)
             }
             ShapeKind::Box => self.scale.length() * 0.5,
-            ShapeKind::Triangle => self.verts.iter().fold(0.0f32, |far, v| {
-                far.max((*v - self.centroid()).length())
-            }),
+            ShapeKind::Triangle => self
+                .verts
+                .iter()
+                .fold(0.0f32, |far, v| far.max((*v - self.centroid()).length())),
         }
     }
 }
@@ -275,12 +273,7 @@ fn segment_gap(a0: glam::Vec3, a1: glam::Vec3, b0: glam::Vec3, b1: glam::Vec3) -
     ((a0 + (a1 - a0) * s) - (b0 + (b1 - b0) * t)).length()
 }
 
-fn segment_params(
-    a0: glam::Vec3,
-    a1: glam::Vec3,
-    b0: glam::Vec3,
-    b1: glam::Vec3,
-) -> (f32, f32) {
+fn segment_params(a0: glam::Vec3, a1: glam::Vec3, b0: glam::Vec3, b1: glam::Vec3) -> (f32, f32) {
     let da = a1 - a0;
     let db = b1 - b0;
     let r = a0 - b0;
@@ -332,11 +325,7 @@ pub fn tri_tri_cross(one: [glam::Vec3; 3], two: [glam::Vec3; 3]) -> bool {
     true
 }
 
-pub fn tri_sph_cross_point(
-    tri: [glam::Vec3; 3],
-    centre: glam::Vec3,
-    radius: f32,
-) -> glam::Vec3 {
+pub fn tri_sph_cross_point(tri: [glam::Vec3; 3], centre: glam::Vec3, radius: f32) -> glam::Vec3 {
     let mid = (tri[0] + tri[1]) * 0.5;
     let sq = (mid - centre).length_squared();
     if sq.abs() < TRI_ABS_MIN {
@@ -374,7 +363,11 @@ pub fn tri_sph_cross(tri: [glam::Vec3; 3], centre: glam::Vec3, radius: f32) -> b
         || distance_to_segment(centre, tri[2], tri[0]) <= radius
 }
 
-pub fn tri_line_cross(start: glam::Vec3, end: glam::Vec3, tri: [glam::Vec3; 3]) -> Option<glam::Vec3> {
+pub fn tri_line_cross(
+    start: glam::Vec3,
+    end: glam::Vec3,
+    tri: [glam::Vec3; 3],
+) -> Option<glam::Vec3> {
     let (normal, d) = tri_plane(tri);
     let a = plane_func(normal, d, start);
     let b = plane_func(normal, d, end);
@@ -415,14 +408,7 @@ fn plane_func(normal: glam::Vec3, d: f32, point: glam::Vec3) -> f32 {
 
 fn tri_project_x(tri: [glam::Vec3; 3], point: glam::Vec3) -> bool {
     if !inclusion_2d(
-        tri[0].y,
-        tri[0].z,
-        tri[1].y,
-        tri[1].z,
-        tri[2].y,
-        tri[2].z,
-        point.y,
-        point.z,
+        tri[0].y, tri[0].z, tri[1].y, tri[1].z, tri[2].y, tri[2].z, point.y, point.z,
     ) {
         return false;
     }
@@ -438,14 +424,7 @@ fn tri_project_x(tri: [glam::Vec3; 3], point: glam::Vec3) -> bool {
 
 fn tri_project_y(tri: [glam::Vec3; 3], point: glam::Vec3) -> bool {
     if !inclusion_2d(
-        tri[0].z,
-        tri[0].x,
-        tri[1].z,
-        tri[1].x,
-        tri[2].z,
-        tri[2].x,
-        point.z,
-        point.x,
+        tri[0].z, tri[0].x, tri[1].z, tri[1].x, tri[2].z, tri[2].x, point.z, point.x,
     ) {
         return false;
     }
@@ -461,14 +440,7 @@ fn tri_project_y(tri: [glam::Vec3; 3], point: glam::Vec3) -> bool {
 
 fn tri_project_z(tri: [glam::Vec3; 3], point: glam::Vec3) -> bool {
     if !inclusion_2d(
-        tri[0].x,
-        tri[0].y,
-        tri[1].x,
-        tri[1].y,
-        tri[2].x,
-        tri[2].y,
-        point.x,
-        point.y,
+        tri[0].x, tri[0].y, tri[1].x, tri[1].y, tri[2].x, tri[2].y, point.x, point.y,
     ) {
         return false;
     }

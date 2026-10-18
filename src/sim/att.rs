@@ -36,8 +36,7 @@ pub const AT_SPRM_VS_PLAYER: u32 = 0x04;
 pub const TG_SPRM_IS_ENEMY: u32 = 0x02;
 pub const CO_SPRM_IS_PLAYER: u32 = 0x04;
 pub const AT_TYPE_HOOKSHOT: u32 = 1 << 15;
-pub const TG_TYPE_ALL_BUT: u32 =
-    !((1 << 8) | (1 << 17) | (1 << 21) | (1 << 22) | (1 << 23));
+pub const TG_TYPE_ALL_BUT: u32 = !((1 << 8) | (1 << 17) | (1 << 21) | (1 << 22) | (1 << 23));
 pub const REG0_F16: f32 = 0.0;
 pub const REG6_F3: f32 = 0.0;
 pub const REG6_S7: i16 = 0;
@@ -451,7 +450,9 @@ fn execute(
         if broken {
             events.list.push(SimEvent::Se(SE_LK_W_WEP_HIT));
             if r30 <= NEIGHBOUR_MAX
-                && boss.slot(NEIGHBOUR_MAX - r30).is_some_and(|slot| slot.m2d0 != 0)
+                && boss
+                    .slot(NEIGHBOUR_MAX - r30)
+                    .is_some_and(|slot| slot.m2d0 != 0)
             {
                 if let Some(slot) = boss.slot_neighbour(NEIGHBOUR_SLOT) {
                     *slot = NEIGHBOUR_TIMER;

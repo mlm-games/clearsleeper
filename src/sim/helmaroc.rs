@@ -4,8 +4,8 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
@@ -148,7 +148,6 @@ const REG14_F9: f32 = 0.0;
 const REG14_F10: f32 = 0.0;
 const REG14_S8: i16 = 0;
 const REG14_S9: i16 = 0;
-
 
 const AREA_X: f32 = 3600.0;
 const AREA_Y: f32 = 9800.0;
@@ -515,7 +514,6 @@ impl Action {
             Self::AfterFight => ACTION_AFTER_FIGHT,
         }
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1430,7 +1428,12 @@ impl Helmaroc {
             TURN_DIV_WALK,
             (self.turn_scale * self.turn_step) as i16,
         );
-        add_calc2(&mut self.turn_step, SPEED_STEP, SPEED_STEP, TURN_STEP_GROUND);
+        add_calc2(
+            &mut self.turn_step,
+            SPEED_STEP,
+            SPEED_STEP,
+            TURN_STEP_GROUND,
+        );
     }
 
     fn pl_view_check(&self, actor: &Actor, env: &Env<'_>) -> bool {
@@ -1498,40 +1501,40 @@ impl Helmaroc {
         let mut arm = self.state;
         loop {
             match arm {
-            0 => {
-                self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
-                self.rise_smoke = 0x19;
-                let out = turned(actor.angle[ANGLE_Y], [0.0, 2000.0, 5000.0]);
-                self.target = actor.pos + out;
-                self.state = self.state.wrapping_add(1);
-                self.speed_f = 0.0;
-                self.speed_step = 1.0;
-                self.speed_walk = 0.0;
-                break;
-            }
-            1 => {
-                if self.morph.frame == f32::from(REG12_S7 + 0x17) {
-                    self.state = 2;
-                    self.speed_walk = REG12_F8 + 50.0;
-                    self.speed_f = 40.0;
-                    self.speed_step = REG12_F9 + 1.0;
-                    actor.angle[ANGLE_X] = -0x3000;
-                    arm = 2;
-                } else {
-                    move_pos = true;
+                0 => {
+                    self.anm_init(BCK_TOBITATU1, 5.0, EMODE_NONE, 1.0, 0x16, 0);
+                    self.rise_smoke = 0x19;
+                    let out = turned(actor.angle[ANGLE_Y], [0.0, 2000.0, 5000.0]);
+                    self.target = actor.pos + out;
+                    self.state = self.state.wrapping_add(1);
+                    self.speed_f = 0.0;
+                    self.speed_step = 1.0;
+                    self.speed_walk = 0.0;
                     break;
                 }
-            }
-            2 => {
-                self.turn_step = 0.0;
-                if self.morph.is_stop() {
-                    self.action = Action::Fly;
-                    self.fly_ca = -1;
-                    self.state = 0;
+                1 => {
+                    if self.morph.frame == f32::from(REG12_S7 + 0x17) {
+                        self.state = 2;
+                        self.speed_walk = REG12_F8 + 50.0;
+                        self.speed_f = 40.0;
+                        self.speed_step = REG12_F9 + 1.0;
+                        actor.angle[ANGLE_X] = -0x3000;
+                        arm = 2;
+                    } else {
+                        move_pos = true;
+                        break;
+                    }
                 }
-                break;
-            }
-            _ => break,
+                2 => {
+                    self.turn_step = 0.0;
+                    if self.morph.is_stop() {
+                        self.action = Action::Fly;
+                        self.fly_ca = -1;
+                        self.state = 0;
+                    }
+                    break;
+                }
+                _ => break,
             }
         }
         if !move_pos {
@@ -1671,18 +1674,8 @@ impl Helmaroc {
                         1.0,
                         self.speed.z.abs() * self.turn_step,
                     );
-                    add_calc_angle_s2(
-                        &mut actor.angle[ANGLE_Z],
-                        0,
-                        TURN_DIV_WALK,
-                        TURN_CAP as i16,
-                    );
-                    add_calc_angle_s2(
-                        &mut actor.angle[ANGLE_X],
-                        0,
-                        TURN_DIV_WALK,
-                        TURN_CAP as i16,
-                    );
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
                     if (self.target - actor.pos).length() < REG0_F3 + APPROACH_STOP {
                         self.state = 3;
                     }
@@ -1705,18 +1698,8 @@ impl Helmaroc {
                         0.2,
                         self.speed.z.abs() * self.turn_step,
                     );
-                    add_calc_angle_s2(
-                        &mut actor.angle[ANGLE_Z],
-                        0,
-                        TURN_DIV_WALK,
-                        TURN_CAP as i16,
-                    );
-                    add_calc_angle_s2(
-                        &mut actor.angle[ANGLE_X],
-                        0,
-                        TURN_DIV_WALK,
-                        TURN_CAP as i16,
-                    );
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_Z], 0, TURN_DIV_WALK, TURN_CAP as i16);
+                    add_calc_angle_s2(&mut actor.angle[ANGLE_X], 0, TURN_DIV_WALK, TURN_CAP as i16);
                     let ground = env.ground_h(actor.pos);
                     if self.ground_hit != 0 || actor.pos.y <= ground + 1.0 {
                         self.speed_walk = 0.0;
@@ -1759,9 +1742,7 @@ impl Helmaroc {
         let dist = env.player_distance(actor.pos);
         self.track_player = true;
         self.target = env.player_pos;
-        let angle = actor
-            .angle[ANGLE_Y]
-            .wrapping_sub(env.player_bearing(actor.pos));
+        let angle = actor.angle[ANGLE_Y].wrapping_sub(env.player_bearing(actor.pos));
         self.speed_f = 0.0;
         self.speed_step = 5.0;
         self.turn_scale = 500.0;
@@ -2173,8 +2154,7 @@ impl Helmaroc {
                     }
                     if self.timers[0] == 0 {
                         self.speed.y -= 0.5 + REG0_F7;
-                        actor.angle[ANGLE_Z] =
-                            actor.angle[ANGLE_Z].wrapping_add(REG0_S7 + 0x50);
+                        actor.angle[ANGLE_Z] = actor.angle[ANGLE_Z].wrapping_add(REG0_S7 + 0x50);
                         if self.timers[1] == 0 {
                             self.state = 0xC;
                             self.target_yaw = actor.angle[ANGLE_Y].wrapping_add(-0x8000);
@@ -2431,8 +2411,7 @@ impl Helmaroc {
                 self.fov = 45.0;
                 for index in 0..PIECE_COUNT {
                     self.piece_live[index] = 1;
-                    self.piece_pos[index] =
-                        turned(self.shape_angle[ANGLE_Y], JOINT_ATAMA1);
+                    self.piece_pos[index] = turned(self.shape_angle[ANGLE_Y], JOINT_ATAMA1);
                     self.piece_rot[index][1] = self.shape_angle[ANGLE_Y];
                     self.piece_rot[index][0] = REG0_S6 + 0x3625;
                     self.piece_rot[index][2] = 0;
@@ -2800,9 +2779,7 @@ impl Helmaroc {
                 }
             }
             3 => {
-                if self.timers[0] == 0
-                    && env.player_distance(actor.pos) < REG0_F13 + 700.0
-                {
+                if self.timers[0] == 0 && env.player_distance(actor.pos) < REG0_F13 + 700.0 {
                     self.anm_init(BCK_ATTACK_T3, 5.0, EMODE_NONE, 1.0, BAS_NONE, 0);
                     out.se(SE_CV_DK_ATTACK);
                     self.state = 4;
@@ -2906,7 +2883,14 @@ impl Helmaroc {
             Action::AfterFight => self.after_fight(),
         }
         if self.resume_pending != 0 && self.morph.is_stop() {
-            self.anm_init(self.resume_bck, 20.0, self.resume_loop, 1.0, self.resume_bas, 0);
+            self.anm_init(
+                self.resume_bck,
+                20.0,
+                self.resume_loop,
+                1.0,
+                self.resume_bas,
+                0,
+            );
             self.resume_pending = 0;
         }
     }
@@ -3115,9 +3099,14 @@ impl Helmaroc {
                             * sin_s(
                                 self.frame_count
                                     .wrapping_add(PIECE_SPIN_STEP)
-                                    .wrapping_add(index as i32 * PIECE_SPIN_SPREAD) as i16,
+                                    .wrapping_add(index as i32 * PIECE_SPIN_SPREAD)
+                                    as i16,
                             );
-                        add_calc0(&mut self.piece_roll[index], 1.0, KAMEN_SWING_STEP + REG12_F5);
+                        add_calc0(
+                            &mut self.piece_roll[index],
+                            1.0,
+                            KAMEN_SWING_STEP + REG12_F5,
+                        );
                         add_calc_angle_s2(
                             &mut self.piece_rot[index][2],
                             KAMEN_BREAK_Z1[index].wrapping_add(swing as i16),
@@ -3125,17 +3114,18 @@ impl Helmaroc {
                             0x1000,
                         );
                     }
-                    let push = turned(
-                        self.piece_angle[index],
-                        [0.0, 0.0, self.piece_speed[index]],
-                    );
+                    let push = turned(self.piece_angle[index], [0.0, 0.0, self.piece_speed[index]]);
                     self.piece_move[index].x = push.x;
                     self.piece_move[index].z = push.z;
                     self.hulls[hull].centre = self.piece_pos[index];
                     self.piece_rot[index][1] = self.piece_rot[index][1].wrapping_add(
                         (self.piece_sway_speed[index] * self.piece_speed[index]) as i16,
                     );
-                    add_calc0(&mut self.piece_speed[index], 1.0, REG14_F5 + PIECE_PUSH_STEP);
+                    add_calc0(
+                        &mut self.piece_speed[index],
+                        1.0,
+                        REG14_F5 + PIECE_PUSH_STEP,
+                    );
                     if self.hulls[hull].tg_set
                         && self.piece_speed[index] < 1.0
                         && self.hulls[hull].touches(env.player_pos, env.blow.at.reach())
@@ -3174,7 +3164,9 @@ impl Helmaroc {
     fn kamen_struck(&mut self, index: usize, env: &Env<'_>, out: &mut Sink<'_>) {
         if env.blow.at.result() == AT_WIND {
             self.piece_speed[index] = REG14_F4 + KAMEN_BLOW_SPEED + self.rnd_f(2.0);
-            self.piece_angle[index] = env.player_yaw.wrapping_add(self.rnd_fx(KAMEN_BLOW_SPREAD) as i16);
+            self.piece_angle[index] = env
+                .player_yaw
+                .wrapping_add(self.rnd_fx(KAMEN_BLOW_SPREAD) as i16);
             self.piece_sway_speed[index] = self.rnd_fx(KAMEN_BLOW_SWAY);
         } else {
             let yaw = bearing(env.player_pos, self.piece_pos[index]);
@@ -3315,296 +3307,332 @@ impl Helmaroc {
         let mut arm = self.demo_state;
         loop {
             match arm {
-            0 => break,
-            1 => {
-                if !self.demo_gate() {
-                    run = false;
-                    break;
-                }
-                self.demo_state = self.demo_state.wrapping_add(1);
-                self.demo_count = 0;
-                self.demo_sub = 0;
-                self.fov = 45.0;
-                self.mask_damage = 4;
-                arm = 2;
-            }
-            2 => {
-                self.cam_eye =
-                    turned(self.shape_angle[ANGLE_Y], [REG0_F0 + CAM_NEAR_X - 30.0, REG14_F1 - 30.0, REG14_F2 + 50.0])
-                        + self.head;
-                self.cam_look =
-                    turned(self.shape_angle[ANGLE_Y], [REG12_F5 + 400.0, REG12_F6 - 100.0, REG12_F7 + 400.0])
-                        + self.head;
-                if self.demo_sub > REG6_S7 + 0x3C {
-                    add_calc2(&mut self.fov, 20.0, 0.5, 1.0);
-                } else if self.demo_sub > 0 {
-                    add_calc2(&mut self.fov, 35.0, 0.35, 1.0);
-                } else {
-                    add_calc2(&mut self.fov, 45.0, 0.05, 1.0);
-                }
-                break;
-            }
-            0xA => {
-                if !self.demo_gate() {
-                    run = false;
-                    break;
-                }
-                self.demo_state = self.demo_state.wrapping_add(1);
-                self.demo_param = 0.0;
-                self.demo_count = 0;
-                self.demo_sub = 0;
-                self.fov = 55.0;
-                self.cam_eye = Vec3::new(2598.0, 9902.0, -3498.0);
-                self.cam_look = Vec3::new(2228.0, 9961.0, -3403.0);
-                arm = 0xB;
-            }
-            0xB => {
-                add_calc2(&mut self.cam_eye.x, 164.0, 0.05, self.demo_param * 24.34);
-                add_calc2(&mut self.cam_eye.y, 11617.0, 0.05, self.demo_param * 17.15);
-                add_calc2(&mut self.cam_eye.z, -2802.0, 0.05, self.demo_param * 6.96);
-                add_calc2(&mut self.cam_look.x, -167.0, 0.05, self.demo_param * 23.949999);
-                add_calc2(&mut self.cam_look.y, 11791.0, 0.05, self.demo_param * 18.3);
-                add_calc2(&mut self.cam_look.z, -2706.0, 0.05, self.demo_param * 6.97);
-                if self.demo_sub > REG13_S1 + 0x1E {
-                    add_calc2(&mut self.demo_param, REG13_F1 + 1.0, 1.0, REG13_F2 + 0.015);
-                }
-                if self.demo_sub >= REG13_S6 + 0xBE {
-                    if self.demo_sub == REG13_S6 + 0xD2 {
-                        out.bgm(STRM_DK_START);
+                0 => break,
+                1 => {
+                    if !self.demo_gate() {
+                        run = false;
+                        break;
                     }
-                    self.shake = REG13_F18 + 1.5;
-                    out.se(SE_ATM_MJT_JINARI);
-                    add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
-                    self.shutter_roll = self.shutter_roll + 0.003 + REG0_F8;
-                    rumble = true;
+                    self.demo_state = self.demo_state.wrapping_add(1);
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 45.0;
+                    self.mask_damage = 4;
+                    arm = 2;
                 }
-                if self.demo_sub > REG13_S2 + 0xFA {
-                    self.demo_state = 0xC;
-                    self.cam_eye = Vec3::new(2195.0, 10007.0, -4079.0);
-                    self.cam_look = Vec3::new(1816.0, 10051.0, -4137.0);
+                2 => {
+                    self.cam_eye = turned(
+                        self.shape_angle[ANGLE_Y],
+                        [
+                            REG0_F0 + CAM_NEAR_X - 30.0,
+                            REG14_F1 - 30.0,
+                            REG14_F2 + 50.0,
+                        ],
+                    ) + self.head;
+                    self.cam_look = turned(
+                        self.shape_angle[ANGLE_Y],
+                        [REG12_F5 + 400.0, REG12_F6 - 100.0, REG12_F7 + 400.0],
+                    ) + self.head;
+                    if self.demo_sub > REG6_S7 + 0x3C {
+                        add_calc2(&mut self.fov, 20.0, 0.5, 1.0);
+                    } else if self.demo_sub > 0 {
+                        add_calc2(&mut self.fov, 35.0, 0.35, 1.0);
+                    } else {
+                        add_calc2(&mut self.fov, 45.0, 0.05, 1.0);
+                    }
+                    break;
+                }
+                0xA => {
+                    if !self.demo_gate() {
+                        run = false;
+                        break;
+                    }
+                    self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_param = 0.0;
+                    self.demo_count = 0;
                     self.demo_sub = 0;
-                    arm = 0xC;
-                } else {
-                    break;
+                    self.fov = 55.0;
+                    self.cam_eye = Vec3::new(2598.0, 9902.0, -3498.0);
+                    self.cam_look = Vec3::new(2228.0, 9961.0, -3403.0);
+                    arm = 0xB;
                 }
-            }
-            0xC => {
-                add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
-                rumble = true;
-                self.shutter_roll = self.shutter_roll + REG0_F8 + 0.003;
-                if self.demo_sub < REG13_S6 + 0x9B {
-                    self.shake = REG13_F5 + 5.0;
-                    out.se(SE_ATM_MJT_JINARI);
-                }
-                if self.demo_sub == REG13_S6 + 0x96 {
-                    self.demo_flag = 1;
-                }
-                if self.demo_sub == REG13_S7 + 0xA0 {
-                    self.demo_sub = 0;
-                    self.demo_state = 0xD;
-                }
-                add_calc2(&mut self.cam_eye.x, 2682.0, 0.05, self.demo_param * 4.87);
-                add_calc2(&mut self.cam_eye.y, 9904.0, 0.05, self.demo_param * 1.03);
-                add_calc2(&mut self.cam_eye.z, -3600.0, 0.05, self.demo_param * 4.79);
-                add_calc2(&mut self.cam_look.x, 2308.0, 0.05, self.demo_param * 4.92);
-                add_calc2(&mut self.cam_look.y, 9961.0, 0.05, self.demo_param * 0.9);
-                add_calc2(&mut self.cam_look.z, -3524.0, 0.05, self.demo_param * 6.1299998);
-                add_calc2(&mut self.demo_param, REG13_F3 + 1.5, 1.0, REG13_F4 + 0.02);
-                break;
-            }
-            0xD => {
-                if self.demo_sub < REG0_S3 + 0x64 {
-                    add_calc2(&mut self.fov, 25.0, 0.1, 0.5);
-                } else {
-                    add_calc2(&mut self.fov, 55.0, 0.2, 3.0);
-                }
-                if self.demo_sub == REG13_S8 + 0x37 {
-                    self.demo_flag = 1;
-                }
-                add_calc2(&mut self.cam_eye.x, self.head.x, 0.1, 50.0);
-                add_calc2(
-                    &mut self.cam_eye.y,
-                    (self.head.y - 200.0) + REG13_F11,
-                    0.1,
-                    50.0,
-                );
-                add_calc2(&mut self.cam_eye.z, self.head.z, 0.1, 50.0);
-                if self.morph.is_stop() {
-                    self.anm_init(BCK_FLY3, 1.0, EMODE_LOOP, 1.0, 0xD, 0);
-                }
-                if self.demo_sub == REG13_S8 + 0xF0 {
-                    self.demo_sub = 0;
-                    self.demo_state = 0xE;
-                }
-                rumble = true;
-                break;
-            }
-            0xE => {
-                self.cam_eye = Vec3::new(3304.0, 10983.0, -3644.0);
-                self.cam_look = Vec3::new(2841.0, 13058.0, -3272.0);
-                self.demo_state = 0xF;
-                self.demo_sub = 0;
-                self.demo_param = 0.0;
-                self.shutter_ring = REG13_F17 - 100.0;
-                self.shutter_roll = 0.0;
-                arm = 0xF;
-            }
-            0xF | 0x10 => {
-                rumble = true;
-                add_calc0(&mut self.shutter_ring, 1.0, REG6_F11 + 1.5);
-                if self.shutter_ring.abs() < 1.0 {
-                    add_calc0(&mut self.shutter_shift, 1.0, REG6_F12 + 1.0);
-                    if self.demo_state == 0xF {
-                        self.flags_on(out);
-                        self.stage_boss_demo = true;
-                        out.purge_eyes();
-                        self.demo_state = 0x10;
+                0xB => {
+                    add_calc2(&mut self.cam_eye.x, 164.0, 0.05, self.demo_param * 24.34);
+                    add_calc2(&mut self.cam_eye.y, 11617.0, 0.05, self.demo_param * 17.15);
+                    add_calc2(&mut self.cam_eye.z, -2802.0, 0.05, self.demo_param * 6.96);
+                    add_calc2(
+                        &mut self.cam_look.x,
+                        -167.0,
+                        0.05,
+                        self.demo_param * 23.949999,
+                    );
+                    add_calc2(&mut self.cam_look.y, 11791.0, 0.05, self.demo_param * 18.3);
+                    add_calc2(&mut self.cam_look.z, -2706.0, 0.05, self.demo_param * 6.97);
+                    if self.demo_sub > REG13_S1 + 0x1E {
+                        add_calc2(&mut self.demo_param, REG13_F1 + 1.0, 1.0, REG13_F2 + 0.015);
+                    }
+                    if self.demo_sub >= REG13_S6 + 0xBE {
+                        if self.demo_sub == REG13_S6 + 0xD2 {
+                            out.bgm(STRM_DK_START);
+                        }
+                        self.shake = REG13_F18 + 1.5;
+                        out.se(SE_ATM_MJT_JINARI);
+                        add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
+                        self.shutter_roll = self.shutter_roll + 0.003 + REG0_F8;
+                        rumble = true;
+                    }
+                    if self.demo_sub > REG13_S2 + 0xFA {
+                        self.demo_state = 0xC;
+                        self.cam_eye = Vec3::new(2195.0, 10007.0, -4079.0);
+                        self.cam_look = Vec3::new(1816.0, 10051.0, -4137.0);
+                        self.demo_param = 0.0;
+                        self.demo_sub = 0;
+                        arm = 0xC;
+                    } else {
+                        break;
                     }
                 }
-                add_calc2(&mut self.cam_look.x, 3152.0, 0.05, self.demo_param * 3.11);
-                add_calc2(&mut self.cam_look.z, -3070.0, 0.05, self.demo_param * 2.02);
-                add_calc2(&mut self.demo_param, REG13_F3 + 1.2, 1.0, REG13_F4 + 0.015);
-                if self.demo_sub == 0xA0 {
-                    self.demo_state = 0x96;
-                    self.action = Action::Fly;
-                    self.fly_ca = -1;
-                    self.state = 0;
-                    self.gravity = REG0_F4 + GRAVITY;
-                    self.battle_mode = 0;
-                    self.shape_angle[ANGLE_X] = 0;
-                    out.bgm(BGM_DK_BATTLE);
-                }
-                break;
-            }
-            0x32 => {
-                if !self.demo_gate() {
-                    run = false;
+                0xC => {
+                    add_calc0(&mut self.shutter_ring, 1.0, REG13_F0 + 1.0);
+                    rumble = true;
+                    self.shutter_roll = self.shutter_roll + REG0_F8 + 0.003;
+                    if self.demo_sub < REG13_S6 + 0x9B {
+                        self.shake = REG13_F5 + 5.0;
+                        out.se(SE_ATM_MJT_JINARI);
+                    }
+                    if self.demo_sub == REG13_S6 + 0x96 {
+                        self.demo_flag = 1;
+                    }
+                    if self.demo_sub == REG13_S7 + 0xA0 {
+                        self.demo_sub = 0;
+                        self.demo_state = 0xD;
+                    }
+                    add_calc2(&mut self.cam_eye.x, 2682.0, 0.05, self.demo_param * 4.87);
+                    add_calc2(&mut self.cam_eye.y, 9904.0, 0.05, self.demo_param * 1.03);
+                    add_calc2(&mut self.cam_eye.z, -3600.0, 0.05, self.demo_param * 4.79);
+                    add_calc2(&mut self.cam_look.x, 2308.0, 0.05, self.demo_param * 4.92);
+                    add_calc2(&mut self.cam_look.y, 9961.0, 0.05, self.demo_param * 0.9);
+                    add_calc2(
+                        &mut self.cam_look.z,
+                        -3524.0,
+                        0.05,
+                        self.demo_param * 6.1299998,
+                    );
+                    add_calc2(&mut self.demo_param, REG13_F3 + 1.5, 1.0, REG13_F4 + 0.02);
                     break;
                 }
-                self.demo_state = self.demo_state.wrapping_add(1);
-                self.demo_param = 0.0;
-                self.demo_count = 0;
-                self.demo_sub = 0;
-                self.fov = 60.0;
-                self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
-                self.cam_eye = self.eye;
-                self.cam_eye.y -= REG0_F7 + 100.0;
-                arm = 0x33;
-            }
-            0x33 => {
-                add_calc2(&mut self.cam_eye.x, self.eye.x, 0.1, self.demo_param * 100.0);
-                add_calc2(
-                    &mut self.cam_eye.y,
-                    self.eye.y - (REG0_F7 + 100.0),
-                    0.3,
-                    self.demo_param * 200.0,
-                );
-                add_calc2(&mut self.cam_eye.z, self.eye.z, 0.1, self.demo_param * 100.0);
-                if self.action == Action::Start {
+                0xD => {
+                    if self.demo_sub < REG0_S3 + 0x64 {
+                        add_calc2(&mut self.fov, 25.0, 0.1, 0.5);
+                    } else {
+                        add_calc2(&mut self.fov, 55.0, 0.2, 3.0);
+                    }
+                    if self.demo_sub == REG13_S8 + 0x37 {
+                        self.demo_flag = 1;
+                    }
+                    add_calc2(&mut self.cam_eye.x, self.head.x, 0.1, 50.0);
+                    add_calc2(
+                        &mut self.cam_eye.y,
+                        (self.head.y - 200.0) + REG13_F11,
+                        0.1,
+                        50.0,
+                    );
+                    add_calc2(&mut self.cam_eye.z, self.head.z, 0.1, 50.0);
+                    if self.morph.is_stop() {
+                        self.anm_init(BCK_FLY3, 1.0, EMODE_LOOP, 1.0, 0xD, 0);
+                    }
+                    if self.demo_sub == REG13_S8 + 0xF0 {
+                        self.demo_sub = 0;
+                        self.demo_state = 0xE;
+                    }
+                    rumble = true;
+                    break;
+                }
+                0xE => {
+                    self.cam_eye = Vec3::new(3304.0, 10983.0, -3644.0);
+                    self.cam_look = Vec3::new(2841.0, 13058.0, -3272.0);
+                    self.demo_state = 0xF;
+                    self.demo_sub = 0;
+                    self.demo_param = 0.0;
+                    self.shutter_ring = REG13_F17 - 100.0;
+                    self.shutter_roll = 0.0;
+                    arm = 0xF;
+                }
+                0xF | 0x10 => {
+                    rumble = true;
+                    add_calc0(&mut self.shutter_ring, 1.0, REG6_F11 + 1.5);
+                    if self.shutter_ring.abs() < 1.0 {
+                        add_calc0(&mut self.shutter_shift, 1.0, REG6_F12 + 1.0);
+                        if self.demo_state == 0xF {
+                            self.flags_on(out);
+                            self.stage_boss_demo = true;
+                            out.purge_eyes();
+                            self.demo_state = 0x10;
+                        }
+                    }
+                    add_calc2(&mut self.cam_look.x, 3152.0, 0.05, self.demo_param * 3.11);
+                    add_calc2(&mut self.cam_look.z, -3070.0, 0.05, self.demo_param * 2.02);
+                    add_calc2(&mut self.demo_param, REG13_F3 + 1.2, 1.0, REG13_F4 + 0.015);
+                    if self.demo_sub == 0xA0 {
+                        self.demo_state = 0x96;
+                        self.action = Action::Fly;
+                        self.fly_ca = -1;
+                        self.state = 0;
+                        self.gravity = REG0_F4 + GRAVITY;
+                        self.battle_mode = 0;
+                        self.shape_angle[ANGLE_X] = 0;
+                        out.bgm(BGM_DK_BATTLE);
+                    }
+                    break;
+                }
+                0x32 => {
+                    if !self.demo_gate() {
+                        run = false;
+                        break;
+                    }
+                    self.demo_state = self.demo_state.wrapping_add(1);
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 60.0;
+                    self.cam_look = Vec3::new(3267.0, 9561.0, -4562.0);
+                    self.cam_eye = self.eye;
+                    self.cam_eye.y -= REG0_F7 + 100.0;
+                    arm = 0x33;
+                }
+                0x33 => {
+                    add_calc2(
+                        &mut self.cam_eye.x,
+                        self.eye.x,
+                        0.1,
+                        self.demo_param * 100.0,
+                    );
+                    add_calc2(
+                        &mut self.cam_eye.y,
+                        self.eye.y - (REG0_F7 + 100.0),
+                        0.3,
+                        self.demo_param * 200.0,
+                    );
+                    add_calc2(
+                        &mut self.cam_eye.z,
+                        self.eye.z,
+                        0.1,
+                        self.demo_param * 100.0,
+                    );
+                    if self.action == Action::Start {
+                        self.demo_state = self.demo_state.wrapping_add(1);
+                        self.demo_sub = 0;
+                    }
+                    add_calc2(&mut self.demo_param, 1.0, 1.0, REG0_F4 + 0.02);
+                    break;
+                }
+                0x34 => {
+                    if self.demo_sub >= 0x64 {
+                        self.demo_state = 0x96;
+                    }
+                    break;
+                }
+                0x64 => {
+                    if !self.demo_gate() {
+                        run = false;
+                        break;
+                    }
+                    self.demo_state = self.demo_state.wrapping_add(1);
+                    self.demo_param = 0.0;
+                    self.demo_count = 0;
+                    self.demo_sub = 0;
+                    self.fov = 45.0;
+                    self.cam_look = self.cam_eye;
+                    let dx = self.cam_eye.x - self.head.x;
+                    let dz = self.cam_eye.z - self.head.z;
+                    self.cam_yaw = bearing(Vec3::ZERO, Vec3::new(dx, 0.0, dz));
+                    self.cam_pitch = 0;
+                    actor.angle[ANGLE_Y] = self.cam_yaw.wrapping_add(self.rnd_fx(4000.0) as i16);
+                    self.demo_radius = 1500.0;
+                    arm = 0x65;
+                }
+                0x65 => {
+                    if self.demo_sub == 0x3C {
+                        out.bgm(STRM_DK_CLEAR);
+                    }
+                    self.cam_eye = self.head;
+                    self.cam_eye.y += REG6_F16 - 100.0;
+                    let local = pitched(self.cam_pitch, [0.0, 0.0, self.demo_radius + REG6_F17]);
+                    let look = turned(self.cam_yaw, local.to_array()) + self.cam_eye;
+                    add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
+                    if self.flown_high == 0 {
+                        self.cam_look.y = REG6_F18 + 9950.0;
+                    } else {
+                        add_calc2(&mut self.cam_look.y, look.y + REG6_F13, 0.1, 100.0);
+                    }
+                    add_calc2(&mut self.cam_look.z, look.z, 0.1, 100.0);
+                    break;
+                }
+                0x6E => {
+                    self.fov = 40.0;
+                    self.cam_look = Vec3::new(-25267.0, -948.0, 22916.0);
+                    self.demo_state = 0x6F;
+                    arm = 0x6F;
+                }
+                0x6F => {
+                    self.cam_eye.x = AREA_X;
+                    if actor.pos.y < 30000.0 {
+                        self.cam_eye.y = (actor.pos.y - 6000.0) + REG6_F19;
+                    }
+                    self.cam_eye.z = AREA_Z;
+                    add_calc2(&mut self.cam_look.z, 30449.0, 0.02, self.demo_param * 75.33);
+                    if self.demo_sub > REG6_S2 {
+                        add_calc2(
+                            &mut self.demo_param,
+                            f32::from(REG6_S1) + 1.5,
+                            1.0,
+                            REG6_F2 + 0.02,
+                        );
+                    }
+                    break;
+                }
+                0x70 => {
+                    self.cam_eye = self.target;
                     self.demo_state = self.demo_state.wrapping_add(1);
                     self.demo_sub = 0;
+                    self.fov = 45.0;
+                    arm = 0x71;
                 }
-                add_calc2(&mut self.demo_param, 1.0, 1.0, REG0_F4 + 0.02);
-                break;
-            }
-            0x34 => {
-                if self.demo_sub >= 0x64 {
-                    self.demo_state = 0x96;
-                }
-                break;
-            }
-            0x64 => {
-                if !self.demo_gate() {
-                    run = false;
+                0x71 => {
+                    if self.demo_sub == 0x78 {
+                        let at = Vec3::new(AREA_X, 10300.0, AREA_Z);
+                        self.eff_hane_set(at, 0x27, -1);
+                    }
+                    if self.demo_sub > REG12_S7 + 0x43 {
+                        add_calc2(
+                            &mut self.cam_eye.y,
+                            REG12_F4 + 9900.0,
+                            0.5,
+                            REG12_F6 + 200.0,
+                        );
+                    }
+                    self.cam_look = self.target;
+                    self.cam_look.y = REG12_F5 + 10000.0;
+                    self.cam_look.x += REG12_F7 + 500.0;
                     break;
                 }
-                self.demo_state = self.demo_state.wrapping_add(1);
-                self.demo_param = 0.0;
-                self.demo_count = 0;
-                self.demo_sub = 0;
-                self.fov = 45.0;
-                self.cam_look = self.cam_eye;
-                let dx = self.cam_eye.x - self.head.x;
-                let dz = self.cam_eye.z - self.head.z;
-                self.cam_yaw = bearing(Vec3::ZERO, Vec3::new(dx, 0.0, dz));
-                self.cam_pitch = 0;
-                actor.angle[ANGLE_Y] = self.cam_yaw.wrapping_add(self.rnd_fx(4000.0) as i16);
-                self.demo_radius = 1500.0;
-                arm = 0x65;
-            }
-            0x65 => {
-                if self.demo_sub == 0x3C {
-                    out.bgm(STRM_DK_CLEAR);
+                0x72 => {
+                    self.cam_eye = Vec3::new(4386.0, 10020.0, -4368.0);
+                    self.cam_look = Vec3::new(4144.0, 10061.0, -4131.0);
+                    if self.demo_sub == 10 {
+                        self.stage_boss_enemy = true;
+                        out.se(SE_OBJ_TOGE_IN);
+                    }
+                    if self.demo_sub == 0x28 {
+                        self.demo_state = 0x96;
+                    }
+                    break;
                 }
-                self.cam_eye = self.head;
-                self.cam_eye.y += REG6_F16 - 100.0;
-                let local = pitched(self.cam_pitch, [0.0, 0.0, self.demo_radius + REG6_F17]);
-                let look = turned(self.cam_yaw, local.to_array()) + self.cam_eye;
-                add_calc2(&mut self.cam_look.x, look.x, 0.1, 100.0);
-                if self.flown_high == 0 {
-                    self.cam_look.y = REG6_F18 + 9950.0;
-                } else {
-                    add_calc2(&mut self.cam_look.y, look.y + REG6_F13, 0.1, 100.0);
+                0x96 => {
+                    self.demo_state = 0;
+                    break;
                 }
-                add_calc2(&mut self.cam_look.z, look.z, 0.1, 100.0);
-                break;
-            }
-            0x6E => {
-                self.fov = 40.0;
-                self.cam_look = Vec3::new(-25267.0, -948.0, 22916.0);
-                self.demo_state = 0x6F;
-                arm = 0x6F;
-            }
-            0x6F => {
-                self.cam_eye.x = AREA_X;
-                if actor.pos.y < 30000.0 {
-                    self.cam_eye.y = (actor.pos.y - 6000.0) + REG6_F19;
-                }
-                self.cam_eye.z = AREA_Z;
-                add_calc2(&mut self.cam_look.z, 30449.0, 0.02, self.demo_param * 75.33);
-                if self.demo_sub > REG6_S2 {
-                    add_calc2(&mut self.demo_param, f32::from(REG6_S1) + 1.5, 1.0, REG6_F2 + 0.02);
-                }
-                break;
-            }
-            0x70 => {
-                self.cam_eye = self.target;
-                self.demo_state = self.demo_state.wrapping_add(1);
-                self.demo_sub = 0;
-                self.fov = 45.0;
-                arm = 0x71;
-            }
-            0x71 => {
-                if self.demo_sub == 0x78 {
-                    let at = Vec3::new(AREA_X, 10300.0, AREA_Z);
-                    self.eff_hane_set(at, 0x27, -1);
-                }
-                if self.demo_sub > REG12_S7 + 0x43 {
-                    add_calc2(&mut self.cam_eye.y, REG12_F4 + 9900.0, 0.5, REG12_F6 + 200.0);
-                }
-                self.cam_look = self.target;
-                self.cam_look.y = REG12_F5 + 10000.0;
-                self.cam_look.x += REG12_F7 + 500.0;
-                break;
-            }
-            0x72 => {
-                self.cam_eye = Vec3::new(4386.0, 10020.0, -4368.0);
-                self.cam_look = Vec3::new(4144.0, 10061.0, -4131.0);
-                if self.demo_sub == 10 {
-                    self.stage_boss_enemy = true;
-                    out.se(SE_OBJ_TOGE_IN);
-                }
-                if self.demo_sub == 0x28 {
-                    self.demo_state = 0x96;
-                }
-                break;
-            }
-            0x96 => {
-                self.demo_state = 0;
-                break;
-            }
-            _ => break,
+                _ => break,
             }
         }
         if self.demo_state != 0 && run {
@@ -3637,9 +3665,9 @@ impl Helmaroc {
         } else if angle < -8000 {
             angle = -8000;
         }
-        let wobble = ((REG14_F5 + BEAK_WOBBLE) * self.beak_sway_calc
-            * sin_s(self.beak_tick.wrapping_mul(REG8_S4 + 2500)))
-            as i16;
+        let wobble = ((REG14_F5 + BEAK_WOBBLE)
+            * self.beak_sway_calc
+            * sin_s(self.beak_tick.wrapping_mul(REG8_S4 + 2500))) as i16;
         let rate = (self.beak_calc * 4000.0) as i16;
         add_calc2(&mut self.beak_calc, 1.0, 1.0, REG14_F4 + 0.01);
         if self.demo_sub > REG14_S9 + 0x41 {
@@ -3656,7 +3684,10 @@ impl Helmaroc {
         if self.beak_timer != 0 {
             self.beak_amp = 0;
             self.beak_sway = 0;
-            let reach = turned(self.beak_aim, [0.0, 0.0, self.beak_timer as f32 * (REG0_F7 + 500.0)]);
+            let reach = turned(
+                self.beak_aim,
+                [0.0, 0.0, self.beak_timer as f32 * (REG0_F7 + 500.0)],
+            );
             let wave = sin_s((self.frame_count.wrapping_mul(i32::from(REG0_S4) + 7000)) as i16);
             self.tosaka_y4 = (reach.z * wave) as i16;
             self.tosaka_z4 = (reach.x * wave) as i16;
@@ -3889,10 +3920,7 @@ pub fn control(
     mut health: ResMut<Health>,
     mut events: ResMut<SimEvents>,
     mut commands: Commands,
-    mut bosses: Query<
-        (Entity, &mut Actor, &mut Helmaroc),
-        (With<Helmaroc>, Without<Player>),
-    >,
+    mut bosses: Query<(Entity, &mut Actor, &mut Helmaroc), (With<Helmaroc>, Without<Player>)>,
 ) {
     let solid = watch.collision.as_deref();
     let blow = blow_of(&watch);

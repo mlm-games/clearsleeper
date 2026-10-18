@@ -12,22 +12,8 @@ use super::walk;
 pub const HMLIF_ACTORS: [&str; 3] = ["Hmlif", "Hyuf1", "Hyuf2"];
 
 pub const SPEEDS: [f32; 16] = [
-    1.6666666,
-    3.3333333,
-    5.0,
-    6.6666665,
-    8.333333,
-    10.0,
-    11.666667,
-    13.333333,
-    15.0,
-    16.666666,
-    18.333334,
-    20.0,
-    21.666666,
-    23.333334,
-    25.0,
-    26.666666,
+    1.6666666, 3.3333333, 5.0, 6.6666665, 8.333333, 10.0, 11.666667, 13.333333, 15.0, 16.666666,
+    18.333334, 20.0, 21.666666, 23.333334, 25.0, 26.666666,
 ];
 pub const SPEED_TOP: u8 = 8;
 
@@ -80,12 +66,7 @@ const TYPE_SHIFT: u32 = 27;
 const TYPE_MASK: u32 = 0xF;
 const ANGLE_Z_MASK: i16 = 0xFF;
 
-pub const ARROW_KIND_AT: [u32; 4] = [
-    AT_NORMAL_ARROW,
-    AT_FIRE_ARROW,
-    AT_ICE_ARROW,
-    AT_LIGHT_ARROW,
-];
+pub const ARROW_KIND_AT: [u32; 4] = [AT_NORMAL_ARROW, AT_FIRE_ARROW, AT_ICE_ARROW, AT_LIGHT_ARROW];
 
 fn add_calc_pos2(value: &mut Vec3, target: Vec3, scale: f32, max_step: f32) {
     if *value != target {

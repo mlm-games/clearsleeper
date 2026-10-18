@@ -396,7 +396,7 @@ impl Hlift {
         // }
         // ```
         // (:130-149) - the `else` arm is the whole travel, so returning early during the delay is
-    /// exactly the decomp's structure.
+        /// exactly the decomp's structure.
         if self.start_delay > 0 {
             self.start_delay -= 1;
             return;
@@ -433,11 +433,7 @@ impl Hlift {
         // }
         // ```
         // (:143-148) - `vib_set()` is renderer; the sound and the re-init are not.
-        if super::walk::chase_f(
-            &mut actor.pos.y,
-            self.home_y + self.up_dist(),
-            self.speed,
-        ) {
+        if super::walk::chase_f(&mut actor.pos.y, self.home_y + self.up_dist(), self.speed) {
             events.list.push(SimEvent::Se(SE_LIFT_STOP));
             self.upper_init(actor);
         }
@@ -545,7 +541,10 @@ impl Hlift {
     /// without waiting for the event to actually play.
     fn mode_demoreq(&mut self, events: &mut SimEvents, active: &mut ActiveEvent) {
         if let Some(slot) = self.event_slot
-            && matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+            && matches!(
+                active.stage_of(slot),
+                Some(Stage::Play) | Some(Stage::Close)
+            )
         {
             // `field_0x2F6 = 1;` (:214)
             self.demo_running = true;

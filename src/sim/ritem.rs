@@ -370,7 +370,11 @@ pub fn control(
             .find(|bolt| bolt.parameter == super::boomerang::MODE_THROW);
         if ritem.kind == KIND_NORMAL
             && let Some(bolt) = bolt
-            && walk::within(actor.pos, bolt.pos, item_radius(ritem.item) + BOOMERANG_REACH)
+            && walk::within(
+                actor.pos,
+                bolt.pos,
+                item_radius(ritem.item) + BOOMERANG_REACH,
+            )
         {
             ritem.bits |= BOOMERANG_BIT;
         }

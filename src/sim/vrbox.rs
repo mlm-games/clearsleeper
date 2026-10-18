@@ -1,13 +1,13 @@
 use bevy_ecs::prelude::*;
 
 use super::area::StageName;
+use super::daynight::check_event_night_stop;
 use super::door::StayRoom;
-use super::flags::{Collect, EventFlags, SYMBOL_NAYRU};
+use super::flags::{Collect, EventFlags};
 use super::kytag00::EnvLight;
 
 pub const VRBOX_ACTORS: [&str; 1] = ["Vrbox"];
 
-const EVENT_ENDLESS_NIGHT: u32 = 0x0A02; // <- d_kankyo.cpp:3163 (dSv_event_flag_c::ENDLESS_NIGHT)
 const STAGE_NEW_DUNGEON: &str = "M_NewD2"; // <- d_a_vrbox.cpp:105
 const STAGE_DRAGON: &str = "M_Dra09"; // <- d_a_vrbox.cpp:109
 const STAGE_KIN_MB: &str = "kinMB"; // <- d_a_vrbox.cpp:111
@@ -51,12 +51,6 @@ impl Vrbox {
     }
 }
 
-/// `dKy_checkEventNightStop` (`d_kankyo.cpp:3161-3167`): the Endless Night event bit, held down
-/// only while Link has not yet been given the Nayru's Pearl.
-fn night_stop(flags: &EventFlags, collect: &Collect) -> bool {
-    flags.test(EVENT_ENDLESS_NIGHT) && !collect.is_symbol(SYMBOL_NAYRU)
-}
-
 /// `dKy_change_colpat` (`d_kankyo.cpp:3339-3345`). The `mColpatCurr != param_0` test guards
 /// zeroing `mColPatBlendGather`; `mColpatCurr` (`d_kankyo.h:0xC85`) has no `EnvLight` field, so
 /// the blend reset is omitted.
@@ -79,7 +73,7 @@ fn dungeon_rain_proc(
     flags: &EventFlags,
     collect: &Collect,
 ) {
-    if !night_stop(flags, collect) {
+    if !check_event_night_stop(flags, collect) {
         return;
     }
     let mode = match stage {

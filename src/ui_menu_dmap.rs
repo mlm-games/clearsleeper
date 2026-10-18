@@ -533,8 +533,7 @@ pub fn message_name_walk(
             }
             let width = font_char_width(font, slot, code);
             if !first {
-                str_width =
-                    scale * (width as f32 + font_char_offset(font, slot, code) as f32);
+                str_width = scale * (width as f32 + font_char_offset(font, slot, code) as f32);
                 first = true;
             } else {
                 str_width += width as f32 * scale;

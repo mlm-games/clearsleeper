@@ -20,7 +20,6 @@ const REL_SECTION_TABLE_AT: usize = 0x10;
 const REL_BSS_SIZE_AT: usize = 0x20;
 const REL_SECTIONS: [&str; REL_SLOT_COUNT] = ["text", "ctors", "dtors", "rodata", "data", "bss"];
 
-
 #[derive(Debug)]
 pub enum AssetError {
     MissingRoot {
@@ -32,6 +31,10 @@ pub enum AssetError {
     MissingEntry {
         path: PathBuf,
         entry: String,
+    },
+    MissingId {
+        path: PathBuf,
+        id: u16,
     },
     MissingSection {
         path: PathBuf,
@@ -45,6 +48,11 @@ pub enum AssetError {
     Corrupt {
         path: PathBuf,
         detail: &'static str,
+    },
+    /// A read that came out of a disc image's own reader, which carries its own typed failures.
+    Disc {
+        path: PathBuf,
+        source: crate::disc::DiscError,
     },
     Io {
         path: PathBuf,
@@ -64,6 +72,9 @@ impl std::fmt::Display for AssetError {
             Self::MissingEntry { path, entry } => {
                 write!(f, "entry `{entry}` not found in archive {}", path.display())
             }
+            Self::MissingId { path, id } => {
+                write!(f, "id {id:#06x} not found in archive {}", path.display())
+            }
             Self::MissingSection { path, section } => {
                 write!(f, "section `{section}` missing in {}", path.display())
             }
@@ -80,6 +91,9 @@ impl std::fmt::Display for AssetError {
             Self::Corrupt { path, detail } => {
                 write!(f, "corrupt asset {}: {detail}", path.display())
             }
+            Self::Disc { path, source } => {
+                write!(f, "failed to read asset {}: {source}", path.display())
+            }
             Self::Io { path, source } => {
                 write!(f, "failed to read asset {}: {source}", path.display())
             }
@@ -90,12 +104,12 @@ impl std::fmt::Display for AssetError {
 impl std::error::Error for AssetError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Disc { source, .. } => Some(source),
             Self::Io { source, .. } => Some(source),
             _ => None,
         }
     }
 }
-
 
 pub fn yaz0_decode(src: &[u8], path: impl AsRef<Path>) -> Result<Vec<u8>, AssetError> {
     let path = path.as_ref();
@@ -145,8 +159,7 @@ pub fn yaz0_decode(src: &[u8], path: impl AsRef<Path>) -> Result<Vec<u8>, AssetE
                 let mut len = usize::from(b1 >> 4);
                 if len == 0 {
                     len = usize::from(
-                        *src
-                            .get(cursor)
+                        *src.get(cursor)
                             .ok_or_else(|| corrupt(path, "yaz0 stream truncated"))?,
                     ) + 0x12;
                     cursor += 1;
@@ -185,7 +198,6 @@ fn corrupt(path: &Path, detail: &'static str) -> AssetError {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Archive {
     path: PathBuf,
@@ -203,6 +215,9 @@ struct DirNode {
 
 #[derive(Debug)]
 struct ArchiveEntry {
+    /// `SDIFileEntry::mFileId` (`JKRArchive.h:60-72`): the `dRes_ID_*` a generated
+    /// `res/Object/*.h` names, which `mDoExt_resIDToIndex` searches the entry table for.
+    id: u16,
     name: String,
     dir: bool,
     offset: usize,
@@ -328,6 +343,7 @@ impl Archive {
         let mut files = Vec::with_capacity(file_count);
         for index in 0..file_count {
             let at = file_off + index * 0x14;
+            let id = u16_at(at)?;
             let hash = u16_at(at + 2)?;
             let kind = data[at + 4];
             let pad = data[at + 5];
@@ -358,6 +374,7 @@ impl Archive {
                 return Err(corrupt(&path, "rarc entry data out of range"));
             }
             files.push(ArchiveEntry {
+                id,
                 name,
                 dir,
                 offset,
@@ -385,9 +402,7 @@ impl Archive {
         let mut dir_index = 0_usize;
         let mut parts = entry.split('/').peekable();
         loop {
-            let part = parts
-                .next()
-                .ok_or_else(|| self.missing_entry(entry))?;
+            let part = parts.next().ok_or_else(|| self.missing_entry(entry))?;
             let dir = &self.dirs[dir_index];
             let found = (dir.first..dir.first + dir.count)
                 .map(|index| &self.files[index])
@@ -414,6 +429,22 @@ impl Archive {
         }
     }
 
+    /// `mDoExt_resIDToIndex` (`m_Do_ext.cpp:1117-1126`): the entry whose
+    /// `SDIFileEntry::mFileId` is `id` - `JKRArchive::findIdResource(id)` narrowed to the
+    /// byte range the port hands out. This is the lookup `dComIfG_getObjectIDRes`
+    /// (`d_com_inf_game.h:4118-4120`) makes for every `dRes_ID_*` a `res/Object/*.h` names,
+    /// `dRes_ID_BA_BTP_MABA01_e` (`assets/GZLE01/res/Object/Ba.h`) included.
+    pub fn read_id(&self, id: u16) -> Result<&[u8], AssetError> {
+        let Some(found) = self.files.iter().find(|file| !file.dir && file.id == id) else {
+            return Err(AssetError::MissingId {
+                path: self.path.clone(),
+                id,
+            });
+        };
+        let start = self.data_start + found.offset;
+        Ok(&self.data[start..start + found.size])
+    }
+
     fn missing_entry(&self, entry: &str) -> AssetError {
         AssetError::MissingEntry {
             path: self.path.clone(),
@@ -421,7 +452,6 @@ impl Archive {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RelSection {

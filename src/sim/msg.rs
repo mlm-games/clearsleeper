@@ -20,6 +20,8 @@ const OPEN_TALK_FRAMES: u16 = 13;
 const OPEN_ITEM_FRAMES: u16 = 8;
 const CLOSE_FRAMES: u16 = 10;
 const SPACE_TIMER: i16 = 2;
+/// `fopMsgM_messageTypeSelect`'s fallback when the header or the message is missing:
+/// `*i_msgNo = 1` (`f_op_msg_mng.cpp:384-393`), a bare code, so group 0's message 1.
 const FALLBACK_MESSAGE: u32 = 1;
 
 const CTRL_CAMERA: u8 = 0x02;
@@ -33,24 +35,65 @@ const CTRL_WAIT: u8 = 0x07;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MsgEntry {
+    /// `JMSMesgEntry_c::mMsgNo` (`f_op_msg_mng.h:24`): the number the talk path's scan matches
+    /// (`f_op_msg_mng.cpp:1482-1500`), *not* the entry's position in the list.
+    pub msg_no: u32,
+    /// `JMSMesgEntry_c::mDataOffs` (`f_op_msg_mng.h:23`). Zero is an entry with no text: the
+    /// talk path's scan skips those rows (`f_op_msg_mng.cpp:1487-1489`), while the position read
+    /// still returns them.
+    pub data_offs: u32,
     pub text: Vec<u8>,
     pub draw_type: u8,
     pub textbox_type: u8,
     pub lines: u16,
 }
 
+/// `JMessage::TResourceContainer` (`resource.h:52-77`) narrowed to what a lookup needs: one entry
+/// list per group, where a `bmg`'s group is the `INF1` block's `JUTMesgInfo::groupID`
+/// (`data.h:64-73`) that `dMesg_parse` feeds the container one archive at a time
+/// (`d_mesg.cpp:2186-2202`).
 #[derive(Resource, Debug, Default)]
 pub struct MsgTable {
-    entries: HashMap<u32, MsgEntry>,
+    groups: HashMap<u16, MsgGroup>,
+}
+
+#[derive(Debug, Default)]
+struct MsgGroup {
+    /// `JUTMesgInfo::messageEntryTable` (`data.h:74`): the entries in block order, which is the
+    /// index `TResource::getMessageEntry(messageIndex)` reads (`resource.h:34-44`).
+    entries: Vec<MsgEntry>,
 }
 
 impl MsgTable {
-    pub fn insert(&mut self, id: u32, entry: MsgEntry) {
-        self.entries.insert(id, entry);
+    /// The container's `Do_create`/`setData_*` pair (`resource.cpp`) over one `bmg`: the INF1
+    /// entry list in block order under the block's own group id.
+    pub fn insert(&mut self, group: u16, entry: MsgEntry) {
+        self.groups.entry(group).or_default().entries.push(entry);
     }
 
-    pub fn get(&self, id: u32) -> Option<&MsgEntry> {
-        self.entries.get(&id)
+    /// `TResourceContainer::Get_groupID(groupID)` (`resource.cpp`) answering with a resource.
+    pub fn has_group(&self, group: u16) -> bool {
+        self.groups.contains_key(&group)
+    }
+
+    /// `TResource::getMessageEntry(messageIndex)` - `resource.h:34-44`: the entry at the index,
+    /// which is the read `JMessage::TControl::getMessageEntry` and the demo's `dMesg_waitProc`
+    /// make.
+    pub fn entry_at(&self, group: u16, index: u32) -> Option<&MsgEntry> {
+        self.groups
+            .get(&group)?
+            .entries
+            .get(usize::try_from(index).ok()?)
+    }
+
+    /// `fopMsgM_msgGet_c::getMessage`'s scan - `f_op_msg_mng.cpp:1482-1500`: the first entry whose
+    /// `mMsgNo` matches and whose `mDataOffs` is set, the talk path's lookup.
+    pub fn entry_for_no(&self, group: u16, msg_no: u32) -> Option<&MsgEntry> {
+        self.groups
+            .get(&group)?
+            .entries
+            .iter()
+            .find(|entry| entry.data_offs != 0 && entry.msg_no == msg_no)
     }
 }
 
@@ -59,6 +102,12 @@ pub struct MsgBox {
     active: bool,
     status: u8,
     msg_no: u32,
+    /// `JMessage::TControl::getMessageCode()` - `(getMessageGroupID() << 16) | getMessageIndex()`
+    /// (`JMessage/control.h:55`). The demo's `JMSG` command is the only writer: retail's
+    /// `JStudio_JMessage::TAdaptor_message::adaptor_do_MESSAGE` calls `setMessageCode(packed)`
+    /// (`JStudio_JMessage/object-message.cpp:22-30`), whose two halves are stored on the control
+    /// before `setMessageCode_flush_` loads the entry (`JMessage/control.cpp:100-111`).
+    message_code: u32,
     data: Vec<u8>,
     draw_type: u8,
     textbox_type: u8,
@@ -80,6 +129,7 @@ impl Default for MsgBox {
             active: false,
             status: MSG_DESTROYED,
             msg_no: 0,
+            message_code: 0,
             data: Vec::new(),
             draw_type: 0,
             textbox_type: 0,
@@ -121,21 +171,65 @@ impl MsgBox {
             self.msg_no = msg_no;
             return;
         }
+        // `fopMsgM_msgGet_c::getMesgHeader` - `f_op_msg_mng.cpp:1441-1462`: the group is the
+        // code's high half, and the entry is the one whose `mMsgNo` matches the low half
+        // (`:1482-1500`). A miss is `fopMsgM_messageTypeSelect`'s `*i_msgNo = 1` (`:384-393`).
+        let group = (msg_no >> 16) as u16;
+        let index = msg_no & 0xFFFF;
+        let entry = table
+            .entry_for_no(group, index)
+            .or_else(|| table.entry_for_no(group, FALLBACK_MESSAGE));
+        self.open(msg_no, entry);
+    }
+
+    /// `JMessage::TControl::setMessageCode(packed)` - `JMessage/control.h:18-24`: the group is
+    /// the code's high half and the message index its low half, and the flush loads the entry for
+    /// the pair (`JMessage/control.cpp:100-111`). The entry itself is
+    /// `TResource::getMessageEntry(messageIndex)` (`resource.h:34-44`), the entry **at** that
+    /// index: this path indexes the group's list, it does not scan it, and a miss falls back to
+    /// nothing - `setMessageCode_flush_` has no fallback, unlike the talk path's
+    /// `fopMsgM_messageTypeSelect`. `dMesg_waitProc` is what turns the changed code into a box
+    /// rebuild: it compares the code it last opened with against `getMessageCode()` and, on a
+    /// difference, builds the screen and re-reads the control's text (`d_mesg.cpp:2361-2445`),
+    /// which is the reload below.
+    pub fn message_set_code(&mut self, code: u32, table: &MsgTable) {
+        let changed = !self.active || self.message_code != code;
+        self.message_code = code;
+        if !changed {
+            return;
+        }
+        let held = self.held;
+        *self = Self::default();
+        self.held = held;
+        self.active = true;
+        self.message_code = code;
+        let group = (code >> 16) as u16;
+        let index = code & 0xFFFF;
+        self.msg_no = index;
+        self.load_entry(table.entry_at(group, index));
+        self.status = MSG_PREPARING;
+    }
+
+    /// The packed code the last [`MsgBox::message_set_code`] carried.
+    pub fn message_code(&self) -> u32 {
+        self.message_code
+    }
+
+    /// The box's shared open: the `held` flag survives the reset, the entry's fields become the
+    /// box's and the counter state starts clean. `message_set` and `message_set_code` are the two
+    /// callers, one with the entry the scan found and one with the entry at the code's index.
+    fn open(&mut self, msg_no: u32, entry: Option<&MsgEntry>) {
         let held = self.held;
         *self = Self::default();
         self.held = held;
         self.active = true;
         self.msg_no = msg_no;
-        self.load_entry(msg_no, table);
+        self.load_entry(entry);
         self.status = MSG_PREPARING;
     }
 
-    fn load_entry(&mut self, msg_no: u32, table: &MsgTable) {
-        let entry = table
-            .get(msg_no)
-            .or_else(|| table.get(FALLBACK_MESSAGE))
-            .cloned()
-            .unwrap_or_default();
+    fn load_entry(&mut self, entry: Option<&MsgEntry>) {
+        let entry = entry.cloned().unwrap_or_default();
         self.data = entry.text;
         self.draw_type = entry.draw_type;
         self.textbox_type = entry.textbox_type;
@@ -222,11 +316,21 @@ impl MsgBox {
         }
     }
 
-    fn continue_tick(&mut self, pressed: bool, table: &MsgTable) {
+    /// The continue step's reload: the entry the box already holds stays, its counter state
+    /// starts over. `dMesg` re-reads the control's message data at the same code
+    /// (`d_mesg.cpp:2361-2445`), which is the same entry the code resolved to.
+    fn continue_tick(&mut self, pressed: bool) {
         if !pressed {
             return;
         }
-        self.load_entry(self.msg_no, table);
+        self.frame = 0;
+        self.cursor = 0;
+        self.line_count = 0;
+        self.wait_timer = 0;
+        self.instant = false;
+        self.instant2 = false;
+        self.auto_send = false;
+        self.hand_send = false;
         self.status = MSG_TYPING;
     }
 
@@ -362,7 +466,7 @@ impl MsgBox {
     }
 }
 
-pub fn control(do_intent: Res<DoIntent>, table: Res<MsgTable>, mut msg: ResMut<MsgBox>) {
+pub fn control(do_intent: Res<DoIntent>, mut msg: ResMut<MsgBox>) {
     let pressed = do_intent.0 && !msg.held;
     msg.held = do_intent.0;
     if !msg.active {
@@ -374,7 +478,7 @@ pub fn control(do_intent: Res<DoIntent>, table: Res<MsgTable>, mut msg: ResMut<M
         MSG_TYPING => msg.typing_tick(pressed),
         MSG_STOP => msg.stop_tick(pressed),
         MSG_CLOSE_WAIT => msg.close_wait_tick(pressed),
-        MSG_CONTINUES => msg.continue_tick(pressed, &table),
+        MSG_CONTINUES => msg.continue_tick(pressed),
         MSG_ENDS => msg.ends_tick(pressed),
         MSG_BOX_CLOSING => msg.closing_tick(),
         MSG_DESTROYED => msg.active = false,

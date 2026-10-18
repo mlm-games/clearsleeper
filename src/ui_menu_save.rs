@@ -101,7 +101,9 @@ pub const ENDING_TICKER_DELAY: i16 = 30;
 
 pub const MESSAGE_TABLE: [u32; 5] = [0x40, 0x3A, 0x3C, 0x3E, 0x4D];
 
-pub const WIPE_TAGS: [&str; WIPE_PANES] = ["wp00", "wp01", "wp02", "wp03", "wp04", "wp05", "wp06", "wp07"];
+pub const WIPE_TAGS: [&str; WIPE_PANES] = [
+    "wp00", "wp01", "wp02", "wp03", "wp04", "wp05", "wp06", "wp07",
+];
 pub const MASK_TAG: &str = "msk0";
 pub const BASE_TAGS: [&str; BASE_PANES] = ["cc01", "cc12", "cc23", "st00", "st01"];
 pub const TITLE_TAG: &str = "tk00";
@@ -1302,12 +1304,8 @@ impl ErrorPanel {
     }
 
     pub fn create(&mut self, screen: &Screen) {
-        self.panes[0].rotation = screen
-            .find("cur1")
-            .map_or(0, |pane| pane.rotation);
-        self.panes[1].rotation = screen
-            .find("cur2")
-            .map_or(0, |pane| pane.rotation);
+        self.panes[0].rotation = screen.find("cur1").map_or(0, |pane| pane.rotation);
+        self.panes[1].rotation = screen.find("cur2").map_or(0, |pane| pane.rotation);
         self.pane0_rotation = f32::from(deg2s(f32::from(self.panes[0].rotation))) / 32768.0 * 180.0;
         self.pane1_rotation = f32::from(deg2s(f32::from(self.panes[1].rotation))) / 32768.0 * 180.0;
         for pane in &mut self.panes {
@@ -1579,8 +1577,7 @@ impl ErrorPanel {
     }
 
     pub fn yes_no_select_wait(&mut self, pad: &PadInput) {
-        self.stick
-            .check_trigger(pad.stick_value, pad.stick_angle);
+        self.stick.check_trigger(pad.stick_value, pad.stick_angle);
         if pad.trig_a {
             self.state = 2;
         } else if pad.trig_b {
@@ -1630,11 +1627,9 @@ impl ErrorPanel {
             self.panes[index].pane_trans(cursor_x - origin_x, board_y);
         }
         let (x0, y0) = (self.panes[0].size.x / 2.0, self.panes[0].size.y / 2.0);
-        self.panes[0]
-            .rotate(x0, y0, self.pane0_rotation - ERROR_FRAME[4] as f32);
+        self.panes[0].rotate(x0, y0, self.pane0_rotation - ERROR_FRAME[4] as f32);
         let (x1, y1) = (self.panes[1].size.x / 2.0, self.panes[1].size.y / 2.0);
-        self.panes[1]
-            .rotate(x1, y1, self.pane1_rotation + ERROR_FRAME[4] as f32);
+        self.panes[1].rotate(x1, y1, self.pane1_rotation + ERROR_FRAME[4] as f32);
     }
 
     pub fn yn_cursor_anime(&mut self) {
@@ -1650,16 +1645,20 @@ impl ErrorPanel {
             let board_y = self.board_y + ERROR_CURSOR_Y;
             let origin0 = self.panes[0].pos_top_left_orig.x;
             let origin1 = self.panes[1].pos_top_left_orig.x;
-            self.panes[0]
-                .pane_trans(cursor_x - origin0 + XP1[idx], board_y);
-            self.panes[1]
-                .pane_trans(cursor_x - origin1 + XP2[idx], board_y);
+            self.panes[0].pane_trans(cursor_x - origin0 + XP1[idx], board_y);
+            self.panes[1].pane_trans(cursor_x - origin1 + XP2[idx], board_y);
             let (x0, y0) = (self.panes[0].size.x / 2.0, self.panes[0].size.y / 2.0);
-            self.panes[0]
-                .rotate(x0, y0, self.pane0_rotation - ERROR_FRAME[4] as f32 + RT1[idx]);
+            self.panes[0].rotate(
+                x0,
+                y0,
+                self.pane0_rotation - ERROR_FRAME[4] as f32 + RT1[idx],
+            );
             let (x1, y1) = (self.panes[1].size.x / 2.0, self.panes[1].size.y / 2.0);
-            self.panes[1]
-                .rotate(x1, y1, self.pane1_rotation + ERROR_FRAME[4] as f32 + RT2[idx]);
+            self.panes[1].rotate(
+                x1,
+                y1,
+                self.pane1_rotation + ERROR_FRAME[4] as f32 + RT2[idx],
+            );
             self.flag_2f9 = self.flag_2f9.wrapping_add(1);
             if self.flag_2f9 > 2 {
                 self.flag_2f9 = 0;
@@ -1668,8 +1667,7 @@ impl ErrorPanel {
             self.panes[0].user_area -= 1;
         }
 
-        let mut value =
-            value_increase(ERROR_FRAME[4], i32::from(self.panes[1].user_area), 0);
+        let mut value = value_increase(ERROR_FRAME[4], i32::from(self.panes[1].user_area), 0);
         if self.flag_2f8 != 0 {
             value = 1.0 - value;
         }
@@ -1894,7 +1892,8 @@ impl SaveMenu {
     pub fn create(&mut self, screen: Screen, error_screen: Screen) {
         self.screen = Some(screen);
         self.error_screen = Some(error_screen);
-        self.error.create(self.error_screen.as_ref().expect("error screen bound"));
+        self.error
+            .create(self.error_screen.as_ref().expect("error screen bound"));
         self.screen_set();
         self.display_init();
         self.pane_trans_init();
@@ -2063,12 +2062,7 @@ impl SaveMenu {
         }
         env.menu.set_push_menu_button(PUSH_MENU_BUTTON_NONE);
         let mut second = false;
-        let alpha_mask = self.pane_alpha_mask(
-            self.timer - IDX_06 as i16,
-            IDX_05,
-            1,
-            0,
-        );
+        let alpha_mask = self.pane_alpha_mask(self.timer - IDX_06 as i16, IDX_05, 1, 0);
         let base = self.pane_trance_base(
             self.timer - IDX_09 as i16,
             IDX_08,
@@ -2087,21 +2081,10 @@ impl SaveMenu {
                 2,
             );
         }
-        let alpha_wipe = self.pane_scale_alpha_wipe(
-            self.timer - IDX_24 as i16,
-            IDX_23,
-            f32::from(IDX_26),
-            1,
-            0,
-        );
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let alpha_wipe =
+            self.pane_scale_alpha_wipe(self.timer - IDX_24 as i16, IDX_23, f32::from(IDX_26), 1, 0);
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let menu = self.menu_up();
         alpha_mask && base && second && alpha_wipe && title && menu
     }
@@ -2112,12 +2095,7 @@ impl SaveMenu {
         }
         env.menu.set_push_menu_button(PUSH_MENU_BUTTON_NONE);
         let mut second = false;
-        let alpha_mask = self.pane_alpha_mask(
-            self.timer - IDX_06 as i16,
-            IDX_05,
-            1,
-            0,
-        );
+        let alpha_mask = self.pane_alpha_mask(self.timer - IDX_06 as i16, IDX_05, 1, 0);
         let base = self.pane_trance_base(
             self.timer - IDX_09 as i16,
             IDX_08,
@@ -2136,21 +2114,10 @@ impl SaveMenu {
                 2,
             );
         }
-        let alpha_wipe = self.pane_scale_alpha_wipe(
-            self.timer - IDX_24 as i16,
-            IDX_23,
-            f32::from(IDX_26),
-            1,
-            0,
-        );
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let alpha_wipe =
+            self.pane_scale_alpha_wipe(self.timer - IDX_24 as i16, IDX_23, f32::from(IDX_26), 1, 0);
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let menu = self.menu_up();
         alpha_mask && base && second && alpha_wipe && title && menu
     }
@@ -2161,20 +2128,8 @@ impl SaveMenu {
         }
         let mut second = false;
         env.menu.set_push_menu_button(PUSH_MENU_BUTTON_CLOSE);
-        let alpha_mask = self.pane_alpha_mask(
-            self.timer - IDX_07 as i16,
-            IDX_05,
-            0,
-            1,
-        );
-        let base = self.pane_trance_base(
-            self.timer - IDX_0a as i16,
-            IDX_08,
-            0.0,
-            40.0,
-            4,
-            2,
-        );
+        let alpha_mask = self.pane_alpha_mask(self.timer - IDX_07 as i16, IDX_05, 0, 1);
+        let base = self.pane_trance_base(self.timer - IDX_0a as i16, IDX_08, 0.0, 40.0, 4, 2);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_0a as i16 + IDX_08 as i16),
@@ -2185,21 +2140,9 @@ impl SaveMenu {
                 1,
             );
         }
-        let alpha_wipe = self.pane_scale_alpha_wipe(
-            self.timer - IDX_25 as i16,
-            IDX_23,
-            1.0,
-            0,
-            1,
-        );
-        let title = self.pane_trance_title(
-            self.timer - IDX_12 as i16,
-            IDX_10,
-            0.0,
-            IDX_14 as f32,
-            0,
-            1,
-        );
+        let alpha_wipe = self.pane_scale_alpha_wipe(self.timer - IDX_25 as i16, IDX_23, 1.0, 0, 1);
+        let title =
+            self.pane_trance_title(self.timer - IDX_12 as i16, IDX_10, 0.0, IDX_14 as f32, 0, 1);
         let menu = if self.flag_535 != 0 {
             true
         } else {
@@ -2214,20 +2157,8 @@ impl SaveMenu {
         }
         let mut second = false;
         env.menu.set_push_menu_button(1);
-        let alpha_mask = self.pane_alpha_mask(
-            self.timer - IDX_07 as i16,
-            IDX_05,
-            0,
-            1,
-        );
-        let base = self.pane_trance_base(
-            self.timer - IDX_0a as i16,
-            IDX_08,
-            0.0,
-            40.0,
-            4,
-            2,
-        );
+        let alpha_mask = self.pane_alpha_mask(self.timer - IDX_07 as i16, IDX_05, 0, 1);
+        let base = self.pane_trance_base(self.timer - IDX_0a as i16, IDX_08, 0.0, 40.0, 4, 2);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_0a as i16 + IDX_08 as i16),
@@ -2238,21 +2169,9 @@ impl SaveMenu {
                 1,
             );
         }
-        let alpha_wipe = self.pane_scale_alpha_wipe(
-            self.timer - IDX_25 as i16,
-            IDX_23,
-            1.0,
-            0,
-            1,
-        );
-        let title = self.pane_trance_title(
-            self.timer - IDX_12 as i16,
-            IDX_10,
-            0.0,
-            IDX_14 as f32,
-            0,
-            1,
-        );
+        let alpha_wipe = self.pane_scale_alpha_wipe(self.timer - IDX_25 as i16, IDX_23, 1.0, 0, 1);
+        let title =
+            self.pane_trance_title(self.timer - IDX_12 as i16, IDX_10, 0.0, IDX_14 as f32, 0, 1);
         let menu = if self.flag_535 != 0 {
             true
         } else {
@@ -2266,14 +2185,8 @@ impl SaveMenu {
             self.sound(SE_SAVE_PANEL_IN);
         }
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_09 as i16,
-            IDX_08,
-            IDX_0c as f32,
-            0.0,
-            1,
-            0,
-        );
+        let base =
+            self.pane_trance_base(self.timer - IDX_09 as i16, IDX_08, IDX_0c as f32, 0.0, 1, 0);
         let temp = self.timer - (IDX_09 as i16 + IDX_08 as i16 - 2);
         if temp == 0 && self.flag_539 != 0 {
             for x in OPEN_FOR_GAME_OVER_X {
@@ -2292,14 +2205,8 @@ impl SaveMenu {
                 2,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let menu = self.menu_up();
         base && second && title && menu
     }
@@ -2317,14 +2224,7 @@ impl SaveMenu {
             self.sound(SE_SAVE_PANEL_OUT);
         }
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_0a as i16,
-            IDX_08,
-            0.0,
-            40.0,
-            4,
-            2,
-        );
+        let base = self.pane_trance_base(self.timer - IDX_0a as i16, IDX_08, 0.0, 40.0, 4, 2);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_0a as i16 + IDX_08 as i16),
@@ -2335,14 +2235,8 @@ impl SaveMenu {
                 1,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_12 as i16,
-            IDX_10,
-            0.0,
-            IDX_14 as f32,
-            0,
-            1,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_12 as i16, IDX_10, 0.0, IDX_14 as f32, 0, 1);
         let menu = if self.flag_535 != 0 {
             true
         } else {
@@ -2356,14 +2250,8 @@ impl SaveMenu {
         let mut yes_rt = false;
         let mut no_rt = false;
 
-        let first = self.pane_trance_title(
-            self.timer - IDX_13 as i16,
-            IDX_10,
-            0.0,
-            IDX_2c as f32,
-            1,
-            2,
-        );
+        let first =
+            self.pane_trance_title(self.timer - IDX_13 as i16, IDX_10, 0.0, IDX_2c as f32, 1, 2);
         self.pane_rotate(
             self.timer - IDX_13 as i16,
             IDX_10,
@@ -2384,14 +2272,8 @@ impl SaveMenu {
             );
         }
 
-        let first = self.pane_trance_base(
-            self.timer - IDX_0b as i16,
-            IDX_08,
-            0.0,
-            IDX_2c as f32,
-            1,
-            2,
-        );
+        let first =
+            self.pane_trance_base(self.timer - IDX_0b as i16, IDX_08, 0.0, IDX_2c as f32, 1, 2);
         self.pane_rotate(
             self.timer - IDX_0b as i16,
             IDX_10,
@@ -2494,14 +2376,8 @@ impl SaveMenu {
             self.sound(SE_SAVE_PANEL_IN);
         }
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_09 as i16,
-            IDX_08,
-            IDX_0c as f32,
-            0.0,
-            1,
-            0,
-        );
+        let base =
+            self.pane_trance_base(self.timer - IDX_09 as i16, IDX_08, IDX_0c as f32, 0.0, 1, 0);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_09 as i16 + IDX_08 as i16),
@@ -2512,14 +2388,8 @@ impl SaveMenu {
                 2,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let menu = self.menu_up();
         base && second && title && menu
     }
@@ -2528,14 +2398,8 @@ impl SaveMenu {
             self.sound(SE_SAVE_PANEL_IN);
         }
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_09 as i16,
-            IDX_08,
-            IDX_0c as f32,
-            0.0,
-            1,
-            0,
-        );
+        let base =
+            self.pane_trance_base(self.timer - IDX_09 as i16, IDX_08, IDX_0c as f32, 0.0, 1, 0);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_09 as i16 + IDX_08 as i16),
@@ -2546,14 +2410,8 @@ impl SaveMenu {
                 2,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         base && second && title
     }
     pub fn close_for_ending(&mut self) -> bool {
@@ -2561,14 +2419,7 @@ impl SaveMenu {
             self.sound(SE_SAVE_PANEL_OUT);
         }
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_0a as i16,
-            IDX_08,
-            0.0,
-            40.0,
-            4,
-            2,
-        );
+        let base = self.pane_trance_base(self.timer - IDX_0a as i16, IDX_08, 0.0, 40.0, 4, 2);
         if base {
             second = self.pane_trance_base(
                 self.timer - (IDX_0a as i16 + IDX_08 as i16),
@@ -2579,14 +2430,8 @@ impl SaveMenu {
                 1,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_12 as i16,
-            IDX_10,
-            0.0,
-            IDX_14 as f32,
-            0,
-            1,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_12 as i16, IDX_10, 0.0, IDX_14 as f32, 0, 1);
         let menu = if self.flag_535 != 0 {
             true
         } else {
@@ -3042,7 +2887,8 @@ impl SaveMenu {
 
             if self.op_result == 1 {
                 self.sound(SE_SAVE_FINISH);
-                env.card.set_mem_card_check_id(env.card.get_card_serial_no());
+                env.card
+                    .set_mem_card_check_id(env.card.get_card_serial_no());
                 env.card.set_new_file(0);
                 env.card.set_no_file(0);
                 self.text_b = format!("\u{1}{MSG_SAVED}");
@@ -3384,11 +3230,8 @@ impl SaveMenu {
     }
 
     pub fn cursor_anime(&mut self) {
-        let mut value = value_increase(
-            i32::from(IDX_20),
-            i32::from(self.panes.cursor.user_area),
-            0,
-        );
+        let mut value =
+            value_increase(i32::from(IDX_20), i32::from(self.panes.cursor.user_area), 0);
         if self.flag_530 != 0 {
             value = 1.0 - value;
         }
@@ -3424,14 +3267,8 @@ impl SaveMenu {
                 2,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_11 as i16,
-            IDX_10,
-            IDX_14 as f32,
-            0.0,
-            1,
-            0,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_11 as i16, IDX_10, IDX_14 as f32, 0.0, 1, 0);
         let menu = self.menu_up();
 
         self.timer += 1;
@@ -3444,14 +3281,7 @@ impl SaveMenu {
 
     pub fn close_save(&mut self) -> bool {
         let mut second = false;
-        let base = self.pane_trance_base(
-            self.timer - IDX_0a as i16,
-            IDX_08,
-            0.0,
-            40.0,
-            4,
-            2,
-        );
+        let base = self.pane_trance_base(self.timer - IDX_0a as i16, IDX_08, 0.0, 40.0, 4, 2);
         if base {
             second = self.pane_trance_base(
                 (self.timer - IDX_0a as i16) - IDX_08 as i16,
@@ -3462,14 +3292,8 @@ impl SaveMenu {
                 1,
             );
         }
-        let title = self.pane_trance_title(
-            self.timer - IDX_12 as i16,
-            IDX_10,
-            0.0,
-            IDX_14 as f32,
-            0,
-            1,
-        );
+        let title =
+            self.pane_trance_title(self.timer - IDX_12 as i16, IDX_10, 0.0, IDX_14 as f32, 0, 1);
         let menu = if self.flag_535 != 0 {
             true
         } else {
@@ -3486,15 +3310,8 @@ impl SaveMenu {
     }
 
     pub fn menu_up(&mut self) -> bool {
-        let yes = self.pane_trance_menu(
-            self.timer,
-            IDX_18,
-            MenuSlot::Yes,
-            IDX_1e as f32,
-            0.0,
-            1,
-            0,
-        );
+        let yes =
+            self.pane_trance_menu(self.timer, IDX_18, MenuSlot::Yes, IDX_1e as f32, 0.0, 1, 0);
         let no = self.pane_trance_menu(
             self.timer - IDX_1c as i16,
             IDX_18,
@@ -3508,15 +3325,8 @@ impl SaveMenu {
     }
 
     pub fn menu_down(&mut self) -> bool {
-        let yes = self.pane_trance_menu(
-            self.timer,
-            IDX_18,
-            MenuSlot::Yes,
-            0.0,
-            IDX_1e as f32,
-            0,
-            1,
-        );
+        let yes =
+            self.pane_trance_menu(self.timer, IDX_18, MenuSlot::Yes, 0.0, IDX_1e as f32, 0, 1);
         let no = self.pane_trance_menu(
             self.timer - IDX_1c as i16,
             IDX_18,
@@ -3607,16 +3417,25 @@ impl SaveMenu {
 
             let origin0 = self.panes.wipe[0].pos_top_left_orig;
             let size0 = self.panes.wipe[0].size;
-            let pos0 = (origin0.x - (size0.x - self.panes.wipe[0].size_orig.x), origin0.y);
+            let pos0 = (
+                origin0.x - (size0.x - self.panes.wipe[0].size_orig.x),
+                origin0.y,
+            );
             self.panes.wipe[0].move_to(pos0.0, pos0.1);
 
             let origin2 = self.panes.wipe[2].pos_top_left_orig;
             let size2 = self.panes.wipe[2].size;
-            self.panes.wipe[2].move_to(origin2.x, origin2.y - (size2.y - self.panes.wipe[2].size_orig.y));
+            self.panes.wipe[2].move_to(
+                origin2.x,
+                origin2.y - (size2.y - self.panes.wipe[2].size_orig.y),
+            );
 
             let origin1 = self.panes.wipe[1].pos_top_left_orig;
             let size1 = self.panes.wipe[1].size;
-            self.panes.wipe[1].move_to(size2.x, origin1.y - (size1.y - self.panes.wipe[1].size_orig.y));
+            self.panes.wipe[1].move_to(
+                size2.x,
+                origin1.y - (size1.y - self.panes.wipe[1].size_orig.y),
+            );
 
             let origin3 = self.panes.wipe[3].pos_top_left_orig;
             self.panes.wipe[3].move_to(size0.x, origin3.y);
@@ -3630,14 +3449,8 @@ impl SaveMenu {
 
             let size6 = self.panes.wipe[6].size;
             let size7 = self.panes.wipe[7].size;
-            self.panes.wipe[6].move_to(
-                -(size0.x + size5.x),
-                -(size2.y + size6.y),
-            );
-            self.panes.wipe[7].move_to(
-                -(size0.x + size5.x),
-                size0.y + size7.y,
-            );
+            self.panes.wipe[6].move_to(-(size0.x + size5.x), -(size2.y + size6.y));
+            self.panes.wipe[7].move_to(-(size0.x + size5.x), size0.y + size7.y);
         }
 
         if param_4 != 2 {
@@ -3733,7 +3546,10 @@ impl SaveMenu {
         match slot {
             TitleSlot::Title => self.panes.title.rotate(angle_x, angle_y, angle_z * value),
             TitleSlot::Base => self.panes.base[0].rotate(angle_x, angle_y, angle_z * value),
-            TitleSlot::Label => self.panes.title_label.rotate(angle_x, angle_y, angle_z * value),
+            TitleSlot::Label => self
+                .panes
+                .title_label
+                .rotate(angle_x, angle_y, angle_z * value),
             TitleSlot::Yes => self.panes.yes[0].rotate(angle_x, angle_y, angle_z * value),
             TitleSlot::No => self.panes.no[0].rotate(angle_x, angle_y, angle_z * value),
         }
@@ -3811,11 +3627,7 @@ pub fn default_name() -> &'static str {
 }
 
 pub fn save_title(use_type: u8) -> &'static str {
-    if use_type == 3 {
-        "ending"
-    } else {
-        "save"
-    }
+    if use_type == 3 { "ending" } else { "save" }
 }
 
 pub fn status_name(save_status: u8) -> &'static str {

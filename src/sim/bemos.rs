@@ -153,11 +153,7 @@ fn blue_range(bemos: &mut Bemos, player: &Player, pos: Vec3, lift: f32) -> Optio
     let ahead = delta.x * sin + delta.z * cos;
     let across = delta.x * cos - delta.z * sin;
     let flat = (ahead * ahead + across * across).sqrt();
-    if ahead > 0.0
-        && ahead < bemos.reach
-        && across.abs() < BLUE_SIDE
-        && delta.y.abs() < EYE_LIMIT
-    {
+    if ahead > 0.0 && ahead < bemos.reach && across.abs() < BLUE_SIDE && delta.y.abs() < EYE_LIMIT {
         bemos.seen = true;
         Some(to_s16((delta.y + lift).atan2(flat)))
     } else {
@@ -166,12 +162,7 @@ fn blue_range(bemos: &mut Bemos, player: &Player, pos: Vec3, lift: f32) -> Optio
     }
 }
 
-fn red_range(
-    bemos: &mut Bemos,
-    player: &Player,
-    pos: Vec3,
-    lift: f32,
-) -> Option<(i16, i16)> {
+fn red_range(bemos: &mut Bemos, player: &Player, pos: Vec3, lift: f32) -> Option<(i16, i16)> {
     let delta = player.pos - pos;
     let flat = (delta.x * delta.x + delta.z * delta.z).sqrt();
     let bearing = to_s16(delta.x.atan2(delta.z));
@@ -195,7 +186,11 @@ fn red_range(
 
 fn spawn_ray(commands: &mut Commands, actor: &Actor, beamos: &Bemos) -> Entity {
     let yaw = beamos.body.wrapping_add(beamos.yaw);
-    let seat = if beamos.kind == KIND_YELLOW { BEAM_SEAT } else { 0.0 };
+    let seat = if beamos.kind == KIND_YELLOW {
+        BEAM_SEAT
+    } else {
+        0.0
+    };
     let ray = Actor {
         name: BEAM_ACTOR.to_owned(),
         parameters: BEAM_PARAM,
@@ -444,9 +439,7 @@ pub fn control(
                         if let Some((_, beam)) = ray.as_mut() {
                             ramp_up(&mut *beam);
                         }
-                    } else if ray.as_mut()
-                        .map_or(true, |(_, beam)| ramp_down(&mut *beam))
-                    {
+                    } else if ray.as_mut().map_or(true, |(_, beam)| ramp_down(&mut *beam)) {
                         beamos.state = Eye::Wait;
                     }
                 }
@@ -464,9 +457,7 @@ pub fn control(
                         } else {
                             beamos.lock = Some(player.pos);
                         }
-                    } else if ray.as_mut()
-                        .map_or(true, |(_, beam)| ramp_down(&mut *beam))
-                    {
+                    } else if ray.as_mut().map_or(true, |(_, beam)| ramp_down(&mut *beam)) {
                         beamos.state = Eye::Charge;
                         beamos.hold = RED_HOLD;
                         beamos.gate = RED_HOLD;
@@ -480,9 +471,7 @@ pub fn control(
                             body.angle = [beamos.pitch, beamos.body.wrapping_add(beamos.yaw), 0];
                             ramp_up(&mut *beam);
                         }
-                    } else if ray.as_mut()
-                        .map_or(true, |(_, beam)| ramp_down(&mut *beam))
-                    {
+                    } else if ray.as_mut().map_or(true, |(_, beam)| ramp_down(&mut *beam)) {
                         beamos.state = Eye::Charge;
                         beamos.hold = BLUE_HOLD_AGAIN;
                         beamos.gate = BLUE_HOLD_AGAIN;

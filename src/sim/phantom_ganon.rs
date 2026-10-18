@@ -5,8 +5,8 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::arrow;
 use super::boko;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
@@ -120,7 +120,6 @@ const REG12_F1: f32 = 0.0;
 const REG12_F2: f32 = 0.0;
 const REG12_F3: f32 = 0.0;
 const REG12_F10: f32 = 0.0;
-
 
 const REG17_S0: i16 = 0;
 const REG17_S2: i16 = 0;
@@ -655,11 +654,7 @@ impl Env<'_> {
         match self.solid {
             Some(solid) => {
                 let hit = solid.slide(from, to);
-                if hit != to {
-                    (true, hit)
-                } else {
-                    (false, to)
-                }
+                if hit != to { (true, hit) } else { (false, to) }
             }
             None => (false, to),
         }
@@ -1034,8 +1029,7 @@ impl PhantomGanon {
             MODE_ENTRY => {
                 self.deru_brk(out);
                 actor.pos = self.home_pos;
-                actor.pos.y = env.player_pos.y
-                    + if big { HIO_M18 } else { HIO_M10 };
+                actor.pos.y = env.player_pos.y + if big { HIO_M18 } else { HIO_M10 };
                 self.shape_angle[1] = bearing(actor.pos, env.player_eye);
                 self.mode = 1;
                 self.anm_init(BCK_WAIT1, 20.0, EMODE_LOOP, 1.0);
@@ -1218,8 +1212,8 @@ impl PhantomGanon {
             self.mode = 1;
         }
         if self.mode == 1 {
-            let seat = env.player_pos
-                + turned(self.shape_angle[1], [0.0, HIO_M2C + SPIN_SEAT_Y, HIO_M30]);
+            let seat =
+                env.player_pos + turned(self.shape_angle[1], [0.0, HIO_M2C + SPIN_SEAT_Y, HIO_M30]);
             actor.pos = seat;
             if !env.blocked(env.player_pos, actor.pos) {
                 actor.pos.y -= 100.0;
@@ -1587,18 +1581,13 @@ impl PhantomGanon {
             }
             self.mode = 2;
             self.set_t(0, DROP_FRAMES);
-            let anchor = Vec3::new(
-                self.home_pos.x,
-                self.home_pos.y + 100.0,
-                self.home_pos.z,
-            );
+            let anchor = Vec3::new(self.home_pos.x, self.home_pos.y + 100.0, self.home_pos.z);
             let far = anchor + turned(self.home_angle, [0.0, 0.0, SWORD_SPEED_SPAN as f32]);
             let (hit, cross) = env.crossed(anchor, far);
             let base = if hit { cross } else { anchor };
             let tip = self.home_pos + bind(JNT_ITEM1, self.home_angle);
-            self.sword_yaw = self.shape_angle[1].wrapping_sub(to_s16(
-                (tip.x - base.x).atan2(tip.z - base.z),
-            ));
+            self.sword_yaw =
+                self.shape_angle[1].wrapping_sub(to_s16((tip.x - base.x).atan2(tip.z - base.z)));
             self.sword_yaw = self.sword_yaw.wrapping_add(SWORD_YAW_OFFSET + REG0_S8);
             self.sword_step = REG0_S5 + SWORD_TURN_STEP;
             self.sword_timer = 100;
@@ -1847,8 +1836,7 @@ impl PhantomGanon {
         let dx = from.x - self.body.x;
         let dz = from.z - self.body.z;
         let dy = from.y - self.body.y;
-        dx * dx + dz * dz <= self.cyl_radius * self.cyl_radius
-            && dy.abs() <= self.cyl_height * 0.5
+        dx * dx + dz * dz <= self.cyl_radius * self.cyl_radius && dy.abs() <= self.cyl_height * 0.5
     }
 
     fn damage_check(&mut self, actor: &mut Actor, env: &Env<'_>, out: &mut Sink<'_>) {
@@ -1945,9 +1933,8 @@ impl PhantomGanon {
     }
 
     fn sword_branch(&mut self, env: &Env<'_>, out: &mut Sink<'_>) {
-        let swung = self.action == ACTION_DOWN
-            || self.action == ACTION_SPIN
-            || self.action == ACTION_SPIN2;
+        let swung =
+            self.action == ACTION_DOWN || self.action == ACTION_SPIN || self.action == ACTION_SPIN2;
         if !swung {
             return;
         }
@@ -2013,20 +2000,17 @@ impl PhantomGanon {
             self.ball_mode = 2;
         }
         if self.ball_mode == 2 {
-            self.ball_pos =
-                actor.pos + self.model_offset + bind(JNT_UDE_L3, self.shape_angle[1])
-                    + turned(self.shape_angle[1], [BALL_SPAWN_X, BALL_SPAWN_Y, 0.0]);
+            self.ball_pos = actor.pos
+                + self.model_offset
+                + bind(JNT_UDE_L3, self.shape_angle[1])
+                + turned(self.shape_angle[1], [BALL_SPAWN_X, BALL_SPAWN_Y, 0.0]);
             if self.ball_fire != 0 {
                 self.ball_fire = 0;
                 self.ball_mode = 3;
                 let mut delta = env.player_eye - self.ball_pos;
                 delta.y -= REG0_F18 + BALL_PROBE_AIM;
                 let (yaw, pitch) = aim_of(delta);
-                let reach = if self.kind == 0 {
-                    HIO_M1C
-                } else {
-                    HIO_M20
-                };
+                let reach = if self.kind == 0 { HIO_M1C } else { HIO_M20 };
                 self.ball_speed = reach;
                 self.ball_step = aimed(yaw, pitch, reach);
                 self.ball_pause = BALL_PAUSE_FIRE;
@@ -2164,11 +2148,8 @@ impl PhantomGanon {
                 self.demo_count = 0;
                 actor.pos = Vec3::new(REG8_F0 - 300294.0, REG8_F1 + 745.0, REG8_F2 - 303109.0);
                 self.cam_eye = Vec3::new(REG8_F3 - 300169.0, REG8_F4 + 770.0, REG8_F5 - 303635.0);
-                self.cam_look = Vec3::new(
-                    actor.pos.x,
-                    actor.pos.y + (REG0_F0 + 160.0),
-                    actor.pos.z,
-                );
+                self.cam_look =
+                    Vec3::new(actor.pos.x, actor.pos.y + (REG0_F0 + 160.0), actor.pos.z);
             }
             if self.demo_state == 3 {
                 if self.demo_count > DEMO_INTRO_HOLD {
@@ -2279,8 +2260,8 @@ impl PhantomGanon {
                     .wrapping_add(self.cam_swing)
                     .wrapping_add(REG8_S5);
                 self.cam_swing += REG8_S6 + 30;
-                self.cam_eye = env.player_pos
-                    + turned(yaw, [0.0, REG8_F4 + 1500.0, REG8_F5 + 2000.0]);
+                self.cam_eye =
+                    env.player_pos + turned(yaw, [0.0, REG8_F4 + 1500.0, REG8_F5 + 2000.0]);
                 if self.demo_count != DEMO_CAPE_END {
                     break 'phase;
                 }
@@ -2305,10 +2286,7 @@ impl PhantomGanon {
                 add_calc2(&mut self.cam_look.y, self.eye.y - 50.0, 0.1, 200.0);
                 add_calc2(&mut self.cam_look.z, actor.pos.z, 0.1, 200.0);
                 let seat = actor.pos
-                    + turned(
-                        self.shape_angle[1],
-                        [0.0, REG8_F0 - 100.0, REG8_F1 + 400.0],
-                    );
+                    + turned(self.shape_angle[1], [0.0, REG8_F0 - 100.0, REG8_F1 + 400.0]);
                 let (hit, mut look) = env.crossed(self.cam_look, seat);
                 if hit {
                     look.y += REG8_F18 + 20.0;
@@ -2518,8 +2496,12 @@ impl PhantomGanon {
 
 fn aim_of(delta: Vec3) -> (i16, i16) {
     let yaw = to_s16(delta.x.atan2(delta.z));
-    let pitch = to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
-        .wrapping_neg();
+    let pitch = to_s16(
+        delta
+            .y
+            .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+    )
+    .wrapping_neg();
     (yaw, pitch)
 }
 
@@ -2634,9 +2616,7 @@ pub fn control(
             .find(|(_, phase, _)| *phase == arrow::Phase::Flying)
             .map(|(_, _, pos)| *pos);
         let light_touch = shafts.iter().any(|(kind, phase, pos)| {
-            *kind == arrow::TYPE_LIGHT
-                && *phase == arrow::Phase::Flying
-                && boss.cyl_hits(*pos)
+            *kind == arrow::TYPE_LIGHT && *phase == arrow::Phase::Flying && boss.cyl_hits(*pos)
         });
         let orb_touch = orbs.iter().any(|pos| boss.cyl_hits(*pos));
         let env = Env {

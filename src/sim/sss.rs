@@ -560,7 +560,11 @@ impl Sss {
             let mut r4 = (i32::from(self.timer) & 3) + i as i32 * 2;
             r4 %= BODY_LEN as i32;
             let index = usize::try_from(r4).unwrap_or(0);
-            let at = self.body.get(index).map(|node| node.pos).unwrap_or_default();
+            let at = self
+                .body
+                .get(index)
+                .map(|node| node.pos)
+                .unwrap_or_default();
             self.sph[i].centre = if mv.b2 { away } else { at };
             if self.state == STATE_GRAB {
                 self.sph[i].off_co_sprm_bit(1);
@@ -667,13 +671,9 @@ impl Sss {
         let f27 = self.wobble;
         for i in 1..BODY_LEN - 1 {
             let sp30 = Vec3::new(
-                f27 * ssin(
-                    i32::from(self.timer) * (REG0_S5 + 1100) + i as i32 * (REG0_S6 + 4000),
-                ),
+                f27 * ssin(i32::from(self.timer) * (REG0_S5 + 1100) + i as i32 * (REG0_S6 + 4000)),
                 G_D.get(i).copied().unwrap_or(0.0),
-                f27 * scos(
-                    i32::from(self.timer) * (REG0_S7 + 800) + i as i32 * (REG0_S8 + 4000),
-                ),
+                f27 * scos(i32::from(self.timer) * (REG0_S7 + 800) + i as i32 * (REG0_S8 + 4000)),
             );
             let sp18 = point(base, sp30);
             let prev = self.body[i - 1].pos;
@@ -729,13 +729,9 @@ impl Sss {
         let reg = REG0_F18 + RISE_SWAY;
         for i in 1..CUT_LEN {
             let sp44 = Vec3::new(
-                reg * ssin(
-                    i32::from(self.timer) * (REG0_S5 + 4100) + i as i32 * (REG0_S6 + 10000),
-                ),
+                reg * ssin(i32::from(self.timer) * (REG0_S5 + 4100) + i as i32 * (REG0_S6 + 10000)),
                 REG0_F17 + RISE_SWAY,
-                reg * scos(
-                    i32::from(self.timer) * (REG0_S7 + 4400) + i as i32 * (REG0_S8 + 10000),
-                ),
+                reg * scos(i32::from(self.timer) * (REG0_S7 + 4400) + i as i32 * (REG0_S8 + 10000)),
             );
             let sp38 = point(base, sp44);
             let prev = self.cut[i - 1].pos;
@@ -756,15 +752,9 @@ impl Sss {
         let f27 = self.wobble;
         for i in (0..BODY_LEN).rev() {
             let sp48 = Vec3::new(
-                f27 * ssin(
-                    i32::from(self.timer) * (REG0_S5 + 2500) + i as i32 * (REG0_S6 + 3000),
-                ),
-                f27 * ssin(
-                    i32::from(self.timer) * (REG0_S5 + 2950) + i as i32 * (REG0_S6 + 4000),
-                ),
-                f27 * scos(
-                    i32::from(self.timer) * (REG0_S7 + 2800) + i as i32 * (REG0_S8 + 3500),
-                ),
+                f27 * ssin(i32::from(self.timer) * (REG0_S5 + 2500) + i as i32 * (REG0_S6 + 3000)),
+                f27 * ssin(i32::from(self.timer) * (REG0_S5 + 2950) + i as i32 * (REG0_S6 + 4000)),
+                f27 * scos(i32::from(self.timer) * (REG0_S7 + 2800) + i as i32 * (REG0_S8 + 3500)),
             );
             let me = self.body[i].pos;
             let nxt = self.body[i + 1].pos;

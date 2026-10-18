@@ -501,7 +501,12 @@ impl Ff {
                 if delta.length_squared() < SCATTER_ARRIVE_SQ {
                     self.mode = MODE_HOME;
                 }
-                add_calc2(&mut self.rot_vel, CHASE_ROT_TARGET, CHASE_ROT_SCALE, CHASE_ROT_MAX);
+                add_calc2(
+                    &mut self.rot_vel,
+                    CHASE_ROT_TARGET,
+                    CHASE_ROT_SCALE,
+                    CHASE_ROT_MAX,
+                );
             }
             MODE_GUST => {
                 // ```
@@ -578,7 +583,12 @@ impl Ff {
                 ANGLE_STEP_SCALE_S,
                 max_step,
             );
-            add_calc2(&mut self.rot_vel, REST_ROT_TARGET, REST_ROT_SCALE, REST_ROT_MAX);
+            add_calc2(
+                &mut self.rot_vel,
+                REST_ROT_TARGET,
+                REST_ROT_SCALE,
+                REST_ROT_MAX,
+            );
             add_calc2(
                 &mut self.speed_f,
                 self.velocity_fwd_target,
@@ -590,11 +600,7 @@ impl Ff {
             // MtxPosition(&local_cc, &i_this->speed);
             // ```
             // (:203-205) - see [`rotated_forward`].
-            self.speed = rotated_forward(
-                actor.angle[1],
-                actor.angle[0],
-                self.speed_f * SPEED_SPAN,
-            );
+            self.speed = rotated_forward(actor.angle[1], actor.angle[0], self.speed_f * SPEED_SPAN);
             // `i_this->current.pos += (i_this->speed + i_this->mVelImpulse);` (:206) - the RHS is
             // hoisted so the mutable borrow of `actor` does not span it.
             let drift = self.speed + self.vel_impulse;
@@ -661,9 +667,24 @@ impl Ff {
     /// is the CURRENT magnitude of the matching `speed` component, so all three are read before any
     /// of them changes.
     fn pull_home(&self, pos: &mut Vec3) {
-        add_calc2(&mut pos.x, self.home_pos.x, HOME_PULL_SCALE, self.speed.x.abs());
-        add_calc2(&mut pos.y, self.home_pos.y, HOME_PULL_SCALE, self.speed.y.abs());
-        add_calc2(&mut pos.z, self.home_pos.z, HOME_PULL_SCALE, self.speed.z.abs());
+        add_calc2(
+            &mut pos.x,
+            self.home_pos.x,
+            HOME_PULL_SCALE,
+            self.speed.x.abs(),
+        );
+        add_calc2(
+            &mut pos.y,
+            self.home_pos.y,
+            HOME_PULL_SCALE,
+            self.speed.y.abs(),
+        );
+        add_calc2(
+            &mut pos.z,
+            self.home_pos.z,
+            HOME_PULL_SCALE,
+            self.speed.z.abs(),
+        );
     }
 
     /// `cM_rnd` (`c_math.cpp:177-182`) on this actor's own copy of the three lanes.
@@ -738,7 +759,11 @@ fn rotated_forward(yaw: i16, pitch: i16, v: f32) -> Vec3 {
     let (yaw_sin, yaw_cos) = walk::from_s16(yaw).sin_cos();
     let pitch_sin = ssin(pitch);
     let pitch_cos = scos(pitch);
-    Vec3::new(v * yaw_sin, -v * yaw_cos * pitch_sin, v * yaw_cos * pitch_cos)
+    Vec3::new(
+        v * yaw_sin,
+        -v * yaw_cos * pitch_sin,
+        v * yaw_cos * pitch_cos,
+    )
 }
 
 /// `cM_ssin(s16 x) = JMASSin(x)` (`c_math.h:39-41`).

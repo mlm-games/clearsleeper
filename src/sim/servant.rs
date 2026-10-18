@@ -15,7 +15,7 @@ use super::walk;
 use crate::assets::MsgArchives;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgproc::fop_msgm_message_set;
-use crate::text::msgproc::{MsgGameInfo, MsgProcs, DA_EVT_MODE_NONE, FPC_M_ERROR_PROCESS_ID};
+use crate::text::msgproc::{DA_EVT_MODE_NONE, FPC_M_ERROR_PROCESS_ID, MsgGameInfo, MsgProcs};
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_INPUT, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED,
     STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_TYPING,
@@ -439,11 +439,17 @@ impl Servant {
     }
 
     pub fn staff_name(&self) -> &'static str {
-        STAFF_NAMES.get(self.slot()).copied().unwrap_or(STAFF_NAMES[0])
+        STAFF_NAMES
+            .get(self.slot())
+            .copied()
+            .unwrap_or(STAFF_NAMES[0])
     }
 
     pub fn daiza_name(&self) -> &'static str {
-        DAIZA_NAMES.get(self.slot()).copied().unwrap_or(DAIZA_NAMES[0])
+        DAIZA_NAMES
+            .get(self.slot())
+            .copied()
+            .unwrap_or(DAIZA_NAMES[0])
     }
 
     pub fn head_x(&self) -> i16 {
@@ -765,13 +771,8 @@ impl Servant {
         } else {
             self.speed_f = 0.0;
         }
-        self.yaw = walk::add_calc_angle_s(
-            self.yaw,
-            target,
-            HIO_WALK_SCALE,
-            HIO_WALK_MAX,
-            HIO_WALK_MIN,
-        );
+        self.yaw =
+            walk::add_calc_angle_s(self.yaw, target, HIO_WALK_SCALE, HIO_WALK_MAX, HIO_WALK_MIN);
     }
 
     pub fn chase_shape_yaw(&mut self) {
@@ -1130,10 +1131,7 @@ impl Servant {
             _ => return,
         };
         if !already {
-            self.order = MESSAGE_ORDER
-                .get(self.slot())
-                .copied()
-                .unwrap_or(NO_STEP);
+            self.order = MESSAGE_ORDER.get(self.slot()).copied().unwrap_or(NO_STEP);
         }
     }
 
@@ -1217,11 +1215,7 @@ impl Servant {
 
     fn opening_brk(&self, stories: &StoryBits) -> i8 {
         if self.wakeup_check(stories) {
-            if self.finish_check(stories) {
-                1
-            } else {
-                6
-            }
+            if self.finish_check(stories) { 1 } else { 6 }
         } else {
             5
         }
@@ -1562,15 +1556,7 @@ impl Servant {
             from = self.pos;
             from.y = self.eye.y;
         }
-        self.look_at_target(
-            true,
-            0,
-            aim,
-            from,
-            self.shape_yaw,
-            self.turn,
-            follow != 0,
-        );
+        self.look_at_target(true, 0, aim, from, self.shape_yaw, self.turn, follow != 0);
         let _ = facing;
     }
 
@@ -1614,7 +1600,9 @@ impl Servant {
     }
 
     fn joint_limitter(&self, value: i16, row: usize, axis: usize) -> i16 {
-        value.min(self.max_angles[row][axis]).max(self.min_angles[row][axis])
+        value
+            .min(self.max_angles[row][axis])
+            .max(self.min_angles[row][axis])
     }
 
     fn joint_move(&mut self, input: i16, axis: usize) -> bool {
@@ -1647,13 +1635,7 @@ impl Servant {
     fn joint_ang_calc(&self, out: &mut i16, target: i16, max_vel: i16) {
         let before = *out;
         let orig_diff = before.wrapping_sub(target);
-        let diff = walk::add_calc_angle_s(
-            orig_diff,
-            0,
-            JOINT_SCALE,
-            max_vel,
-            JOINT_MIN_ANGLE,
-        );
+        let diff = walk::add_calc_angle_s(orig_diff, 0, JOINT_SCALE, max_vel, JOINT_MIN_ANGLE);
         if diff.unsigned_abs() > JOINT_SCALE as u16 {
             *out = before.wrapping_add(diff.wrapping_sub(orig_diff));
         } else {
@@ -1720,11 +1702,7 @@ impl Servant {
         self.check_player_room(ctx);
         let finished = self.finish_check(ctx.stories);
         if let Some(base) = ctx.pedestal {
-            let lifted = Vec3::new(
-                base.pos.x,
-                base.pos.y + FINISH_HOME_LIFT,
-                base.pos.z,
-            );
+            let lifted = Vec3::new(base.pos.x, base.pos.y + FINISH_HOME_LIFT, base.pos.z);
             if !self.is_finish() && finished {
                 self.home = lifted;
             } else if self.is_finish() && !self.is_set_home_pos() {

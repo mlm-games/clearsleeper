@@ -4,9 +4,9 @@ use glam::{Quat, Vec3};
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bomb;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
@@ -803,8 +803,16 @@ impl AmosKnight {
         }
         self.light.timer = self.light.timer.wrapping_add(1);
         if self.light.timer < LIGHT_SHRINK_END + REG14_S1 {
-            add_calc0(&mut self.light.scale_xz, LIGHT_SHRINK_SCALE, LIGHT_SHRINK_MAX);
-            add_calc0(&mut self.light.scale_y, LIGHT_SHRINK_SCALE, LIGHT_SHRINK_MAX);
+            add_calc0(
+                &mut self.light.scale_xz,
+                LIGHT_SHRINK_SCALE,
+                LIGHT_SHRINK_MAX,
+            );
+            add_calc0(
+                &mut self.light.scale_y,
+                LIGHT_SHRINK_SCALE,
+                LIGHT_SHRINK_MAX,
+            );
         } else {
             if self.light.timer == LIGHT_SHRINK_END + REG14_S1 {
                 events.list.push(SimEvent::Se(SE_CM_L_ARROW_PASS_AWAY));
@@ -1239,7 +1247,12 @@ impl AmosKnight {
         }
     }
 
-    pub fn action_handou_move(&mut self, actor: &mut Actor, player: &Player, events: &mut SimEvents) {
+    pub fn action_handou_move(
+        &mut self,
+        actor: &mut Actor,
+        player: &Player,
+        events: &mut SimEvents,
+    ) {
         loop {
             match self.mode {
                 MODE_HANDOU_MOVE_INIT => {
@@ -1443,11 +1456,7 @@ impl AmosKnight {
     }
 
     fn light_death(&mut self, actor: &Actor, commands: &mut Commands) {
-        let pos = Vec3::new(
-            actor.pos.x,
-            actor.pos.y + self.light.y_offset,
-            actor.pos.z,
-        );
+        let pos = Vec3::new(actor.pos.x, actor.pos.y + self.light.y_offset, actor.pos.z);
         commands.spawn((
             Actor {
                 name: iball::IBALL_ACTORS[0].to_owned(),
@@ -1474,11 +1483,7 @@ impl AmosKnight {
 
     fn bg_check(&self, actor: &mut Actor, solid: Option<&Collision>) {
         if let Some(solid) = solid {
-            let from = Vec3::new(
-                actor.pos.x,
-                actor.pos.y - self.correction_y,
-                actor.pos.z,
-            );
+            let from = Vec3::new(actor.pos.x, actor.pos.y - self.correction_y, actor.pos.z);
             actor.pos.y -= self.correction_y;
             actor.pos = solid.slide(from, actor.pos);
             actor.pos.y += self.correction_y;
@@ -1514,9 +1519,9 @@ impl AmosKnight {
             ),
             Step::ModoruMove => self.action_modoru_move(actor, solid, events),
             Step::HandouMove => self.action_handou_move(actor, player, events),
-            Step::ItaiMove => self.action_itai_move(
-                actor, player, solid, shells, eaten, events, live, commands,
-            ),
+            Step::ItaiMove => {
+                self.action_itai_move(actor, player, solid, shells, eaten, events, live, commands)
+            }
         }
         if self.step != Step::ItaiMove && self.spawn_pos_y - ABYSS_DROP > actor.pos.y {
             self.fall_out(actor, events);
@@ -1526,12 +1531,7 @@ impl AmosKnight {
             && self.mode != MODE_ITAI_MOVE_BURST
             && self.mode != MODE_HANDOU_MOVE_MAIN
         {
-            stream::add_calc_angle_s2(
-                &mut self.shape_angle,
-                actor.angle[1],
-                TURN_DIV,
-                TURN_CAP,
-            );
+            stream::add_calc_angle_s2(&mut self.shape_angle, actor.angle[1], TURN_DIV, TURN_CAP);
         }
         if self.countdown[CD_BOMB] == 0 {
             self.morph.play();

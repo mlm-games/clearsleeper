@@ -608,9 +608,10 @@ fn radius_of(shape: &Shape) -> f32 {
     match shape.kind {
         ShapeKind::Sphere | ShapeKind::Cylinder | ShapeKind::Capsule => scaled,
         ShapeKind::Box => shape.scale.length() * 0.5,
-        ShapeKind::Triangle => shape.verts.iter().fold(0.0f32, |far, v| {
-            far.max((*v - shape.centroid()).length())
-        }),
+        ShapeKind::Triangle => shape
+            .verts
+            .iter()
+            .fold(0.0f32, |far, v| far.max((*v - shape.centroid()).length())),
     }
 }
 

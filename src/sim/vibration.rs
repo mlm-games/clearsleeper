@@ -164,8 +164,7 @@ pub const MOTOR_SHOCK_PATTERNS: [Pattern; SHOCK_PATTERN_COUNT] = [
     },
 ];
 
-pub const CAMERA_SHOCK_PATTERNS: [Pattern; SHOCK_PATTERN_COUNT] =
-    MOTOR_SHOCK_PATTERNS;
+pub const CAMERA_SHOCK_PATTERNS: [Pattern; SHOCK_PATTERN_COUNT] = MOTOR_SHOCK_PATTERNS;
 
 pub const MOTOR_QUAKE_PATTERNS: [Pattern; QUAKE_PATTERN_COUNT] = [
     Pattern {
@@ -233,12 +232,7 @@ pub const MOTOR_QUAKE_PATTERNS: [Pattern; QUAKE_PATTERN_COUNT] = [
 pub const CAMERA_QUAKE_PATTERNS: [Pattern; QUAKE_PATTERN_COUNT] = MOTOR_QUAKE_PATTERNS;
 
 pub fn wave_data(pattern: u32, length: i32) -> [u16; 4] {
-    [
-        length as u16,
-        (pattern >> 16) as u16,
-        pattern as u16,
-        0,
-    ]
+    [length as u16, (pattern >> 16) as u16, pattern as u16, 0]
 }
 
 pub fn roll_shift(pattern: u32, pattern_len: i32, current: i32) -> u32 {
@@ -433,8 +427,7 @@ impl Vibration {
     }
 
     pub fn check_quake(&self) -> bool {
-        self.camera_quake.pattern_idx != PATTERN_OFF
-            || self.motor_quake.pattern_idx != PATTERN_OFF
+        self.camera_quake.pattern_idx != PATTERN_OFF || self.motor_quake.pattern_idx != PATTERN_OFF
     }
 
     pub fn pause(&mut self) {
@@ -508,7 +501,13 @@ impl Vibration {
         ret
     }
 
-    pub fn start_quake_pattern(&mut self, pattern: &[u8], rounds: i32, flags: i32, coord: Vec3) -> bool {
+    pub fn start_quake_pattern(
+        &mut self,
+        pattern: &[u8],
+        rounds: i32,
+        flags: i32,
+        coord: Vec3,
+    ) -> bool {
         let byte = |at: usize| i32::from(pattern.get(at).copied().unwrap_or(0));
         let pattern_len = (byte(0) << 8) | byte(1);
         let bits = (byte(if pattern_len >= 1 { 2 } else { 0 }) << 24)
@@ -623,11 +622,7 @@ impl Vibration {
                 let mut pattern =
                     (self.camera_shock.pattern as i32).wrapping_shl(shock_frame as u32);
                 let length = self.camera_shock.length - shock_frame;
-                let bits = make_bits(
-                    self.camera_quake.pattern,
-                    self.camera_quake.length,
-                    length,
-                );
+                let bits = make_bits(self.camera_quake.pattern, self.camera_quake.length, length);
                 pattern |= roll_shift(bits, length, self.frame_idx) as i32;
                 let rounds = self.camera_shock.rounds.max(self.camera_quake.rounds);
                 pattern |= self.random_bit(rounds, length) as i32;
@@ -675,13 +670,10 @@ impl Vibration {
                 self.request_wave(pattern as u32, length, true);
             } else if rumble == RUMBLE_SHOCK | RUMBLE_QUAKE {
                 let shock_frame = self.motor_shock.current_frame;
-                let mut pattern = (self.motor_shock.pattern as i32).wrapping_shl(shock_frame as u32);
+                let mut pattern =
+                    (self.motor_shock.pattern as i32).wrapping_shl(shock_frame as u32);
                 let length = self.motor_shock.length - shock_frame;
-                let bits = make_bits(
-                    self.motor_quake.pattern,
-                    self.motor_quake.length,
-                    length,
-                );
+                let bits = make_bits(self.motor_quake.pattern, self.motor_quake.length, length);
                 pattern |= roll_shift(bits, length, self.frame_idx) as i32;
                 let rounds = self.motor_shock.rounds.max(self.motor_quake.rounds);
                 pattern |= self.random_bit(rounds, length) as i32;

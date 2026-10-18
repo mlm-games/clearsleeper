@@ -79,10 +79,7 @@ pub const ENEMY_PARAM: [u32; ENEMY_ROWS] = [
     0xFF00_0300,
     0xFF00_0400,
 ];
-pub const ENEMY_LIFT: [Vec3; 2] = [
-    Vec3::new(0.0, 300.0, 350.0),
-    Vec3::new(0.0, 0.0, 25.0),
-];
+pub const ENEMY_LIFT: [Vec3; 2] = [Vec3::new(0.0, 300.0, 350.0), Vec3::new(0.0, 0.0, 25.0)];
 
 pub const ITEM_SWITCH: u32 = 0xFF;
 pub const ITEM_ACTION_SHIFT: u32 = 26;
@@ -304,7 +301,10 @@ impl Homen {
         let Some(parameter) = ENEMY_PARAM.get(usize::from(self.enemy)).copied() else {
             return;
         };
-        let lift = ENEMY_LIFT.get(self.slot()).copied().unwrap_or(ENEMY_LIFT[0]);
+        let lift = ENEMY_LIFT
+            .get(self.slot())
+            .copied()
+            .unwrap_or(ENEMY_LIFT[0]);
         let (state, hit_points) = enemy::spawn(parameter, 0);
         self.foe = Some(
             commands
@@ -461,7 +461,10 @@ impl Homen {
             );
         }
         if self.gravity != 0.0 {
-            self.speed_f = FALL_SPEED.get(self.slot()).copied().unwrap_or(FALL_SPEED[0]);
+            self.speed_f = FALL_SPEED
+                .get(self.slot())
+                .copied()
+                .unwrap_or(FALL_SPEED[0]);
         }
     }
 
@@ -532,12 +535,7 @@ impl Homen {
         let mut struck = None;
         for (shot, hook) in hooks.iter() {
             if hook.phase == Phase::Shot
-                && walk::swept(
-                    hook.pos,
-                    hook.pos + hook.heading * SHOT_STEP,
-                    centre,
-                    reach,
-                )
+                && walk::swept(hook.pos, hook.pos + hook.heading * SHOT_STEP, centre, reach)
             {
                 struck = Some((shot, hook.pos));
                 break;

@@ -6,20 +6,19 @@ use super::msgbox::{
     PANE_TYPE_ID_TEXT_BOX, PANE_TYPE_ID_WINDOW, PaneSetup, PaneState, TextBox, TextPane,
 };
 use super::msgdata::{MsgLenState, MsgStickFlags};
-use super::msglayout::{MsgLayoutState, fop_msgm_get_color_table};
 use super::msgget::{MsgArchive, MsgGet, hyrule_language_check};
+use super::msglayout::{MsgLayoutState, fop_msgm_get_color_table};
 use super::msgproc::{
-    MsgGameInfo, MeterMsgHio, MsgIconPic, MyPicture, fop_msgm_out_font_draw, fop_msgm_out_font_set,
+    MeterMsgHio, MsgGameInfo, MsgIconPic, MyPicture, fop_msgm_out_font_draw, fop_msgm_out_font_set,
     fop_msgm_value_increase,
 };
 use super::{
     FontSlot, ICON_ARROW_DOWN, ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP,
-    ICON_FLASHING_A_BUTTON_2, ICON_INPUT, ICON_NONE, ICON_SELECT_YOKO_LEFT,
-    ICON_SELECT_YOKO_RIGHT, MesgEntry, MsgData, SELECT_OFF, STATUS_BOX_CLOSED,
-    STATUS_BOX_CLOSING, STATUS_BOX_OPENING, STATUS_CLOSE_WAIT, STATUS_DEMO, STATUS_INPUT,
-    STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_PREPARING, STATUS_TYPING, STATUS_SELECT_2, STATUS_SELECT_3, STATUS_SELECT_YOKO,
-    STATUS_STOP, STATUS_TACT,
+    ICON_FLASHING_A_BUTTON_2, ICON_INPUT, ICON_NONE, ICON_SELECT_YOKO_LEFT, ICON_SELECT_YOKO_RIGHT,
+    MesgEntry, MsgData, SELECT_OFF, STATUS_BOX_CLOSED, STATUS_BOX_CLOSING, STATUS_BOX_OPENING,
+    STATUS_CLOSE_WAIT, STATUS_DEMO, STATUS_INPUT, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED,
+    STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_PREPARING, STATUS_SELECT_2, STATUS_SELECT_3,
+    STATUS_SELECT_YOKO, STATUS_STOP, STATUS_TACT, STATUS_TYPING,
 };
 
 pub const MSG1_HEAP_LOCK: u8 = 7;
@@ -243,7 +242,10 @@ pub struct Msg1Tact {
 
 impl Msg1Tact {
     pub fn beat_num(&self) -> usize {
-        MSG1_BEAT_NUM.get(self.melody_num as usize).copied().unwrap_or(0) as usize
+        MSG1_BEAT_NUM
+            .get(self.melody_num as usize)
+            .copied()
+            .unwrap_or(0) as usize
     }
 
     pub fn pattern_time_at(&self, i: usize) -> f32 {
@@ -392,7 +394,8 @@ pub struct Msg1Ctx<'a, F: MsgArchive + ?Sized> {
 pub fn msg_pane_parts_set(pane: &mut PaneState, part: u8) {
     match part {
         1 => {
-            pane.pos_top_left[1] = (MSG1_SCREEN_H - (pane.pos_top_left_orig[1] + pane.size_orig[1]))
+            pane.pos_top_left[1] = (MSG1_SCREEN_H
+                - (pane.pos_top_left_orig[1] + pane.size_orig[1]))
                 + MSG1_TOP_BOTTOM_DY_BOTTOM;
         }
         2 => {
@@ -798,7 +801,10 @@ impl Msg1Box {
     fn icon_uses_text_color(icon_num: u8, flashing_a: bool) -> bool {
         matches!(
             icon_num,
-            ICON_ARROW_LEFT | ICON_ARROW_RIGHT | ICON_ARROW_UP | ICON_ARROW_DOWN
+            ICON_ARROW_LEFT
+                | ICON_ARROW_RIGHT
+                | ICON_ARROW_UP
+                | ICON_ARROW_DOWN
                 | ICON_SELECT_YOKO_RIGHT
         ) || (flashing_a && icon_num == ICON_FLASHING_A_BUTTON_2)
     }
@@ -957,10 +963,18 @@ impl Msg1Box {
 
     pub fn screen_data_set_talk(&mut self, screen: &Msg1Screen, hio: &Msg1Hio) {
         pane_data(Some(&mut self.m049c), screen.frame, PANE_TYPE_ID_WINDOW);
-        pane_data(Some(&mut self.m_pane_arrow), screen.arrow, PANE_TYPE_ID_WINDOW);
+        pane_data(
+            Some(&mut self.m_pane_arrow),
+            screen.arrow,
+            PANE_TYPE_ID_WINDOW,
+        );
         pane_data(Some(&mut self.m050c), screen.dot, PANE_TYPE_ID_WINDOW);
         for i in 0..4 {
-            self.text_pane_data(i, screen.text.get(i).copied().flatten(), PANE_TYPE_ID_TEXT_BOX);
+            self.text_pane_data(
+                i,
+                screen.text.get(i).copied().flatten(),
+                PANE_TYPE_ID_TEXT_BOX,
+            );
             self.select_pane_data(
                 i,
                 screen.select.get(i).copied().flatten(),
@@ -996,10 +1010,18 @@ impl Msg1Box {
 
     pub fn screen_data_set_item(&mut self, screen: &Msg1Screen, hio: &Msg1Hio, env: &Msg1Env) {
         pane_data(Some(&mut self.m049c), screen.frame, PANE_TYPE_ID_WINDOW);
-        pane_data(Some(&mut self.m_pane_arrow), screen.arrow, PANE_TYPE_ID_WINDOW);
+        pane_data(
+            Some(&mut self.m_pane_arrow),
+            screen.arrow,
+            PANE_TYPE_ID_WINDOW,
+        );
         pane_data(Some(&mut self.m050c), screen.dot, PANE_TYPE_ID_WINDOW);
         for i in 0..4 {
-            self.text_pane_data(i, screen.text.get(i).copied().flatten(), PANE_TYPE_ID_TEXT_BOX);
+            self.text_pane_data(
+                i,
+                screen.text.get(i).copied().flatten(),
+                PANE_TYPE_ID_TEXT_BOX,
+            );
         }
         for (slot, idx) in [
             (8usize, 8usize),
@@ -1028,8 +1050,7 @@ impl Msg1Box {
                 p.pane.hide();
             }
             self.m0624[8].user_area = 1;
-            let d_var12 =
-                self.m049c.pos_center_orig[0] - self.m0544[0].state.pos_center_orig[0];
+            let d_var12 = self.m049c.pos_center_orig[0] - self.m0544[0].state.pos_center_orig[0];
             for p in self.m0544.iter_mut() {
                 p.state.size[0] = MSG1_ITEM_TEXT_W;
                 p.state.pane_trans(d_var12, 0.0f32);
@@ -1050,12 +1071,7 @@ impl Msg1Box {
         if self.mesg_entry.textbox_type == 1 {
             self.frame_white = pack_color(MSG1_TCOLOR_WHITE);
             self.frame_black = pack_color(MSG1_TCOLOR_BLACK);
-            self.frame_corner = [
-                0x3232_B4FF,
-                0x3232_B4FF,
-                0x3232_B496,
-                0x6464_78FF,
-            ];
+            self.frame_corner = [0x3232_B4FF, 0x3232_B4FF, 0x3232_B496, 0x6464_78FF];
         }
         self.text_common_setup(hio);
         self.text_ruby_setup(hio);
@@ -1068,7 +1084,11 @@ impl Msg1Box {
 
     pub fn screen_data_set_demo(&mut self, screen: &Msg1Screen, hio: &Msg1Hio) {
         for i in 0..4 {
-            self.text_pane_data(i, screen.text.get(i).copied().flatten(), PANE_TYPE_ID_TEXT_BOX);
+            self.text_pane_data(
+                i,
+                screen.text.get(i).copied().flatten(),
+                PANE_TYPE_ID_TEXT_BOX,
+            );
         }
         self.text_set_font(0, self.mx);
         self.text_set_font(1, self.rx);
@@ -1098,7 +1118,11 @@ impl Msg1Box {
 
     pub fn screen_data_set_tact(&mut self, screen: &Msg1Screen, hio: &Msg1Hio, env: &Msg1Env) {
         if (MSG1_MSG_NO_TACT_ALT_FIRST..=MSG1_MSG_NO_TACT_ALT_LAST).contains(&self.msg_no) {
-            pane_data(Some(&mut self.m049c), screen.tact_frame_alt, PANE_TYPE_ID_WINDOW);
+            pane_data(
+                Some(&mut self.m049c),
+                screen.tact_frame_alt,
+                PANE_TYPE_ID_WINDOW,
+            );
             for i in 0..4 {
                 self.text_pane_data(
                     i,
@@ -1108,7 +1132,11 @@ impl Msg1Box {
             }
             self.tact_alt_hidden = false;
         } else {
-            pane_data(Some(&mut self.m049c), screen.tact_frame, PANE_TYPE_ID_WINDOW);
+            pane_data(
+                Some(&mut self.m049c),
+                screen.tact_frame,
+                PANE_TYPE_ID_WINDOW,
+            );
             for i in 0..4 {
                 self.text_pane_data(
                     i,
@@ -1201,8 +1229,7 @@ impl Msg1Box {
                 p.set_now_alpha_zero();
             }
         } else if self.mesg_entry.textbox_type == 0xE
-            && (self.msg_no == MSG1_MSG_NO_TACT_DEMO_1
-                || self.msg_no == MSG1_MSG_NO_TACT_DEMO_2)
+            && (self.msg_no == MSG1_MSG_NO_TACT_DEMO_1 || self.msg_no == MSG1_MSG_NO_TACT_DEMO_2)
         {
             for i in 0..env.tact.beat_num() {
                 if let Some(p) = self.m08c4.get_mut(i) {
@@ -1436,13 +1463,11 @@ impl Msg1Box {
             self.m049c.set_init_alpha();
         } else {
             if self.m1100 < MSG1_FRAME_OPEN_TALK_RAMP {
-                let temp_f31 =
-                    MSG1_FRAME_W * (self.m049c.size_orig[1] / self.m049c.size_orig[0]);
+                let temp_f31 = MSG1_FRAME_W * (self.m049c.size_orig[1] / self.m049c.size_orig[0]);
                 let temp_f30 = self.m049c.size_orig[0] - MSG1_FRAME_W;
                 let temp_f29 = self.m049c.size_orig[1] - temp_f31;
-                let temp_f1 =
-                    fop_msgm_value_increase(MSG1_FRAME_OPEN_TALK_RAMP, self.m1100, 0)
-                        .unwrap_or_default();
+                let temp_f1 = fop_msgm_value_increase(MSG1_FRAME_OPEN_TALK_RAMP, self.m1100, 0)
+                    .unwrap_or_default();
                 self.m049c.size[0] = MSG1_FRAME_W + (temp_f30 * temp_f1);
                 self.m049c.size[1] = temp_f31 + (temp_f29 * temp_f1);
                 self.m049c.pos_center[0] = self.m10e0[0] + (self.m10d0 * temp_f1);
@@ -1464,8 +1489,8 @@ impl Msg1Box {
                 self.m049c.pos_center[1] = self.m10e0[1] + self.m10d4 + (temp_f1_3 * temp_f3_2);
                 self.m049c.cpos_move();
             }
-            let ramp = fop_msgm_value_increase(MSG1_FRAME_OPEN_TALK, self.m1100, 0)
-                .unwrap_or_default();
+            let ramp =
+                fop_msgm_value_increase(MSG1_FRAME_OPEN_TALK, self.m1100, 0).unwrap_or_default();
             self.m049c.set_now_alpha(ramp);
         }
     }
@@ -1511,8 +1536,7 @@ impl Msg1Box {
             self.status = STATUS_BOX_CLOSED;
             self.m049c.pane.hide();
         } else {
-            let f1 =
-                fop_msgm_value_increase(MSG1_FRAME_CLOSE, self.m1100, 0).unwrap_or_default();
+            let f1 = fop_msgm_value_increase(MSG1_FRAME_CLOSE, self.m1100, 0).unwrap_or_default();
             let tmp2 = MSG1_FRAME_CLOSE_W - self.m049c.size_orig[0];
             let f29 = (self.m049c.size_orig[1] / self.m049c.size_orig[0]) * MSG1_FRAME_CLOSE_W
                 - self.m049c.size_orig[1];
@@ -1597,8 +1621,8 @@ impl Msg1Box {
         let u_var1 = self.m0544[0].state.pos_top_left_orig[0];
         let i_var3 = if b_var4 == 1 {
             (MSG1_SCREEN_H
-                - (self.m0544[0].state.pos_top_left_orig[1]
-                    + self.m0544[0].state.size_orig[1])) as i32
+                - (self.m0544[0].state.pos_top_left_orig[1] + self.m0544[0].state.size_orig[1]))
+                as i32
                 - 0x13
         } else if b_var4 == 2 {
             (MSG1_SCREEN_MID - self.m0544[0].state.size_orig[1] * 0.5f32) as i32
@@ -1705,8 +1729,7 @@ impl Msg1Box {
                 } else {
                     i_var4
                 };
-                let t =
-                    fop_msgm_value_increase(MSG1_DOT_HALF, step, 0).unwrap_or_default();
+                let t = fop_msgm_value_increase(MSG1_DOT_HALF, step, 0).unwrap_or_default();
                 let black = self.color_bc.to_le_bytes();
                 let white = self.color_white.to_le_bytes();
                 let white_target = [
@@ -1717,10 +1740,8 @@ impl Msg1Box {
                 let mut next_black = [0u8; 4];
                 let mut next_white = [0u8; 4];
                 for ch in 0..3 {
-                    next_black[ch] = to_u8(
-                        black[ch] as f32
-                            + ((MSG1_DOT_BLACK_TARGET - black[ch] as f32) * t),
-                    );
+                    next_black[ch] =
+                        to_u8(black[ch] as f32 + ((MSG1_DOT_BLACK_TARGET - black[ch] as f32) * t));
                     next_white[ch] =
                         to_u8(white[ch] as f32 + ((white_target[ch] - white[ch] as f32) * t));
                 }
@@ -1905,8 +1926,8 @@ impl Msg1Box {
             if self.icon_num(i) == ICON_INPUT {
                 let b = self.text_bounds(0);
                 self.m10ec = b[0] as i32 + self.icon_pos_x(i);
-                self.m10f0 =
-                    b[1] as i32 + (self.m1104 * (3i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
+                self.m10f0 = b[1] as i32
+                    + (self.m1104 * (3i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
             }
         }
         let columns = if self.msg_no == MSG1_MSG_NO_NUMBER_3 {
@@ -1924,7 +1945,11 @@ impl Msg1Box {
         env.message_set_number = result.number as i32;
         self.msg_data.color_anime();
         let num = env.message_set_number;
-        let digits = [(num / 100) as usize, ((num % 100) / 10) as usize, (num % 10) as usize];
+        let digits = [
+            (num / 100) as usize,
+            ((num % 100) / 10) as usize,
+            (num % 10) as usize,
+        ];
         for slot in [2usize, 1, 0] {
             let s = MSG1_NUM_STR
                 .get(digits.get(slot).copied().unwrap_or(0))
@@ -1986,10 +2011,10 @@ impl Msg1Box {
         for i in 0..beat_num {
             let s_var1 = self.m0b64.get(i).map(|p| p.user_area).unwrap_or(0);
             if s_var1 > 0 && s_var1 <= MSG1_GUIDE_HIT_MAX {
-                let alpha =
-                    (fop_msgm_value_increase(MSG1_TACT_RAMP, s_var1 as i32, 0).unwrap_or_default()
-                        * MSG1_HALF_ALPHA)
-                        + MSG1_HALF_ALPHA;
+                let alpha = (fop_msgm_value_increase(MSG1_TACT_RAMP, s_var1 as i32, 0)
+                    .unwrap_or_default()
+                    * MSG1_HALF_ALPHA)
+                    + MSG1_HALF_ALPHA;
                 if env.tact.melody_num < 5 {
                     if let Some(p) = self.m0a14.get_mut(i) {
                         p.set_now_alpha(alpha);
@@ -2060,8 +2085,7 @@ impl Msg1Box {
         }
         let local_68 = hio.field_0x78 as i32 as f32;
         let mut f_var3 = local_68
-            + ((hio.field_0x7e as f32) * 2.0f32
-                + (self.msg_data.select_length as f32)
+            + ((hio.field_0x7e as f32) * 2.0f32 + (self.msg_data.select_length as f32)
                 - self.m011c[0].state.size_orig[0]);
         for i in 0..4 {
             self.m011c[i].state.size[0] = self.m011c[i].state.size_orig[0] + f_var3;
@@ -2069,7 +2093,8 @@ impl Msg1Box {
         self.m026c[5].size[0] = self.m026c[5].size_orig[0] + f_var3;
         self.m026c[8].size[0] = self.m026c[8].size_orig[0] + f_var3;
         self.m026c[9].size[0] = self.m026c[9].size_orig[0] + f_var3;
-        f_var3 = (hio.field_0x7a as i32 as f32) + (select_height - self.m011c[0].state.size_orig[1]);
+        f_var3 =
+            (hio.field_0x7a as i32 as f32) + (select_height - self.m011c[0].state.size_orig[1]);
         for i in 0..4 {
             self.m011c[i].state.size[1] = self.m011c[i].state.size_orig[1] + f_var3;
         }
@@ -2099,12 +2124,10 @@ impl Msg1Box {
         self.m026c[5].pos_center[1] = self.m026c[5].pos_center_orig[1] - f_var5;
         self.m026c[8].pos_center[1] = self.m026c[8].pos_center_orig[1] + f_var5;
         for i in 0..4 {
-            self.m011c[i].state.pos_center[1] =
-                self.m011c[i].state.pos_center_orig[1] + f_var2;
+            self.m011c[i].state.pos_center[1] = self.m011c[i].state.pos_center_orig[1] + f_var2;
         }
-        self.m01fc.pos_center_orig[0] = self.m01fc.pos_top_left_orig[0]
-            + self.m01fc.size_orig[0] / 2.0f32
-            + f_var3;
+        self.m01fc.pos_center_orig[0] =
+            self.m01fc.pos_top_left_orig[0] + self.m01fc.size_orig[0] / 2.0f32 + f_var3;
         let f4 = (hio.field_0x7e as f32) * 2.0f32;
         let f3 = self.m01fc.pos_center_orig[0] + self.m01fc.size_orig[0];
         self.m0234.pos_center_orig[0] = f3 + (self.msg_data.select_length as f32) + f4;
@@ -2180,8 +2203,8 @@ impl Msg1Box {
             (d_var5 * (MSG1_TACT_FRAME_SCALE[1] - MSG1_TACT_FRAME_SCALE[0]))
                 + MSG1_TACT_FRAME_SCALE[0]
         } else {
-            let d_var5 =
-                fop_msgm_value_increase(hio.field_0x46 as i32, i_var3 - i_var2, 0).unwrap_or_default();
+            let d_var5 = fop_msgm_value_increase(hio.field_0x46 as i32, i_var3 - i_var2, 0)
+                .unwrap_or_default();
             (d_var5 * (MSG1_TACT_FRAME_SCALE[2] - MSG1_TACT_FRAME_SCALE[1]))
                 + MSG1_TACT_FRAME_SCALE[1]
         };
@@ -2232,11 +2255,13 @@ impl Msg1Box {
     }
 
     pub fn set_close_sound(&mut self, env: &mut Msg1Env, param_2: u8) {
-        env.se = Some(if param_2 != 0 || env.do_status_force == MSG1_DO_STATUS_CANCEL {
-            Msg1Se::TalkSelCancel
-        } else {
-            Msg1Se::TalkWinClose
-        });
+        env.se = Some(
+            if param_2 != 0 || env.do_status_force == MSG1_DO_STATUS_CANCEL {
+                Msg1Se::TalkSelCancel
+            } else {
+                Msg1Se::TalkWinClose
+            },
+        );
     }
 
     pub fn set_cancel_mode(&mut self, env: &mut Msg1Env, trig_b: bool) {
@@ -2410,12 +2435,7 @@ impl Msg1Box {
         self.cursor2_blend = blend;
     }
 
-    pub fn select_proc(
-        &mut self,
-        hio: &Msg1Hio,
-        env: &mut Msg1Env,
-        stick: &Msg1Stick,
-    ) -> i32 {
+    pub fn select_proc(&mut self, hio: &Msg1Hio, env: &mut Msg1Env, stick: &Msg1Stick) -> i32 {
         let bounds = self.text_bounds(0);
         let i_var10 = bounds[0] as i32;
         let i_var11 = bounds[1] as i32;
@@ -2495,8 +2515,9 @@ impl Msg1Box {
                 let icon_num = self.icon_num(i);
                 if icon_num == ICON_SELECT_YOKO_LEFT {
                     var_r5 = bounds[0] as i32 + self.icon_pos_x(i);
-                    var_r6 =
-                        bounds[1] as i32 + (self.m1104 * (2i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
+                    var_r6 = bounds[1] as i32
+                        + (self.m1104
+                            * (2i32.saturating_sub(self.m1108) + (self.icon_pos_y(i) * 2)));
                 } else if icon_num == ICON_SELECT_YOKO_RIGHT {
                     var_r11 = bounds[0] as i32 + self.icon_pos_x(i);
                 }
@@ -2647,8 +2668,7 @@ impl Msg1Box {
                             self.message_pane_show();
                             self.yose_select(font, len);
                             if self.mesg_entry.initial_sound != 0 {
-                                env.se =
-                                    Some(Msg1Se::Message(self.mesg_entry.initial_sound));
+                                env.se = Some(Msg1Se::Message(self.mesg_entry.initial_sound));
                             }
                             self.msg_data.short_cut();
                             self.msg_data.string_set(font, layout);
@@ -2779,12 +2799,12 @@ impl Msg1Box {
                 arw_pane_parts_set(&mut self.m_pane_arrow, &frame);
                 let frame = self.m049c.clone();
                 arw_pane_parts_set(&mut self.m050c, &frame);
-                self.m1114 = (self.m_pane_arrow.pos_top_left[1]
-                    + self.m_pane_arrow.size_orig[1]) as i32;
+                self.m1114 =
+                    (self.m_pane_arrow.pos_top_left[1] + self.m_pane_arrow.size_orig[1]) as i32;
                 let d_var3 = self.m0544[0].state.pos_top_left_orig[0];
                 let f_var5 = (MSG1_SCREEN_H
-                    - (self.m0544[0].state.pos_top_left_orig[1]
-                        + self.m0544[0].state.size_orig[1])) as i32
+                    - (self.m0544[0].state.pos_top_left_orig[1] + self.m0544[0].state.size_orig[1]))
+                    as i32
                     - 0x13;
                 self.m10f8 = d_var3 as i32;
                 self.m10fc = if self.mesg_entry.textbox_position != 1 {
@@ -3111,25 +3131,20 @@ impl Msg1Box {
             self.text_move(
                 2,
                 (self.m10f8 + 2) as f32,
-                dy66
-                    + (d_var15
-                        + (self.m10fc as f32
-                            - (hio.field_0x62 as i32 as f32 + 2.0f32 - offset_y))),
+                dy66 + (d_var15
+                    + (self.m10fc as f32 - (hio.field_0x62 as i32 as f32 + 2.0f32 - offset_y))),
             );
         } else {
             self.text_move(
                 2,
                 (self.m10f8 + 2) as f32,
-                dy66
-                    + (d_var15
-                        + (((self.m10fc - hio.field_0x62 as i32) + 2) as f32 - offset_y)),
+                dy66 + (d_var15 + (((self.m10fc - hio.field_0x62 as i32) + 2) as f32 - offset_y)),
             );
         }
         self.text_move(
             3,
             (self.m10f8 + 2) as f32,
-            dy66
-                + (d_var15 + (((self.m10fc - hio.field_0x60 as i32) + 2) as f32 - offset_y)),
+            dy66 + (d_var15 + (((self.m10fc - hio.field_0x60 as i32) + 2) as f32 - offset_y)),
         );
     }
 
@@ -3140,13 +3155,15 @@ impl Msg1Box {
             self.m049c.pane.white = hio.field_0x5;
         }
         let dy66 = hio.field_0x66 as i32 as f32;
-        self.m049c
-            .pane
-            .move_to(self.m049c.pos_top_left[0], self.m049c.pos_top_left[1] + dy66);
+        self.m049c.pane.move_to(
+            self.m049c.pos_top_left[0],
+            self.m049c.pos_top_left[1] + dy66,
+        );
         if dot {
-            self.m050c
-                .pane
-                .move_to(self.m050c.pos_top_left[0], self.m050c.pos_top_left[1] + dy66);
+            self.m050c.pane.move_to(
+                self.m050c.pos_top_left[0],
+                self.m050c.pos_top_left[1] + dy66,
+            );
         }
     }
 
@@ -3178,9 +3195,7 @@ impl Msg1Box {
 
         let user_area = self.m026c[0].user_area;
         if user_area == 3
-            || (self.status != STATUS_SELECT_2
-                && self.status != STATUS_SELECT_3
-                && user_area != 0)
+            || (self.status != STATUS_SELECT_2 && self.status != STATUS_SELECT_3 && user_area != 0)
         {
             if (self.m026c[9].user_area as i32) < (hio.field_0x48 as i32 + hio.field_0x76 as i32) {
                 self.sub_text_close(&hio);
@@ -3362,7 +3377,8 @@ impl Msg1Box {
                 (self.m1104 as f32 + bounds[1] + local_28) as i32
             } else if scale > self.m110c {
                 if self.m1108 > 1 {
-                    let temp1 = (self.m1104 * (3i32.saturating_sub(pos_y) - (self.m1108 + -2))) as f32;
+                    let temp1 =
+                        (self.m1104 * (3i32.saturating_sub(pos_y) - (self.m1108 + -2))) as f32;
                     ((scale - self.m110c) / 2) + ((temp1 + bounds[1]) - ((scale / 2) as f32)) as i32
                 } else {
                     (((self.m1104 << 2) as f32 + bounds[1]) - ((scale / 2) as f32)) as i32
@@ -3387,15 +3403,18 @@ impl Msg1Box {
     pub fn draw_msg(&mut self, hio: &Msg1Hio, out_hio: &MeterMsgHio) {
         self.out_font_draw(hio, out_hio);
         if self.status == STATUS_SELECT_YOKO {
-            self.arrow_rot
-                .set(self.arrow_size[0] / 2.0f32, self.arrow_size[1] / 2.0f32, 90.0f32);
+            self.arrow_rot.set(
+                self.arrow_size[0] / 2.0f32,
+                self.arrow_size[1] / 2.0f32,
+                90.0f32,
+            );
             self.msg_data
                 .select_arrow(self.arrow_size[0], self.arrow_size[1], 0.0f32, 0.0f32);
         } else if self.status == STATUS_INPUT
             && (self.mesg_entry.textbox_type == 0 || self.mesg_entry.textbox_type == 10)
         {
-            self.number_cell_w = self.number_pane[0].get_font_size()[0]
-                + self.number_pane[0].get_char_space();
+            self.number_cell_w =
+                self.number_pane[0].get_font_size()[0] + self.number_pane[0].get_char_space();
             let columns = if self.msg_no == MSG1_MSG_NO_NUMBER_3 {
                 3
             } else {

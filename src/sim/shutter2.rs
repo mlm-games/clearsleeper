@@ -244,24 +244,16 @@ impl Shutter2 {
     ) {
         // `u8 isSwitch = fopAcM_isSwitch(this, mSwitchNo);` (:234)
         let is_switch = switches.test(self.switch_no);
-        if self.want == WANT_IDLE
-            && is_switch != self.was_switch
-            && self.frame_timer < 0
-        {
+        if self.want == WANT_IDLE && is_switch != self.was_switch && self.frame_timer < 0 {
             self.want = if is_switch { WANT_OPEN } else { WANT_CLOSE };
         }
 
         if self.demo_running(active) {
-            if self
-                .open_slot
-                .is_some_and(|slot| active.start_check(slot))
-                && self.want == WANT_OPEN
+            if self.open_slot.is_some_and(|slot| active.start_check(slot)) && self.want == WANT_OPEN
             {
                 self.want = WANT_IDLE;
             }
-            if self
-                .close_slot
-                .is_some_and(|slot| active.start_check(slot))
+            if self.close_slot.is_some_and(|slot| active.start_check(slot))
                 && self.want == WANT_CLOSE
             {
                 self.want = WANT_IDLE;
@@ -298,7 +290,12 @@ impl Shutter2 {
         [self.open_slot, self.close_slot]
             .into_iter()
             .flatten()
-            .any(|slot| matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)))
+            .any(|slot| {
+                matches!(
+                    active.stage_of(slot),
+                    Some(Stage::Play) | Some(Stage::Close)
+                )
+            })
     }
 
     /// `fopAcM_orderOtherEventId(this, mOpenEventIdx)` (`:259`) and its `mCloseEventIdx` twin

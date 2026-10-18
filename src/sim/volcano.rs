@@ -118,7 +118,9 @@ impl Volcano {
 }
 
 fn order(list: &EventList, index: Option<usize>, entity: Entity, active: &mut ActiveEvent) {
-    if let Some(index) = index && active.stage_of(index).is_none() {
+    if let Some(index) = index
+        && active.stage_of(index).is_none()
+    {
         active.order(list, index, entity);
     }
 }

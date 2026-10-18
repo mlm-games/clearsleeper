@@ -144,9 +144,7 @@ const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
 const RND_SCALE: [f32; 3] = [30269.0, 30307.0, 30323.0];
 const RND_SEED: i32 = 100;
 
-const ITA_Z_P: [f32; 11] = [
-    0.1, 0.3, 0.5, 0.75, 0.9, 1.0, 0.9, 0.75, 0.5, 0.3, 0.1,
-]; // <- d_a_bridge.cpp:26
+const ITA_Z_P: [f32; 11] = [0.1, 0.3, 0.5, 0.75, 0.9, 1.0, 0.9, 0.75, 0.5, 0.3, 0.1]; // <- d_a_bridge.cpp:26
 
 const LINE_MAIN_LINES: usize = 2;
 const LINE_MAIN_SEGS: usize = 14;
@@ -467,7 +465,11 @@ impl Bridge {
         let path = ((parameters >> PRM_PATH_SHIFT) & PRM_PATH_WIDTH) as u8;
         Bridge {
             mMoveProcMode: MODE_START,
-            mTypeBits: if type_bits == PRM_BYTE as u8 { 0 } else { type_bits },
+            mTypeBits: if type_bits == PRM_BYTE as u8 {
+                0
+            } else {
+                type_bits
+            },
             home_pos: Vec3::ZERO,
             home_yaw: 0,
             m02D9: ((parameters >> PRM_SUB_SHIFT) & PRM_SUB_WIDTH) as u8,
@@ -544,14 +546,17 @@ impl Bridge {
         self.mPathIdP = self.mPathId.wrapping_add(1);
         let delta = second - first;
         actor.angle[1] = to_s16(delta.x.atan2(delta.z));
-        actor.angle[0] = -to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()));
+        actor.angle[0] = -to_s16(
+            delta
+                .y
+                .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+        );
         let far = if delta.length() > PLANK_LEN_FAR {
             PLANK_LEN_FAR_STEP
         } else {
             0.0
         };
-        self.mBrCount =
-            (delta.length() / ((far + PLANK_LEN_BASE) * PLANK_LEN_STEP)) as i8;
+        self.mBrCount = (delta.length() / ((far + PLANK_LEN_BASE) * PLANK_LEN_STEP)) as i8;
         if self.mTypeBits & TYPE_PAIR != 0 {
             self.m02DD = if self.mBrCount as i32 >= PAIR_TALL {
                 PAIR_TALL_COUNT as i8
@@ -692,8 +697,8 @@ impl Bridge {
         }
         magnitude *= soft;
         let swing = sin_s(self.m0300);
-        self.br[index].m3F4 = self.br[index].m3F4 * soft
-            + self.m02FC * swing * RIDE_SWAY_FACTOR * magnitude;
+        self.br[index].m3F4 =
+            self.br[index].m3F4 * soft + self.m02FC * swing * RIDE_SWAY_FACTOR * magnitude;
         self.br[index].m400 = (-sp4c.x * magnitude) as i16;
         self.br[index].m406 = 2;
         let delta = sp4c - sp40;
@@ -725,7 +730,10 @@ impl Bridge {
         } else {
             SWAY_LONG
         };
-        let sp24 = place(&rot_y(home_yaw), Vec3::new(self.m02F8 * cos_s(self.m02EC), 0.0, 0.0));
+        let sp24 = place(
+            &rot_y(home_yaw),
+            Vec3::new(self.m02F8 * cos_s(self.m02EC), 0.0, 0.0),
+        );
         let sp18 = place(&rot_y(home_yaw), Vec3::new(1.0, 0.0, 0.0));
         let sp0c = place(
             &rot_y(wind_yaw),
@@ -744,15 +752,9 @@ impl Bridge {
                         .wrapping_add(trunc(i32::from(step.wrapping_add(SWAY_LEAD)) * i as i32)),
                 )
                 * here.m3F0;
-            let x = (here.m3CC.x - prev.m3CC.x)
-                + sway_x * sp18.x
-                + sp24.x * here.m3F0
-                + sp0c.x;
+            let x = (here.m3CC.x - prev.m3CC.x) + sway_x * sp18.x + sp24.x * here.m3F0 + sp0c.x;
             let y = sway_y + (rise - prev.m3CC.y);
-            let z = (here.m3CC.z - prev.m3CC.z)
-                + sway_x * sp18.z
-                + sp24.z * here.m3F0
-                + sp0c.z;
+            let z = (here.m3CC.z - prev.m3CC.z) + sway_x * sp18.z + sp24.z * here.m3F0 + sp0c.z;
             let atan = to_s16(x.atan2(z));
             let atan2 = -to_s16(y.atan2((x * x + z * z).sqrt()));
             let mtx = rot_y(atan) * rot_x(atan2);
@@ -1011,8 +1013,8 @@ impl Bridge {
                 }
             }
             if (flags & 4) != 0 && (self.br[i].m3A0[0] != 0 || self.br[i].m3A0[1] != 0) {
-                let swing = (i32::from(self.br[i].m3A0[0]) | i32::from(self.br[i].m3A0[1])) as f32
-                    * 150.0;
+                let swing =
+                    (i32::from(self.br[i].m3A0[0]) | i32::from(self.br[i].m3A0[1])) as f32 * 150.0;
                 let push = swing * sin_s(trunc(i32::from(self.m0300) * 4));
                 for j in SPARK_MIN..=SPARK_MAX {
                     let at = i as i32 + j;
@@ -1259,8 +1261,7 @@ impl Bridge {
             i32::from(self.m02D9) * i32::from(SWAY_SUB)
                 + i32::from(self.m0302) * i32::from(SWAY_SALT2),
         );
-        let gust =
-            (wind_power + SWAY_WIND_OFF) * (sin_s(phase) * SWAY_WIND_GAIN + SWAY_WIND_BIAS);
+        let gust = (wind_power + SWAY_WIND_OFF) * (sin_s(phase) * SWAY_WIND_GAIN + SWAY_WIND_BIAS);
         let sp84 = place(&rot_y(wind_yaw), Vec3::new(0.0, 0.0, gust));
         let wobble = sin_s(trunc(i32::from(self.m0300) * 6));
         if self.br[i].m408 & 1 != 0 {
@@ -1333,12 +1334,7 @@ pub struct Cut {
     pub damage: i32,
 }
 
-fn himo_cut_control1(
-    pts: &mut [Vec3; HIMO_POINTS],
-    wind_power: f32,
-    wind_yaw: i16,
-    head: Vec3,
-) {
+fn himo_cut_control1(pts: &mut [Vec3; HIMO_POINTS], wind_power: f32, wind_yaw: i16, head: Vec3) {
     pts[0] = head;
     let moved = place(
         &rot_y(wind_yaw),
@@ -1429,9 +1425,7 @@ pub fn control(
     let running = env.info.event_run_check();
     let blade = env.held.item;
     let soup = env.combat.soup;
-    let live = env.combat.active
-        && env.combat.frame >= CUT_START
-        && env.combat.frame < CUT_END;
+    let live = env.combat.active && env.combat.frame >= CUT_START && env.combat.frame < CUT_END;
     let player = players.iter_mut().next().map(|p| {
         let cut = Cut {
             live,

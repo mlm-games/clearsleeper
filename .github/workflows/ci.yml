@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: mlm-games/ci/.github/workflows/rust-app-ci.yml@main
+    with:
+      run-clippy: false
+      run-fmt: true
+      run-test: true
+      extra-checks: |
+        --target wasm32-unknown-unknown
+      include-android: true
+      upload-artifacts: true
+      app-slug: clearsleeper

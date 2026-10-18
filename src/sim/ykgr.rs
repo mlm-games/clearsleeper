@@ -184,10 +184,7 @@ pub fn is_ykgr(name: &str) -> bool {
     YKGR_ACTORS.contains(&name)
 }
 
-pub fn control(
-    mut hazes: Query<(Entity, &mut Ykgr)>,
-    mut commands: Commands,
-) {
+pub fn control(mut hazes: Query<(Entity, &mut Ykgr)>, mut commands: Commands) {
     for (entity, mut haze) in &mut hazes {
         if haze.refused {
             let _ = commands.entity(entity).despawn();

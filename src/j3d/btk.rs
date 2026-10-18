@@ -17,7 +17,6 @@ const CENTER_TABLE: usize = 0x24;
 const SCALE_TABLE: usize = 0x28;
 const ROTATION_TABLE: usize = 0x2C;
 const TRANSLATION_TABLE: usize = 0x30;
-const POST_TRACKS: usize = 0x34;
 const CALC_TYPE: usize = 0x5C;
 const MAX_DEC_SHIFT: u8 = 15;
 const CHANNELS_PER_TRACK: usize = 3;
@@ -110,7 +109,13 @@ impl TextureAnimation {
         self.entries.len() / CHANNELS_PER_TRACK
     }
 
+    /// The sample frame for a tick: the animation's own cursor, which the room path drives off
+    /// the sim tick rather than a `J3DFrameCtrl`. A zero frame count has no wrap, so the cursor
+    /// stays on its first frame, which is where retail's entry sampling clamps too.
     pub fn frame_at(&self, tick: u64) -> f32 {
+        if self.frame_max == 0 {
+            return 0.0;
+        }
         (tick % u64::from(self.frame_max)) as f32
     }
 
@@ -149,7 +154,12 @@ impl TextureAnimation {
         TexSrt {
             scale_x: channel(&x.scale, &self.scale_values, frame, 1.0),
             scale_y: channel(&y.scale, &self.scale_values, frame, 1.0),
-            rotation: rotation_channel(&rotation.rotation, &self.rotation_values, frame, self.dec_shift),
+            rotation: rotation_channel(
+                &rotation.rotation,
+                &self.rotation_values,
+                frame,
+                self.dec_shift,
+            ),
             translation_x: channel(&x.translation, &self.translation_values, frame, 0.0),
             translation_y: channel(&y.translation, &self.translation_values, frame, 0.0),
         }
@@ -189,7 +199,7 @@ pub fn parse(data: &[u8]) -> Result<TextureAnimation, BtkError> {
         return Err(BtkError::Descriptor);
     }
     let frame_max = read_i16(data, block + FRAME_MAX)?;
-    if frame_max < 1 {
+    if frame_max < 0 {
         return Err(BtkError::Block);
     }
     let track_num = read_u16(data, block + TRACK_NUM)?;
@@ -197,9 +207,14 @@ pub fn parse(data: &[u8]) -> Result<TextureAnimation, BtkError> {
         return Err(BtkError::Block);
     }
     let track_count = usize::from(track_num / CHANNELS_PER_TRACK as u16);
-    if read_u16(data, block + POST_TRACKS)? != 0 {
-        return Err(BtkError::Descriptor);
-    }
+    // The post-concat half (`mPostTrackNum` and the second table pair, `J3DAnimation.h:440-449`)
+    // is loaded by `J3DAnmKeyLoader_v15::setAnmTextureSRT` (`J3DAnmLoader.cpp:494-500`) and
+    // applied by nothing: `J3DMaterialAnm::calc` never reads it and `mDoExt_btkAnm::init` hands
+    // `setTexMtxAnimator` its `pDualAnmR` as NULL (`m_Do_ext.cpp:289-291`). The port keeps the
+    // same main tables and drops the post ones, so a file that carries them still parses.
+    // `mTexMtxCalcType` (`getTexMtxCalcType`, `J3DAnimation.h:445`) is consumed, into the
+    // material's tex matrix info (`J3DMaterialAttach.cpp:298`), and the port has one uv transform
+    // rather than that hardware mode, so a non-zero type is refused.
     if read_u32(data, block + CALC_TYPE)? == 1 {
         return Err(BtkError::Descriptor);
     }
@@ -239,7 +254,11 @@ pub fn parse(data: &[u8]) -> Result<TextureAnimation, BtkError> {
     if usize::from(read_u16(data, name_at)?) < track_count {
         return Err(BtkError::Block);
     }
-    if name_at.checked_add(4 + track_count * 4).ok_or(BtkError::Block)? > end {
+    if name_at
+        .checked_add(4 + track_count * 4)
+        .ok_or(BtkError::Block)?
+        > end
+    {
         return Err(BtkError::Block);
     }
     let mut names = Vec::with_capacity(track_count);
@@ -255,7 +274,11 @@ pub fn parse(data: &[u8]) -> Result<TextureAnimation, BtkError> {
             .iter()
             .position(|&byte| byte == 0)
             .ok_or(BtkError::Block)?;
-        names.push(std::str::from_utf8(&bytes[..length]).map_err(|_| BtkError::Block)?.to_owned());
+        names.push(
+            std::str::from_utf8(&bytes[..length])
+                .map_err(|_| BtkError::Block)?
+                .to_owned(),
+        );
     }
 
     let matrix_rel = read_u32(data, block + TEXTURE_MATRIX_TABLE)? as usize;
@@ -266,7 +289,13 @@ pub fn parse(data: &[u8]) -> Result<TextureAnimation, BtkError> {
         data[start..start + track_count].to_vec()
     };
 
-    let key_at = table(data, block, end, KEY_TABLE, usize::from(track_num) * ENTRY_STRIDE)?;
+    let key_at = table(
+        data,
+        block,
+        end,
+        KEY_TABLE,
+        usize::from(track_num) * ENTRY_STRIDE,
+    )?;
     let mut entries = Vec::with_capacity(usize::from(track_num));
     for index in 0..usize::from(track_num) {
         let slot = at(key_at, index * ENTRY_STRIDE)?;
@@ -299,7 +328,13 @@ fn at(base: usize, offset: usize) -> Result<usize, BtkError> {
     base.checked_add(offset).ok_or(BtkError::Block)
 }
 
-fn table(data: &[u8], block: usize, end: usize, field: usize, bytes: usize) -> Result<usize, BtkError> {
+fn table(
+    data: &[u8],
+    block: usize,
+    end: usize,
+    field: usize,
+    bytes: usize,
+) -> Result<usize, BtkError> {
     if bytes == 0 {
         return Ok(end);
     }
@@ -347,11 +382,7 @@ fn read_key(data: &[u8], start: usize) -> Result<Key, BtkError> {
 }
 
 fn stride(kind: u16) -> usize {
-    if kind == 0 {
-        3
-    } else {
-        4
-    }
+    if kind == 0 { 3 } else { 4 }
 }
 
 fn validate(key: &Key, values: usize) -> Result<(), BtkError> {
@@ -392,7 +423,10 @@ fn rotation_channel(key: &Key, values: &[i16], frame: f32, dec_shift: u8) -> i16
             .map(|&value| ((i32::from(value)) << dec_shift) as i16)
             .unwrap_or(0),
         _ => quantize(interpolate(frame, key, |index| {
-            values.get(index).map(|&value| f32::from(value)).unwrap_or(0.0)
+            values
+                .get(index)
+                .map(|&value| f32::from(value))
+                .unwrap_or(0.0)
         })),
     }
 }

@@ -200,12 +200,7 @@ pub fn control(mut barricades: Query<&mut Barricade>) {
     }
 }
 
-pub fn strike(
-    barricade: &mut Barricade,
-    cut: u32,
-    half: usize,
-    switches: &mut Switches,
-) -> bool {
+pub fn strike(barricade: &mut Barricade, cut: u32, half: usize, switches: &mut Switches) -> bool {
     if barricade.scorches(cut) {
         barricade.scorch(switches);
         return true;

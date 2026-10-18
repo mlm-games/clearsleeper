@@ -3,18 +3,18 @@ use bevy_ecs::prelude::*;
 /// Every stage string in `tww/src/d/d_stage.cpp` that resolves to `fpcNm_GRASS_e`, which is the
 /// process `daGrass_Create` registers as `g_profile_GRASS` (`d_a_grass.cpp:207`).
 pub const SCENERY_ACTORS: [&str; 12] = [
-    "kusax1",   // <- d_stage.cpp:438
-    "kusax7",   // <- d_stage.cpp:439
-    "kusax21",  // <- d_stage.cpp:440
-    "flower",   // <- d_stage.cpp:441
-    "flwr7",    // <- d_stage.cpp:442
-    "flwr17",   // <- d_stage.cpp:443
-    "pflower",  // <- d_stage.cpp:444
-    "pflwrx7",  // <- d_stage.cpp:445
-    "swood",    // <- d_stage.cpp:446
-    "swood3",   // <- d_stage.cpp:447
-    "swood5",   // <- d_stage.cpp:448
-    "Grass",    // <- d_stage.cpp:1259
+    "kusax1",  // <- d_stage.cpp:438
+    "kusax7",  // <- d_stage.cpp:439
+    "kusax21", // <- d_stage.cpp:440
+    "flower",  // <- d_stage.cpp:441
+    "flwr7",   // <- d_stage.cpp:442
+    "flwr17",  // <- d_stage.cpp:443
+    "pflower", // <- d_stage.cpp:444
+    "pflwrx7", // <- d_stage.cpp:445
+    "swood",   // <- d_stage.cpp:446
+    "swood3",  // <- d_stage.cpp:447
+    "swood5",  // <- d_stage.cpp:448
+    "Grass",   // <- d_stage.cpp:1259
 ];
 
 /// `daGrass_Create` (`:33-193`) is the entire actor. It reads three parameters -

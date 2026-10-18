@@ -298,8 +298,7 @@ impl Mflft {
             return false;
         }
         let gap = at - self.anchor[index];
-        gap.x * gap.x + gap.z * gap.z <= reach * reach
-            && gap.y.abs() <= CYL_HEIGHT * 0.5
+        gap.x * gap.x + gap.z * gap.z <= reach * reach && gap.y.abs() <= CYL_HEIGHT * 0.5
     }
 
     fn clash(&mut self, index: usize, at: Vec3, reach: f32, power: i32) -> Option<u32> {
@@ -346,7 +345,12 @@ pub fn control(
     let arrows: Vec<(Vec3, i32)> = shafts
         .iter()
         .filter(|shaft| shaft.phase == arrow::Phase::Flying)
-        .map(|shaft| (shaft.pos + shaft.speed * arrow::CAPSULE_STRETCH, arrow::POWER))
+        .map(|shaft| {
+            (
+                shaft.pos + shaft.speed * arrow::CAPSULE_STRETCH,
+                arrow::POWER,
+            )
+        })
         .collect();
     for (mut actor, mut lift) in &mut lifts {
         let actor = &mut *actor;
@@ -400,12 +404,7 @@ pub fn control(
             let mut sound = None;
             if striking {
                 if let Some(at) = blow {
-                    sound = lift.clash(
-                        index,
-                        at,
-                        CYL_RADIUS + hammer::AT_RADIUS,
-                        hammer::AT_POWER,
-                    );
+                    sound = lift.clash(index, at, CYL_RADIUS + hammer::AT_RADIUS, hammer::AT_POWER);
                 }
             }
             if sound.is_none() {

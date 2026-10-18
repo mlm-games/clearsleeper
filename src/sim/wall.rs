@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::bombflower::{Blasts, BLAST_RADIUS};
+use super::bombflower::{BLAST_RADIUS, Blasts};
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 
@@ -42,7 +42,7 @@ const FADE_FRAMES: u8 = 10; // <- d_a_wall.cpp:215
 pub const HALF_EXTENT: [[f32; 2]; 3] = [
     [150.0, 120.0], // <- d_a_wall.cpp:26, :27
     [700.0, 500.0], // <- d_a_wall.cpp:30, :31
-    [180.0, 90.0], // <- d_a_wall.cpp:34, :35
+    [180.0, 90.0],  // <- d_a_wall.cpp:34, :35
 ];
 
 /// `daWall_c::m_cull_size` (`d_a_wall.cpp:40-44`), the profile's `fopAc_CULLBOX_CUSTOM_e` (`:366`)
@@ -175,7 +175,8 @@ impl Wall {
         match self.kind {
             // case 0: case 1: case 2: (:212-224)
             0..=2 => {
-                if self.counter > FADE_FRAMES && super::walk::chase_f(&mut self.fade, 0.0, FADE_STEP)
+                if self.counter > FADE_FRAMES
+                    && super::walk::chase_f(&mut self.fade, 0.0, FADE_STEP)
                 {
                     return true;
                 }

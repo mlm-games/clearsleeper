@@ -448,9 +448,7 @@ pub fn control(
         if !drift.entered {
             drift.create_init(&*actor, &mut commands);
         }
-        let mut flower = drift
-            .flower
-            .and_then(|entity| flowers.get_mut(entity).ok());
+        let mut flower = drift.flower.and_then(|entity| flowers.get_mut(entity).ok());
         drift.execute(&mut *actor, flower.as_deref_mut());
     }
 }

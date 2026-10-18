@@ -130,25 +130,21 @@ impl Paper {
     }
 
     pub fn solid_status(&self) -> u32 {
-        if self.kind == TYPE_PIWA { PIWA_STATUS } else { 0 }
+        if self.kind == TYPE_PIWA {
+            PIWA_STATUS
+        } else {
+            0
+        }
     }
 
     pub fn cull(&self) -> (f32, f32, f32) {
         let info = attr(self.kind);
-        (
-            0.0,
-            f32::from(info.cull_y),
-            f32::from(info.cull_radius),
-        )
+        (0.0, f32::from(info.cull_y), f32::from(info.cull_radius))
     }
 
     pub fn attention(&self, pos: Vec3) -> Vec3 {
         let info = attr(self.kind);
-        Vec3::new(
-            pos.x,
-            pos.y + f32::from(info.attention_offset),
-            pos.z,
-        )
+        Vec3::new(pos.x, pos.y + f32::from(info.attention_offset), pos.z)
     }
 
     pub fn create_init(&mut self) {
@@ -194,15 +190,9 @@ impl Paper {
         }
         self.attended = false;
         self.msg_id = match archive {
-            Some(archive) => fop_msgm_message_set_actor(
-                procs,
-                info,
-                archive,
-                0,
-                msg_no,
-                None,
-                self.eye,
-            ),
+            Some(archive) => {
+                fop_msgm_message_set_actor(procs, info, archive, 0, msg_no, None, self.eye)
+            }
             None => NO_MSG,
         };
         self.mode = MODE_GET_MSG;

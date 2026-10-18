@@ -175,8 +175,6 @@ impl Barrel {
         }
     }
 
-
-
     pub fn liftable(&self, grounded: bool) -> bool {
         !self.broken && grounded
     }
@@ -189,7 +187,6 @@ impl Barrel {
     pub fn dropped(&mut self) {
         self.enter(Mode::Jump);
     }
-
 
     pub fn carry_step(&mut self, still_carried: bool) -> Option<Mode> {
         self.timer = self.timer.saturating_sub(1);
@@ -210,19 +207,18 @@ impl Barrel {
             return None;
         }
         let rolling = self.tilt == LYING;
-        let next = if rolling && sloped { Some(Mode::Walk) } else { None };
+        let next = if rolling && sloped {
+            Some(Mode::Walk)
+        } else {
+            None
+        };
         self.weight = if rolling { ROLLING_WEIGHT } else { WEIGHT };
         next
     }
 
     pub fn integrate(&mut self, heading: i16) {
-        let (speed, speed_f) = stream::calc_speed(
-            self.speed_f,
-            heading,
-            self.speed.y,
-            self.gravity,
-            MAX_FALL,
-        );
+        let (speed, speed_f) =
+            stream::calc_speed(self.speed_f, heading, self.speed.y, self.gravity, MAX_FALL);
         self.speed = speed;
         self.speed_f = speed_f;
     }
@@ -249,8 +245,7 @@ impl Barrel {
 
     pub fn wobble(&mut self, grounded: bool) {
         let factor = if grounded { GROUND_FACTOR } else { 1.0 };
-        let gain =
-            ((self.roll) as f32 * VIB_SLOPE + VIB_BIAS) * VIB_RATE * VIB_RATE_GAIN * factor;
+        let gain = ((self.roll) as f32 * VIB_SLOPE + VIB_BIAS) * VIB_RATE * VIB_RATE_GAIN * factor;
         self.yaw = self.yaw.wrapping_add(stream::units_s(gain));
         let spin = stream::units_s(VIB_RATE * VIB_SPIN * factor);
         self.spin = self.spin.wrapping_add(spin);
@@ -348,7 +343,6 @@ impl Barrel {
             self.drive = Vec3::ZERO;
         }
     }
-
 }
 
 pub fn is_barrel(name: &str) -> bool {
@@ -400,7 +394,11 @@ pub fn control(
             Mode::Walk => {
                 if grounded {
                     barrel.drag_step(heading, Some(slope));
-                    barrel.roll_step(tiltable && slope.x.abs() >= SLOPE_EPSILON && slope.z.abs() >= SLOPE_EPSILON)
+                    barrel.roll_step(
+                        tiltable
+                            && slope.x.abs() >= SLOPE_EPSILON
+                            && slope.z.abs() >= SLOPE_EPSILON,
+                    )
                 } else {
                     barrel.drag_step(heading, None);
                     let tilt = LYING;
@@ -427,4 +425,3 @@ pub fn control(
 pub fn hull() -> (f32, f32) {
     (BODY_HEIGHT, RADIUS)
 }
-

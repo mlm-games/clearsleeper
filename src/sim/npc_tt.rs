@@ -760,10 +760,7 @@ impl NpcTt {
 
     /// `daNpc_Tt_c::checkOrder` (`:112-124`).
     fn check_order(&mut self, demo_accept: bool, talk_command: bool, talk_xy: bool) {
-        if !demo_accept
-            && talk_command
-            && self.order_flags & ORDER_TALK_DEMO != 0
-        {
+        if !demo_accept && talk_command && self.order_flags & ORDER_TALK_DEMO != 0 {
             if talk_xy {
                 self.flags |= FLAG_TALK_ITEM;
             } else {
@@ -898,10 +895,7 @@ pub fn control(
     let demo_accept = msg.info.event_run_check();
     let send_button = msg.one.m116a != 0;
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (mut actor, mut tt) in &mut actors {
         let tap = do_now && !tt.prev_do;
         tt.prev_do = do_now;

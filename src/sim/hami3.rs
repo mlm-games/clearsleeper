@@ -127,7 +127,13 @@ impl Hami3 {
     }
 
     /// `daObjHami3_close_stop` (`d_a_obj_hami3.cpp:119-125`).
-    fn close_stop(&mut self, list: &EventList, active: &mut ActiveEvent, switches: &Switches, entity: Entity) {
+    fn close_stop(
+        &mut self,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        switches: &Switches,
+        entity: Entity,
+    ) {
         if switches.test(self.switch_no) {
             self.order(list, active, entity);
             self.mode = Mode::OpenDemoWait;
@@ -138,11 +144,14 @@ impl Hami3 {
     /// `mCommand == dEvtCmd_INDEMO_e` (`f_op_actor.h:177`), which `dEvt_control_c::demoCheck` sets
     /// on both ordered actors when the event starts (`d_event.cpp:314-316`) - `ActiveEvent::
     /// start_check`, the mapping `hami4.rs:108-110` documents.
-    fn open_demo_wait(&mut self, list: &EventList, active: &mut ActiveEvent, events: &mut SimEvents, entity: Entity) {
-        if self
-            .event_slot
-            .is_some_and(|slot| active.start_check(slot))
-        {
+    fn open_demo_wait(
+        &mut self,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        events: &mut SimEvents,
+        entity: Entity,
+    ) {
+        if self.event_slot.is_some_and(|slot| active.start_check(slot)) {
             if self.sound == 0 {
                 events.list.push(SimEvent::Se(SE_READ_RIDDLE_1));
             }
@@ -166,7 +175,13 @@ impl Hami3 {
 
     /// `daObjHami3_open_stop` (`:156-162`): the platform stays up until the pictogram switch is
     /// cleared, at which point it orders the demo again and starts closing.
-    fn open_stop(&mut self, list: &EventList, active: &mut ActiveEvent, switches: &Switches, entity: Entity) {
+    fn open_stop(
+        &mut self,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        switches: &Switches,
+        entity: Entity,
+    ) {
         if !switches.test(self.switch_no) {
             self.order(list, active, entity);
             self.mode = Mode::CloseDemoWait;
@@ -175,10 +190,7 @@ impl Hami3 {
 
     /// `daObjHami3_close_demo_wait` (`:165-171`).
     fn close_demo_wait(&mut self, list: &EventList, active: &mut ActiveEvent, entity: Entity) {
-        if self
-            .event_slot
-            .is_some_and(|slot| active.start_check(slot))
-        {
+        if self.event_slot.is_some_and(|slot| active.start_check(slot)) {
             self.mode = Mode::CloseDemo;
         } else {
             self.order(list, active, entity);

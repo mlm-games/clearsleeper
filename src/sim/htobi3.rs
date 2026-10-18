@@ -101,10 +101,20 @@ impl Htobi3 {
     /// `Create`'s height of `:55` plus its `mbIsSwitch` (`:60`) and `mbIsNearEnemy` (`:51`) stores.
     /// Nothing can change between Create and the first `Execute`, so reading the live values here
     /// reproduces them exactly.
-    fn create_init(&mut self, actor: &mut Actor, list: &EventList, switches: &Switches, enemies: &[i8]) {
+    fn create_init(
+        &mut self,
+        actor: &mut Actor,
+        list: &EventList,
+        switches: &Switches,
+        enemies: &[i8],
+    ) {
         self.open_slot = list.event_index(EVENT_OPEN);
         self.close_slot = list.event_index(EVENT_CLOSE);
-        let lift = if self.pose == DEMO_UP { LIFT_HEIGHT } else { 0.0 };
+        let lift = if self.pose == DEMO_UP {
+            LIFT_HEIGHT
+        } else {
+            0.0
+        };
         self.home_y = actor.pos.y - lift;
         actor.pos.y = self.home_y + lift;
         self.was_switch = switches.test(self.switch_no);
@@ -113,7 +123,13 @@ impl Htobi3 {
 
     /// `fopAcM_orderOtherEventId(this, mOpenEventIdx)` (`:198`) and its `mCloseEventIdx` twin
     /// (`:202`), guarded as in `vfan::Vfan::order`.
-    fn order(&self, slot: Option<usize>, list: &EventList, active: &mut ActiveEvent, entity: Entity) {
+    fn order(
+        &self,
+        slot: Option<usize>,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        entity: Entity,
+    ) {
         let Some(slot) = slot else {
             return;
         };
@@ -137,14 +153,7 @@ impl Htobi3 {
         entity: Entity,
     ) {
         self.demo(
-            actor,
-            list,
-            active,
-            switches,
-            ev_flags,
-            events,
-            enemies,
-            entity,
+            actor, list, active, switches, ev_flags, events, enemies, entity,
         );
         self.was_switch = switches.test(self.switch_no);
         self.was_near_enemy = Self::near_enemy(actor, enemies);
@@ -161,7 +170,12 @@ impl Htobi3 {
         [self.open_slot, self.close_slot]
             .into_iter()
             .flatten()
-            .any(|slot| matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)))
+            .any(|slot| {
+                matches!(
+                    active.stage_of(slot),
+                    Some(Stage::Play) | Some(Stage::Close)
+                )
+            })
     }
 
     /// `demo` (`d_a_shutter2.cpp:161-205`). The two `eventInfo.onCondition(dEvtCnd_UNK2_e)` calls
@@ -186,10 +200,18 @@ impl Htobi3 {
         if self.demo_state == STATE_CLOSED {
             if self.switch_no != NO_SWITCH {
                 if is_switch != self.was_switch {
-                    self.demo_state = if is_switch { STATE_OPENING } else { STATE_CLOSING };
+                    self.demo_state = if is_switch {
+                        STATE_OPENING
+                    } else {
+                        STATE_CLOSING
+                    };
                 }
             } else if is_near_enemy != self.was_near_enemy {
-                self.demo_state = if is_near_enemy { STATE_OPENING } else { STATE_CLOSING };
+                self.demo_state = if is_near_enemy {
+                    STATE_OPENING
+                } else {
+                    STATE_CLOSING
+                };
             }
         }
 
@@ -202,16 +224,12 @@ impl Htobi3 {
             return;
         }
 
-        if self
-            .open_slot
-            .is_some_and(|slot| active.start_check(slot))
+        if self.open_slot.is_some_and(|slot| active.start_check(slot))
             && self.demo_state == STATE_OPENING
         {
             self.demo_state = STATE_CLOSED;
         }
-        if self
-            .close_slot
-            .is_some_and(|slot| active.start_check(slot))
+        if self.close_slot.is_some_and(|slot| active.start_check(slot))
             && self.demo_state == STATE_CLOSING
         {
             self.demo_state = STATE_CLOSED;

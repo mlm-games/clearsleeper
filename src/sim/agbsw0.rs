@@ -1,10 +1,9 @@
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering};
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
-use crate::text::msgproc::MsgGameInfo;
 use super::actor::Actor;
 use super::bomb;
 use super::chest::Chests;
@@ -22,21 +21,11 @@ use super::player::Player;
 use super::stream::{cos_s, sin_s};
 use super::swim::Swim;
 use super::walk::to_s16;
+use crate::text::msgproc::MsgGameInfo;
 
 pub const AGBSW0_ACTORS: [&str; 13] = [
-    "agbA",
-    "agbAT",
-    "agbA2",
-    "agbF",
-    "agbF2",
-    "agbMARK",
-    "agbMW",
-    "agbCSW",
-    "agbTBOX",
-    "agbR",
-    "agbB",
-    "agbD",
-    "agbFA",
+    "agbA", "agbAT", "agbA2", "agbF", "agbF2", "agbMARK", "agbMW", "agbCSW", "agbTBOX", "agbR",
+    "agbB", "agbD", "agbFA",
 ];
 
 pub fn is_agbsw0(name: &str) -> bool {
@@ -253,7 +242,6 @@ const MAIL_NONE: u16 = NO_MSG;
 const GBA_LINK: bool = false;
 const AGB_PRESENT: bool = false;
 const NO_SET_ID: u16 = 0xFFFF;
-
 
 static MAIL_WORD: AtomicU64 = AtomicU64::new(0);
 static MAIL_SE: AtomicU32 = AtomicU32::new(0);
@@ -587,7 +575,13 @@ impl Agbsw0 {
     }
 
     fn mail_cancel(&mut self) {
-        self.mail_send(MAIL_NONE, MAIL_REACT_NONE, NO_SWITCH, NO_SWITCH, MAIL_SFX_NONE);
+        self.mail_send(
+            MAIL_NONE,
+            MAIL_REACT_NONE,
+            NO_SWITCH,
+            NO_SWITCH,
+            MAIL_SFX_NONE,
+        );
     }
 
     fn relative_pos(&self, abs: Vec3) -> Vec3 {
@@ -607,7 +601,8 @@ impl Agbsw0 {
                 let x_diff = (abs.x - self.pos.x).abs();
                 if x_diff < self.scale.x {
                     let z_diff = (abs.z - self.pos.z).abs();
-                    if z_diff < self.scale.x && x_diff * x_diff + z_diff * z_diff < self.scale.x * self.scale.x
+                    if z_diff < self.scale.x
+                        && x_diff * x_diff + z_diff * z_diff < self.scale.x * self.scale.x
                     {
                         return true;
                     }
@@ -615,7 +610,11 @@ impl Agbsw0 {
             }
         } else {
             let pos = self.relative_pos(abs);
-            if -radius <= pos.y && pos.y <= self.scale.y && pos.x.abs() < self.scale.x && pos.z.abs() < self.scale.z {
+            if -radius <= pos.y
+                && pos.y <= self.scale.y
+                && pos.x.abs() < self.scale.x
+                && pos.z.abs() < self.scale.z
+            {
                 return true;
             }
         }
@@ -654,7 +653,10 @@ impl Agbsw0 {
         self.param_no = param_no;
 
         if kind == TYPE_AT {
-            if sw0 < TBOX_RANGE && actor.angle[0] != PARAM_NO_ZERO && f.chests.is_open(SAVE_STAGE_CURRENT, sw0) {
+            if sw0 < TBOX_RANGE
+                && actor.angle[0] != PARAM_NO_ZERO
+                && f.chests.is_open(SAVE_STAGE_CURRENT, sw0)
+            {
                 return false;
             }
         } else if kind == TYPE_B {
@@ -771,9 +773,11 @@ impl Agbsw0 {
 
     fn cc_calc(&mut self, ctx: &Ctx<'_>) {
         self.cyl.tg_hit = self.cyl.tg_set
-            && ctx.f.bombs.iter().any(|shell| {
-                shell.mode == bomb::MODE_EXPLODE && self.cyl.touches(shell.pos)
-            });
+            && ctx
+                .f
+                .bombs
+                .iter()
+                .any(|shell| shell.mode == bomb::MODE_EXPLODE && self.cyl.touches(shell.pos));
     }
 
     fn release(&mut self, ctx: &mut Ctx<'_>) -> bool {
@@ -801,10 +805,7 @@ impl Agbsw0 {
             }
         }
 
-        if matches!(
-            kind,
-            TYPE_A | TYPE_AT | TYPE_M | TYPE_A2 | TYPE_F2 | TYPE_R
-        ) || kind >= TYPE_FA
+        if matches!(kind, TYPE_A | TYPE_AT | TYPE_M | TYPE_A2 | TYPE_F2 | TYPE_R) || kind >= TYPE_FA
         {
             if self.gba_link() && self.field_0x298 == 1 {
                 let packed = u64::from(NO_MSG)
@@ -1282,7 +1283,11 @@ impl Agbsw0 {
                 }
             }
 
-            if ctx.f.look_attention.is_some_and(|at| ctx.active.end_check(at)) {
+            if ctx
+                .f
+                .look_attention
+                .is_some_and(|at| ctx.active.end_check(at))
+            {
                 if let Some(at) = ctx.f.look_attention {
                     ctx.active.end(at);
                 }
@@ -1468,7 +1473,8 @@ impl Agbsw0 {
                     let beat = FIGURE_BEAT.load(Ordering::Relaxed);
                     if self.field_0x299 == beat {
                         let key = i32::from(self.field_0x299) - 1;
-                        if let Some(&msg) = usize::try_from(key).ok().and_then(|i| BEAT_MSG.get(i)) {
+                        if let Some(&msg) = usize::try_from(key).ok().and_then(|i| BEAT_MSG.get(i))
+                        {
                             let react = big_little_change(u32::from(msg)) >> 16;
                             self.mail_send(react as u16, 0xB, NO_SWITCH, NO_SWITCH, MAIL_SFX_NONE);
                         }
@@ -1559,18 +1565,26 @@ impl Agbsw0 {
                             }
                         } else if x_diff < z_diff {
                             if rel.x >= 0.0 {
-                                agb.home.x = (self.pos.x - pos_diff.x) + (x_diff + 1.0) * cos_s(self.shape_angle_y);
-                                agb.home.z = (self.pos.z - pos_diff.z) - (x_diff + 1.0) * sin_s(self.shape_angle_y);
+                                agb.home.x = (self.pos.x - pos_diff.x)
+                                    + (x_diff + 1.0) * cos_s(self.shape_angle_y);
+                                agb.home.z = (self.pos.z - pos_diff.z)
+                                    - (x_diff + 1.0) * sin_s(self.shape_angle_y);
                             } else {
-                                agb.home.x = (self.pos.x - pos_diff.x) - (x_diff + 1.0) * cos_s(self.shape_angle_y);
-                                agb.home.z = (self.pos.z - pos_diff.z) + (x_diff + 1.0) * sin_s(self.shape_angle_y);
+                                agb.home.x = (self.pos.x - pos_diff.x)
+                                    - (x_diff + 1.0) * cos_s(self.shape_angle_y);
+                                agb.home.z = (self.pos.z - pos_diff.z)
+                                    + (x_diff + 1.0) * sin_s(self.shape_angle_y);
                             }
                         } else if rel.z >= 0.0 {
-                            agb.home.x = (self.pos.x - pos_diff.x) + (z_diff + 1.0) * sin_s(self.shape_angle_y);
-                            agb.home.z = (self.pos.z - pos_diff.z) + (z_diff + 1.0) * cos_s(self.shape_angle_y);
+                            agb.home.x = (self.pos.x - pos_diff.x)
+                                + (z_diff + 1.0) * sin_s(self.shape_angle_y);
+                            agb.home.z = (self.pos.z - pos_diff.z)
+                                + (z_diff + 1.0) * cos_s(self.shape_angle_y);
                         } else {
-                            agb.home.x = (self.pos.x - pos_diff.x) - (z_diff + 1.0) * sin_s(self.shape_angle_y);
-                            agb.home.z = (self.pos.z - pos_diff.z) - (z_diff + 1.0) * cos_s(self.shape_angle_y);
+                            agb.home.x = (self.pos.x - pos_diff.x)
+                                - (z_diff + 1.0) * sin_s(self.shape_angle_y);
+                            agb.home.z = (self.pos.z - pos_diff.z)
+                                - (z_diff + 1.0) * cos_s(self.shape_angle_y);
                         }
                     }
                 }
@@ -1924,7 +1938,8 @@ impl Agbsw0 {
                 }
             }
             0x1A => {
-                if inventory::NO_ITEM != f.equipped.item(inventory::BOW_SLOT) && f.arrow_num < f.arrow_max
+                if inventory::NO_ITEM != f.equipped.item(inventory::BOW_SLOT)
+                    && f.arrow_num < f.arrow_max
                 {
                     return false;
                 }
@@ -1952,7 +1967,8 @@ impl Agbsw0 {
                 }
             }
             0x1F => {
-                if inventory::check_get_item(&f.equipped, &f.collect, ITEM_BOMB_BAG) && f.bomb_num == 0
+                if inventory::check_get_item(&f.equipped, &f.collect, ITEM_BOMB_BAG)
+                    && f.bomb_num == 0
                 {
                     return false;
                 }
@@ -2047,9 +2063,7 @@ impl Agbsw0 {
                 }
             }
             0x2F => {
-                if f.collect.is_symbol(SYMBOL_DIN)
-                    && !f.stories.test(BIT_UNLOCK_TING_DISCOUNT)
-                {
+                if f.collect.is_symbol(SYMBOL_DIN) && !f.stories.test(BIT_UNLOCK_TING_DISCOUNT) {
                     return false;
                 }
             }
@@ -2528,8 +2542,7 @@ impl Agbsw0 {
 
     fn chart_short(f: &Facts) -> bool {
         (CHART_FIRST..=CHART_LAST).any(|no| {
-            f.charts.has(usize::from(Self::slot(no)))
-                && !f.charts.triforce(Self::triforce_slot(no))
+            f.charts.has(usize::from(Self::slot(no))) && !f.charts.triforce(Self::triforce_slot(no))
         })
     }
 
@@ -2545,7 +2558,8 @@ impl Agbsw0 {
         }
 
         for no in CHART_FIRST..=CHART_LAST {
-            if f.charts.has(usize::from(Self::slot(no))) && !f.charts.triforce(Self::triforce_slot(no))
+            if f.charts.has(usize::from(Self::slot(no)))
+                && !f.charts.triforce(Self::triforce_slot(no))
             {
                 if RUPEE_BUY_MIN <= f.rupees {
                     return 0x305;
@@ -2575,7 +2589,11 @@ impl Agbsw0 {
                 };
             }
             let num = f.pendant_num(ITEM_JOY_PENDANT);
-            return if num >= JOY_PENDANT_FULL { 0x30C } else { 0x30D };
+            return if num >= JOY_PENDANT_FULL {
+                0x30C
+            } else {
+                0x30D
+            };
         }
         if !f.charts.has(usize::from(Self::slot(CHART_FIRST + 2))) {
             if inventory::check_get_item(&f.equipped, &f.collect, ITEM_BAIT_BAG) {
@@ -2593,7 +2611,9 @@ impl Agbsw0 {
         if !f.charts.has(usize::from(Self::slot(CHART_FIRST + 3)))
             && inventory::check_get_item(&f.equipped, &f.collect, ITEM_HOOKSHOT)
         {
-            if f.charts.is_open(usize::from(Self::slot(CHART_TRIFORCE_SLOT))) {
+            if f.charts
+                .is_open(usize::from(Self::slot(CHART_TRIFORCE_SLOT)))
+            {
                 if f.hour < HOUR_DAWN || f.hour >= HOUR_NIGHT_END {
                     match f.moon {
                         MOON_CRESCENT => {
@@ -2765,9 +2785,7 @@ impl Facts {
     }
 
     fn ocean_sv(&self, grid: usize, bit: u16) -> bool {
-        self.ocean_sv
-            .get(grid)
-            .is_some_and(|word| word & bit != 0)
+        self.ocean_sv.get(grid).is_some_and(|word| word & bit != 0)
     }
 }
 

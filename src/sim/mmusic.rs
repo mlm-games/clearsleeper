@@ -18,8 +18,18 @@ const FLAG_1610: u32 = 0x1610; // <- d_save_event_flag.inc:169
 /// `manage_se` (`:92-110`) is the only reader of `mTimer`, and it needs a continuous-audio
 /// channel plus `cM_rndF`, neither of which exists here, so the timer is not stored.
 ///
-/// `mpEmitter` is a `JPABaseEmitter*`; the particle system is not modelled, so both branches
-/// that test it (`:119` and `:129`) are particle-only and omitted. What remains of
+/// `mpEmitter` is a `JPABaseEmitter*` held for the whole actor. Its two branches (`:119`, `:129`)
+/// exist to gate `manage_se` and to stop or resume the emitter's creation
+/// (`stopCreateParticle` / `playCreateParticle`, `:102`, `:139`), so what they need is a held
+/// emitter handle: the port's actor-facing particle channel queues one-shot
+/// `dComIfGp_particle_set` requests ([`DamageFxQueue`](super::damage_fx::DamageFxQueue)) and carries
+/// no handle, the same limit `gryw.rs` records.
+///
+/// The sound the emitter gates is `mDoAud_cbPracticePlay` / `mDoAud_checkCbPracticePlay`
+/// (`:92-110`): a CONTINUOUS channel the shell starts and the audio manager reports on, which the
+/// port has no voice for - `SimEvent::Bgm` is the one music channel and its drain has no consumer
+/// yet. Striking one up per `mTimer` frame and reporting it through the events channel would be a
+/// different sound from the one the reference plays, so it is not invented. What remains of
 /// `_execute` is its final `else`, which re-samples the predicate every tick.
 ///
 /// `Macore_is_playing` (`:39-48`), minus `dComIfGs_isStageBossEnemy(dSv_save_c::STAGE_WT)`:

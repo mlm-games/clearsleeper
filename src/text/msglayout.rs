@@ -1,65 +1,41 @@
-use crate::text::{
-    ICON_ARROW_DOWN, ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP,
-};
 use super::{
     CTRL_A_BUTTON, CTRL_ARROW_DOWN, CTRL_ARROW_LEFT, CTRL_ARROW_RIGHT, CTRL_ARROW_UP,
-    CTRL_B_BUTTON, CTRL_C_STICK, CTRL_DPAD, CTRL_FLASHING_A_BUTTON, CTRL_HEART, CTRL_L_BUTTON,
-    CTRL_MAIN_STICK, CTRL_MAIN_STICK_DOWN, CTRL_MAIN_STICK_LEFT, CTRL_MAIN_STICK_LEFT_RIGHT,
-    CTRL_MAIN_STICK_RIGHT, CTRL_MAIN_STICK_UP, CTRL_MAIN_STICK_UP_DOWN, CTRL_MUSIC_NOTE,
-    CTRL_PLAYER_NAME, CTRL_R_BUTTON, CTRL_SELECT_THREE, CTRL_SELECT_TWO, CTRL_SELECT_YOKO_LEFT,
-    CTRL_SELECT_YOKO_RIGHT, CTRL_STARBURST, CTRL_UNK01, CTRL_UNK02, CTRL_UNK03, CTRL_UNK04,
-    CTRL_UNK05, CTRL_UNK20, CTRL_UNK21, CTRL_UNK22, CTRL_UNK23, CTRL_UNK24, CTRL_UNK25,
-    CTRL_UNK26, CTRL_UNK28, CTRL_UNK29, CTRL_UNK2B, CTRL_UNK2C, CTRL_UNK2D, CTRL_UNK2E,
-    CTRL_UNK2F, CTRL_UNK30, CTRL_UNK31, CTRL_UNK32, CTRL_UNK33, CTRL_UNK34, CTRL_UNK35,
-    CTRL_UNK36, CTRL_UNK37, CTRL_UNK38, CTRL_UNK3B, CTRL_UNK3C, CTRL_UNK3D, CTRL_UNK3E,
-    CTRL_UNK3F, CTRL_UNK40, CTRL_UNK41, CTRL_UNK42, CTRL_UNK43, CTRL_UNK44, CTRL_UNK45,
-    CTRL_UNK46, CTRL_UNK47, CTRL_UNK48, CTRL_UNK49, CTRL_UNK4A, CTRL_WAIT, CTRL_X_BUTTON,
-    CTRL_DUMMY, CTRL_Y_BUTTON, CTRL_Z_BUTTON, FontSlot, ICON_A_BUTTON, ICON_B_BUTTON, ICON_C_STICK,
-    ICON_DPAD, ICON_FLASHING_A_BUTTON_2, ICON_HEART_2, ICON_L_BUTTON, ICON_MAIN_STICK,
-    ICON_MAIN_STICK_DOWN, ICON_MAIN_STICK_LEFT, ICON_MAIN_STICK_LEFT_RIGHT, ICON_MAIN_STICK_RIGHT,
-    ICON_MAIN_STICK_UP, ICON_MAIN_STICK_UP_DOWN, ICON_MUSIC_NOTE_2, ICON_R_BUTTON,
-    ICON_SELECT_YOKO_LEFT, ICON_SELECT_YOKO_RIGHT, ICON_STARBURST_2, ICON_X_BUTTON, ICON_Y_BUTTON,
-    ICON_Z_BUTTON, MSG_MAX_SELECT, MsgData, SELECT_OFF, SELECT_ON, SPCL_COLOR, SPCL_RUBY,
-    SPCL_UNK1, STATUS_CLOSE_WAIT, STATUS_INPUT, STATUS_MSG_CONTINUES, STATUS_MSG_DISPLAYED,
-    STATUS_MSG_ENDS, STATUS_SELECT_2, STATUS_SELECT_3, STATUS_SELECT_YOKO, STATUS_STOP,
-    STATUS_TYPING, TEXT_BUF, be32,
+    CTRL_B_BUTTON, CTRL_C_STICK, CTRL_DPAD, CTRL_DUMMY, CTRL_FLASHING_A_BUTTON, CTRL_HEART,
+    CTRL_L_BUTTON, CTRL_MAIN_STICK, CTRL_MAIN_STICK_DOWN, CTRL_MAIN_STICK_LEFT,
+    CTRL_MAIN_STICK_LEFT_RIGHT, CTRL_MAIN_STICK_RIGHT, CTRL_MAIN_STICK_UP, CTRL_MAIN_STICK_UP_DOWN,
+    CTRL_MUSIC_NOTE, CTRL_PLAYER_NAME, CTRL_R_BUTTON, CTRL_SELECT_THREE, CTRL_SELECT_TWO,
+    CTRL_SELECT_YOKO_LEFT, CTRL_SELECT_YOKO_RIGHT, CTRL_STARBURST, CTRL_UNK01, CTRL_UNK02,
+    CTRL_UNK2B, CTRL_UNK2C, CTRL_UNK2D, CTRL_UNK2E, CTRL_UNK2F, CTRL_UNK03, CTRL_UNK3B, CTRL_UNK3C,
+    CTRL_UNK3D, CTRL_UNK3E, CTRL_UNK3F, CTRL_UNK04, CTRL_UNK4A, CTRL_UNK05, CTRL_UNK20, CTRL_UNK21,
+    CTRL_UNK22, CTRL_UNK23, CTRL_UNK24, CTRL_UNK25, CTRL_UNK26, CTRL_UNK28, CTRL_UNK29, CTRL_UNK30,
+    CTRL_UNK31, CTRL_UNK32, CTRL_UNK33, CTRL_UNK34, CTRL_UNK35, CTRL_UNK36, CTRL_UNK37, CTRL_UNK38,
+    CTRL_UNK40, CTRL_UNK41, CTRL_UNK42, CTRL_UNK43, CTRL_UNK44, CTRL_UNK45, CTRL_UNK46, CTRL_UNK47,
+    CTRL_UNK48, CTRL_UNK49, CTRL_WAIT, CTRL_X_BUTTON, CTRL_Y_BUTTON, CTRL_Z_BUTTON, FontSlot,
+    ICON_A_BUTTON, ICON_B_BUTTON, ICON_C_STICK, ICON_DPAD, ICON_FLASHING_A_BUTTON_2, ICON_HEART_2,
+    ICON_L_BUTTON, ICON_MAIN_STICK, ICON_MAIN_STICK_DOWN, ICON_MAIN_STICK_LEFT,
+    ICON_MAIN_STICK_LEFT_RIGHT, ICON_MAIN_STICK_RIGHT, ICON_MAIN_STICK_UP, ICON_MAIN_STICK_UP_DOWN,
+    ICON_MUSIC_NOTE_2, ICON_R_BUTTON, ICON_SELECT_YOKO_LEFT, ICON_SELECT_YOKO_RIGHT,
+    ICON_STARBURST_2, ICON_X_BUTTON, ICON_Y_BUTTON, ICON_Z_BUTTON, MSG_MAX_SELECT, MsgData,
+    SELECT_OFF, SELECT_ON, SPCL_COLOR, SPCL_RUBY, SPCL_UNK1, STATUS_CLOSE_WAIT, STATUS_INPUT,
+    STATUS_MSG_CONTINUES, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_SELECT_2, STATUS_SELECT_3,
+    STATUS_SELECT_YOKO, STATUS_STOP, STATUS_TYPING, TEXT_BUF, be32,
 };
+use crate::text::{ICON_ARROW_DOWN, ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP};
 
 const PLURAL_NAME_MSG_NO: [u32; 6] = [0x33B, 0xC8B, 0x1D21, 0x31D7, 0x37DD, 0x37DE];
 
 const COLOR_NAME_MSGNO: [u32; 9] = [
-    0x000000FF,
-    0xB40000FF,
-    0x008282FF,
-    0x0000AAFF,
-    0xF0F01EFF,
-    0x82FFFFFF,
-    0x6400FFFF,
-    0x505050FF,
+    0x000000FF, 0xB40000FF, 0x008282FF, 0x0000AAFF, 0xF0F01EFF, 0x82FFFFFF, 0x6400FFFF, 0x505050FF,
     0xFFB400FF,
 ];
 
 const COLOR_TEXTBOX_2_6_7: [u32; 9] = [
-    0x00000000,
-    0xB4000000,
-    0x00828200,
-    0x0000AA00,
-    0xF0F01E00,
-    0x82FFFF00,
-    0x6400FF00,
-    0x50505000,
+    0x00000000, 0xB4000000, 0x00828200, 0x0000AA00, 0xF0F01E00, 0x82FFFF00, 0x6400FF00, 0x50505000,
     0xFFB40000,
 ];
 
 const COLOR_TEXTBOX_0B: [u32; 9] = [
-    0x000000FF,
-    0xB40000FF,
-    0x008282FF,
-    0x0000AAFF,
-    0xE67D0FFF,
-    0x82FFFFFF,
-    0x6400FFFF,
-    0x3C3C3CFF,
+    0x000000FF, 0xB40000FF, 0x008282FF, 0x0000AAFF, 0xE67D0FFF, 0x82FFFFFF, 0x6400FFFF, 0x3C3C3CFF,
     0xFFB400FF,
 ];
 
@@ -173,8 +149,6 @@ const ITEM_ICON: [u8; 60] = [
     ITEM_NO_SHOP_GURU_STATUE,
 ];
 
-
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MsgSetFlow {
     pub set_continue_msg: bool,
@@ -251,7 +225,11 @@ pub fn fop_msgm_get_color_table(clt1: &[u8], color_no: u16) -> u32 {
     be32(clt1, 0x0C + 4 * color_no as usize).unwrap_or(0)
 }
 
-pub fn set_fontsize_center(out: &mut [Option<String>; MSG_MAX_SELECT], old_size: i32, new_size: i32) {
+pub fn set_fontsize_center(
+    out: &mut [Option<String>; MSG_MAX_SELECT],
+    old_size: i32,
+    new_size: i32,
+) {
     let temp = (new_size - old_size) / 2;
     let buf1 = format!("\u{1b}FX[{new_size}]\u{1b}FY[{new_size}]");
     if temp > 0 {
@@ -292,7 +270,12 @@ fn out_at(out: &mut [Option<String>; MSG_MAX_SELECT], idx: usize, text: &str) {
 }
 
 fn cstr_bytes(bytes: &[u8]) -> String {
-    bytes.iter().copied().take_while(|&b| b != 0).map(|b| b as char).collect()
+    bytes
+        .iter()
+        .copied()
+        .take_while(|&b| b != 0)
+        .map(|b| b as char)
+        .collect()
 }
 
 fn textbox_flashing(textbox_type: u8) -> bool {
@@ -382,7 +365,11 @@ impl MsgData {
         self.line_count = 0;
         self.now_cursor_pos = self.field_0x108.get(0).copied().unwrap_or(0) as f32;
         self.layout_step();
-        self.mesg_status = if three { STATUS_SELECT_3 } else { STATUS_SELECT_2 };
+        self.mesg_status = if three {
+            STATUS_SELECT_3
+        } else {
+            STATUS_SELECT_2
+        };
     }
 
     fn layout_flashing_on(&mut self) {
@@ -531,7 +518,10 @@ impl MsgData {
                     ruby_text.clear();
                     while (code_len as i32) > (r17 as i32) {
                         let hi = src.get(offset.wrapping_add(r17)).copied().unwrap_or(0);
-                        let lo = src.get(offset.wrapping_add(r17).wrapping_add(1)).copied().unwrap_or(0);
+                        let lo = src
+                            .get(offset.wrapping_add(r17).wrapping_add(1))
+                            .copied()
+                            .unwrap_or(0);
                         ruby_text.push(hi as char);
                         ruby_text.push(lo as char);
                         let c = ((hi as i32) << 8) | (lo as i32);
@@ -558,7 +548,11 @@ impl MsgData {
                 }
                 let scale = self.field_0x148;
                 if self.field_0x150 == 0 {
-                    let base = self.field_0xf8.get(self.line_count as usize).copied().unwrap_or(0);
+                    let base = self
+                        .field_0xf8
+                        .get(self.line_count as usize)
+                        .copied()
+                        .unwrap_or(0);
                     let w = self.char_length(font, scale, c as u16, true);
                     self.now_cursor_pos = w + base as f32;
                 } else {
@@ -571,8 +565,7 @@ impl MsgData {
                     ruby_count -= 1;
                     if ruby_count == 0 {
                         let f0 = (self.now_cursor_pos - ruby_start) / 2.0f32;
-                        let temp2_2 =
-                            (ruby_start + f0 - (ruby_width / 2.0f32) + 0.5f32) as i32;
+                        let temp2_2 = (ruby_start + f0 - (ruby_width / 2.0f32) + 0.5f32) as i32;
                         let temp2 = ((temp2_2 as f32 - self.field_0x24) + 0.5f32) as i32;
                         if temp2 > 0 {
                             let s = format!("\u{1b}CR[{temp2}]");
@@ -657,8 +650,7 @@ impl MsgData {
                     if (0x42..=0x4B).contains(&msg_no) {
                         self.string_color =
                             COLOR_NAME_MSGNO.get(idx as usize).copied().unwrap_or(0);
-                        let s =
-                            format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
+                        let s = format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
                         self.layout_out_main(&s);
                     } else if (idx as i8) >= 0 && idx <= 8 {
                         let textbox_type = self.entry.textbox_type;
@@ -672,14 +664,12 @@ impl MsgData {
                         } else if textbox_type == 0xB {
                             self.string_color =
                                 COLOR_TEXTBOX_0B.get(idx as usize).copied().unwrap_or(0);
-                            let s =
-                                format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
+                            let s = format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
                             self.layout_out_main(&s);
                         } else {
                             self.string_color =
                                 fop_msgm_get_color_table(state.color_clt1, idx as u16);
-                            let s =
-                                format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
+                            let s = format!("\u{1b}CC[{:08x}]\u{1b}GM[0]", self.string_color);
                             self.layout_out_main(&s);
                         }
                     }
@@ -722,8 +712,7 @@ impl MsgData {
                         self.field_0x18 = 0.0f32;
                         self.field_0x1c = 0.0f32;
                         self.field_0x28 = self.now_cursor_pos;
-                        self.field_0x154 =
-                            self.layout_at(self.count.wrapping_add(5)) as i32;
+                        self.field_0x154 = self.layout_at(self.count.wrapping_add(5)) as i32;
                         self.count = self.count.wrapping_add(6);
                         let mut acc = 0usize;
                         while end > self.count {

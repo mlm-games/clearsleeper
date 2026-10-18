@@ -197,7 +197,10 @@ const NO_EVENT: usize = usize::MAX;
 
 /// `isBomb` — `d_item.cpp:2762-2768`.
 fn is_bomb(item: u8) -> bool {
-    matches!(item, ITEM_BOMB_5 | ITEM_BOMB_10 | ITEM_BOMB_20 | ITEM_BOMB_30)
+    matches!(
+        item,
+        ITEM_BOMB_5 | ITEM_BOMB_10 | ITEM_BOMB_20 | ITEM_BOMB_30
+    )
 }
 
 /// `isArrow` — `d_item.cpp:2771-2777`.
@@ -249,8 +252,12 @@ const fn set_data(
     }
 }
 
-const FEEDBAG_DATA: ItemData =
-    item_data(ITEM_BAIT_BAG, ITEM_BAIT_BAG, NO_ITEM_ID, BUY_RUPEES | BUY_MUST_NOT_OWN_ITEM); // <- d_shop.cpp:33-38
+const FEEDBAG_DATA: ItemData = item_data(
+    ITEM_BAIT_BAG,
+    ITEM_BAIT_BAG,
+    NO_ITEM_ID,
+    BUY_RUPEES | BUY_MUST_NOT_OWN_ITEM,
+); // <- d_shop.cpp:33-38
 const FOOD_ALL_DATA: ItemData = item_data(
     ITEM_BIRD_BAIT_5,
     ITEM_BIRD_BAIT_5,
@@ -293,8 +300,12 @@ const EMPTYBOTTLE_DATA: ItemData = item_data(
     ITEM_EMPTY_BOTTLE as i32,
     BUY_RUPEES,
 ); // <- :110-115
-const HEART_DATA: ItemData =
-    item_data(ITEM_HEART_PIECE, ITEM_HEART_PIECE, NO_ITEM_ID, BUY_RUPEES | BUY_MUST_NOT_OWN_ITEM); // <- :117-122
+const HEART_DATA: ItemData = item_data(
+    ITEM_HEART_PIECE,
+    ITEM_HEART_PIECE,
+    NO_ITEM_ID,
+    BUY_RUPEES | BUY_MUST_NOT_OWN_ITEM,
+); // <- :117-122
 const MAP_DATA: ItemData = item_data(
     ITEM_COLLECT_MAP_30,
     ITEM_COLLECT_MAP_30,
@@ -572,7 +583,7 @@ impl Shop {
     pub fn spawn(parameters: u32) -> Self {
         let kind = match (parameters >> TYPE_SHIFT) & TYPE_MASK {
             1 => TYPE_MASKED, // <- :2144
-            _ => TYPE_NORMAL,  // <- :2141 and the default arm, :2147
+            _ => TYPE_NORMAL, // <- :2141 and the default arm, :2147
         };
         let raw = (parameters & INDEX_BITS) as u8 as i8;
         let index = if raw == -1 {
@@ -694,12 +705,8 @@ impl Shop {
         if self.kind == TYPE_MASKED {
             // :1483-1515 — the Bazaar base list, each sold-out slot replaced once
             // in this order by the bomb / arrow / potion / bomb / arrow set.
-            let mut replacement: [&Entry; 4] = [
-                &BOMB30_BS2,
-                &ARROW30_BS2,
-                &RED_BOTTLE_BS2,
-                &ARROW30_BS2,
-            ];
+            let mut replacement: [&Entry; 4] =
+                [&BOMB30_BS2, &ARROW30_BS2, &RED_BOTTLE_BS2, &ARROW30_BS2];
             let mut next = 0usize;
             if check_get_item(equipped, collect, ITEM_BOMB_BAG) {
                 // :1487-1489
@@ -759,8 +766,7 @@ impl Shop {
         for i in 0..SLOT_COUNT {
             // :1523-1534
             let item = self.slots[i].item.item;
-            self.sold_out[i] = (!check_get_item(equipped, collect, ITEM_BOMB_BAG)
-                && is_bomb(item))
+            self.sold_out[i] = (!check_get_item(equipped, collect, ITEM_BOMB_BAG) && is_bomb(item))
                 || (!has_bow(equipped) && is_arrow(item));
         }
         self.selected = NO_SELECTED; // <- :1536
@@ -772,10 +778,7 @@ impl Shop {
         if self.kind == TYPE_MASKED {
             range(0x2F4A, 0x2F53) || range(0x2F6B, 0x2F78) || msg == 0x2F47 // <- :1214
         } else {
-            range(0xF42, 0xF54)
-                || range(0xF67, 0xF6E)
-                || range(0xF63, 0xF66)
-                || msg == 0xF3E // <- :1209
+            range(0xF42, 0xF54) || range(0xF67, 0xF6E) || range(0xF63, 0xF66) || msg == 0xF3E // <- :1209
         }
     }
 
@@ -800,8 +803,22 @@ impl Shop {
     fn beast_item_msg(&self, msg: u32) -> bool {
         matches!(
             msg,
-            0xF7A | 0xF7C | 0xF82 | 0xF84 | 0xF87 | 0xF89 | 0xF8C | 0xF8E | 0xF91 | 0xF93
-                | 0xF96 | 0xF98 | 0xF9B | 0xF9D | 0xFA0 | 0xFD3
+            0xF7A
+                | 0xF7C
+                | 0xF82
+                | 0xF84
+                | 0xF87
+                | 0xF89
+                | 0xF8C
+                | 0xF8E
+                | 0xF91
+                | 0xF93
+                | 0xF96
+                | 0xF98
+                | 0xF9B
+                | 0xF9D
+                | 0xFA0
+                | 0xFD3
         )
     }
 
@@ -827,8 +844,6 @@ impl Shop {
         }
         0xF3F // <- :1243
     }
-
-    
 
     /// `daNpc_Bs1_c::chkAttention` — `:337-344`. Retail compares the raw Z delta
     /// against `mMaxAttnDistXZ`; it is not a distance.
@@ -1069,7 +1084,11 @@ impl Shop {
             }
             if flags.test(BIT_MASKED_RETURN) {
                 if flags.test(BIT_MASKED_TICKET) {
-                    return if self.masked_asked == 1 { 0x2F60 } else { 0x2F61 }; // :1094, :1097
+                    return if self.masked_asked == 1 {
+                        0x2F60
+                    } else {
+                        0x2F61
+                    }; // :1094, :1097
                 }
                 flags.set(BIT_MASKED_TICKET); // <- :1099
                 self.masked_asked = 1; // <- :1101
@@ -1144,9 +1163,29 @@ impl Shop {
         // ---- straight-through advances — :448-471
         if matches!(
             msg,
-            0xF50 | 0xF53 | 0xF55 | 0xF56 | 0xF58 | 0xF6F | 0xF70 | 0xF71 | 0xF73 | 0xF79
-                | 0xF81 | 0xF86 | 0xF8B | 0xF90 | 0xF95 | 0xF9A | 0xF9F | 0xFD6 | 0xFD7
-                | 0x2F62 | 0x2F64 | 0x2F65 | 0x2F67
+            0xF50
+                | 0xF53
+                | 0xF55
+                | 0xF56
+                | 0xF58
+                | 0xF6F
+                | 0xF70
+                | 0xF71
+                | 0xF73
+                | 0xF79
+                | 0xF81
+                | 0xF86
+                | 0xF8B
+                | 0xF90
+                | 0xF95
+                | 0xF9A
+                | 0xF9F
+                | 0xFD6
+                | 0xFD7
+                | 0x2F62
+                | 0x2F64
+                | 0x2F65
+                | 0x2F67
         ) {
             return Step::Next(msg + 1); // <- :471
         }
@@ -1216,9 +1255,27 @@ impl Shop {
         // ---- the Bazaar's opening lines — :613-634
         if matches!(
             msg,
-            0x2F45 | 0x2F46 | 0x2F48 | 0x2F50 | 0x2F51 | 0x2F52 | 0x2F53 | 0x2F54 | 0x2F55
-                | 0x2F58 | 0x2F59 | 0x2F5A | 0x2F5B | 0x2F5C | 0x2F5D | 0x2F5E | 0x2F5F
-                | 0x2F60 | 0x2F61 | 0x2F66 | 0x2F68
+            0x2F45
+                | 0x2F46
+                | 0x2F48
+                | 0x2F50
+                | 0x2F51
+                | 0x2F52
+                | 0x2F53
+                | 0x2F54
+                | 0x2F55
+                | 0x2F58
+                | 0x2F59
+                | 0x2F5A
+                | 0x2F5B
+                | 0x2F5C
+                | 0x2F5D
+                | 0x2F5E
+                | 0x2F5F
+                | 0x2F60
+                | 0x2F61
+                | 0x2F66
+                | 0x2F68
         ) {
             return Step::Next(0x2F47); // <- :634
         }
@@ -1379,12 +1436,15 @@ impl Shop {
             .saturating_sub(i32::from(ctx.price).max(0) as u32); // <- :833 / :905
         let item = entry.item.item;
         if bazaar {
-            if matches!(item, ITEM_EMPTY_BOTTLE | ITEM_HEART_PIECE | ITEM_COLLECT_MAP_30) {
+            if matches!(
+                item,
+                ITEM_EMPTY_BOTTLE | ITEM_HEART_PIECE | ITEM_COLLECT_MAP_30
+            ) {
                 self.sold_out[at] = true; // <- SoldOutItem, :891
                 match item {
                     ITEM_EMPTY_BOTTLE => ctx.flags.set(BIT_BOTTLE_SOLD), // <- :896
-                    ITEM_HEART_PIECE => ctx.flags.set(BIT_HEART_SOLD),    // <- :899
-                    _ => ctx.flags.set(BIT_MAP_SOLD),                     // <- :902
+                    ITEM_HEART_PIECE => ctx.flags.set(BIT_HEART_SOLD),   // <- :899
+                    _ => ctx.flags.set(BIT_MAP_SOLD),                    // <- :902
                 }
             }
         } else if item == ITEM_BAIT_BAG {
@@ -1507,7 +1567,8 @@ fn bought_error_status(
             status |= BUY_MUST_OWN_ITEM; // <- :1362
         }
     }
-    if cond & BUY_MUST_NOT_OWN_ITEM != 0 && check_get_item(equipped, collect, entry.item.must_not_own)
+    if cond & BUY_MUST_NOT_OWN_ITEM != 0
+        && check_get_item(equipped, collect, entry.item.must_not_own)
     {
         status |= BUY_MUST_NOT_OWN_ITEM; // <- :1367
     }
@@ -1683,10 +1744,7 @@ pub fn control(
 ) {
     let clear_count = world.text_flags.clear_count;
     let send = boxes.one.m116a;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     let player = boxes.players.iter().next().copied();
     let stick_value = intent.axis.length().min(1.0);
     let stick_angle = stick_angle(intent.axis);

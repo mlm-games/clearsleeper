@@ -238,7 +238,10 @@ pub fn control(
                     }
                 }
             }
-            if sound.is_none() && striking && let Some(head) = head {
+            if sound.is_none()
+                && striking
+                && let Some(head) = head
+            {
                 sound = pile.struck(AT_SKULL_HAMMER, head, actor.pos);
             }
             if let Some(sound) = sound {

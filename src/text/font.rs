@@ -158,9 +158,21 @@ impl ResFont {
         font.wid1_at = Self::block_at(&font.data, WID1);
         font.map1_at = Self::block_at(&font.data, MAP1);
         font.gly1_at = Self::block_at(&font.data, GLY1);
-        font.wid_block_num = if fontdata::wid1(&font.data).is_some() { 1 } else { 0 };
-        font.glyph_block_num = if fontdata::gly1(&font.data).is_some() { 1 } else { 0 };
-        font.map_block_num = if fontdata::map1(&font.data).is_some() { 1 } else { 0 };
+        font.wid_block_num = if fontdata::wid1(&font.data).is_some() {
+            1
+        } else {
+            0
+        };
+        font.glyph_block_num = if fontdata::gly1(&font.data).is_some() {
+            1
+        } else {
+            0
+        };
+        font.map_block_num = if fontdata::map1(&font.data).is_some() {
+            1
+        } else {
+            0
+        };
         font.valid = true;
         font.set_block();
         font
@@ -415,8 +427,8 @@ impl ResFont {
         self.cell_x = cell_col * cell_w;
         self.cell_y = cell_row * cell_h;
 
-        let image_bytes = (usize::from(glyph.texture_width) * usize::from(glyph.texture_height) / 2)
-            .max(1);
+        let image_bytes =
+            (usize::from(glyph.texture_width) * usize::from(glyph.texture_height) / 2).max(1);
         let page_at = self
             .gly1_at
             .wrapping_add(GLYPH_HEADER_SIZE)
@@ -726,9 +738,7 @@ impl CacheFont {
             let dst_at = aram_at as usize;
             let len = src.len().min(self.aram.len().saturating_sub(dst_at));
             let dst_end = dst_at.wrapping_add(len);
-            if let (Some(dst), Some(head)) =
-                (self.aram.get_mut(dst_at..dst_end), src.get(..len))
-            {
+            if let (Some(dst), Some(head)) = (self.aram.get_mut(dst_at..dst_end), src.get(..len)) {
                 dst.copy_from_slice(head);
             }
             self.glyph_aram.push(aram_at);
@@ -1014,7 +1024,8 @@ impl FontBank {
 
 impl FontSlot for FontBank {
     fn metrics(&self, slot: usize) -> Metrics {
-        self.get(slot).map_or_else(Metrics::default, ResFont::metrics)
+        self.get(slot)
+            .map_or_else(Metrics::default, ResFont::metrics)
     }
 
     fn char_width(&self, slot: usize, code: u16) -> i32 {

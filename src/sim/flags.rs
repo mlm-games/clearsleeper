@@ -27,8 +27,12 @@ impl Default for StoryBits {
 }
 
 impl StoryBits {
-    fn cell(&self, id: u16) -> (usize, u8) {
+    pub(crate) fn cell_of(id: u16) -> (usize, u8) {
         ((id >> 8) as usize, (id & 0xFF) as u8)
+    }
+
+    fn cell(&self, id: u16) -> (usize, u8) {
+        Self::cell_of(id)
     }
 
     pub fn test(&self, id: u16) -> bool {
@@ -55,6 +59,45 @@ impl StoryBits {
         let (cell, mask) = self.cell(id);
         self.bytes[cell] &= !mask;
         self.bytes[cell] |= value;
+    }
+}
+
+/// `dSv_event_c`'s temporary instance: `dComIfGs_isTmpBit`, `onTmpBit` and `offTmpBit`
+/// are `save.getTmp().isEventBit` and its two writers (`d_com_inf_game.h:1376-1386`),
+/// a second flag store of the same shape as the one [`StoryBits`] models. The numeric
+/// ids are the same space, which is the trap: `dSv_event_flag_c::UNK_0310` (the tale
+/// told, read by `d_a_npc_p1.cpp:1302` and `d_a_obj_pirateship.cpp:431`) and
+/// `dSv_event_tmp_flag_c::UNK_0310` (Grandma's offer, `d_a_npc_ba1.cpp:1410`) are two
+/// different bits at `0x310`, so the tmp store is its own resource here. Nothing reads
+/// the register half (`dComIfGs_setTmpReg`/`getTmpReg`) yet, so only the flag half is
+/// modelled.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TmpBits {
+    bytes: [u8; STORY_BYTES],
+}
+
+impl Default for TmpBits {
+    fn default() -> Self {
+        Self {
+            bytes: [0_u8; STORY_BYTES],
+        }
+    }
+}
+
+impl TmpBits {
+    pub fn test(&self, id: u16) -> bool {
+        let (cell, mask) = StoryBits::cell_of(id);
+        self.bytes[cell] & mask != 0
+    }
+
+    pub fn set(&mut self, id: u16) {
+        let (cell, mask) = StoryBits::cell_of(id);
+        self.bytes[cell] |= mask;
+    }
+
+    pub fn clear(&mut self, id: u16) {
+        let (cell, mask) = StoryBits::cell_of(id);
+        self.bytes[cell] &= !mask;
     }
 }
 
@@ -318,7 +361,6 @@ impl EventFlags {
         Self { bytes }
     }
 }
-
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct OrderFlags {

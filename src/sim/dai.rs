@@ -279,7 +279,11 @@ impl Dai {
 
     /// `!checkItemGet(dItemNo_DELIVERY_BAG_e, TRUE)` (`d_a_dai.cpp:123-125`) - see [`Dai::spawn`]
     /// for the full reduction.
-    fn create_refused(&mut self, equipped: &super::inventory::Equipped, collect: &super::flags::Collect) {
+    fn create_refused(
+        &mut self,
+        equipped: &super::inventory::Equipped,
+        collect: &super::flags::Collect,
+    ) {
         self.refused = !super::inventory::check_get_item(equipped, collect, ITEM_DELIVERY_BAG);
     }
 

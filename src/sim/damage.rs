@@ -29,7 +29,6 @@ pub const BOMERANG: i32 = 1;
 pub const TSUBO: i32 = 3;
 pub const WATER_JUG: i32 = 4;
 
-
 pub fn sword_power(item: u8, soup: bool) -> i32 {
     if item == ITEM_SWORD {
         if soup { SOUP_SWORD } else { SWORD }

@@ -4,10 +4,10 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::carry::Carryable;
-use super::registry::ActorRegistry;
 use super::collision::Collision;
 use super::ground;
 use super::player::Player;
+use super::registry::ActorRegistry;
 
 pub const HOOKSHOT_ACTOR: &str = "HShot";
 
@@ -56,8 +56,7 @@ impl Hookshot {
     pub fn launch(&mut self, pitch: f32, yaw: f32) {
         self.phase = Phase::Shot;
         let x_cos = pitch.cos();
-        self.heading =
-            Vec3::new(yaw.sin() * x_cos, -pitch.sin(), yaw.cos() * x_cos) * SHOT_SPEED;
+        self.heading = Vec3::new(yaw.sin() * x_cos, -pitch.sin(), yaw.cos() * x_cos) * SHOT_SPEED;
         self.measure();
     }
 
@@ -129,13 +128,17 @@ impl Hookshot {
             return Vec3::ZERO;
         }
         let slack = (links as f32 - self.chain).max(0.0);
-        let taken = slack + if self.chain <= SPOOL { self.chain } else { SPOOL };
+        let taken = slack
+            + if self.chain <= SPOOL {
+                self.chain
+            } else {
+                SPOOL
+            };
         self.chain -= taken;
         let move_by = delta * ((taken * LINK) / reach);
         self.heading = move_by;
         move_by
     }
-
 }
 
 pub fn is_hookshot(name: &str) -> bool {

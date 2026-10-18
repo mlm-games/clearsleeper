@@ -368,7 +368,11 @@ impl Coming2 {
         // `unk_2A0 = get_speed(this);` (:70)
         self.speed = speed;
         // `if (fVar1 < 35.0f) { fVar1 = 35.0f; } else { fVar1 = unk_2A0; }` (:71-76)
-        let reach = if speed < SPEED_FLOOR { SPEED_FLOOR } else { speed };
+        let reach = if speed < SPEED_FLOOR {
+            SPEED_FLOOR
+        } else {
+            speed
+        };
         // `sp18.set(0.0f, 100.0f, fVar1 * 135.0f);` (:77-79)
         let arm = Vec3::new(0.0, ARM_LIFT, reach * ARM_SCALE);
         // ```
@@ -536,11 +540,7 @@ impl Coming2 {
     /// the `evnt - 1 < 0` test is a SIGNED compare on an `s32`, so the subtraction is done in `i32`.
     fn minus_coming_point(&mut self, ctx: &mut Ctx<'_>) {
         let evnt = i32::from(ctx.regs.reg(COMING_POINT));
-        let next = if evnt - 1 < 0 {
-            0
-        } else {
-            (evnt - 1) as u8
-        };
+        let next = if evnt - 1 < 0 { 0 } else { (evnt - 1) as u8 };
         ctx.regs.set_reg(COMING_POINT, next);
     }
 
@@ -693,12 +693,7 @@ impl Coming2 {
             //                                               coming_process_init(4); }
             // ```
             // (:481-484)
-            if Self::line_cross_xz(
-                ctx.old,
-                ctx.origin,
-                self.buoys[0].pos,
-                self.buoys[1].pos,
-            ) {
+            if Self::line_cross_xz(ctx.old, ctx.origin, self.buoys[0].pos, self.buoys[1].pos) {
                 // `request_all_flag_exit();` (:482)
                 self.request_all_flag_exit(barrels);
                 // `coming_process_init(4);` (:483)
@@ -765,7 +760,12 @@ impl Coming2 {
     ///     }
     /// }
     /// ```
-    fn barrel_execute(&mut self, index: usize, ctx: &mut Ctx<'_>, barrels: &mut Query<&mut BuoyBarrel>) {
+    fn barrel_execute(
+        &mut self,
+        index: usize,
+        ctx: &mut Ctx<'_>,
+        barrels: &mut Query<&mut BuoyBarrel>,
+    ) {
         // `if (barrelProc != fpcM_ERROR_PROCESS_ID_e)` (:310)
         let Some(barrel) = self.barrels[index].barrel else {
             return;

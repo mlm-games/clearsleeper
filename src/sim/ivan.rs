@@ -274,8 +274,8 @@ const MSG_TALK_NOTICE: u32 = 0x26B9;
 const MSG_TALK_HOLD: u32 = 0x26B5;
 const MSG_TALK_MINIGAME: u32 = 0x26B1;
 const MSG_CHAIN: [u32; 13] = [
-    0x26BD, 0x26C5, 0x26C6, 0x26C7, 0x26C8, 0x26C9, 0x26CB, 0x26CD, 0x26D0, 0x26D1, 0x26D3,
-    0x26D4, 0x26D8,
+    0x26BD, 0x26C5, 0x26C6, 0x26C7, 0x26C8, 0x26C9, 0x26CB, 0x26CD, 0x26D0, 0x26D1, 0x26D3, 0x26D4,
+    0x26D8,
 ];
 
 const SE_START_WHISTLE: u32 = 0x08F0;
@@ -408,14 +408,7 @@ fn abs_xz(v: Vec3) -> f32 {
     (v.x * v.x + v.z * v.z).sqrt()
 }
 
-fn len_2d_sq_pnt_and_seg_line(
-    px: f32,
-    pz: f32,
-    ax: f32,
-    az: f32,
-    bx: f32,
-    bz: f32,
-) -> Option<f32> {
+fn len_2d_sq_pnt_and_seg_line(px: f32, pz: f32, ax: f32, az: f32, bx: f32, bz: f32) -> Option<f32> {
     let vx = bx - ax;
     let vz = bz - az;
     let wx = px - ax;
@@ -521,7 +514,11 @@ impl PathRun {
     }
 
     pub fn set_idx(&mut self, idx: usize) {
-        self.idx = if self.num == 0 { 0 } else { idx.min(self.num - 1) };
+        self.idx = if self.num == 0 {
+            0
+        } else {
+            idx.min(self.num - 1)
+        };
     }
 
     pub fn clr_idx(&mut self) {
@@ -612,7 +609,11 @@ impl PathRun {
         let f2 = walk::from_s16(heading).cos();
         let f3 = -(f29 * target.x + f2 * target.z);
         let side = f29 * curr.x + f2 * curr.z + f3;
-        if going_forwards { side > 0.0 } else { side <= 0.0 }
+        if going_forwards {
+            side > 0.0
+        } else {
+            side <= 0.0
+        }
     }
 
     pub fn set_near_path_indx(&mut self, pos: Vec3, range: f32) -> bool {
@@ -760,7 +761,8 @@ impl MkStatic {
                 PATH_TURN_FAST_MIN,
             );
         } else {
-            *yaw = walk::add_calc_angle_s(*yaw, angle, PATH_TURN_SCALE, PATH_TURN_STEP, PATH_TURN_MIN);
+            *yaw =
+                walk::add_calc_angle_s(*yaw, angle, PATH_TURN_SCALE, PATH_TURN_STEP, PATH_TURN_MIN);
         }
         let cosine = (yaw.wrapping_sub(angle) as f32).cos();
         if cosine < RUN_JUMP_COS {
@@ -847,8 +849,10 @@ impl MkStatic {
         let s_var5 = target_angle_y(local_60, local_6c);
         if (self.m0 == 1 || self.m0 == 2)
             && (i32::from(s_var5.wrapping_sub(s_var4))).unsigned_abs() < FAR_LINK_ANGLE as u32
-            && len_2d_sq_pnt_and_seg_line(link.x, link.z, local_60.x, local_60.z, local_6c.x, local_6c.z)
-                .is_some_and(|output2| output2 < FAR_LINK_LEN)
+            && len_2d_sq_pnt_and_seg_line(
+                link.x, link.z, local_60.x, local_60.z, local_6c.x, local_6c.z,
+            )
+            .is_some_and(|output2| output2 < FAR_LINK_LEN)
         {
             if self.m0 == 1 { 2 } else { 1 }
         } else {
@@ -872,12 +876,7 @@ impl MkStatic {
         let i_var1 = i32::from(s_var6.wrapping_sub(s_var5));
         if i_var1.unsigned_abs() < FAR_LINK_ANGLE as u32
             && len_2d_sq_pnt_and_seg_line(
-                link.x,
-                link.z,
-                local_8c.x,
-                local_8c.z,
-                local_80.x,
-                local_80.z,
+                link.x, link.z, local_8c.x, local_8c.z, local_80.x, local_80.z,
             )
             .is_some_and(|output2| output2 < FAR_LINK_LEN)
         {
@@ -886,12 +885,7 @@ impl MkStatic {
         let i_var2 = i32::from(s_var7.wrapping_sub(s_var5));
         if i_var2.unsigned_abs() < FAR_LINK_ANGLE as u32
             && len_2d_sq_pnt_and_seg_line(
-                link.x,
-                link.z,
-                local_8c.x,
-                local_8c.z,
-                local_74.x,
-                local_74.z,
+                link.x, link.z, local_8c.x, local_8c.z, local_74.x, local_74.z,
             )
             .is_some_and(|output2| output2 < FAR_LINK_LEN)
         {
@@ -1578,8 +1572,8 @@ impl Ivan {
                     if msg_status == STATUS_MSG_DISPLAYED {
                         self.msg_push_button(ctx.text);
                         let mut curr = self.curr_msg_no;
-                    let next = self.next_msg_status(&mut curr);
-                    self.curr_msg_no = curr;
+                        let next = self.next_msg_status(&mut curr);
+                        self.curr_msg_no = curr;
                         ctx.text.set_status(next);
                         if next == STATUS_MSG_CONTINUES {
                             let msg_no = self.curr_msg_no;
@@ -1765,13 +1759,8 @@ impl Ivan {
                     }
                     ctx.end_cut = true;
                 } else {
-                    self.yaw = walk::add_calc_angle_s(
-                        self.yaw,
-                        angle,
-                        TURN_SCALE,
-                        TURN_STEP,
-                        TURN_MIN,
-                    );
+                    self.yaw =
+                        walk::add_calc_angle_s(self.yaw, angle, TURN_SCALE, TURN_STEP, TURN_MIN);
                     walk::chase_f(&mut self.speed_f, DEMO_TARGET_SPEED, DEMO_CHASE);
                     if self.demo_timer > 0 {
                         self.demo_timer -= 1;
@@ -1844,13 +1833,8 @@ impl Ivan {
                 self.is_morf()
             }
             16 => {
-                if walk::add_calc_angle_s(
-                    self.yaw,
-                    self.run_angle,
-                    TURN_SCALE,
-                    TURN_STEP,
-                    TURN_MIN,
-                ) == 0
+                if walk::add_calc_angle_s(self.yaw, self.run_angle, TURN_SCALE, TURN_STEP, TURN_MIN)
+                    == 0
                 {
                     ctx.end_cut = true;
                 }
@@ -1898,8 +1882,7 @@ impl Ivan {
             return 1;
         }
         if self.state == STATE_VISIT
-            && (self.visit_mode == VISIT_WALK_AROUND_LINK
-                || self.visit_mode == VISIT_REACHED_LINK)
+            && (self.visit_mode == VISIT_WALK_AROUND_LINK || self.visit_mode == VISIT_REACHED_LINK)
         {
             return 1;
         }
@@ -1914,12 +1897,16 @@ impl Ivan {
         match self.get_look_back_mode() {
             0 => {
                 self.trn = true;
-                dst_pos = ctx.link.map(|pos| Vec3::new(pos.x, pos.y + LOOKBACK_PLAYER_EYE, pos.z));
+                dst_pos = ctx
+                    .link
+                    .map(|pos| Vec3::new(pos.x, pos.y + LOOKBACK_PLAYER_EYE, pos.z));
                 temp = self.pos;
                 temp.y = self.attn_eye.y;
             }
             1 => {
-                dst_pos = ctx.link.map(|pos| Vec3::new(pos.x, pos.y + LOOKBACK_PLAYER_EYE, pos.z));
+                dst_pos = ctx
+                    .link
+                    .map(|pos| Vec3::new(pos.x, pos.y + LOOKBACK_PLAYER_EYE, pos.z));
                 temp = self.pos;
                 temp.y = self.attn_eye.y;
                 head_only_follow = true;
@@ -2075,8 +2062,7 @@ impl Ivan {
             self.set_order(ORDER_TALK);
             if self.visit_mode == VISIT_WALK_AROUND_LINK || self.visit_mode == VISIT_REACHED_LINK {
                 if let Some(link) = ctx.link {
-                    let angle = target_angle_y(link, self.pos)
-                        .wrapping_sub(ctx.link_shape_yaw);
+                    let angle = target_angle_y(link, self.pos).wrapping_sub(ctx.link_shape_yaw);
                     let angle = if angle < 0 { -angle } else { angle };
                     if angle > LOOK_ANGLE {
                         self.order_flags &= !0x01;
@@ -2637,11 +2623,7 @@ impl Ivan {
                 if !self.path_c.get_path() {
                     return false;
                 }
-                for path in [
-                    &mut self.path_a,
-                    &mut self.path_b,
-                    &mut self.path_c,
-                ] {
+                for path in [&mut self.path_a, &mut self.path_b, &mut self.path_c] {
                     path.set_point(0, self.pos);
                 }
             }
@@ -2698,8 +2680,13 @@ impl Ivan {
         self.clr_flag(FLAG_TURN_PATH);
         self.mtrl_snd_id = 0;
         if !self.chk_flag(FLAG_NO_MOVE) {
-            let (next_speed, speed_f) =
-                stream::calc_speed(self.speed_f, self.yaw, self.speed.y, self.gravity, self.max_fall);
+            let (next_speed, speed_f) = stream::calc_speed(
+                self.speed_f,
+                self.yaw,
+                self.speed.y,
+                self.gravity,
+                self.max_fall,
+            );
             self.speed = next_speed;
             self.speed_f = speed_f;
             self.old = self.pos;
@@ -2767,10 +2754,7 @@ pub fn control(
     let press = msg.do_intent.0;
     let lock_on = msg.lock.target.is_some();
     let lock_target = msg.lock.target;
-    let archive = msg
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = msg.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut ivan) in &mut actors {
         let actor = &mut *actor;
         let ivan = &mut *ivan;
@@ -2849,7 +2833,9 @@ pub fn control(
         let staff = ivan.staff_name();
         drop(ctx);
         if end_cut {
-            world.active.end_staff_cut(&world.list, &mut world.ev_flags, staff);
+            world
+                .active
+                .end_staff_cut(&world.list, &mut world.ev_flags, staff);
         }
         if let Some((pos, item)) = present_item {
             let room = actor.room;
@@ -2863,7 +2849,10 @@ pub fn control(
                     room,
                     ..Default::default()
                 },
-                PresentItem { item, hidden: false },
+                PresentItem {
+                    item,
+                    hidden: false,
+                },
             ));
         }
         if delete_um2 {
@@ -2873,9 +2862,8 @@ pub fn control(
                 }
             }
         }
-        let order_index = order_index.or_else(|| {
-            order_name.and_then(|name| world.list.event_index(name))
-        });
+        let order_index =
+            order_index.or_else(|| order_name.and_then(|name| world.list.event_index(name)));
         if let Some(index) = order_index
             && world.active.stage_of(index).is_none()
         {

@@ -67,7 +67,11 @@ impl Vmc {
         let sw_save = prm_get_sw_save(parameters);
         let has_tree = switches.test(sw_save as u8);
         Vmc {
-            state: if has_tree { STATE_TREE_MAIN } else { STATE_BASE_MAIN },
+            state: if has_tree {
+                STATE_TREE_MAIN
+            } else {
+                STATE_BASE_MAIN
+            },
             sw_save,
             has_tree,
             // `dComIfG_Bgsp()->Regist(mpBgTree, ...)` returns non-zero on failure, which

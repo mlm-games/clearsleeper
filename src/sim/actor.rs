@@ -48,6 +48,11 @@ pub struct Actor {
     /// whose body carries it from the start; the player raises it only while its in-ship mode
     /// flag is up, so the player's module owns this one.
     pub no_crr: bool,
+    /// `demoActorID` (`f_op_actor.h:281`), the one-based index into the demo player's actor table
+    /// (`dDemo_object_c::appendActor`, `d_demo.cpp:545-562`). `0` is the field's own default and
+    /// the test every demo-reading actor module opens with, e.g. `daNpc_Ba1_c::demo`
+    /// (`d_a_npc_ba1.cpp:1785-1786`) and `daDemo00_c::execute` (`d_a_demo00.cpp:636-639`).
+    pub demo_actor_id: u8,
 }
 
 impl Default for Actor {
@@ -72,6 +77,7 @@ impl Default for Actor {
             steal_item_left: 0,
             weight_uc: 100,
             no_crr: false,
+            demo_actor_id: 0,
         }
     }
 }

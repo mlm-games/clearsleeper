@@ -1,4 +1,3 @@
-
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 
@@ -643,7 +642,11 @@ pub fn cc_at_check(
             });
         }
     } else {
-        let se_arg = if target.name == NAME_ST { SE_ARG_ST } else { SE_ARG };
+        let se_arg = if target.name == NAME_ST {
+            SE_ARG_ST
+        } else {
+            SE_ARG
+        };
         if at_info.mb_dead {
             audio.se_start(events, at_se_get_c(&obj), se_arg);
             pause_time = if at_info.m_resulting_attack_type == RESULT_SKULL_HAMMER {

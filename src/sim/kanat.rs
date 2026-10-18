@@ -14,9 +14,13 @@ const SWSAVE_MASK: u32 = 0xFF; // <- d_a_obj_kanat.h:13 (PRM_SWSAVE_W = 0x08, d_
 /// `d_a_obj_kanat.cpp:13`). `daObjKanat::Act_c::Mthd_Create` (`d_a_obj_kanat.cpp:35-49`) returns
 /// `cPhs_STOP_e` when the vine's switch already reads on, and STOP cancels the request inside
 /// Create exactly like ERROR (`f_pc_create_req.cpp:106-108`), so `refused` records that and the
-/// term is dropped on its first tick. `mSmokeCb.isEnd()` (`:101`) belongs to the particle
-/// system, so the `fopAcM_delete` behind it (`:102`) stays unported and the retired vine keeps
-/// existing invisibly.
+/// term is dropped on its first tick. `mSmokeCb.isEnd()` (`:101`) is
+/// `dPa_followEcallBack`'s end latch (`d_particle.h:55`: `mFlag & 1`), raised when the toon
+/// emitter the callback was attached to retires (`dPa_smokeEcallBack::end`, `d_particle.cpp:442`),
+/// so the `fopAcM_delete` behind it stays unported: the port models the callback and its latch
+/// (`jpa.rs`'s `Smoke` / `follow.flag`), but no actor here can attach one -
+/// `dComIfGp_particle_setToon(id, &pos, &angle, NULL, 0xB4, &mSmokeCb, room, ...)`'s callback
+/// argument has no channel on the sim side - so the retired vine keeps existing invisibly.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Kanat {
     pub switch_no: u8,

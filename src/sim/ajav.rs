@@ -43,12 +43,8 @@ pub const HINT_OFFSET: [[f32; 3]; PARTS] = [
     [-124.5, 118.0, 220.0],
     [530.0, 118.0, 220.0],
 ];
-pub const HINT_RADIUS: [f32; PARTS] = [
-    629.0, 294.8, 491.0, 216.0, 563.0, 85.3,
-];
-pub const HINT_HEIGHT: [f32; PARTS] = [
-    773.0, 458.5, 1100.5, 1401.9, 1133.0, 451.9,
-];
+pub const HINT_RADIUS: [f32; PARTS] = [629.0, 294.8, 491.0, 216.0, 563.0, 85.3];
+pub const HINT_HEIGHT: [f32; PARTS] = [773.0, 458.5, 1100.5, 1401.9, 1133.0, 451.9];
 pub const WALL_HEIGHT: [f32; 3] = [3300.0, 2360.0, 1050.0];
 pub const FLAW_OFFSET: [[f32; 3]; PARTS] = [
     [0.0, 0.0, 0.0],
@@ -266,8 +262,7 @@ impl Ajav {
     }
 
     pub fn solid(&self, pos: Vec3, at: Vec3) -> bool {
-        self.standing()
-            && walk::within(pos + self.offset(), at, SPH_RADIUS + BOMB_RADIUS)
+        self.standing() && walk::within(pos + self.offset(), at, SPH_RADIUS + BOMB_RADIUS)
     }
 
     pub fn hinted(&self, pos: Vec3, at: Vec3) -> bool {
@@ -399,7 +394,11 @@ pub fn control(
                     if let Some(cut) = wall.cut {
                         active.end(cut);
                     }
-                    wall.step = if wall.standing() { STEP_IDLE } else { STEP_DONE };
+                    wall.step = if wall.standing() {
+                        STEP_IDLE
+                    } else {
+                        STEP_DONE
+                    };
                 }
             }
             STEP_STOW => {

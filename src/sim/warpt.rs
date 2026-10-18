@@ -452,18 +452,16 @@ pub fn control(
             Mode::Open => pot.mode_open(&mut events),
             Mode::Close => pot.mode_close(&mut switches, &mut regs, &mut events),
             Mode::BreakFire => pot.mode_break_fire(&mut switches, &mut regs, &mut events),
-            Mode::EventWarp => {
-                pot.mode_event_warp(
-                    accepted,
-                    active.staff_cut(&list, "Warpt").map(|(cut, _)| cut),
-                    &mut active,
-                    &list,
-                    &mut flags,
-                    &switches,
-                    &regs,
-                    &mut events,
-                )
-            }
+            Mode::EventWarp => pot.mode_event_warp(
+                accepted,
+                active.staff_cut(&list, "Warpt").map(|(cut, _)| cut),
+                &mut active,
+                &list,
+                &mut flags,
+                &switches,
+                &regs,
+                &mut events,
+            ),
             Mode::EventOpen => pot.mode_event_open(accepted, &mut active, &list, &mut events),
         }
         pot.integrate(actor, solid);

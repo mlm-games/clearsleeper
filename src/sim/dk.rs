@@ -106,7 +106,11 @@ impl Dk {
     /// keeping it would be an unread field.
     pub fn spawn(parameters: u32) -> Self {
         let param = parameters as u8;
-        let mode = if param == PARAM_FLYING { MODE_BOSS } else { MODE_DORMANT };
+        let mode = if param == PARAM_FLYING {
+            MODE_BOSS
+        } else {
+            MODE_DORMANT
+        };
         Self { mode }
     }
 
@@ -123,7 +127,13 @@ impl Dk {
 
     /// `daDk_Execute` (`:221-294`), the whole of its one `if (l_HIO.field_0x05 == 0)` block
     /// (`:230-272`).
-    fn execute(&mut self, actor: &mut Actor, list: &EventList, active: &ActiveEvent, flags: &EventFlags) {
+    fn execute(
+        &mut self,
+        actor: &mut Actor,
+        list: &EventList,
+        active: &ActiveEvent,
+        flags: &EventFlags,
+    ) {
         if HIO_M05 != 0 {
             return;
         }

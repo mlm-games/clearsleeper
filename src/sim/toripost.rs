@@ -10,8 +10,8 @@ use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Collect, EventFlags, MemBits, StoryBits};
 use super::inventory::{self, Equipped};
-use super::player::Player;
 use super::pickup::Rupees;
+use super::player::Player;
 use super::walk::from_s16;
 use crate::assets::MsgArchives;
 use crate::text::driver::{Counters, TextFlags};
@@ -162,13 +162,8 @@ const SEND_PRICE_LETTER_TINGLE: i32 = 0xC9;
 const ISLE_IDX_COUNT: usize = 49;
 
 const PAY_TYPE: [u8; ISLE_IDX_COUNT] = [
-    2, 1, 1, 0, 0, 0, 0, 2,
-    1, 1, 0, 0, 0, 0, 2, 1,
-    1, 0, 0, 0, 0, 2, 1, 1,
-    0, 0, 0, 0, 2, 1, 1, 1,
-    1, 1, 1, 2, 1, 1, 1, 1,
-    1, 1, 2, 2, 2, 2, 2, 2,
-    2,
+    2, 1, 1, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 2, 1, 1, 1,
+    1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
 ];
 
 const EVT_CND_CANTALK: u16 = 0x0001;
@@ -354,8 +349,7 @@ pub struct AnmPrm {
 const ANM_PRM_ROWS: usize = 5;
 const ANM_BCKS_ROWS: usize = 3;
 
-const ANM_BCKS: [i32; ANM_BCKS_ROWS] =
-    [RES_BCK_POST_GET, RES_BCK_POST_PUTOUT, RES_BCK_POST_WAIT];
+const ANM_BCKS: [i32; ANM_BCKS_ROWS] = [RES_BCK_POST_GET, RES_BCK_POST_PUTOUT, RES_BCK_POST_WAIT];
 
 const ANM_PRM: [AnmPrm; ANM_PRM_ROWS] = [
     AnmPrm {
@@ -449,10 +443,7 @@ impl Cyl {
 
     pub fn blocks(&self, at: Vec3) -> bool {
         let co = self.co_flag();
-        if co & CC_CO_SPRM_SET == 0
-            || co & CC_CO_SPRM_IS_OTHER == 0
-            || self.radius <= 0.0
-        {
+        if co & CC_CO_SPRM_SET == 0 || co & CC_CO_SPRM_IS_OTHER == 0 || self.radius <= 0.0 {
             return false;
         }
         let dx = self.centre.x - at.x;
@@ -1776,7 +1767,10 @@ impl Ctx<'_, '_, '_> {
                     room: PRESENT_ITEM_ROOM,
                     ..Default::default()
                 },
-                PresentItem { item, hidden: false },
+                PresentItem {
+                    item,
+                    hidden: false,
+                },
             ))
             .id();
         self.item_partner.entity = Some(entity);

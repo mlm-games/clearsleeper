@@ -5,7 +5,7 @@ use super::cam_bump::Bump;
 use super::cam_engine::{self, EngineInput, LockInput};
 use super::cam_follow::{CamSetup, Follow, FollowInput, SAngle, ViewCache};
 use super::cam_room::CamRoom;
-use super::cam_style::{self, param, CamEngine, STYLE_COUNT};
+use super::cam_style::{self, CamEngine, STYLE_COUNT, param};
 use super::cam_type::{TYPE_FIELD, TYPES, type_index};
 
 const DEFAULT_FOVY: f32 = 0.7853982;
@@ -94,9 +94,18 @@ impl Default for View {
 
 impl View {
     fn refresh(&mut self) {
-        self.view = glam::camera::rh::view::look_at_mat4(self.lookat.eye, self.lookat.center, self.lookat.up);
+        self.view = glam::camera::rh::view::look_at_mat4(
+            self.lookat.eye,
+            self.lookat.center,
+            self.lookat.up,
+        );
         self.view_no_trans = self.view;
-        self.proj = glam::camera::rh::proj::opengl::perspective(self.fovy, self.aspect, self.near, self.far);
+        self.proj = glam::camera::rh::proj::opengl::perspective(
+            self.fovy,
+            self.aspect,
+            self.near,
+            self.far,
+        );
         self.inv_view = self.view.inverse();
         self.proj_view = self.proj * self.view;
     }

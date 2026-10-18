@@ -4,7 +4,7 @@ use super::collision::Collision;
 use super::link_proc::{SWIM_ALLOWED, allows};
 use super::player::Player;
 use super::sea::Sea;
-use super::water::{probe, Water};
+use super::water::{Water, probe};
 
 pub const MIN_DEPTH: f32 = 90.0;
 const STAND_DEPTH: f32 = 85.0;
@@ -89,18 +89,12 @@ fn enter(player: &mut Player, swim: &mut Swim, water: &Water) {
     }
 }
 
-fn keep(
-    player: &mut Player,
-    swim: &mut Swim,
-    water: &Water,
-    collision: Option<&Collision>,
-) {
+fn keep(player: &mut Player, swim: &mut Swim, water: &Water, collision: Option<&Collision>) {
     if !water.in_area {
         fall_out(player, swim);
         return;
     }
-    let ground =
-        collision.and_then(|collision| collision.ground_at(player.pos.x, player.pos.z));
+    let ground = collision.and_then(|collision| collision.ground_at(player.pos.x, player.pos.z));
     if let Some(ground) = ground {
         if water.surface - ground < STAND_DEPTH {
             stand_out(player, swim, water);

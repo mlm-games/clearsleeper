@@ -296,11 +296,7 @@ impl PirateFlag {
         self.m2a8 = self.m2a8.wrapping_add(hio.m08 as i16);
 
         let temp_f3 = 0.5 + ssin(i32::from(self.m2a8)) * 0.5;
-        let sp2c = Vec3::new(
-            0.0,
-            0.0,
-            hio.m0c * temp_f3 + hio.m10 * (1.0 - temp_f3),
-        );
+        let sp2c = Vec3::new(0.0, 0.0, hio.m0c * temp_f3 + hio.m10 * (1.0 - temp_f3));
 
         for i in 0..GRID {
             for j in 0..GRID {
@@ -576,12 +572,7 @@ pub fn control(
         let Some(ship_actor) = ships.get(ship_entity).ok() else {
             continue;
         };
-        flag.execute(
-            &mut actor,
-            ship_actor.pos,
-            ship_actor.shape_angle,
-            &hio,
-        );
+        flag.execute(&mut actor, ship_actor.pos, ship_actor.shape_angle, &hio);
         flag.mtx = flag.draw_mtx(&actor);
     }
 }

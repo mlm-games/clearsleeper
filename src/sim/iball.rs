@@ -270,12 +270,7 @@ fn struck(ball: &Iball, actor: &Actor, at: At, watch: &Watch<'_, '_>, player: &P
         }),
         _ if at.shaft() => watch.arrows.iter().any(|shaft| {
             shaft.phase == arrow::Phase::Flying
-                && ball.swept_reach(
-                    shaft.pos - shaft.speed,
-                    shaft.pos,
-                    actor.pos,
-                    at.reach(),
-                )
+                && ball.swept_reach(shaft.pos - shaft.speed, shaft.pos, actor.pos, at.reach())
         }),
         _ => false,
     }

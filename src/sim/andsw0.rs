@@ -36,11 +36,7 @@ pub const EVENT_DONE: u8 = 2;
 
 pub const DEMO_ACCEPT: bool = false;
 
-pub fn event_slot(
-    stage_events: Option<&StageEvents>,
-    list: &EventList,
-    event_no: u8,
-) -> i16 {
+pub fn event_slot(stage_events: Option<&StageEvents>, list: &EventList, event_no: u8) -> i16 {
     if event_no == NO_SWITCH {
         return NO_EVENT;
     }

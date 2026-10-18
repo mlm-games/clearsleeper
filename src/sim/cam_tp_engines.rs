@@ -1,7 +1,7 @@
 use glam::Vec3;
 
 use super::cam_engine::EngineInput;
-use super::cam_follow::{self, limitf, rational_bezier_ratio, SAngle, SGlobe};
+use super::cam_follow::{self, SAngle, SGlobe, limitf, rational_bezier_ratio};
 use super::cam_room::CamRoom;
 use super::cam_style::param;
 use super::camera::Camera;
@@ -697,7 +697,8 @@ pub fn tower(
             * rational_bezier_ratio(w.ramp as f32 / TOWER_RAMP_FRAMES as f32, TOWER_RAMP_EASE);
     }
 
-    cache.center += (target - cache.center) * Vec3::new(w.lerp_lateral, w.lerp_height, w.lerp_lateral);
+    cache.center +=
+        (target - cache.center) * Vec3::new(w.lerp_lateral, w.lerp_height, w.lerp_lateral);
     let held = SGlobe::from_xyz(camera.bump.eye - camera.bump.center);
 
     let mut reach = 1.0f32;
@@ -755,10 +756,14 @@ pub fn tower(
             } else {
                 to_arrow.longitude() + span
             };
-            w.longitude +=
-                (held.longitude() + (target_longitude - held.longitude()) * share - w.longitude)
-                    * 0.33;
-            let held_press = if status.check0(0x0200_0108) { 0.0 } else { press };
+            w.longitude += (held.longitude() + (target_longitude - held.longitude()) * share
+                - w.longitude)
+                * 0.33;
+            let held_press = if status.check0(0x0200_0108) {
+                0.0
+            } else {
+                press
+            };
             w.longitude_lerp = swing_base + swing_weight * held_press;
         } else {
             let target_longitude = if player_side {
@@ -819,10 +824,16 @@ pub fn tower(
     }
 
     if camera.has_flag(0x400) {
-        let probe = SGlobe::new(radius, cache.direction.latitude(), cache.direction.longitude());
-        w.pushed = input
-            .collision
-            .is_some_and(|solid| solid.line_cross(cache.center + probe.to_xyz(), cache.center).is_some());
+        let probe = SGlobe::new(
+            radius,
+            cache.direction.latitude(),
+            cache.direction.longitude(),
+        );
+        w.pushed = input.collision.is_some_and(|solid| {
+            solid
+                .line_cross(cache.center + probe.to_xyz(), cache.center)
+                .is_some()
+        });
     }
 
     cache
@@ -1006,7 +1017,11 @@ pub fn manual(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
             height_low = -10.0;
         }
     } else if status.check0(0x2800_0108) {
-        latitude_low = if status.check0(0x0200_0000) { -58.0 } else { -70.0 };
+        latitude_low = if status.check0(0x0200_0000) {
+            -58.0
+        } else {
+            -70.0
+        };
         latitude_high = 70.0;
         stick_latitude = 4.0;
         lerp_lateral = 0.45;
@@ -1099,7 +1114,8 @@ pub fn manual(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
         w.lerp_lateral += (lerp_lateral - w.lerp_lateral) * 0.05;
         w.lerp_height += (lerp_height - w.lerp_height) * 0.05;
     }
-    cache.center += (w.aim - cache.center) * Vec3::new(w.lerp_lateral, w.lerp_height, w.lerp_lateral);
+    cache.center +=
+        (w.aim - cache.center) * Vec3::new(w.lerp_lateral, w.lerp_height, w.lerp_lateral);
 
     if input.lockon.target.is_none() {
         let mut probe = player.pos;
@@ -1169,38 +1185,36 @@ pub fn manual(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     );
     cache.fovy += rate_fovy * (fovy - cache.fovy);
 
-    w.phase = if input.follow.main.length() > 0.01
-        || input.lockon.truth
-        || status.check0(0x0100_0000)
-    {
-        0
-    } else {
-        match w.phase {
-            1 => {
-                if stick_y < -0.01 {
-                    0
-                } else if stick_y > 0.9 {
-                    2
-                } else {
-                    1
+    w.phase =
+        if input.follow.main.length() > 0.01 || input.lockon.truth || status.check0(0x0100_0000) {
+            0
+        } else {
+            match w.phase {
+                1 => {
+                    if stick_y < -0.01 {
+                        0
+                    } else if stick_y > 0.9 {
+                        2
+                    } else {
+                        1
+                    }
+                }
+                2 => {
+                    if stick_y < 0.9 {
+                        0
+                    } else {
+                        2
+                    }
+                }
+                _ => {
+                    if radius < radius_near * 1.0001 && stick_y < 0.3 {
+                        1
+                    } else {
+                        0
+                    }
                 }
             }
-            2 => {
-                if stick_y < 0.9 {
-                    0
-                } else {
-                    2
-                }
-            }
-            _ => {
-                if radius < radius_near * 1.0001 && stick_y < 0.3 {
-                    1
-                } else {
-                    0
-                }
-            }
-        }
-    };
+        };
 
     camera.work.tp.manual = w;
     camera.view_cache = cache;
@@ -1337,10 +1351,7 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
     w.lerp += (lerp - w.lerp) * 0.1;
 
     let stretch = if span > fovy_gate {
-        rational_bezier_ratio(
-            (span - fovy_gate) / (1.0 - fovy_gate),
-            RIDE_STRETCH_EASE,
-        )
+        rational_bezier_ratio((span - fovy_gate) / (1.0 - fovy_gate), RIDE_STRETCH_EASE)
     } else {
         0.0
     };
@@ -1407,8 +1418,7 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
         return true;
     }
 
-    cache.center +=
-        (w.walk - cache.center) * Vec3::new(lerp_lateral, w.lerp_height, lerp_lateral);
+    cache.center += (w.walk - cache.center) * Vec3::new(lerp_lateral, w.lerp_height, lerp_lateral);
     let mut held = SGlobe::from_xyz(cache.eye - cache.center);
     let radius = cache.direction.radius() + w.lerp * (wanted.radius() - cache.direction.radius());
 
@@ -1442,8 +1452,8 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
     let mut wanted = wanted;
     wanted.set_latitude(wanted.latitude() + (held.latitude() - wanted.latitude()) * latitude_rate);
 
-    let mut latitude = cache.direction.latitude()
-        + (wanted.latitude() - cache.direction.latitude()) * w.lerp;
+    let mut latitude =
+        cache.direction.latitude() + (wanted.latitude() - cache.direction.latitude()) * w.lerp;
     if latitude < SAngle::from_degrees(RIDE_LATITUDE_MIN) {
         latitude = SAngle::from_degrees(RIDE_LATITUDE_MIN);
     } else if latitude > SAngle::from_degrees(RIDE_LATITUDE_MAX) {
@@ -1454,8 +1464,8 @@ pub fn ride(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> bo
     cache.eye = cache.center + cache.direction.to_xyz();
     cache.fovy += w.lerp * (want_fovy - cache.fovy);
 
-    cache.bank += (SAngle::from_degrees(bank * input.follow.main.x) - cache.bank)
-        * (span.abs() * 0.01);
+    cache.bank +=
+        (SAngle::from_degrees(bank * input.follow.main.x) - cache.bank) * (span.abs() * 0.01);
     camera.event_flags |= 0x400;
 
     camera.work.tp.ride = w;

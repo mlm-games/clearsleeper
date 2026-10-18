@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 
-use crate::archive::{yaz0_decode, Archive};
+use crate::archive::{Archive, yaz0_decode};
 use crate::assets::AssetRoot;
 use crate::j2d::{Kind, Screen, ScreenPane};
 use crate::sim::daynight::DayNight;
@@ -638,10 +638,7 @@ pub fn read_map_texture_names(root: &AssetRoot) -> Vec<String> {
 }
 
 pub fn chart_texture_name(grid_no: i8, salvage: i32) -> String {
-    format!(
-        "R{:02X}_col_{}.bti",
-        grid_no as u8, salvage
-    )
+    format!("R{:02X}_col_{}.bti", grid_no as u8, salvage)
 }
 
 pub fn read_map_texture(root: &AssetRoot, name: &str) -> Option<Vec<u8>> {

@@ -42,10 +42,14 @@ const FREEZE_ICE_EVENT: &str = "FREEZE_ICE"; // <- d_a_obj_iceisland.cpp:79
 const SE_READ_RIDDLE_1: u32 = 0x0806; // <- JAZelAudio_SE.h:18
 
 /// `fopAcM_seStartCurrent(this, JA_SE_ATM_ICEBERG_WIND, field_0x396)`
-/// (`d_a_obj_iceisland.cpp:244`). Its third argument, `field_0x396` (the `s16`
-/// `d_a_obj_iceisland.h:33`, seeded to 0 or 100 at `:72` / `:76` and ramped at `:236-243`), is the
-/// sound's volume parameter and has no counterpart in `super::events::SimEvent::Se(u32)`, so it is
-/// not modelled; the sound itself is.
+/// (`d_a_obj_iceisland.cpp:244`). Its third argument is `mDoAud_seStart`'s `param`, not a volume:
+/// `fopAcM_seStartCurrent` is `mDoAud_seStart(id, &pos, param, reverb)`
+/// (`f_op_actor_mng.h:691-693`), which is `seStart(id, pos, param, reverb, 1.0f, 1.0f, -1.0f,
+/// -1.0f, 0)` with the volume pair separate (`m_Do_audio.h:149-151`). `field_0x396` (the `s16` of
+/// `d_a_obj_iceisland.h:33`, seeded 0 or 100 at `:72` / `:76` and ramped at `:236-243`) is written
+/// only to feed that argument, and `super::events::SimEvent::Se(u32)` carries the id alone - the
+/// shell's cue bank keeps fixed gains and has no per-sound param either - so the ramp is not
+/// modelled; the sound itself is pushed once per tick, exactly as retail calls it.
 const SE_ATM_ICEBERG_WIND: u32 = 0x1072; // <- JAZelAudio_SE.h:306
 
 /// The profile's `fopAc_CULLBOX_CUSTOM_e` (`d_a_obj_iceisland.cpp:303`) has NO
@@ -275,7 +279,10 @@ struct Context<'a> {
 impl Context<'_> {
     fn demo_running(&self, slot: Option<usize>) -> bool {
         slot.is_some_and(|slot| {
-            matches!(self.active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+            matches!(
+                self.active.stage_of(slot),
+                Some(Stage::Play) | Some(Stage::Close)
+            )
         })
     }
 }

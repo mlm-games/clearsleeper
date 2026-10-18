@@ -19,8 +19,10 @@ use super::player::Player;
 /// name and never by index; only `PAUSE` and `WAIT` land on the same handler in both games, and
 /// the six rows this table names that the sibling does not are the two above plus nothing else.
 ///
-/// `WINDDIR` and `TORNADO` are the two rows with no counterpart at all in the sibling's readable
-/// text, so their arms name what they need rather than borrowing a body.
+/// `WINDDIR` and `TORNADO` are the two rows the sibling's readable text does not carry at all, so
+/// their arms cannot borrow a body and each names what its own target body needs instead; the
+/// target's text does carry both (`d_ev_camera.cpp:2395`, `:2640`), and neither is transcribed for
+/// the reasons on its own arm.
 pub const ACTION_NAMES: [&str; 28] = [
     "PAUSE",
     "WAIT",
@@ -1442,19 +1444,110 @@ struct Item0Row {
 /// `sibling d_ev_camera.cpp:2793-2807`, row for row. The reference indexes this table with the
 /// cut's own `Type` and checks nothing, so a type outside it is left out here rather than clamped.
 const ITEM0_ROWS: [Item0Row; 13] = [
-    Item0Row { gap: Vec3::new(0.0, -80.0, 25.0), eyes: &ITEM0_308, fovy: 65.0, frames: 30, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -32.0, 15.0), eyes: &ITEM0_368, fovy: 65.0, frames: 40, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -80.0, 25.0), eyes: &ITEM0_308, fovy: 65.0, frames: 40, hold: 0, swap: 7 },
-    Item0Row { gap: Vec3::new(0.0, -27.0, 25.0), eyes: &ITEM0_2D8, fovy: 65.0, frames: 40, hold: 0, swap: 7 },
-    Item0Row { gap: Vec3::new(10.0, -15.0, 20.0), eyes: &ITEM0_338, fovy: 65.0, frames: 10, hold: 73, swap: -1 },
-    Item0Row { gap: Vec3::new(30.241, 12.653, 13.95), eyes: &ITEM0_2B4, fovy: 70.0, frames: 45, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -60.0, -15.0), eyes: &ITEM0_290, fovy: 60.0, frames: 40, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -60.0, -15.0), eyes: &ITEM0_290, fovy: 60.0, frames: 40, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -15.0, -100.0), eyes: &ITEM0_200, fovy: 45.0, frames: 80, hold: 10, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, 10.0, -30.0), eyes: &ITEM0_1E8, fovy: 65.0, frames: 40, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -15.0, 20.0), eyes: &ITEM0_260, fovy: 60.0, frames: 40, hold: 0, swap: -1 },
-    Item0Row { gap: Vec3::new(0.0, -20.0, 30.0), eyes: &ITEM0_218, fovy: 60.0, frames: 1, hold: 60, swap: -1 },
-    Item0Row { gap: Vec3::new(10.0, -15.0, 20.0), eyes: &ITEM0_338, fovy: 65.0, frames: 20, hold: 0, swap: -1 },
+    Item0Row {
+        gap: Vec3::new(0.0, -80.0, 25.0),
+        eyes: &ITEM0_308,
+        fovy: 65.0,
+        frames: 30,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -32.0, 15.0),
+        eyes: &ITEM0_368,
+        fovy: 65.0,
+        frames: 40,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -80.0, 25.0),
+        eyes: &ITEM0_308,
+        fovy: 65.0,
+        frames: 40,
+        hold: 0,
+        swap: 7,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -27.0, 25.0),
+        eyes: &ITEM0_2D8,
+        fovy: 65.0,
+        frames: 40,
+        hold: 0,
+        swap: 7,
+    },
+    Item0Row {
+        gap: Vec3::new(10.0, -15.0, 20.0),
+        eyes: &ITEM0_338,
+        fovy: 65.0,
+        frames: 10,
+        hold: 73,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(30.241, 12.653, 13.95),
+        eyes: &ITEM0_2B4,
+        fovy: 70.0,
+        frames: 45,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -60.0, -15.0),
+        eyes: &ITEM0_290,
+        fovy: 60.0,
+        frames: 40,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -60.0, -15.0),
+        eyes: &ITEM0_290,
+        fovy: 60.0,
+        frames: 40,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -15.0, -100.0),
+        eyes: &ITEM0_200,
+        fovy: 45.0,
+        frames: 80,
+        hold: 10,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, 10.0, -30.0),
+        eyes: &ITEM0_1E8,
+        fovy: 65.0,
+        frames: 40,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -15.0, 20.0),
+        eyes: &ITEM0_260,
+        fovy: 60.0,
+        frames: 40,
+        hold: 0,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(0.0, -20.0, 30.0),
+        eyes: &ITEM0_218,
+        fovy: 60.0,
+        frames: 1,
+        hold: 60,
+        swap: -1,
+    },
+    Item0Row {
+        gap: Vec3::new(10.0, -15.0, 20.0),
+        eyes: &ITEM0_338,
+        fovy: 65.0,
+        frames: 20,
+        hold: 0,
+        swap: -1,
+    },
 ];
 
 /// `useItem1EvCamera`'s pull-in, `sibling d_ev_camera.cpp:2968`: the centre's height and the field
@@ -1807,37 +1900,71 @@ fn save(camera: &mut Camera, feed: &mut Feed<'_>, cut: &mut Event) -> bool {
     true
 }
 
-/// `dCamera_c::turnToActorEvCamera`, `sibling d_ev_camera.cpp:2552-2554`, which is `return true`
-/// and nothing else.
+/// `dCamera_c::turnToActorEvCamera`, `d_ev_camera.cpp:2578-2610` in the target's own text (the
+/// sibling's three-line `return true`, `sibling d_ev_camera.cpp:2552-2554`, is not the target's
+/// body: the import's `Nonmatching` stub is what the earlier note here read).
 ///
-/// The target's stub claims 1528 bytes of text for this arm, `d_ev_camera.cpp:151-159`, against
-/// the sibling's three lines, so the target almost certainly does something here and its text
-/// cannot say what. Nothing is invented: the sibling's answer stands and the doubt is recorded.
+/// The arm opens on `getEvActor("Target", "@STARTER")` and returns `true` when that name resolves
+/// to nothing. `"@STARTER"` is `@STA`, which the reference resolves to the event's own point-one
+/// actor, `dComIfGp_event_getPt1()` (`sibling d_ev_camera.cpp:406-407`); [`resolve_actor`] answers
+/// for `@PLA` alone, which is the one gap this module names once. The cut the arm serves reaches it
+/// through the default, so the port takes the arm's own missing-target return - the same answer the
+/// reference gives a cut that names nothing - rather than standing in for the actor it cannot
+/// resolve.
 fn turn_to_actor(camera: &mut Camera) -> bool {
     let _ = camera;
     true
 }
 
 /// `dCamera_c::windDirectionEvCamera`, which the target names at index thirteen,
-/// `d_camera.cpp:4727`, and which has no counterpart in the sibling's readable text at all: the
-/// sibling's thirteenth row is `pauseEvCamera` against a `WINDDIR` name,
-/// `sibling d_camera.cpp:9942` against `sibling d_camera.cpp:9979`.
+/// `d_camera.cpp:4727`, and whose body the target's own text does carry, `d_ev_camera.cpp:2394-2546`
+/// (matched in the fork; the sibling's thirteenth row is `pauseEvCamera` behind a `WINDDIR` name,
+/// `sibling d_camera.cpp:9942` against `:9979`, so only the target's body is usable).
 ///
-/// The name says the arm frames along a wind direction and the target's own text says nothing
-/// more, so nothing is written. It needs the stage's wind vector, which the target reads from the
-/// weather system this port does not carry.
+/// The wiring this module runs behind reaches the arm's cut data but not three of its inputs, so
+/// nothing is written rather than a stand-in:
+///
+/// * `g_env_light.mWind.mTactWindAngleX/Y` (`:2411-2412`) and `dKyw_get_tactwind_dir()`
+///   (`:2416`, `:2447`; `d_kankyo_wether.cpp:1358-1366`) frame every state and mirror the two
+///   offset tables. The sim carries that triple in [`super::weather::Wind`], but the engine
+///   dispatch here is reached through `EngineInput`, which carries no weather - see [`event`]'s
+///   wiring note.
+/// * `dComIfGp_event_getItemPartner()` (`:2413`, `d_com_inf_game.h:3572`) is the partner actor the
+///   arm measures and places the eye against (`positionOf(mActor)` `:2439`, `relationalPos(mActor,
+///   &mOffset)` `:2426`, `:2459`, `attentionPos(mActor)` `:2482`). The sim's [`ItemPartner`] holds
+///   an entity and nothing on this path reads its actor transform either.
+/// * `ResetBlure(0)`, `SetBlureTimer(0x6e)`, `SetBlureAlpha(0.6f)` and `SetBlureScale(0.99f)`
+///   (`:2461-2464`, `:2506-2509`) write the camera's own blure state, `d_camera.h:538-544`, which
+///   this port's `Camera` has no member for.
+///
+/// The rest of the arm - the eleven-state walk, the field-of-view blend, `SkipSmoother()` and the
+/// `mEventData.field_0x20 = 1` write its `Type != 0` arm makes (`:2568-2570`) - needs no input the
+/// port lacks; it is these three that stop the transcription, not the arm's shape.
 fn wind_direction(camera: &mut Camera) -> bool {
     let _ = camera;
     false
 }
 
 /// `dCamera_c::tornadoWarpEvCamera`, which the target names at index fourteen,
-/// `d_camera.cpp:4728`, and which the sibling names `portalWarpEvCamera` at its own index
-/// fourteen, `sibling d_ev_camera.cpp:4087-4089`.
+/// `d_camera.cpp:4728`. The target's own text carries the body, `d_ev_camera.cpp:2639-2714`; the
+/// sibling names its own index fourteen `portalWarpEvCamera` (`sibling d_ev_camera.cpp:4087-4089`).
 ///
-/// The sibling's arm is on the map's warp table, which this port has no reader for, so the arm
-/// reports rather than standing in. It needs the map's warp-node list, its own per-node
-/// destination table and the sky-warp transition the target plays.
+/// The arm is `fopAcM_SearchByName(fpcNm_SHIP_e)` (`:2670`; the sim's ship is
+/// [`super::ship::Ship`](super::ship)) and a three-state ship-side walk - two offset tables, a
+/// banked `relationalPos` (`d_camera.cpp:1606-1618`), a `SkipSmoother()` and four line tests. Three
+/// of the inputs it reads have no counterpart on this path, so nothing is written:
+///
+/// * `m786` (`d_camera.h:436`) selects between the two eye arms (`:2676`). `checkSpecialArea`
+///   (`d_camera.cpp:2634-2654`) is its writer: `m780 = is_current_map("sea")` (`:449-452`) and
+///   `m786 = m780 && xyzHorizontalDistance(opixy, player_pos) < dpixy` with the fixed anchor
+///   `opixy(-180000.0f, 750.0f, -200000.0f)` and `dpixy` `2500.0f` (`:2638-2653`). The port's
+///   [`Camera`] carries neither latch.
+/// * `lineCollisionCheck` (`:2693`) is `dComIfG_Ccsp()->ChkCamera(start, end, 15.0f, actor1,
+///   actor2)` (`d_ev_camera.cpp:1987-1989`, `d_cc_s.cpp:469`), which walks the registered actor
+///   collision bodies. This port has no `cCcD` registry - the same RULE 3b absence `wall.rs`
+///   records - so there is nothing to query.
+/// * the `cM_rndFX(6.0f * t)` bank jitter (`:2710`). Retail's global generator has no counterpart
+///   here and this module carries no private one; `coming.rs:976` records the same convention.
 fn tornado_warp(camera: &mut Camera) -> bool {
     let _ = camera;
     false
@@ -1892,11 +2019,7 @@ fn watch_actor(
         w.center = relational(player, facing, w.ctr_gap);
         w.span = SGlobe::from_xyz(cache.eye - w.center);
         w.arm = if w.span.radius() < w.near_dist {
-            if in_sight(camera, w.center) {
-                0
-            } else {
-                1
-            }
+            if in_sight(camera, w.center) { 0 } else { 1 }
         } else if w.span.radius() < w.far_dist {
             2
         } else {
@@ -2044,12 +2167,7 @@ fn clamp_front(globe: &mut SGlobe, facing: SAngle, front: SAngle) {
 /// `d_camera.h:506`, so this is its stage line check alone. The reference's narrow gate, which
 /// closes the search off outside seventy degrees of the target's facing for two profiles the port
 /// cannot name, stays open here: the target is the player.
-fn watch_search(
-    center: Vec3,
-    want: SGlobe,
-    step: SAngle,
-    collision: Option<&Collision>,
-) -> SGlobe {
+fn watch_search(center: Vec3, want: SGlobe, step: SAngle, collision: Option<&Collision>) -> SGlobe {
     let mut globe = want;
     for index in 0..WATCH_TRIES {
         if !blocked(collision, center, center + globe.to_xyz()) {
@@ -2196,7 +2314,14 @@ fn game_over(
     }
 
     if w.arm == 1 {
-        let eye = game_over_walk(collision, player, facing, anchor, &GAMEOVER_NEAR_EYES, &mut w.side);
+        let eye = game_over_walk(
+            collision,
+            player,
+            facing,
+            anchor,
+            &GAMEOVER_NEAR_EYES,
+            &mut w.side,
+        );
         cache.center = relational(player, facing, GAMEOVER_NEAR_GAP);
         cache.eye = eye;
         w.arm += 1;
@@ -2213,7 +2338,14 @@ fn game_over(
         if let Some(hit) = cross_at(collision, anchor, center) {
             center = hit + unit(cache.direction);
         }
-        let eye = game_over_walk(collision, player, facing, anchor, &GAMEOVER_MID_EYES, &mut w.side);
+        let eye = game_over_walk(
+            collision,
+            player,
+            facing,
+            anchor,
+            &GAMEOVER_MID_EYES,
+            &mut w.side,
+        );
         cache.center = center;
         cache.eye = eye;
         w.arm += 1;
@@ -2258,7 +2390,12 @@ fn game_over(
 /// `d_camera.h:506`, so the walk here is its stage line check alone. The first frame's save into
 /// the save file, `sibling d_ev_camera.cpp:2347`, needs the save-file writer this port has none of,
 /// the same reason [`save`] settles on slot nine.
-fn tact(camera: &mut Camera, player: &Player, collision: Option<&Collision>, cut: &mut Event) -> bool {
+fn tact(
+    camera: &mut Camera,
+    player: &Player,
+    collision: Option<&Collision>,
+    cut: &mut Event,
+) -> bool {
     let facing = facing_of(player);
     let mut w = camera.work.ev.tact;
     let mut cache = camera.view_cache;
@@ -2295,7 +2432,10 @@ fn tact(camera: &mut Camera, player: &Player, collision: Option<&Collision>, cut
     match w.arm {
         0 => {
             let mut anchor = player.pos;
-            for (gap, eye_gap) in TACT_CENTERS.iter().zip(TACT_EYES.iter()).take(w.rows.max(0) as usize)
+            for (gap, eye_gap) in TACT_CENTERS
+                .iter()
+                .zip(TACT_EYES.iter())
+                .take(w.rows.max(0) as usize)
             {
                 cache.center = relational(player, facing, *gap);
                 anchor.y = cache.center.y;
@@ -3793,7 +3933,10 @@ fn fixed_frames(
             }
             w.fovy = fovys.get(pick).copied().unwrap_or(0.0);
 
-            if collision.and_then(|solid| solid.line_cross(w.center, w.eye)).is_none() {
+            if collision
+                .and_then(|solid| solid.line_cross(w.center, w.eye))
+                .is_none()
+            {
                 break;
             }
             pick += 1;
@@ -3818,7 +3961,12 @@ fn fixed_frames(
 ///
 /// The arm walks the cut's three key lists along a [`Spline`] for the cut's timer and stops when
 /// the curve says it has reached its last key. The lists themselves are [`SplinePaths`].
-fn b_spline(camera: &mut Camera, player: &Player, paths: &mut SplinePaths, feed: &mut Feed<'_>) -> bool {
+fn b_spline(
+    camera: &mut Camera,
+    player: &Player,
+    paths: &mut SplinePaths,
+    feed: &mut Feed<'_>,
+) -> bool {
     let mut w = camera.work.ev.b_spline;
     let mut cache = camera.view_cache;
 
@@ -3836,7 +3984,11 @@ fn b_spline(camera: &mut Camera, player: &Player, paths: &mut SplinePaths, feed:
         paths.centers = centers;
         paths.eyes = eyes;
         paths.fovys = fovys;
-        w.frames = paths.centers.len().min(paths.eyes.len()).min(paths.fovys.len()) as i32;
+        w.frames = paths
+            .centers
+            .len()
+            .min(paths.eyes.len())
+            .min(paths.fovys.len()) as i32;
         let Some(timer) = feed.int("Timer") else {
             w.done = true;
             camera.work.ev.b_spline = w;

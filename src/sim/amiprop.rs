@@ -70,13 +70,8 @@ impl Amiprop {
             TYPE_PITCH => 1,
             _ => return None,
         };
-        let value = walk::add_calc_angle_s(
-            angle[axis],
-            self.target,
-            CHASE_SCALE,
-            CHASE_MAX,
-            CHASE_MIN,
-        );
+        let value =
+            walk::add_calc_angle_s(angle[axis], self.target, CHASE_SCALE, CHASE_MAX, CHASE_MIN);
         angle[axis] = value;
         Some(value == self.target)
     }

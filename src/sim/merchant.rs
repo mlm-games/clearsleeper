@@ -1,4 +1,3 @@
-
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 
@@ -212,9 +211,15 @@ const MSG_COLLECT_MAP: [u32; 2] = [0x29A6, 0x0000];
 const MSG_TRY_FORCE: [u32; 7] = [0x29A7, 0x29A8, 0x29A9, 0x29AA, 0x0003, 0x29AB, 0x0000];
 
 const ITEM_DAT: [[u8; ITEM_SLOTS]; MERCHANT_COUNT] = [
-    [0x01, 0x00, 0x07, 0x04, 0x09, 0x03, 0x07, 0x09, 0x09, 0x07, 0x09, 0x0A],
-    [0x01, 0x02, 0x01, 0x0A, 0x09, 0x03, 0x02, 0x09, 0x09, 0x08, 0x09, 0x0A],
-    [0x01, 0x00, 0x06, 0x05, 0x07, 0x04, 0x02, 0x04, 0x05, 0x05, 0x0B, 0x0A],
+    [
+        0x01, 0x00, 0x07, 0x04, 0x09, 0x03, 0x07, 0x09, 0x09, 0x07, 0x09, 0x0A,
+    ],
+    [
+        0x01, 0x02, 0x01, 0x0A, 0x09, 0x03, 0x02, 0x09, 0x09, 0x08, 0x09, 0x0A,
+    ],
+    [
+        0x01, 0x00, 0x06, 0x05, 0x07, 0x04, 0x02, 0x04, 0x05, 0x05, 0x0B, 0x0A,
+    ],
 ];
 
 const MSG_KOUKAN_ITEM: [[u32; 3]; MERCHANT_COUNT * ITEM_SLOTS] = [
@@ -672,11 +677,7 @@ impl PathRun {
         let f2 = walk::from_s16(heading).cos() * PATH_TRIG_SCALE;
         let f3 = -(f29 * target.x + f2 * target.z);
         let side = f29 * curr.x + f2 * curr.z + f3;
-        if self.dir {
-            side > 0.0
-        } else {
-            side <= 0.0
-        }
+        if self.dir { side > 0.0 } else { side <= 0.0 }
     }
 }
 
@@ -851,10 +852,13 @@ impl Merchant {
 
     fn seq_value(&self, at: u8) -> u32 {
         match self.seq {
-            Some((seq, pos)) => {
-                seq_at(seq, self.npc_no, usize::from(self.item_idx), usize::from(at))
-                    .unwrap_or(NO_MSG)
-            }
+            Some((seq, pos)) => seq_at(
+                seq,
+                self.npc_no,
+                usize::from(self.item_idx),
+                usize::from(at),
+            )
+            .unwrap_or(NO_MSG),
             None => NO_MSG,
         }
     }
@@ -865,7 +869,15 @@ impl Merchant {
         };
         let eye = self.eye;
         let msg_no = self.msg_no;
-        fop_msgm_message_set(shop.procs, shop.info, archive, MSG_CLEAR_COUNT, msg_no, None, eye)
+        fop_msgm_message_set(
+            shop.procs,
+            shop.info,
+            archive,
+            MSG_CLEAR_COUNT,
+            msg_no,
+            None,
+            eye,
+        )
     }
 
     fn message_set_follow(&mut self, shop: &mut Shop<'_>) -> u32 {
@@ -915,8 +927,12 @@ impl Merchant {
             return STATUS_MSG_ENDS;
         };
         let next = pos.wrapping_add(1);
-        let Some(step) = seq_at(seq, self.npc_no, usize::from(self.item_idx), usize::from(next))
-        else {
+        let Some(step) = seq_at(
+            seq,
+            self.npc_no,
+            usize::from(self.item_idx),
+            usize::from(next),
+        ) else {
             self.seq = None;
             return STATUS_MSG_ENDS;
         };
@@ -1027,8 +1043,13 @@ impl Merchant {
             self.seq = Some((Seq::Etc, 0));
         }
         if let Some((seq, pos)) = self.seq {
-            msg_no = seq_at(seq, self.npc_no, usize::from(self.item_idx), usize::from(pos))
-                .unwrap_or(NO_MSG);
+            msg_no = seq_at(
+                seq,
+                self.npc_no,
+                usize::from(self.item_idx),
+                usize::from(pos),
+            )
+            .unwrap_or(NO_MSG);
         }
         msg_no
     }
@@ -1294,13 +1315,7 @@ impl Merchant {
         self.talking
     }
 
-    pub fn execute_set_mode(
-        &mut self,
-        mode: Mode,
-        shop: &mut Shop<'_>,
-        pos: Vec3,
-        path: &[Vec3],
-    ) {
+    pub fn execute_set_mode(&mut self, mode: Mode, shop: &mut Shop<'_>, pos: Vec3, path: &[Vec3]) {
         self.speed_f = 0.0;
         self.step = match mode {
             Mode::Wait => {
@@ -1438,7 +1453,10 @@ impl Merchant {
             } else if self.started_check(active, self.ev_map) && self.order == ORDER_MAP {
                 self.order = 0;
             }
-        } else if near && pressed && (self.order == ORDER_TALK_ITEM || self.order == 1) && !self.talking
+        } else if near
+            && pressed
+            && (self.order == ORDER_TALK_ITEM || self.order == 1)
+            && !self.talking
         {
             self.talking = true;
             self.speed_f = 0.0;
@@ -1754,14 +1772,14 @@ impl Merchant {
 
     pub fn set_jnt_param(&mut self) {
         let backbone = if self.head_lock != 0 {
-            [HEAD_LOCK_VALUE, HEAD_LOCK_VALUE, HEAD_LOCK_VALUE, HEAD_LOCK_VALUE]
-        } else {
             [
-                HEAD_LIMIT_Y,
-                HEAD_LIMIT_Y,
-                HEAD_MIN_Y,
-                HEAD_MIN_Y,
+                HEAD_LOCK_VALUE,
+                HEAD_LOCK_VALUE,
+                HEAD_LOCK_VALUE,
+                HEAD_LOCK_VALUE,
             ]
+        } else {
+            [HEAD_LIMIT_Y, HEAD_LIMIT_Y, HEAD_MIN_Y, HEAD_MIN_Y]
         };
         self.set_param(
             backbone[0],
@@ -1957,10 +1975,7 @@ fn event_slot(index: i16) -> Option<usize> {
 fn dis_xz_ang_y(from: Vec3, to: Vec3) -> (f32, i16) {
     let dx = to.x - from.x;
     let dz = to.z - from.z;
-    (
-        (dx * dx + dz * dz).sqrt(),
-        walk::to_s16(dx.atan2(dz)),
-    )
+    ((dx * dx + dz * dz).sqrt(), walk::to_s16(dx.atan2(dz)))
 }
 
 fn player_eye_pos(player: Vec3, offset_y: f32) -> Vec3 {

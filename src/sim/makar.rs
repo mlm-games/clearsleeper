@@ -7,15 +7,15 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::carry::Carry;
 use super::collision::Collision;
-use super::movebox::Movebox;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
+use super::flags::Collect;
 use super::flags::{EventFlags, StoryBits};
 use super::ground;
 use super::intent::{CameraYaw, DoIntent, MoveIntent, TargetIntent};
-use super::flags::Collect;
-use super::inventory::{check_get_item as item_obtained, Equipped, ITEM_WIND_WAKER};
+use super::inventory::{Equipped, ITEM_WIND_WAKER, check_get_item as item_obtained};
 use super::lock::Lock;
+use super::movebox::Movebox;
 use super::player::Player;
 use super::stream;
 use super::transition::{NextStage, Target as StageTarget};
@@ -1218,7 +1218,13 @@ fn offset_pos(src: Vec3, angle: i16, v: Vec3) -> Vec3 {
     )
 }
 
-fn add_calc_pos_xz(value: &mut Vec3, target: Vec3, scale: f32, max_step: f32, min_step: f32) -> f32 {
+fn add_calc_pos_xz(
+    value: &mut Vec3,
+    target: Vec3,
+    scale: f32,
+    max_step: f32,
+    min_step: f32,
+) -> f32 {
     if value.x != target.x || value.z != target.z {
         let mut diff = *value - target;
         let mut step = abs_xz(diff);
@@ -1309,11 +1315,7 @@ impl Makar {
         }
         let mut head = 0_i16;
         if !self.head_lock {
-            head = chk_lim(
-                input.wrapping_sub(spine),
-                HIO_MAX_HEAD_Y,
-                HIO_MIN_HEAD_Y,
-            );
+            head = chk_lim(input.wrapping_sub(spine), HIO_MAX_HEAD_Y, HIO_MIN_HEAD_Y);
         }
         (head, spine)
     }
@@ -1446,7 +1448,8 @@ impl Makar {
             src = self.pos;
             src.y = self.eye_pos.y;
         }
-        self.shape_yaw = self.look_at_target(self.shape_yaw, dst, src, desired, self.head_turn, false);
+        self.shape_yaw =
+            self.look_at_target(self.shape_yaw, dst, src, desired, self.head_turn, false);
     }
 }
 
@@ -1797,7 +1800,13 @@ impl Makar {
         }
     }
 
-    pub fn walk_action(&mut self, target_speed: f32, accel: f32, target_angle: i16, ctx: &mut Ctx) -> bool {
+    pub fn walk_action(
+        &mut self,
+        target_speed: f32,
+        accel: f32,
+        target_angle: i16,
+        ctx: &mut Ctx,
+    ) -> bool {
         walk::chase_angle_s(&mut self.yaw, target_angle, TURN_WALK);
         self.look_back(true, ctx.player);
         self.shape_yaw = self.yaw;
@@ -1805,7 +1814,10 @@ impl Makar {
             self.set_npc_action(Step::Wait, Param::Null, ctx);
             return true;
         }
-        let play = min_limit(self.speed_f.abs() * HIO_WALK_ANM_SPEED_SCALE, HIO_MAX_WALK_ANM_SPEED);
+        let play = min_limit(
+            self.speed_f.abs() * HIO_WALK_ANM_SPEED_SCALE,
+            HIO_MAX_WALK_ANM_SPEED,
+        );
         self.anm_speed = play;
         false
     }
@@ -1845,11 +1857,8 @@ impl Makar {
                 } else {
                     HIO_MAX_ATTN_DIST_XZ
                 };
-                self.attn_seen = self.chk_attention(
-                    ctx.player.unwrap_or(Vec3::ZERO),
-                    dist,
-                    ATTENTION_ANGLE_ALL,
-                );
+                self.attn_seen =
+                    self.chk_attention(ctx.player.unwrap_or(Vec3::ZERO), dist, ATTENTION_ANGLE_ALL);
                 let mut watch = self.attn_seen;
                 if watch && self.get_msg(ctx) != 0 {
                     self.ev_order = ORDER_TALK;
@@ -2033,8 +2042,11 @@ impl Makar {
                 TURN_MIN_STEP,
             );
             self.yaw = self.shape_yaw;
-            self.attn_seen =
-                self.chk_attention(ctx.player.unwrap_or(Vec3::ZERO), HIO_MAX_ATTN_DIST_XZ, ATTENTION_ANGLE_ALL);
+            self.attn_seen = self.chk_attention(
+                ctx.player.unwrap_or(Vec3::ZERO),
+                HIO_MAX_ATTN_DIST_XZ,
+                ATTENTION_ANGLE_ALL,
+            );
             if self.attn_seen {
                 if self.is_type_waterfall() {
                     self.ev_order = ORDER_TALK_ITEM;
@@ -2105,10 +2117,8 @@ impl Makar {
                 if !door && dist_sq < SQUARE_400 {
                     walk_speed = 0.0;
                 } else {
-                    walk_speed = max_limit(
-                        HIO_CHASE_DIST_SCALE * dist_xz_sq.sqrt(),
-                        HIO_MAX_WALK_SPEED,
-                    );
+                    walk_speed =
+                        max_limit(HIO_CHASE_DIST_SCALE * dist_xz_sq.sqrt(), HIO_MAX_WALK_SPEED);
                 }
                 angle = target_angle_y(self.pos, player);
                 let blocked = door
@@ -2132,11 +2142,7 @@ impl Makar {
                 }
                 if calc_timer(&mut self.rnd_timer) == 0 {
                     self.rnd_flip ^= 1;
-                    self.rnd_timer = get_rnd_value(
-                        &mut self.seed,
-                        HIO_RND_MIN,
-                        HIO_RND_RANGE,
-                    );
+                    self.rnd_timer = get_rnd_value(&mut self.seed, HIO_RND_MIN, HIO_RND_RANGE);
                 }
                 angle = if self.rnd_flip != 0 {
                     angle.wrapping_sub(HIO_WANDER_ANGLE)
@@ -2187,14 +2193,8 @@ impl Makar {
                     self.set_player_action(Step::WalkPlayer, ctx);
                 }
             } else {
-                self.shape_yaw = self.look_at_target(
-                    self.shape_yaw,
-                    None,
-                    Vec3::ZERO,
-                    self.shape_yaw,
-                    0,
-                    false,
-                );
+                self.shape_yaw =
+                    self.look_at_target(self.shape_yaw, None, Vec3::ZERO, self.shape_yaw, 0, false);
                 self.yaw = self.shape_yaw;
             }
             self.breaking();
@@ -2256,8 +2256,10 @@ impl Makar {
             if walk::chase_f(&mut self.speed_f, target, accel) && target == 0.0 {
                 self.set_player_action(Step::WaitPlayer, ctx);
             } else {
-                self.anm_speed =
-                    min_limit(self.speed_f * HIO_WALK_ANM_SPEED_SCALE, HIO_MAX_WALK_ANM_SPEED);
+                self.anm_speed = min_limit(
+                    self.speed_f * HIO_WALK_ANM_SPEED_SCALE,
+                    HIO_MAX_WALK_ANM_SPEED,
+                );
                 if !self.grounded {
                     self.set_player_action(Step::JumpPlayer, ctx);
                 } else if self.chk_wall_hit(ctx) {
@@ -2375,9 +2377,7 @@ impl Makar {
 
     fn to_player_shape_angle(&self, ctx: &Ctx) -> i16 {
         match ctx.player {
-            Some(at) => self
-                .shape_yaw
-                .wrapping_sub(target_angle_y(self.pos, at)),
+            Some(at) => self.shape_yaw.wrapping_sub(target_angle_y(self.pos, at)),
             None => 0,
         }
     }
@@ -2436,10 +2436,7 @@ impl Makar {
                 }
             }
             let mut angle = atan2s(push.x, push.z);
-            let reach = max_limit(
-                (push.x * push.x + push.z * push.z).sqrt(),
-                flat,
-            );
+            let reach = max_limit((push.x * push.x + push.z * push.z).sqrt(), flat);
             angle = angle.wrapping_sub(self.shape_yaw);
             let mut tilt = reach * HIO_FLY_TILT_SCALE;
             if tilt > HIO_FLY_TILT_MAX {
@@ -2588,8 +2585,10 @@ impl Makar {
                     self.pos.z + scos(self.shape_yaw) * ROUTE_PROBE,
                 );
                 let slid = collision.slide(self.pos, probe);
-                i32::from(distance_angle_s(self.shape_yaw, atan2s(slid.x - self.pos.x, slid.z - self.pos.z)))
-                    > ROUTE_TURN_WALL
+                i32::from(distance_angle_s(
+                    self.shape_yaw,
+                    atan2s(slid.x - self.pos.x, slid.z - self.pos.z),
+                )) > ROUTE_TURN_WALL
             }
             None => false,
         }
@@ -2603,8 +2602,10 @@ impl Makar {
             self.ground_hit = true;
             self.grounded = true;
             if self.normal != Vec3::ZERO
-                && i32::from(distance_angle_s(*angle, atan2s(self.normal.x, self.normal.z)))
-                    > ROUTE_ANGLE
+                && i32::from(distance_angle_s(
+                    *angle,
+                    atan2s(self.normal.x, self.normal.z),
+                )) > ROUTE_ANGLE
             {
                 return true;
             }
@@ -2768,10 +2769,7 @@ impl Makar {
         if !self.talk_cmd {
             return;
         }
-        if matches!(
-            self.ev_order,
-            ORDER_SPEAK | ORDER_TALK | ORDER_TALK_ITEM
-        ) {
+        if matches!(self.ev_order, ORDER_SPEAK | ORDER_TALK | ORDER_TALK_ITEM) {
             self.ev_order = ORDER_OFF;
             if !self.talk_xy {
                 self.on_tact();
@@ -2786,7 +2784,10 @@ impl Makar {
         } else if self.ev_order == ORDER_TALK_ITEM {
         } else if self.ev_order != ORDER_OFF && i32::from(self.ev_order) < ORDER_OTHER {
             self.ev_slot = self.ev_order;
-            let index = self.ev_index.get(usize::try_from(self.ev_slot).unwrap_or(0)).copied();
+            let index = self
+                .ev_index
+                .get(usize::try_from(self.ev_slot).unwrap_or(0))
+                .copied();
             if let Some(index) = index.filter(|value| *value >= 0) {
                 let slot = usize::try_from(index as u16).unwrap_or(0);
                 if ctx.active.stage_of(slot).is_none() {
@@ -2826,7 +2827,11 @@ impl Makar {
                     .get(usize::try_from(self.ev_slot).unwrap_or(0))
                     .copied()
                     .unwrap_or(NO_INDEX);
-                if index >= 0 && ctx.active.end_check(usize::try_from(index as u16).unwrap_or(0)) {
+                if index >= 0
+                    && ctx
+                        .active
+                        .end_check(usize::try_from(index as u16).unwrap_or(0))
+                {
                     ctx.reset_event();
                     self.ev_accepted = false;
                     if self.ev_slot == 1 {
@@ -3043,7 +3048,12 @@ impl Makar {
             self.speed_f = 0.0;
             return true;
         }
-        self.walk_action(speed, HIO_FORWARD_ACCEL, target_angle_y(self.pos, player), ctx);
+        self.walk_action(
+            speed,
+            HIO_FORWARD_ACCEL,
+            target_angle_y(self.pos, player),
+            ctx,
+        );
         false
     }
 
@@ -3153,9 +3163,7 @@ impl Makar {
     fn ev_act_warp(&mut self, ctx: &mut Ctx) -> bool {
         self.gravity = 0.0;
         if self.timer < 0 {
-            if walk::chase_f(&mut self.speed.y, 0.0, WARP_BRACE)
-                && chase_s(&mut self.timer, 0, 1)
-            {
+            if walk::chase_f(&mut self.speed.y, 0.0, WARP_BRACE) && chase_s(&mut self.timer, 0, 1) {
                 self.timer = 0;
             }
         } else {
@@ -3364,7 +3372,11 @@ impl Makar {
         if self.as_player {
             ctx.do_status = ACT_STTS_BLANK;
             ctx.a_status = ACT_STTS_HIDDEN;
-            ctx.r_status = if self.grounded { ACT_STTS_RETURN } else { ACT_STTS_BLANK };
+            ctx.r_status = if self.grounded {
+                ACT_STTS_RETURN
+            } else {
+                ACT_STTS_BLANK
+            };
         }
         if !self.event_proc(ctx) {
             self.off_tact();
@@ -3379,7 +3391,13 @@ impl Makar {
                 }
                 push_scale = 1.0;
             }
-            add_calc_pos_xz(&mut self.push, push, WIND_PUSH_SCALE, push_scale, WIND_PUSH_STEP);
+            add_calc_pos_xz(
+                &mut self.push,
+                push,
+                WIND_PUSH_SCALE,
+                push_scale,
+                WIND_PUSH_STEP,
+            );
             if self.as_player {
                 if self.return_link {
                     self.ev_order = ORDER_TO_LINK;
@@ -3433,11 +3451,7 @@ impl Makar {
             self.shape_yaw,
             Vec3::new(0.0, HIO_ATTN_Y_OFFSET, 0.0),
         );
-        self.eye_pos = offset_pos(
-            self.pos,
-            self.shape_yaw,
-            Vec3::new(0.0, HIO_EYE_LIFT, 0.0),
-        );
+        self.eye_pos = offset_pos(self.pos, self.shape_yaw, Vec3::new(0.0, HIO_EYE_LIFT, 0.0));
         if self.damage_timer > 0 {
             self.damage_timer -= 1;
         }
@@ -3585,13 +3599,7 @@ impl Text<'_> {
         let Some(archive) = self.archive else {
             return FPC_M_ERROR_PROCESS_ID;
         };
-        fop_msgm_tact_message_set(
-            self.procs,
-            self.flags,
-            self.info,
-            archive,
-            self.clear_count,
-        )
+        fop_msgm_tact_message_set(self.procs, self.flags, self.info, archive, self.clear_count)
     }
 }
 
@@ -3806,13 +3814,14 @@ pub fn control(
     for (entity, mut actor, mut makar) in &mut actors {
         let actor = &mut *actor;
         let makar = &mut *makar;
-        let current = ActiveEvent::staff_cut(&world.active, &world.list, STAFF_NAME)
-            .and_then(|(index, advance)| {
+        let current = ActiveEvent::staff_cut(&world.active, &world.list, STAFF_NAME).and_then(
+            |(index, advance)| {
                 world
                     .list
                     .cut_name(index)
                     .map(|name| (index, advance, Cut::of_name(name)))
-            });
+            },
+        );
         let mut ctx = Ctx {
             entity,
             player: link.map(|player| player.pos),
@@ -3854,7 +3863,8 @@ pub fn control(
             wall_hit: false,
             co_hit: link.is_some_and(|player| makar.cyl.blocks(player.pos)),
             tg_hit: link.is_some_and(|player| {
-                makar.cyl.tg_sprm & CCT_TG_SET != 0 && makar.cyl.touches(player.pos, PLAYER_TG_REACH)
+                makar.cyl.tg_sprm & CCT_TG_SET != 0
+                    && makar.cyl.touches(player.pos, PLAYER_TG_REACH)
             }),
             tg_pos: link.map_or(Vec3::ZERO, |player| player.pos),
             wind_tg: false,

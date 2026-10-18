@@ -129,7 +129,10 @@ impl Kantera {
 /// at `:244-266`, which is `mpModel1->calc()`, four matrix calls and two `mpBrkAnm->play()` calls,
 /// i.e. renderer. So the gate latch is the whole modelled behaviour, and `control` records it
 /// faithfully without pretending a visible change follows.
-pub fn control(switches: Res<Switches>, mut braziers: Query<(&mut Actor, &mut Kantera), With<Kantera>>) {
+pub fn control(
+    switches: Res<Switches>,
+    mut braziers: Query<(&mut Actor, &mut Kantera), With<Kantera>>,
+) {
     for (mut actor, mut brazier) in &mut braziers {
         brazier.gate(&switches);
         // ```

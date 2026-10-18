@@ -74,7 +74,6 @@ const TYPE_SHIFT: u32 = 0x14; // <- d_a_obj_auzu.h:31
 /// `prm_get_linkID()` (`d_a_obj_auzu.h:37`). Transcribed here but not stored: its only readers are
 /// the three omitted `ship_p->...WhirlFlg(id, prm_get_linkID())` calls at `:167`, `:169`, `:172`.
 
-
 /// The whirlpool in Jabu-Jabu's cave - `daObjAuzu::Act_c` (`d_a_obj_auzu.h:18-76`), the actor behind
 /// the stage string `Auzu`.
 ///
@@ -166,18 +165,26 @@ impl Auzu {
     /// retail itself reads past the table for a type above 1 - RULE 10 requires the index be
     /// guarded, and anything that is not exactly 1 folds to 0.
     fn radius_mult(&self) -> f32 {
-        if self.kind == 1 { RADIUS_BIG } else { RADIUS_SMALL }
+        if self.kind == 1 {
+            RADIUS_BIG
+        } else {
+            RADIUS_SMALL
+        }
     }
 
     /// `attr().mOuterActivationMult` (`d_a_obj_auzu.cpp:22` / `:28`).
     fn outer_mult(&self) -> f32 {
-        if self.kind == 1 { OUTER_BIG } else { OUTER_SMALL }
+        if self.kind == 1 {
+            OUTER_BIG
+        } else {
+            OUTER_SMALL
+        }
     }
 
     /// `M_attr[0].mInnerActivationMult` (`d_a_obj_auzu.cpp:23`) and `M_attr[1].mInnerActivationMult`
-/// (`:29`) - the inner pull radius, squared at `:157`. NOT stored: that value only chooses between
-/// `ship_p->onWhirlFlg` (`:167`) and `ship_p->onWhirlFlgDirect` (`:169`), both omitted, so a stored
-/// copy would be dead code (RULE 12b).
+    /// (`:29`) - the inner pull radius, squared at `:157`. NOT stored: that value only chooses between
+    /// `ship_p->onWhirlFlg` (`:167`) and `ship_p->onWhirlFlgDirect` (`:169`), both omitted, so a stored
+    /// copy would be dead code (RULE 12b).
 
     /// `is_exist()` (`:114-119`) plus `_create`'s `mScaleAnimFactor` choice (`:83-91`).
     fn create_init(&mut self, switches: &Switches, flags: &EventFlags) {

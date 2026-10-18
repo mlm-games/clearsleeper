@@ -438,19 +438,49 @@ pub const ANM_PRM_TBL: [AnmPrm; 24] = [
     prm(BCK_IDX_WAIT02, -1, HIO_MORF[3], 1.0, EMODE_LOOP),
     prm(BCK_IDX_TALK01, -1, HIO_MORF[4], 1.0, EMODE_LOOP),
     prm(BCK_IDX_WALK01, -1, HIO_MORF[5], 1.0, EMODE_LOOP),
-    prm(BCK_IDX_JAMP_A, ANM_PRM_IDX_JAMP_B, HIO_MORF[6], 1.0, EMODE_NONE),
+    prm(
+        BCK_IDX_JAMP_A,
+        ANM_PRM_IDX_JAMP_B,
+        HIO_MORF[6],
+        1.0,
+        EMODE_NONE,
+    ),
     prm(BCK_IDX_JAMP_B, -1, HIO_MORF[7], 1.0, EMODE_NONE),
     prm(BCK_IDX_JAMP_C, -1, HIO_MORF[8], 0.0, EMODE_NONE),
     prm(BCK_IDX_JAMP_C, -1, HIO_MORF[9], 1.0, EMODE_NONE),
     prm(BCK_IDX_GUARD, -1, HIO_MORF[10], 1.0, EMODE_LOOP),
     prm(BCK_IDX_JTBT, -1, HIO_MORF[11], 1.0, EMODE_LOOP),
-    prm(BCK_IDX_HAPPY, ANM_PRM_IDX_HAPPY2, HIO_MORF[12], 1.0, EMODE_NONE),
+    prm(
+        BCK_IDX_HAPPY,
+        ANM_PRM_IDX_HAPPY2,
+        HIO_MORF[12],
+        1.0,
+        EMODE_NONE,
+    ),
     prm(BCK_IDX_DANCE01, -1, HIO_MORF[13], 1.0, EMODE_NONE),
     prm(BCK_IDX_DANCE02, -1, HIO_MORF[14], 1.0, EMODE_NONE),
     prm(BCK_IDX_GET, -1, HIO_MORF[15], 1.0, EMODE_NONE),
-    prm(BCK_IDX_HAPPY, ANM_PRM_IDX_TALK01, HIO_MORF[16], 1.0, EMODE_NONE),
-    prm(BCK_IDX_DANCE01, ANM_PRM_IDX_TALK01, HIO_MORF[17], 1.0, EMODE_NONE),
-    prm(BCK_IDX_DANCE02, ANM_PRM_IDX_WAIT03, HIO_MORF[18], 1.0, EMODE_NONE),
+    prm(
+        BCK_IDX_HAPPY,
+        ANM_PRM_IDX_TALK01,
+        HIO_MORF[16],
+        1.0,
+        EMODE_NONE,
+    ),
+    prm(
+        BCK_IDX_DANCE01,
+        ANM_PRM_IDX_TALK01,
+        HIO_MORF[17],
+        1.0,
+        EMODE_NONE,
+    ),
+    prm(
+        BCK_IDX_DANCE02,
+        ANM_PRM_IDX_WAIT03,
+        HIO_MORF[18],
+        1.0,
+        EMODE_NONE,
+    ),
     prm(BCK_IDX_MAWASU, -1, HIO_MORF[19], 1.0, EMODE_LOOP),
     prm(BCK_IDX_WAIT04, -1, HIO_MORF[20], 1.0, EMODE_LOOP),
     prm(BCK_IDX_TALK02, -1, HIO_MORF[21], 1.0, EMODE_LOOP),
@@ -926,13 +956,21 @@ fn rotate_y(value: Vec3, angle: i16) -> Vec3 {
 fn rotate_x(value: Vec3, angle: i16) -> Vec3 {
     let rad = walk::from_s16(angle);
     let (s, c) = (rad.sin(), rad.cos());
-    Vec3::new(value.x, value.y * c - value.z * s, value.y * s + value.z * c)
+    Vec3::new(
+        value.x,
+        value.y * c - value.z * s,
+        value.y * s + value.z * c,
+    )
 }
 
 fn rotate_z(value: Vec3, angle: i16) -> Vec3 {
     let rad = walk::from_s16(angle);
     let (s, c) = (rad.sin(), rad.cos());
-    Vec3::new(value.x * c - value.y * s, value.x * s + value.y * c, value.z)
+    Vec3::new(
+        value.x * c - value.y * s,
+        value.x * s + value.y * c,
+        value.z,
+    )
 }
 
 fn rotate_zxy(value: Vec3, angle: [i16; 3]) -> Vec3 {
@@ -1195,11 +1233,7 @@ impl NpcTc {
         }
         if self.event_idx >= EVENT_IDX_FIRST {
             let slot = self.event_idx - EVENT_IDX_FIRST;
-            let at = if slot >= 0 {
-                slot as usize
-            } else {
-                usize::MAX
-            };
+            let at = if slot >= 0 { slot as usize } else { usize::MAX };
             let Some(name) = EVENT_NAMES.get(at).copied() else {
                 return;
             };
@@ -1279,7 +1313,12 @@ impl NpcTc {
             TYPE_RED | TYPE_WHITE => {
                 self.head_lock = true;
                 let target = self.tower_angle[1].wrapping_add(temp2);
-                add_calc_angle_s2(&mut actor.angle[1], target, TOWER_TURN_SCALE, TOWER_TURN_MAX);
+                add_calc_angle_s2(
+                    &mut actor.angle[1],
+                    target,
+                    TOWER_TURN_SCALE,
+                    TOWER_TURN_MAX,
+                );
                 if distance_angle_s(actor.angle[1], target) < TOWER_TURN_TOL {
                     self.tower_stopped = false;
                     self.anm_prm_idx = ANM_PRM_IDX_MAWASU;
@@ -1305,8 +1344,7 @@ impl NpcTc {
             actor.pos = pos + rotate_zxy(temp, angle);
             let temp3 = angle[1].wrapping_add(temp2);
             if self.tower_stopped {
-                if self.anm_prm_idx == ANM_PRM_IDX_MAWASU
-                    || self.anm_prm_idx == ANM_PRM_IDX_WAIT04
+                if self.anm_prm_idx == ANM_PRM_IDX_MAWASU || self.anm_prm_idx == ANM_PRM_IDX_WAIT04
                 {
                     add_calc_angle_s2(&mut actor.angle[1], temp3, 4, 0x800);
                 }
@@ -1703,8 +1741,7 @@ impl NpcTc {
                 {
                     return MSG_DEE;
                 }
-                if is_stage_tbox(ctx.chests, STAGE_FW, MONUMENT_TBOX)
-                    && !ctx.stories.test(BIT_1D08)
+                if is_stage_tbox(ctx.chests, STAGE_FW, MONUMENT_TBOX) && !ctx.stories.test(BIT_1D08)
                 {
                     return MSG_DEE;
                 }
@@ -1713,13 +1750,11 @@ impl NpcTc {
                 {
                     return MSG_DEE;
                 }
-                if is_stage_tbox(ctx.chests, STAGE_WT, MONUMENT_TBOX)
-                    && !ctx.stories.test(BIT_1D02)
+                if is_stage_tbox(ctx.chests, STAGE_WT, MONUMENT_TBOX) && !ctx.stories.test(BIT_1D02)
                 {
                     return MSG_DEE;
                 }
-                if is_stage_tbox(ctx.chests, STAGE_ET, MONUMENT_TBOX)
-                    && !ctx.stories.test(BIT_1D01)
+                if is_stage_tbox(ctx.chests, STAGE_ET, MONUMENT_TBOX) && !ctx.stories.test(BIT_1D01)
                 {
                     return MSG_DEE;
                 }
@@ -1949,7 +1984,8 @@ impl NpcTc {
     fn jnt_move(&mut self, param_1: i16, axis: i16) -> bool {
         let mut angles = [0_i16; 2];
         for index in 0..2 {
-            let mut angle = if (index == 0 && self.head_lock) || (index == 1 && self.backbone_lock) {
+            let mut angle = if (index == 0 && self.head_lock) || (index == 1 && self.backbone_lock)
+            {
                 0
             } else {
                 param_1
@@ -2017,8 +2053,7 @@ impl NpcTc {
         let max_y = HIO_MAX_BACKBONE_Y + HIO_MAX_HEAD_Y;
         let min_y = HIO_MIN_BACKBONE_Y + HIO_MIN_HEAD_Y;
         let r3 = self.jnt_move(delta_y, 1);
-        if (self.jnt_trn
-            || (i32::from(delta_y) > max_y || i32::from(delta_y) < min_y) && r3)
+        if (self.jnt_trn || (i32::from(delta_y) > max_y || i32::from(delta_y) < min_y) && r3)
             && !no_force
         {
             self.jnt_trn = self.jnt_follow(out_y, target_y, max_vel);
@@ -2040,8 +2075,7 @@ impl NpcTc {
         }
         if self.ty == TYPE_WHITE || self.ty == TYPE_RED {
             if self.status == STATUS_WAIT {
-                if self.anm_prm_idx == ANM_PRM_IDX_MAWASU
-                    || self.anm_prm_idx == ANM_PRM_IDX_WAIT04
+                if self.anm_prm_idx == ANM_PRM_IDX_MAWASU || self.anm_prm_idx == ANM_PRM_IDX_WAIT04
                 {
                     self.backbone_lock = true;
                     self.jnt_trn = false;
@@ -2123,7 +2157,13 @@ impl NpcTc {
         self.walk_to_stool_pos = rotate_y(src_walk, angle) + self.stool_pos;
     }
 
-    fn player_in_circle(&self, ctx: &Ctx<'_, '_>, pos: Vec3, radius: f32, half_height: f32) -> bool {
+    fn player_in_circle(
+        &self,
+        ctx: &Ctx<'_, '_>,
+        pos: Vec3,
+        radius: f32,
+        half_height: f32,
+    ) -> bool {
         let Some(player) = ctx.player else {
             return false;
         };
@@ -2200,8 +2240,7 @@ impl NpcTc {
             self.jump_landing_timer = JUMP_LAND_TIMER;
             return;
         }
-        if calc_timer(&mut self.jump_landing_timer) == 0
-            && self.anm_prm_idx == ANM_PRM_IDX_JAMP_C2
+        if calc_timer(&mut self.jump_landing_timer) == 0 && self.anm_prm_idx == ANM_PRM_IDX_JAMP_C2
         {
             self.anm_prm_idx = ANM_PRM_IDX_WALK01;
             self.status = STATUS_WALK_TO_JAIL;
@@ -2622,13 +2661,19 @@ impl NpcTc {
             Some("MOVE_TO_ACTOR") => {
                 self.cut_attention = ctx.list.cut_number(cut, "Attention").is_some();
                 self.cut_no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-                self.cut_speed = ctx.list.cut_float(cut, "Speed").unwrap_or(DEFAULT_MOVE_SPEED);
+                self.cut_speed = ctx
+                    .list
+                    .cut_float(cut, "Speed")
+                    .unwrap_or(DEFAULT_MOVE_SPEED);
             }
             Some("MOVE_TO_POS") => {
                 self.cut_attn_pos = ctx.list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
                 self.cut_attention = ctx.list.cut_number(cut, "Attention").is_some();
                 self.cut_no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-                self.cut_speed = ctx.list.cut_float(cut, "Speed").unwrap_or(DEFAULT_MOVE_SPEED);
+                self.cut_speed = ctx
+                    .list
+                    .cut_float(cut, "Speed")
+                    .unwrap_or(DEFAULT_MOVE_SPEED);
             }
             _ => {}
         }
@@ -2650,13 +2695,7 @@ impl NpcTc {
         }
     }
 
-    fn event_cut_run(
-        &mut self,
-        cut: usize,
-        at: usize,
-        actor: &mut Actor,
-        ctx: &mut Ctx<'_, '_>,
-    ) {
+    fn event_cut_run(&mut self, cut: usize, at: usize, actor: &mut Actor, ctx: &mut Ctx<'_, '_>) {
         match EVENT_CUT_ACTIONS.get(at).copied() {
             Some("WAIT") => {
                 if calc_timer_i16(&mut self.cut_timer) == 0 {
@@ -2789,8 +2828,7 @@ impl NpcTc {
             self.jump_landing_timer = JUMP_LAND_TIMER;
             return;
         }
-        if calc_timer(&mut self.jump_landing_timer) == 0
-            && self.anm_prm_idx == ANM_PRM_IDX_JAMP_C2
+        if calc_timer(&mut self.jump_landing_timer) == 0 && self.anm_prm_idx == ANM_PRM_IDX_JAMP_C2
         {
             self.anm_prm_idx = ANM_PRM_IDX_WAIT01;
             ctx.active.end_staff_cut(ctx.list, ctx.flags, STAFF_NAME);
@@ -2997,7 +3035,10 @@ pub fn control(
             one: &mut msg.one,
             two: &mut msg.two,
             clear_count,
-            archive: msg.archive.as_deref().map(|archive| archive as &dyn MsgArchive),
+            archive: msg
+                .archive
+                .as_deref()
+                .map(|archive| archive as &dyn MsgArchive),
         };
         let player_eye = player.map_or(Vec3::ZERO, |link| {
             Vec3::new(link.pos.x, link.pos.y + HIO_M04, link.pos.z)
@@ -3043,7 +3084,10 @@ pub fn control(
                     room: actor.room,
                     ..Default::default()
                 },
-                PresentItem { item, hidden: false },
+                PresentItem {
+                    item,
+                    hidden: false,
+                },
             ));
         }
         if tc.deleted {

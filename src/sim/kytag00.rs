@@ -72,11 +72,7 @@ impl Kytag00 {
 
         let on = switch_no != 0xFF && switches.test(switch_no);
         let target = if invert == 0 {
-            if on {
-                0.0
-            } else {
-                1.0
-            }
+            if on { 0.0 } else { 1.0 }
         } else if on {
             1.0
         } else {
@@ -96,10 +92,7 @@ impl Kytag00 {
                 scale[0] * 5000.0 + thickness as f32 * 100.0,
             )
         } else {
-            (
-                scale[0] * 500.0,
-                scale[0] * 500.0 + thickness as f32 * 10.0,
-            )
+            (scale[0] * 500.0, scale[0] * 500.0 + thickness as f32 * 10.0)
         };
 
         Self {
@@ -120,7 +113,13 @@ impl Kytag00 {
     }
 }
 
-fn check_pos(tag: &Kytag00, actor: &Actor, eye: glam::Vec3, player: glam::Vec3, events: bool) -> glam::Vec3 {
+fn check_pos(
+    tag: &Kytag00,
+    actor: &Actor,
+    eye: glam::Vec3,
+    player: glam::Vec3,
+    events: bool,
+) -> glam::Vec3 {
     let camera_dist = actor.pos.distance(eye);
     let player_dist = actor.pos.distance(player);
     if events && tag.mode == 0 {
@@ -139,7 +138,11 @@ fn blend_of(tag: &Kytag00, actor: &Actor, pos: glam::Vec3) -> Option<f32> {
     let flat = glam::Vec3::new(pos.x, actor.pos.y, pos.z);
     let dist = actor.pos.distance(flat);
     let top = actor.pos.y + tag.scale_y * 5000.0;
-    if dist < tag.outer_radius && pos.y >= actor.pos.y - fade_y && pos.y < top + fade_y && tag.target > 0.0 {
+    if dist < tag.outer_radius
+        && pos.y >= actor.pos.y - fade_y
+        && pos.y < top + fade_y
+        && tag.target > 0.0
+    {
         let mut blend = 1.0f32;
         let mut vert = 1.0f32;
         let fade_radius = tag.outer_radius - tag.inner_radius;

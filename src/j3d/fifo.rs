@@ -19,19 +19,14 @@ pub enum FifoEvent {
     /// A BP register write: the register id and its 32-bit value. Both halves of
     /// the wire dword are kept — the id is its top byte, so the value is what the
     /// opcode's single `u32` carried.
-    Bp {
-        id: u8,
-        value: u32,
-    },
+    Bp { id: u8, value: u32, at: usize },
     /// A CP register write.
-    Cp {
-        id: u8,
-        value: u32,
-    },
+    Cp { id: u8, value: u32, at: usize },
     /// An XF register write: first register index and the dwords written.
     Xf {
         first: u16,
         dwords: Vec<u32>,
+        at: usize,
     },
     /// An `INDX_A`..`INDX_D` write: the memory index, the first XF register and how
     /// many registers the address word covers. No dwords follow on the wire.
@@ -40,6 +35,7 @@ pub enum FifoEvent {
         index: u16,
         first: u16,
         count: u8,
+        at: usize,
     },
     /// A draw call: the primitive topology and the vertex count, plus the offset of
     /// the opcode byte itself.
@@ -51,18 +47,34 @@ pub enum FifoEvent {
     /// The byte offset of the vertex payload that follows a draw, so the caller can
     /// decode it once the vertex format is known. `len` is how much the stream still
     /// holds at `at`, an upper bound on the payload.
-    VertexPayload {
-        at: usize,
-        len: usize,
-    },
+    VertexPayload { at: usize, len: usize },
     /// A `GX_FIFO_CMD_CALL_DL` packet: the nested display list and its length in
     /// bytes, neither of which this decoder follows.
-    CallDisplayList {
-        address: u32,
-        len: u32,
-    },
+    CallDisplayList { address: u32, len: u32, at: usize },
     /// `GX_FIFO_CMD_INVAL_VTX`, a one-byte packet.
-    InvalidateVertexCache,
+    InvalidateVertexCache { at: usize },
+}
+
+impl FifoEvent {
+    /// The byte offset of the command this event was read from.
+    ///
+    /// A recorded memory write at that offset belongs before the command: the
+    /// fifo recorder analyses a command, recording the bytes it reads or writes
+    /// at the command's own offset, before it appends the command to the frame
+    /// (`FifoRecorder::WriteGPCommand`,
+    /// `dolphin/Source/Core/Core/FifoPlayer/FifoRecorder.cpp`).
+    pub fn at(&self) -> usize {
+        match *self {
+            Self::Bp { at, .. }
+            | Self::Cp { at, .. }
+            | Self::Xf { at, .. }
+            | Self::Indx { at, .. }
+            | Self::Draw { at, .. }
+            | Self::VertexPayload { at, .. }
+            | Self::CallDisplayList { at, .. }
+            | Self::InvalidateVertexCache { at } => at,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,6 +185,7 @@ pub fn decode_with_stride(
                 events.push(FifoEvent::Bp {
                     id: (value >> BP_REGISTER_SHIFT) as u8,
                     value,
+                    at,
                 });
             }
             COMMAND_LOAD_CP => {
@@ -180,7 +193,7 @@ pub fn decode_with_stride(
                 cursor += 1;
                 let value = be_u32(data, cursor)?;
                 cursor += DWORD;
-                events.push(FifoEvent::Cp { id, value });
+                events.push(FifoEvent::Cp { id, value, at });
             }
             COMMAND_LOAD_XF => {
                 let count = usize::from(be_u16(data, cursor)?) + 1;
@@ -188,11 +201,9 @@ pub fn decode_with_stride(
                 let first = be_u16(data, cursor)?;
                 cursor += 2;
                 let dwords = take_dwords(data, &mut cursor, count)?;
-                events.push(FifoEvent::Xf { first, dwords });
+                events.push(FifoEvent::Xf { first, dwords, at });
             }
-            COMMAND_LOAD_INDX_A
-            | COMMAND_LOAD_INDX_B
-            | COMMAND_LOAD_INDX_C
+            COMMAND_LOAD_INDX_A | COMMAND_LOAD_INDX_B | COMMAND_LOAD_INDX_C
             | COMMAND_LOAD_INDX_D => {
                 let index = be_u16(data, cursor)?;
                 cursor += 2;
@@ -203,6 +214,7 @@ pub fn decode_with_stride(
                     index,
                     first: word & INDX_FIRST_MASK,
                     count: ((word >> INDX_COUNT_SHIFT) + 1) as u8,
+                    at,
                 });
             }
             COMMAND_CALL_DL => {
@@ -210,9 +222,9 @@ pub fn decode_with_stride(
                 cursor += DWORD;
                 let len = be_u32(data, cursor)?;
                 cursor += DWORD;
-                events.push(FifoEvent::CallDisplayList { address, len });
+                events.push(FifoEvent::CallDisplayList { address, len, at });
             }
-            COMMAND_INVAL_VTX => events.push(FifoEvent::InvalidateVertexCache),
+            COMMAND_INVAL_VTX => events.push(FifoEvent::InvalidateVertexCache { at }),
             _ => {
                 let topology = command & PRIMITIVE_MASK;
                 if !DRAW_COMMANDS.contains(&topology) {
@@ -234,7 +246,10 @@ pub fn decode_with_stride(
                         if end > data.len() {
                             return Err(FifoError::Truncated);
                         }
-                        events.push(FifoEvent::VertexPayload { at: cursor, len: skip });
+                        events.push(FifoEvent::VertexPayload {
+                            at: cursor,
+                            len: skip,
+                        });
                         cursor = end;
                     }
                     None => {
@@ -305,24 +320,24 @@ mod tests {
                 FifoEvent::Bp {
                     id: 0x41,
                     value: 0x4112_3456,
+                    at: 0,
                 },
                 FifoEvent::Cp {
                     id: 0x50,
                     value: 0x0011_2233,
+                    at: 5,
                 },
                 FifoEvent::Xf {
                     first: 0x1018,
                     dwords: vec![0xAABB_CCDD, 0x1122_3344],
+                    at: 11,
                 },
                 FifoEvent::Draw {
                     command: DRAW_QUADS,
                     vertices: 4,
                     at: 24,
                 },
-                FifoEvent::VertexPayload {
-                    at: 27,
-                    len: 0,
-                },
+                FifoEvent::VertexPayload { at: 27, len: 0 },
             ])
         );
     }
@@ -337,7 +352,11 @@ mod tests {
         // The first command is a five-byte BP write, so a cut inside it must
         // be reported rather than read as a shorter command.
         for cut in 1..5 {
-            assert_eq!(decode(&stream[..cut]), Err(FifoError::Truncated), "at {cut}");
+            assert_eq!(
+                decode(&stream[..cut]),
+                Err(FifoError::Truncated),
+                "at {cut}"
+            );
         }
     }
 
@@ -366,10 +385,7 @@ mod tests {
                     vertices: 0x102,
                     at: 1,
                 },
-                FifoEvent::VertexPayload {
-                    at: 4,
-                    len: 0,
-                },
+                FifoEvent::VertexPayload { at: 4, len: 0 },
             ])
         );
     }
@@ -402,21 +418,20 @@ mod tests {
                     index: 7,
                     first: 0x004,
                     count: 12,
+                    at: 0,
                 },
-                FifoEvent::InvalidateVertexCache,
+                FifoEvent::InvalidateVertexCache { at: 5 },
                 FifoEvent::CallDisplayList {
                     address: 0x8000_0040,
                     len: 16,
+                    at: 6,
                 },
                 FifoEvent::Draw {
                     command: DRAW_FAN,
                     vertices: 3,
                     at: 15,
                 },
-                FifoEvent::VertexPayload {
-                    at: 18,
-                    len: 0,
-                },
+                FifoEvent::VertexPayload { at: 18, len: 0 },
             ])
         );
     }
@@ -432,10 +447,7 @@ mod tests {
                     vertices: 2,
                     at: 0,
                 },
-                FifoEvent::VertexPayload {
-                    at: 3,
-                    len: 4,
-                },
+                FifoEvent::VertexPayload { at: 3, len: 4 },
             ])
         );
     }

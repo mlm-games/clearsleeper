@@ -190,7 +190,8 @@ impl Torch {
     }
 
     pub fn snuff(&mut self, switches: &mut Switches) {
-        if self.burn == 1 && (self.guard == NO_SWITCH || !switches.test(self.guard))
+        if self.burn == 1
+            && (self.guard == NO_SWITCH || !switches.test(self.guard))
             && self.on_switch != NO_SWITCH
         {
             switches.clear(self.on_switch);

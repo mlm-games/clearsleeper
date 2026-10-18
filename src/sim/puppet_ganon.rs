@@ -7,6 +7,9 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::arrow;
 use super::collision::Collision;
+use super::events::SimEvents;
+use super::flags::Switches;
+use super::flags::ZoneActors;
 use super::flags::{EventFlags, StoryBits};
 use super::health::Health;
 use super::item::Held;
@@ -15,9 +18,6 @@ use super::stream::{add_calc_angle_s2, cos_s, sin_s};
 use super::transition::{NextStage, Target};
 use super::walk::{from_s16, to_s16};
 use super::water::Water;
-use super::events::SimEvents;
-use super::flags::Switches;
-use super::flags::ZoneActors;
 
 pub const PUPPET_GANON_ACTOR: &str = "Bgn";
 
@@ -491,11 +491,7 @@ impl Mat {
 
     fn xrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::X,
-            Vec3::new(0.0, cos, sin),
-            Vec3::new(0.0, -sin, cos),
-        );
+        self.concat(Vec3::X, Vec3::new(0.0, cos, sin), Vec3::new(0.0, -sin, cos));
     }
 
     fn yrot_s(&mut self, angle: i16) {
@@ -508,22 +504,12 @@ impl Mat {
 
     fn yrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::new(cos, 0.0, -sin),
-            Vec3::Y,
-            Vec3::new(sin, 0.0, cos),
-        );
+        self.concat(Vec3::new(cos, 0.0, -sin), Vec3::Y, Vec3::new(sin, 0.0, cos));
     }
-
-    
 
     fn zrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::new(cos, sin, 0.0),
-            Vec3::new(-sin, cos, 0.0),
-            Vec3::Z,
-        );
+        self.concat(Vec3::new(cos, sin, 0.0), Vec3::new(-sin, cos, 0.0), Vec3::Z);
     }
 }
 
@@ -834,11 +820,7 @@ fn anchor_vec(anchor: Anchor) -> Vec3 {
     Vec3::new(anchor.x, anchor.y, anchor.z)
 }
 
-fn gr_probe(
-    solid: &Option<&Collision>,
-    water: Option<&Water>,
-    at: &mut Vec3,
-) -> bool {
+fn gr_probe(solid: &Option<&Collision>, water: Option<&Water>, at: &mut Vec3) -> bool {
     let top = Vec3::new(at.x, at.y + GR_LINE_TOP, at.z);
     let bottom = Vec3::new(at.x, at.y - GR_LINE_DOWN, at.z);
     let hit = match solid {
@@ -1237,8 +1219,7 @@ impl PuppetGanon {
         self.head[0].scale = HIO_M0F8;
         self.pelvis[0].scale = HIO_M100;
         self.pelvis[1].scale = HIO_M100;
-        let mut fvar2 =
-            (1.0 / (HAND_MAX - 2) as f32) * (HIO_M104 - HIO_M108);
+        let mut fvar2 = (1.0 / (HAND_MAX - 2) as f32) * (HIO_M104 - HIO_M108);
         self.left_arm[0].scale = HIO_M104 - fvar2;
         self.right_arm[0].scale = HIO_M104 - fvar2;
         for i in 1..HAND_MAX {
@@ -1272,13 +1253,7 @@ impl PuppetGanon {
         self.tail[TAIL_MAX as usize].scale = HIO_M114 * 0.7;
     }
 
-    fn part_control_0(
-        &mut self,
-        chain: u8,
-        count: i32,
-        move_index: usize,
-        param_5: f32,
-    ) {
+    fn part_control_0(&mut self, chain: u8, count: i32, move_index: usize, param_5: f32) {
         let mut mtx = self.mtx;
         let mut local_e8 = Vec3::ZERO;
         if chain == CHAIN_HEAD && (self.moves[0].rope || self.moves[1].rope) {
@@ -1315,17 +1290,22 @@ impl PuppetGanon {
                 let temp_f30 = local_e8.x + (parts[i].pos.x - parts[i - 1].pos.x);
                 let temp_f26 = y2 - parts[i - 1].pos.y;
                 let temp_f25 = local_e8.z + (parts[i].pos.z - parts[i - 1].pos.z);
-                let ivar5 =
-                    (sway * sin_s(phase_x.wrapping_add((i as i16).wrapping_mul(REG0_S3 + 8000)))) as i32;
-                let ivar2 =
-                    (sway * cos_s(phase_z.wrapping_add((i as i16).wrapping_mul(REG0_S4 + 9000)))) as i32;
-                parts[i - 1].rot[0] =
-                    (ivar5 as i16).wrapping_sub(atan2s(temp_f26, temp_f25));
-                parts[i - 1].rot[1] = (ivar2 as i16)
-                    .wrapping_add(atan2s(temp_f30, spread(temp_f26, temp_f25)));
+                let ivar5 = (sway
+                    * sin_s(phase_x.wrapping_add((i as i16).wrapping_mul(REG0_S3 + 8000))))
+                    as i32;
+                let ivar2 = (sway
+                    * cos_s(phase_z.wrapping_add((i as i16).wrapping_mul(REG0_S4 + 9000))))
+                    as i32;
+                parts[i - 1].rot[0] = (ivar5 as i16).wrapping_sub(atan2s(temp_f26, temp_f25));
+                parts[i - 1].rot[1] =
+                    (ivar2 as i16).wrapping_add(atan2s(temp_f30, spread(temp_f26, temp_f25)));
                 mtx.xrot_s(parts[i - 1].rot[0]);
                 mtx.yrot_m(parts[i - 1].rot[1]);
-                let cstack = mtx.pos(Vec3::new(0.0, 0.0, body_scale * (param_5 * parts[i - 1].scale)));
+                let cstack = mtx.pos(Vec3::new(
+                    0.0,
+                    0.0,
+                    body_scale * (param_5 * parts[i - 1].scale),
+                ));
                 parts[i].pos = parts[i - 1].pos + cstack;
             }
         }
@@ -1394,8 +1374,11 @@ impl PuppetGanon {
                 parts[i - 1].rot[0] = (ivar2 as i16).wrapping_sub(atan2s(y, spread(y, z)));
                 mtx.yrot_s(parts[i - 1].rot[1]);
                 mtx.xrot_m(parts[i - 1].rot[0]);
-                let cstack =
-                    mtx.pos(Vec3::new(0.0, 0.0, body_scale * (param_5 * parts[i - 1].scale)));
+                let cstack = mtx.pos(Vec3::new(
+                    0.0,
+                    0.0,
+                    body_scale * (param_5 * parts[i - 1].scale),
+                ));
                 parts[i].pos = parts[i - 1].pos + cstack;
             }
         }
@@ -1409,13 +1392,7 @@ impl PuppetGanon {
         self.ripple_pos = ripple_pos;
     }
 
-    fn part_mtx_set(
-        &mut self,
-        count: i32,
-        chain: u8,
-        chain_id: i32,
-        param_5: i32,
-    ) {
+    fn part_mtx_set(&mut self, count: i32, chain: u8, chain_id: i32, param_5: i32) {
         let mut mtx = self.mtx;
         let mut core_centre = self.core_centre;
         let mut core_pos = self.core_pos;
@@ -1503,8 +1480,7 @@ impl PuppetGanon {
                     self.rope_anchor[0] = mtx.pos(Vec3::new(90.0, 180.0, -40.0));
                     self.rope_anchor[1] = mtx.pos(Vec3::new(-90.0, 180.0, -40.0));
                 } else {
-                    self.rope_anchor[chain_id as usize] =
-                        mtx.pos(Vec3::new(0.0, 0.0, HIO_M168));
+                    self.rope_anchor[chain_id as usize] = mtx.pos(Vec3::new(0.0, 0.0, HIO_M168));
                 }
             }
             if effect != 0 {
@@ -1596,22 +1572,12 @@ impl PuppetGanon {
             tag = 2;
         }
         for i in 0..PELVIS_INDEX {
-            if reaches(
-                self.pelvis[i].centre,
-                self.pelvis[i].radius,
-                shot,
-                0.0,
-            ) {
+            if reaches(self.pelvis[i].centre, self.pelvis[i].radius, shot, 0.0) {
                 tag = 3;
             }
         }
         for i in 0..HAND_MAX as usize {
-            if reaches(
-                self.left_arm[i].centre,
-                self.left_arm[i].radius,
-                shot,
-                0.0,
-            ) {
+            if reaches(self.left_arm[i].centre, self.left_arm[i].radius, shot, 0.0) {
                 tag = 4;
             }
             if reaches(
@@ -1624,12 +1590,7 @@ impl PuppetGanon {
             }
         }
         for i in 0..3 {
-            if reaches(
-                self.left_leg[i].centre,
-                self.left_leg[i].radius,
-                shot,
-                0.0,
-            ) {
+            if reaches(self.left_leg[i].centre, self.left_leg[i].radius, shot, 0.0) {
                 tag = 6;
             }
             if reaches(
@@ -1642,12 +1603,7 @@ impl PuppetGanon {
             }
         }
         for i in 0..TAIL_MAX as usize {
-            if reaches(
-                self.tail[i].centre,
-                self.tail[i].radius,
-                shot,
-                0.0,
-            ) {
+            if reaches(self.tail[i].centre, self.tail[i].radius, shot, 0.0) {
                 tag = 8;
             }
         }
@@ -1898,11 +1854,7 @@ impl PuppetGanon {
         if self.moves[0].rope && self.moves[1].rope {
             let mut mtx = self.mtx;
             mtx.yrot_s(self.shape_angle[1]);
-            let local_6c = Vec3::new(
-                self.rnd_fx(1000.0),
-                0.0,
-                self.rnd_f(1000.0) + 1000.0,
-            );
+            let local_6c = Vec3::new(self.rnd_fx(1000.0), 0.0, self.rnd_f(1000.0) + 1000.0);
             local_90 = mtx.pos(local_6c);
             local_90 += actor.pos;
             local_90.y = 0.0;
@@ -1940,20 +1892,12 @@ impl PuppetGanon {
                     self.right_arm[HAND_MAX as usize - 1].at = true;
                     self.right_arm_tip += self.right_arm_step;
                     self.moves[4].slack = 100.0;
-                    if self.timers[0] == 0
-                        || self.pelvis_probe() < self.water_y + 30.0
-                    {
+                    if self.timers[0] == 0 || self.pelvis_probe() < self.water_y + 30.0 {
                         self.right_held = false;
                         self.moves[4].sway = REG0_F15 + 5000.0;
                         bvar2 = true;
-                        self.moves[4].target =
-                            to_i16x3(self.grab_left());
-                        self.attack_eff_set(
-                            self.right_arm[HAND_MAX as usize - 1].pos,
-                            1,
-                            env,
-                            out,
-                        );
+                        self.moves[4].target = to_i16x3(self.grab_left());
+                        self.attack_eff_set(self.right_arm[HAND_MAX as usize - 1].pos, 1, env, out);
                     }
                     break;
                 }
@@ -1992,12 +1936,7 @@ impl PuppetGanon {
                         self.left_held = false;
                         bvar2 = true;
                         self.moves[3].target = to_i16x3(self.grab_right());
-                        self.attack_eff_set(
-                            self.left_arm[HAND_MAX as usize - 1].pos,
-                            0,
-                            env,
-                            out,
-                        );
+                        self.attack_eff_set(self.left_arm[HAND_MAX as usize - 1].pos, 0, env, out);
                     }
                     break;
                 }
@@ -2048,18 +1987,8 @@ impl PuppetGanon {
                         self.right_held = false;
                         self.moves[3].target = to_i16x3(self.grab_right());
                         self.moves[4].target = to_i16x3(self.grab_left());
-                        self.attack_eff_set(
-                            self.right_arm[HAND_MAX as usize - 1].pos,
-                            1,
-                            env,
-                            out,
-                        );
-                        self.attack_eff_set(
-                            self.left_arm[HAND_MAX as usize - 1].pos,
-                            0,
-                            env,
-                            out,
-                        );
+                        self.attack_eff_set(self.right_arm[HAND_MAX as usize - 1].pos, 1, env, out);
+                        self.attack_eff_set(self.left_arm[HAND_MAX as usize - 1].pos, 0, env, out);
                         bvar2 = true;
                     }
                     break;
@@ -2074,12 +2003,7 @@ impl PuppetGanon {
         if uvar11 != 0 {
             if uvar11 <= 2 {
                 let slot = (uvar11 - 1) as usize;
-                add_calc2(
-                    &mut self.hand_dilate[slot],
-                    REG0_F14 + 1.0,
-                    0.2,
-                    0.05,
-                );
+                add_calc2(&mut self.hand_dilate[slot], REG0_F14 + 1.0, 0.2, 0.05);
             } else {
                 for i in 0..2 {
                     add_calc2(&mut self.hand_dilate[i], 1.0 + REG0_F14, 0.2, 0.05);
@@ -2486,11 +2410,7 @@ impl PuppetGanon {
 
     fn last_himo_control(&mut self) {
         let mut mtx = self.mtx;
-        self.cs_himo[0] = Vec3::new(
-            -15.0,
-            REG8_F4 + 4441.46,
-            REG8_F3 + 375.17,
-        );
+        self.cs_himo[0] = Vec3::new(-15.0, REG8_F4 + 4441.46, REG8_F3 + 375.17);
         self.cs_pos[0] = self.cs_himo[0];
         self.cs_size[0] = 10;
         if self.defeat_state == 1 {
@@ -2513,8 +2433,16 @@ impl PuppetGanon {
             let y = self.cs_himo[i].y - self.cs_himo[i - 1].y - 35.0 + REG0_F13;
             let z = self.cs_himo[i].z - self.cs_himo[i - 1].z;
             if sway > 0.01 {
-                k = (sway * sin_s(((frame * 2000) as i16).wrapping_add((i as i16).wrapping_mul(REG0_S3 + 2000)))) as i16;
-                j = (sway * cos_s(((frame * 0x8fc) as i16).wrapping_add((i as i16).wrapping_mul(REG0_S4 + 0x9c4)))) as i16;
+                k = (sway
+                    * sin_s(
+                        ((frame * 2000) as i16)
+                            .wrapping_add((i as i16).wrapping_mul(REG0_S3 + 2000)),
+                    )) as i16;
+                j = (sway
+                    * cos_s(
+                        ((frame * 0x8fc) as i16)
+                            .wrapping_add((i as i16).wrapping_mul(REG0_S4 + 0x9c4)),
+                    )) as i16;
             }
             mtx.xrot_s(k.wrapping_sub(atan2s(y, z)));
             mtx.yrot_m(j.wrapping_add(atan2s(x, spread(y, z))));
@@ -2534,8 +2462,8 @@ impl PuppetGanon {
         }
         let mut target = 0.0;
         if HIO_M025 == 0 && self.body.y > REG0_F12 + -900.0 {
-            target = REG0_F13
-                + (f32::from(self.moves[move_index].tension) * (REG0_F2 + 20.0) + 300.0);
+            target =
+                REG0_F13 + (f32::from(self.moves[move_index].tension) * (REG0_F2 + 20.0) + 300.0);
         }
         add_calc2(
             &mut self.moves[move_index].sway,
@@ -2543,12 +2471,12 @@ impl PuppetGanon {
             0.5,
             REG0_F8 + 200.0,
         );
-        self.moves[move_index].phase_x = self.moves[move_index].phase_x.wrapping_add(
-            ((param_3 * 3 + 2600) + REG0_S5 as i32) as i16,
-        );
-        self.moves[move_index].phase_z = self.moves[move_index].phase_z.wrapping_add(
-            ((param_3 * 3 + 2300) + REG0_S6 as i32) as i16,
-        );
+        self.moves[move_index].phase_x = self.moves[move_index]
+            .phase_x
+            .wrapping_add(((param_3 * 3 + 2600) + REG0_S5 as i32) as i16);
+        self.moves[move_index].phase_z = self.moves[move_index]
+            .phase_z
+            .wrapping_add(((param_3 * 3 + 2300) + REG0_S6 as i32) as i16);
         if self.moves[move_index].timer != 0 {
             self.moves[move_index].timer -= 1;
         }
@@ -2591,11 +2519,7 @@ impl PuppetGanon {
             self.moves[move_index].himo[0] = local_64;
             self.blue_pos[line][0] = local_64;
             self.himo_control(line, env, out);
-            add_calc0(
-                &mut self.moves[move_index].rope_sway,
-                1.0,
-                REG0_F5 + 100.0,
-            );
+            add_calc0(&mut self.moves[move_index].rope_sway, 1.0, REG0_F5 + 100.0);
         } else {
             let mut local_70 = Vec3::new(0.0, 0.0, 0.0);
             add_calc0(&mut self.moves[move_index].wave, 1.0, 25.0);
@@ -2609,21 +2533,24 @@ impl PuppetGanon {
                     let fvar3 = (REG0_F12 + 10.0)
                         * (f32::from(self.moves[move_index].ripple)
                             * (WIND_STEP_F * i as f32).sin());
-                    local_70.x = fvar3 * cos_s((self.frame as i32 * (REG0_S3 as i32 + 0x5800)) as i16);
-                    local_70.z = fvar3 * cos_s((self.frame as i32 * (REG0_S5 as i32 + 0x5200)) as i16);
+                    local_70.x =
+                        fvar3 * cos_s((self.frame as i32 * (REG0_S3 as i32 + 0x5800)) as i16);
+                    local_70.z =
+                        fvar3 * cos_s((self.frame as i32 * (REG0_S5 as i32 + 0x5200)) as i16);
                 } else {
-                    let mut fvar3 =
-                        self.moves[move_index].wave * (WIND_STEP_F * i as f32).sin();
+                    let mut fvar3 = self.moves[move_index].wave * (WIND_STEP_F * i as f32).sin();
                     fvar3 *= WIND_TAPER * (59 - i) as f32;
                     local_70.x = fvar3
                         * cos_s(
                             (self.frame as i32 * (REG0_S3 as i32 + 200)
-                                + i as i32 * (REG0_S4 as i32 + 2000)) as i16,
+                                + i as i32 * (REG0_S4 as i32 + 2000))
+                                as i16,
                         );
                     local_70.z = fvar3
                         * cos_s(
                             (self.frame as i32 * (REG0_S5 as i32 + 0xfa)
-                                + i as i32 * (REG0_S6 as i32 + 2000)) as i16,
+                                + i as i32 * (REG0_S6 as i32 + 2000))
+                                as i16,
                         );
                 }
                 let cstack = mtx.pos(local_70);
@@ -2643,11 +2570,17 @@ impl PuppetGanon {
             let mut dvar9 = self.chain_speed * (WIND_STEP_F * i as f32).sin();
             dvar9 *= WIND_TAPER * (59 - i) as f32;
             let local_90 = Vec3::new(
-                dvar9 * sin_s((self.frame as i32 * (REG0_S3 as i32 + 300)
-                    + i as i32 * (REG0_S4 as i32 + 2000)) as i16),
+                dvar9
+                    * sin_s(
+                        (self.frame as i32 * (REG0_S3 as i32 + 300)
+                            + i as i32 * (REG0_S4 as i32 + 2000)) as i16,
+                    ),
                 0.0,
-                dvar9 * sin_s((self.frame as i32 * (REG0_S5 as i32 + 0xfa)
-                    + i as i32 * (REG0_S6 as i32 + 2000)) as i16),
+                dvar9
+                    * sin_s(
+                        (self.frame as i32 * (REG0_S5 as i32 + 0xfa)
+                            + i as i32 * (REG0_S6 as i32 + 2000)) as i16,
+                    ),
             );
             self.red_pos[i] = local_9c + local_90;
             self.red_size[i] = (REG0_S3 + 10) as u8;
@@ -2742,18 +2675,16 @@ impl PuppetGanon {
             } else {
                 local_110[2] = local_110[2]
                     .wrapping_add((self.moves[3].pos.y * (REG0_F12 + 5.0)) as i32 as i16);
-                local_110[1] = local_110[1].wrapping_add(
-                    (self.moves[3].pos.z * -(REG0_F13 + 5.0)) as i32 as i16,
-                );
+                local_110[1] = local_110[1]
+                    .wrapping_add((self.moves[3].pos.z * -(REG0_F13 + 5.0)) as i32 as i16);
             }
             if self.moves[4].rope {
                 local_110[2] = local_110[2].wrapping_add((REG0_S0 + 3000) as i16);
             } else {
                 local_110[2] = local_110[2]
                     .wrapping_add((self.moves[4].pos.y * -(REG0_F12 + 5.0)) as i32 as i16);
-                local_110[1] = local_110[1].wrapping_add(
-                    (self.moves[4].pos.z * (REG0_F13 + 5.0)) as i32 as i16,
-                );
+                local_110[1] = local_110[1]
+                    .wrapping_add((self.moves[4].pos.z * (REG0_F13 + 5.0)) as i32 as i16);
             }
             add_calc_angle_s2(&mut self.body_angle[0], local_110[0], 4, 0x200);
             add_calc_angle_s2(&mut self.yaw_tick, local_110[1], 4, 0x1000);
@@ -2791,8 +2722,7 @@ impl PuppetGanon {
                     );
                 } else if i == 1 && self.right_held {
                     fvar9 = length_of(
-                        self.right_arm[CHAIN_TIP].pos
-                            - self.right_arm[HAND_MAX as usize - 1].pos,
+                        self.right_arm[CHAIN_TIP].pos - self.right_arm[HAND_MAX as usize - 1].pos,
                     );
                 }
                 let temp_f0_8 = 200.0 + REG0_F5;
@@ -2802,7 +2732,12 @@ impl PuppetGanon {
                 } else {
                     fvar9 = 0.0;
                 }
-                add_calc2(&mut self.hand_scale[i], HIO_M124 + fvar9, 1.0, 20.0 + REG0_F4);
+                add_calc2(
+                    &mut self.hand_scale[i],
+                    HIO_M124 + fvar9,
+                    1.0,
+                    20.0 + REG0_F4,
+                );
                 add_calc0(&mut self.hand_dilate[i], 0.05, 0.02);
             }
             self.size_set();
@@ -2865,7 +2800,12 @@ impl PuppetGanon {
             }
             3 => {
                 add_calc2(&mut self.cam_center.x, self.cam_anchor.x, 0.1, 100.0);
-                add_calc2(&mut self.cam_center.y, self.cam_anchor.y + REG0_F13, 0.1, 200.0);
+                add_calc2(
+                    &mut self.cam_center.y,
+                    self.cam_anchor.y + REG0_F13,
+                    0.1,
+                    200.0,
+                );
                 add_calc2(&mut self.cam_center.z, self.cam_anchor.z, 0.1, 100.0);
                 if self.cut_count == (REG0_S7 + 90) as i16 {
                     self.shake = REG0_F18 + 30.0;
@@ -2918,13 +2858,14 @@ impl PuppetGanon {
                 self.mtx = mtx;
                 if self.cut_state == 11 {
                     add_calc2(&mut self.cam_center.x, self.cam_anchor.x, 0.1, 300.0);
-                    add_calc2(&mut self.cam_center.y, self.cam_anchor.y + REG0_F13, 0.1, 300.0);
-                    add_calc2(&mut self.cam_center.z, self.cam_anchor.z, 0.1, 300.0);
-                    self.cut_player_pos = Vec3::new(
-                        REG0_F4,
-                        env.player_pos.y,
-                        REG0_F5 + -2000.0,
+                    add_calc2(
+                        &mut self.cam_center.y,
+                        self.cam_anchor.y + REG0_F13,
+                        0.1,
+                        300.0,
                     );
+                    add_calc2(&mut self.cam_center.z, self.cam_anchor.z, 0.1, 300.0);
+                    self.cut_player_pos = Vec3::new(REG0_F4, env.player_pos.y, REG0_F5 + -2000.0);
                     self.cut_player_yaw = self.cam_anchor.yaw;
                 } else {
                     add_calc2(&mut self.cam_center.x, self.cam_follow.x, 0.1, 300.0);
@@ -2968,13 +2909,14 @@ impl PuppetGanon {
                 add_calc_angle_s2(&mut self.blure, 1, 1, 1);
                 self.cam_eye = Vec3::new(500.0, REG0_F3 + 500.0, REG0_F4 + 2000.0);
                 add_calc2(&mut self.cam_center.x, self.cam_follow.x, 0.1, 300.0);
-                add_calc2(&mut self.cam_center.y, self.cam_follow.y + REG0_F13, 0.1, 300.0);
-                add_calc2(&mut self.cam_center.z, self.cam_follow.z, 0.1, 300.0);
-                self.cut_player_pos = Vec3::new(
-                    REG0_F4,
-                    env.player_pos.y,
-                    REG0_F5 + -1000.0,
+                add_calc2(
+                    &mut self.cam_center.y,
+                    self.cam_follow.y + REG0_F13,
+                    0.1,
+                    300.0,
                 );
+                add_calc2(&mut self.cam_center.z, self.cam_follow.z, 0.1, 300.0);
+                self.cut_player_pos = Vec3::new(REG0_F4, env.player_pos.y, REG0_F5 + -1000.0);
                 self.cut_player_yaw = self.cam_anchor.yaw;
                 if self.cut_count == 260 {
                     out.se(SE_CV_BGN_DIE);
@@ -3009,8 +2951,8 @@ impl PuppetGanon {
             self.cam_eye.y += fy;
             self.cam_center.x += fx;
             self.cam_center.y += fy;
-            self.cam_bank = (self.shake * cos_s((self.frame as i32 * 0x1c00) as i16) * CAM_BANK_SCALE)
-                as i16;
+            self.cam_bank =
+                (self.shake * cos_s((self.frame as i32 * 0x1c00) as i16) * CAM_BANK_SCALE) as i16;
             add_calc0(&mut self.shake, 1.0, REG0_F16 + 1.0);
             self.cut_count += 1;
         }
@@ -3023,7 +2965,13 @@ impl PuppetGanon {
 
     pub fn at_hits(&self, player_eye: Vec3) -> usize {
         let mut hits = 0;
-        if self.body_at && reaches(self.body_centre, self.body_radius, player_eye, PLAYER_BODY_RADIUS)
+        if self.body_at
+            && reaches(
+                self.body_centre,
+                self.body_radius,
+                player_eye,
+                PLAYER_BODY_RADIUS,
+            )
         {
             hits += 1;
         }
@@ -3214,10 +3162,7 @@ impl PuppetGanon {
             1 => {
                 if self.timers[0] != 0 || env.keese != 0 || HIO_M028 == 0 {
                     stop = true;
-                } else if self.move_count == 1
-                    || self.move_count == 2
-                    || self.move_count == 3
-                {
+                } else if self.move_count == 1 || self.move_count == 2 || self.move_count == 3 {
                     if self.moves[0].rope && self.moves[1].rope && self.timers[2] == 0 {
                         self.action = ACTION_HEAD_RECOVER;
                         self.sub = 0;
@@ -3284,7 +3229,6 @@ impl PuppetGanon {
             }
         }
     }
-
 }
 
 #[derive(SystemParam)]
@@ -3347,10 +3291,7 @@ pub fn control(
     mut next: ResMut<NextStage>,
     mut zones: ResMut<ZoneActors>,
     mut commands: Commands,
-    mut bosses: Query<
-        (Entity, &mut Actor, &mut PuppetGanon),
-        (With<PuppetGanon>, Without<Player>),
-    >,
+    mut bosses: Query<(Entity, &mut Actor, &mut PuppetGanon), (With<PuppetGanon>, Without<Player>)>,
 ) {
     let solid = watch.collision.as_deref();
     let water = watch.water.as_deref();

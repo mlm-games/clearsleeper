@@ -4,7 +4,6 @@ use super::flags::Switches;
 use super::inventory::{Equipped, Got};
 use super::pickup::Rupees;
 
-
 pub const FUNC_NORMAL: u8 = 0;
 pub const FUNC_EXTRA_SAVE_INFO: u8 = 7;
 pub const FUNC_EXTRA_SAVE_INFO_SPAWN: u8 = 8;
@@ -17,8 +16,6 @@ pub const SHAPE_MAX: u8 = 4;
 pub const NO_ROOM: i8 = -1;
 pub const ROOM_MASK: i8 = 0x3F;
 pub const GRAB_RANGE: f32 = 60.0;
-
-
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Chests {
@@ -77,7 +74,10 @@ pub struct Chest {
 pub struct ChestOpen;
 
 pub fn stage_of(chest: &Chest) -> u8 {
-    if matches!(chest.func, FUNC_EXTRA_SAVE_INFO | FUNC_EXTRA_SAVE_INFO_SPAWN) {
+    if matches!(
+        chest.func,
+        FUNC_EXTRA_SAVE_INFO | FUNC_EXTRA_SAVE_INFO_SPAWN
+    ) {
         SEA2_STAGE
     } else {
         0
@@ -101,14 +101,16 @@ impl Chest {
     }
 
     pub fn uses_switch(&self) -> bool {
-        !matches!(self.func, FUNC_NORMAL | FUNC_EXTRA_SAVE_INFO | FUNC_SWITCH_VISIBLE | FUNC_GRAVITY)
+        !matches!(
+            self.func,
+            FUNC_NORMAL | FUNC_EXTRA_SAVE_INFO | FUNC_SWITCH_VISIBLE | FUNC_GRAVITY
+        )
     }
 
     pub fn gated_by_switch(&self) -> bool {
         !self.uses_switch() && self.switch_no >= SWITCH_CEILING
     }
 }
-
 
 pub fn present(chest: &Chest, switches: &Switches) -> bool {
     if chest.uses_switch() {
@@ -127,4 +129,3 @@ pub fn loot(chest: &Chest, rupees: &mut Rupees, equipped: &mut Equipped, got: &m
         }
     }
 }
-

@@ -12,8 +12,8 @@ use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
 use super::ground::{self, grounded};
 use super::health::Health;
-use super::hop::Hop;
 use super::hookshot;
+use super::hop::Hop;
 use super::intent::UseIntent;
 use super::jump::Jump;
 use super::player::Player;
@@ -161,13 +161,7 @@ impl Shots<'_, '_> {
     }
 }
 
-fn launch(
-    player: &Player,
-    held: &mut Held,
-    rounds: u8,
-    locks: usize,
-    commands: &mut Commands,
-) {
+fn launch(player: &Player, held: &mut Held, rounds: u8, locks: usize, commands: &mut Commands) {
     let Some(kind) = held.kind() else {
         return;
     };
@@ -311,5 +305,4 @@ pub fn control(
         zones.mark_done(room, set_id);
         let _ = commands.entity(entity).despawn();
     }
-
 }

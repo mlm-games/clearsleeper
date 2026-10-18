@@ -28,14 +28,7 @@ const PRM_ORB_MASK: u32 = 0xF;
 const ORB_SLOTS: usize = 8;
 const SPDD: [f32; ORB_SLOTS] = [0.65, 0.3, 0.1, 0.0, 0.0, 0.1, 0.3, 0.65];
 const ANG_XD: [i16; ORB_SLOTS] = [
-    0x0000,
-    -0x0C00,
-    -0x1800,
-    -0x2000,
-    -0x2000,
-    -0x1800,
-    -0x0C00,
-    0x0000,
+    0x0000, -0x0C00, -0x1800, -0x2000, -0x2000, -0x1800, -0x0C00, 0x0000,
 ];
 
 const SPD_SLOPE: f32 = 0.2;
@@ -262,8 +255,7 @@ impl FgMahou {
                     actor.speed_f *= (SPD_SLOPE + HIO_REG0_F4) * spdd(self.orb_number) + SPD_BIAS;
                     self.target_pos = env.player_eye.unwrap_or(actor.pos);
                     let diff2 = self.target_pos - actor.pos;
-                    let yaw = orb * (HIO_REG8_S2 + ORB_YAW_STEP)
-                        - (HIO_REG8_S3 + YAW_BASE)
+                    let yaw = orb * (HIO_REG8_S2 + ORB_YAW_STEP) - (HIO_REG8_S3 + YAW_BASE)
                         + i32::from(atan2s(diff2.x, diff2.z));
                     self.home_angle[1] = yaw as i16;
                     self.home_angle[0] = ang_xd(usize::from(self.orb_number));
@@ -562,11 +554,7 @@ pub fn control(
 ) {
     let player_pos = world.players.iter().next().map(|player| player.pos);
     let player_eye = player_pos.map(|pos| pos + Vec3::new(0.0, PLAYER_EYE_Y, 0.0));
-    let boss_eye = world
-        .boss
-        .iter()
-        .map(|(actor, _)| actor.eye)
-        .next();
+    let boss_eye = world.boss.iter().map(|(actor, _)| actor.eye).next();
     let sword = if world.combat.active
         && world.combat.frame >= SWORD_FIRST
         && world.combat.frame < SWORD_LAST

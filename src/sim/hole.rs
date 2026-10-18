@@ -293,7 +293,10 @@ impl Hole {
     /// `dEvent_manager_c::getMyStaffId` scans (`d_event_manager.cpp:412`).
     fn demo_running(active: &ActiveEvent, slot: Option<usize>) -> bool {
         slot.is_some_and(|slot| {
-            matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+            matches!(
+                active.stage_of(slot),
+                Some(Stage::Play) | Some(Stage::Close)
+            )
         })
     }
 }

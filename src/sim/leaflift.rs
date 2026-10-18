@@ -231,7 +231,13 @@ impl Olift {
         // zero return is exactly "the lift has arrived"; `walk::add_calc` is the same arithmetic
         // and returns nothing, so the arrival test is made on the value afterwards. `home.pos.y` is
         // [`Olift::parked_y`].
-        walk::add_calc(&mut actor.pos.y, self.parked_y, MOVE_SCALE, MAX_SPEED, MIN_SPEED);
+        walk::add_calc(
+            &mut actor.pos.y,
+            self.parked_y,
+            MOVE_SCALE,
+            MAX_SPEED,
+            MIN_SPEED,
+        );
         let arrived = actor.pos.y == self.parked_y;
         // ```
         // if (downVel == 0.0f) {

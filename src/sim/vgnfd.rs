@@ -350,7 +350,14 @@ pub fn control(
             door.entered = true;
             door.create_init(&list);
         }
-        if door.execute(&list, &mut active, &mut stories, &mut ev_flags, &mut events, entity) {
+        if door.execute(
+            &list,
+            &mut active,
+            &mut stories,
+            &mut ev_flags,
+            &mut events,
+            entity,
+        ) {
             let _ = commands.entity(entity).despawn();
         }
     }

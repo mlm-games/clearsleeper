@@ -122,7 +122,11 @@ impl ObjNest {
 
     pub fn set_mtx(&mut self, angle: [i16; 3]) {
         let shape = zxy_rot(angle);
-        let tilt = [to_s16(self.tilt.x), to_s16(self.tilt.y), to_s16(self.tilt.z)];
+        let tilt = [
+            to_s16(self.tilt.x),
+            to_s16(self.tilt.y),
+            to_s16(self.tilt.z),
+        ];
         self.warp_rot = shape;
         self.model_rot = shape * zxy_rot(tilt);
     }

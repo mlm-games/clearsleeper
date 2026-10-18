@@ -395,7 +395,10 @@ struct Context<'a> {
 impl Context<'_> {
     fn demo_running(&self, slot: Option<usize>) -> bool {
         slot.is_some_and(|slot| {
-            matches!(self.active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+            matches!(
+                self.active.stage_of(slot),
+                Some(Stage::Play) | Some(Stage::Close)
+            )
         })
     }
 
@@ -417,7 +420,11 @@ impl Context<'_> {
 /// `enum Prm_e` (`d_a_obj_hbrf1.h:24-29`). Guarded on the shift so `1 << 32` cannot happen even
 /// though every `Prm_e` width is 1 or 8.
 fn mask(width: u32) -> u32 {
-    if width >= 32 { u32::MAX } else { (1 << width) - 1 }
+    if width >= 32 {
+        u32::MAX
+    } else {
+        (1 << width) - 1
+    }
 }
 
 pub fn is_hbrf1(name: &str) -> bool {

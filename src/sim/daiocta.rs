@@ -164,7 +164,14 @@ impl Daiocta {
         };
         let range = flat_distance(actor.pos, player.pos);
         if (range < self.appear_radius || range < HIO_MIN_APPEAR_RADIUS) && riding {
-            self.mode_proc(Proc::Init, Mode::Appear, actor, Some(player), riding, events);
+            self.mode_proc(
+                Proc::Init,
+                Mode::Appear,
+                actor,
+                Some(player),
+                riding,
+                events,
+            );
         }
     }
 

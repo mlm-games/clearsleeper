@@ -14,6 +14,7 @@ use super::npc_mt::{FIGURE_ROOM_NAME, PHOTO_NONE, TOTAL_FIGURE_COUNT, fig_room_i
 use super::ohatch::OHATCH_ACTORS;
 use super::player::Player;
 use super::stream::add_calc_angle_s2;
+use super::transition::NextStage;
 use super::walk::to_s16;
 use crate::assets::MsgArchives;
 use crate::text::driver::TextFlags;
@@ -21,8 +22,8 @@ use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgget::MsgArchive;
 use crate::text::msgproc::{
-    DA_EVT_MODE_NONE, DA_PY_STTS0_TELESCOPE_LOOK, FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG,
-    FPC_NM_MSG2, MsgGameInfo, MsgProcs, fop_msgm_message_set, fop_msgm_message_set_actor,
+    DA_EVT_MODE_NONE, DA_PY_STTS0_TELESCOPE_LOOK, FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2,
+    MsgGameInfo, MsgProcs, fop_msgm_message_set, fop_msgm_message_set_actor,
     fop_msgm_scope_message_set,
 };
 use crate::text::{
@@ -475,11 +476,29 @@ impl Chain {
 ///   and `fopAcM_createItemForPresentDemo` is item-table work. The cut still ends the way retail
 ///   does, because `privateCut`'s second switch has no `case 1` and falls to `default:
 ///   shouldEnd = true` (`:938-940`).
-/// * `fopAcM_orderPotentialEvent` (`:723`), `fopAcM_orderSpeakEvent` (`:842`),
-///   `fopAcM_orderChangeEventId` (`:845`), `eventInfo.onCondition(dEvtCnd_UNK2_e)` (`:724`),
-///   `eventInfo.onCondition(dEvtCnd_CANTALK_e)` (`:840`) and
-///   `dComIfGp_setScopeType(dScpTyp_UNK1_e)` (`:652`): no counterpart in the event manager, so
-///   `eventOrder` (`:838-847`) has no effect at all and is not transcribed.
+/// * `eventOrder` (`:838-847`) and the three ordering calls behind it:
+///   `fopAcM_orderPotentialEvent` (`:723`), `fopAcM_orderSpeakEvent` (`:842`) and
+///   `fopAcM_orderChangeEventId` (`:845`), plus `eventInfo.onCondition(dEvtCnd_CANTALK_e)`
+///   (`:840`) / `(dEvtCnd_UNK2_e)` (`:724`). The order queue and mode those ride have
+///   no counterpart in this port's event manager: `dEvt_control_c::order` queues the request
+///   (`d_event.cpp:37-79`), `changeProc` consumes it once and drops the rest (`:439-471`), and
+///   `demoCheck` (`:295-326`) is what turns it into `dComIfGp_evmng_order` plus
+///   `dEvtCmd_INDEMO_e` on both actors (`:312-315`) and `mMode = dEvtMode_DEMO_e` (`:317`). That
+///   mode is the port's `MsgGameInfo::event_mode`, which nothing raises off `DA_EVT_MODE_NONE`
+///   (`warpfo.rs:154-157` records the same absence), so `checkCommandDemoAccrpt()`
+///   (`f_op_actor.h:177`) never answers and `checkOrder`'s `mEvtOrderType = 0` clear (`:829-830`)
+///   is unreachable. Without it an order the actor must keep issuing until the event starts would
+///   land on [`ActiveEvent::order`], which re-seats a running event at `Stage::Order` and drops
+///   its staff runs: the open cut would restart every tick instead of running. The
+///   `mEvtOrderType == 2` half of the first arm is dead in the target regardless - the field is
+///   written only `0`, `1` and `3` (`:611`, `:613`, `:665`, `:830`) - so the live arm is the
+///   `orderChangeEventId` one, and the port cannot reach it: `FIGURE_HATCH_OPEN` has no other
+///   orderer anywhere in the checkout (`d_a_obj_ohatch.cpp` only tests its existence at `:201`),
+///   so `ohatch.rs`'s OPEN cut never runs today. Flagged in the report.
+///   `eventInfo.onCondition` itself IS modelled (`OrderFlags`, the shape `ba1.rs` transcribes at
+///   `d_a_npc_ba1.cpp:541-555`), but it is downstream of the same missing gate.
+/// * `dComIfGp_setScopeType(dScpTyp_UNK1_e)` (`:652`): the camera's scope type has no counterpart
+///   in this port's `Camera`, so the write is dropped; the gate around it is transcribed.
 /// * `dComIfGp_event_chkTalkXY()` (`:1288`) is an inline in `d_com_inf_game.h:3505` with no body
 ///   anywhere in the decomp; it is fed `false`, the value `npc_ah.rs` already feeds it.
 /// * `dEventCut_c::getAttnFlag` / `getAttnPos` / `getTurnSpeed` / `cutProc` (`:1393`, `:852`,
@@ -661,10 +680,12 @@ impl Marlon {
     fn create_init(&mut self, actor: &mut Actor, stage: Option<&str>) {
         // `mHomeYRot = home.angle.y;` (:251) - `home` is the stage-placed spawn transform.
         self.home_y_rot = actor.angle[1];
-        // `mPosFlag = chkPosNo();` (:254) - `chkPosNo` compares the stage name against
-        // `l_room_name`, and `getNextStageName()` has no counterpart here, so the crate's stage
-        // resource (`area::StageName`, which `bg.rs` uses for `dComIfGp_getStartStageName()`)
-        // stands in. Flagged in the report.
+        // `mPosFlag = chkPosNo();` (:254) - `chkPosNo` compares `dComIfGp_getNextStageName()`
+        // against `l_room_name`, which is the name `dComIfGp_setNextStage` last stored
+        // (`d_com_inf_game.h:2303-2305`): the field keeps that name after the mount clears only
+        // the enable flag (`dStage_nextStage_c::offEnable` via `d_s_play.cpp:1344`), so an
+        // unconsumed request is `transition::NextStage::target` and a mounted stage is the stage
+        // itself, which is what `stage` carries.
         self.pos_flag = chk_pos_no(stage);
         // `mNpcNo = getPrmNpcNo();` (:255) - `getPrmNpcNo()` is `mPosFlag != false`
         // (`:1362-1364`). A name that matched nothing yields `ARRAY_SIZE`, still non-zero, so
@@ -832,7 +853,11 @@ impl Marlon {
         // `attention_info.position.set(current.pos.x, current.pos.y + mAttnPosOfsY, current.pos.z);`
         // (:599) - omitted, the attention request channel is a RULE 3b absence.
         // `eyePos.set(current.pos.x, current.pos.y + mEyePosOfsY, current.pos.z);` (:600).
-        self.eye_pos = Vec3::new(actor.pos.x, actor.pos.y + self.dat_eye_pos_ofs_y(), actor.pos.z);
+        self.eye_pos = Vec3::new(
+            actor.pos.x,
+            actor.pos.y + self.dat_eye_pos_ofs_y(),
+            actor.pos.z,
+        );
         // `lookBack();` (:602)
         self.look_back(actor);
     }
@@ -1080,9 +1105,14 @@ impl Marlon {
                 // `eventBikkuriInit`: `mEventTimer = 1; if (timer != NULL) mEventTimer = *timer;
                 // if (mEventTimer <= 0) mEventTimer = 1;` (:1052-1058)
                 CUT_BIKKURI => {
-                    let rolled =
-                        ctx.cut_number(KEY_TIMER).map_or(BIKKURI_TIMER_MIN, |value| value as i16);
-                    self.event_timer = if rolled <= 0 { BIKKURI_TIMER_MIN } else { rolled };
+                    let rolled = ctx
+                        .cut_number(KEY_TIMER)
+                        .map_or(BIKKURI_TIMER_MIN, |value| value as i16);
+                    self.event_timer = if rolled <= 0 {
+                        BIKKURI_TIMER_MIN
+                    } else {
+                        rolled
+                    };
                 }
                 _ => {}
             }
@@ -1661,7 +1691,12 @@ impl Marlon {
         // mEventCut.getTurnSpeed(); cLib_addCalcAngleS2(&mTurnVel, maxVel, 4, 0x800); } else
         // { mTurnVel = 0; }` (:1501-1508). `getTurnSpeed` has no counterpart, so `maxVel` stands.
         if self.jnt.trn_chk() {
-            add_calc_angle_s2(&mut self.turn_vel, max_vel, TURN_VEL_SCALE, TURN_VEL_MAX_STEP);
+            add_calc_angle_s2(
+                &mut self.turn_vel,
+                max_vel,
+                TURN_VEL_SCALE,
+                TURN_VEL_MAX_STEP,
+            );
         } else {
             self.turn_vel = 0;
         }
@@ -1860,6 +1895,9 @@ pub struct World<'w, 's> {
     pub list: Res<'w, EventList>,
     pub active: ResMut<'w, ActiveEvent>,
     pub stage: Res<'w, StageName>,
+    /// `dComIfGp_getNextStageName()`'s store: `dStage_nextStage_c`'s name field, which
+    /// `dComIfGp_setNextStage` writes and the mount only disables (`d_stage.cpp:27-33`).
+    pub next: Res<'w, NextStage>,
     pub do_intent: Res<'w, DoIntent>,
     pub text_flags: Res<'w, TextFlags>,
     pub archive: Option<Res<'w, MsgArchives>>,
@@ -1891,10 +1929,7 @@ pub fn control(
     let clear_count = world.text_flags.clear_count;
     let event_run = msg.info.event_run_check();
     let telescope_look = msg.info.check_player_status0(DA_PY_STTS0_TELESCOPE_LOOK);
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     // `fopAcM_searchFromName("Ohatch", 0, 0)` (`:1029`, `:1090`), resolved through
     // `ohatch::OHATCH_ACTORS` because `d_stage.cpp`'s OBJNAME table is the stage-string authority.
     let hatch_pos = world
@@ -1903,7 +1938,11 @@ pub fn control(
         .find(|actor| OHATCH_ACTORS.contains(&actor.name.as_str()))
         .map(|actor| actor.pos);
     let hatch = world.list.event_index(EVENT_HATCH_OPEN);
-    let stage = world.stage.0.as_str();
+    let stage = world
+        .next
+        .target
+        .as_ref()
+        .map_or(world.stage.0.as_str(), |target| target.stage.as_str());
     let ground = collision.as_deref();
     let do_now = world.do_intent.0;
     let stories = &mut *world.stories;

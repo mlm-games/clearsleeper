@@ -32,10 +32,7 @@ impl TagKk1 {
         if player.pos.y - pos.y >= VERTICAL {
             return false;
         }
-        walk::to_s16(player.face)
-            .wrapping_sub(yaw)
-            .unsigned_abs()
-            < ANGLE_LIMIT
+        walk::to_s16(player.face).wrapping_sub(yaw).unsigned_abs() < ANGLE_LIMIT
     }
 }
 

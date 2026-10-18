@@ -30,10 +30,10 @@ pub const ZELDA_ACTOR: &str = "Zl1";
 
 /// `l_evn_tbl[4]` — `:127-132`, indexed by `field_0x84A - 3`.
 pub const EVENT_NAMES: [&str; 4] = [
-    "yuukaigo", // <- :128
-    "ooi", // <- :129
+    "yuukaigo",        // <- :128
+    "ooi",             // <- :129
     "majyuu_shinnyuu", // <- :130
-    "nakaniwa", // <- :131
+    "nakaniwa",        // <- :131
 ];
 
 /// `decideType` writes `mArcName` — `:1330-1337`. Types 0, 6 and 7 use `"Zl2"`,
@@ -153,10 +153,7 @@ const SET_TETORA_POS: [[[f32; 3]; 3]; 2] = [
     ],
 ];
 /// `a_set_tetoraAng[2][3]`, in degrees — `:256-259`.
-const SET_TETORA_ANG: [[f32; 3]; 2] = [
-    [16.0, -171.0, 16.0],
-    [-159.0, 15.0, -153.0],
-];
+const SET_TETORA_ANG: [[f32; 3]; 2] = [[16.0, -171.0, 16.0], [-159.0, 15.0, -153.0]];
 
 /// The action functions `set_action` selects between — `d_a_npc_zl1.h`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,7 +233,7 @@ impl Zelda {
         let kind = (parameters & PARAM_BITS) as u8 as i8; // <- :2883
         let arc = match kind {
             0 | STT_DEMO_A | STT_DEMO_B => ARC_SLEEPING, // <- :1332
-            _ => ARC_AWAKE,                               // <- :1335
+            _ => ARC_AWAKE,                              // <- :1335
         };
         Self {
             kind,
@@ -434,11 +431,11 @@ impl Zelda {
     /// `daNpc_Zl1_c::getMsg` — `:1031-1051`.
     fn get_msg(&self, collect: &Collect, flags: &EventFlags) -> u32 {
         match self.kind {
-            2 => get_msg_zl1_2(collect, flags), // <- :1034
-            STT_TURN => get_msg_zl1_4(flags),    // <- :1037
-            5 => 0x15EE,                         // <- getMsg_ZL1_5, :1028
+            2 => get_msg_zl1_2(collect, flags),   // <- :1034
+            STT_TURN => get_msg_zl1_4(flags),     // <- :1037
+            5 => 0x15EE,                          // <- getMsg_ZL1_5, :1028
             1 | 3 | STT_DEMO_A | STT_DEMO_B => 0, // <- :1043-1047
-            _ => 0, // no case for type 0, :1048
+            _ => 0,                               // no case for type 0, :1048
         }
     }
 
@@ -455,7 +452,7 @@ impl Zelda {
             0x15E2 => Step::Next(0x15E3), // <- :990
             0x15E3 => Step::Next(0x15E4), // <- :994
             0x15E7 => Step::Next(0x15E8), // <- :998
-            _ => Step::Ends,             // <- :1001-1004
+            _ => Step::Ends,              // <- :1001-1004
         }
     }
 
@@ -508,9 +505,9 @@ impl Zelda {
                 return false; // <- :1075
             }
             match self.event_slot {
-                0 => self.demo_wait = true,  // <- field_0x7D3 = true, :1077
-                2 => self.in_event = true,   // <- field_0x7C9 = true, :1081
-                3 => self.look_lock = true,  // <- field_0x7D8 = true, :1086
+                0 => self.demo_wait = true, // <- field_0x7D3 = true, :1077
+                2 => self.in_event = true,  // <- field_0x7C9 = true, :1081
+                3 => self.look_lock = true, // <- field_0x7D8 = true, :1086
                 _ => {}
             }
             self.order = ORDER_NONE; // <- :1090
@@ -899,10 +896,7 @@ pub fn control(
     mut commands: Commands,
 ) {
     let clear_count = world.text_flags.clear_count;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     let player = cast.players.iter().next().copied();
     let do_now = do_intent.0;
     for (entity, mut actor, mut zelda) in &mut zeldas {

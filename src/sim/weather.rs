@@ -66,9 +66,8 @@ pub const SUN_CHKPNT: [(f32, f32); SUN_CHECKS] = [
 
 /// `room_pat_tbl` (`d_kankyo_rain.cpp:2330-2347`), indexed by `dComIfGp_roomControl_getStayNo()`
 /// when that number is below sixteen. A negative entry means the room has no poison pattern.
-pub const POISON_ROOM_PATTERN: [i32; 16] = [
-    -1, -1, -1, 0, -1, -1, -1, -1, -1, 4, -1, 3, -1, 1, -1, 2,
-];
+pub const POISON_ROOM_PATTERN: [i32; 16] =
+    [-1, -1, -1, 0, -1, -1, -1, -1, -1, 4, -1, 3, -1, 1, -1, 2];
 
 /// `wind_table` (`d_kankyo_wether.cpp:1375-1379`), the eight direction buckets
 /// `dKyw_get_windsdir` walks the compass angle of the wind through.
@@ -1497,7 +1496,10 @@ pub fn squal_set(
     speed: f32,
     max_strength: f32,
 ) -> Option<usize> {
-    let slot = weather.wind_entity.iter().position(|entity| entity.in_use == 0)?;
+    let slot = weather
+        .wind_entity
+        .iter()
+        .position(|entity| entity.in_use == 0)?;
     let entity = &mut weather.wind_entity[slot];
     entity.in_use = 1;
     entity.min_radius = min_radius;
@@ -1619,16 +1621,10 @@ fn stage_misc_wind(stage: &str) -> i16 {
 /// custom override, and is cut by the second event-wind mode before it is eased into place.
 pub fn wind_set(weather: &mut Weather, frame: &Frame) {
     let (mut wind_vec, mut strength) = if weather.wind.has_wind_vec_override {
-        (
-            weather.wind.wind_vec,
-            weather.wind.wind_strength_override,
-        )
+        (weather.wind.wind_vec, weather.wind.wind_strength_override)
     } else {
         let (x, y) = if weather.wind.evt_wind_set != 0 && weather.wind.evt_wind_set != 0xFF {
-            (
-                weather.wind.evt_wind_angle_x,
-                weather.wind.evt_wind_angle_y,
-            )
+            (weather.wind.evt_wind_angle_x, weather.wind.evt_wind_angle_y)
         } else if weather.wind.tact_wind_angle_flags != 0 {
             (
                 weather.wind.tact_wind_angle_x,
@@ -1904,7 +1900,13 @@ pub fn sun_move(weather: &mut Weather, frame: &Frame, colpat_weather: u8) {
         let mut alpha = (weather.sun.pos[0].y - frame.eye.y) / -8000.0;
         alpha = square(alpha);
         alpha *= 6.0;
-        add_calc(&mut weather.sun.moon_alpha, alpha.min(1.0), 0.2, 0.01, 0.001);
+        add_calc(
+            &mut weather.sun.moon_alpha,
+            alpha.min(1.0),
+            0.2,
+            0.01,
+            0.001,
+        );
     } else {
         add_calc(&mut weather.sun.moon_alpha, 0.0, 0.2, 0.01, 0.001);
     }
@@ -1997,9 +1999,27 @@ pub fn rain_move(
     if weather.rain.center_delta_mul > 0.3 {
         weather.rain.center_delta_mul = 0.3;
     }
-    add_calc(&mut weather.rain.center_delta.x, center_delta.x, 0.2, 0.1, 0.01);
-    add_calc(&mut weather.rain.center_delta.y, center_delta.y, 0.2, 0.1, 0.01);
-    add_calc(&mut weather.rain.center_delta.z, center_delta.z, 0.2, 0.1, 0.01);
+    add_calc(
+        &mut weather.rain.center_delta.x,
+        center_delta.x,
+        0.2,
+        0.1,
+        0.01,
+    );
+    add_calc(
+        &mut weather.rain.center_delta.y,
+        center_delta.y,
+        0.2,
+        0.1,
+        0.01,
+    );
+    add_calc(
+        &mut weather.rain.center_delta.z,
+        center_delta.z,
+        0.2,
+        0.1,
+        0.01,
+    );
     weather.rain.cam_center_pos = frame.center;
 
     let spawn = set_eyevect_calc2(frame.eye, frame.center, 700.0, 600.0);
@@ -2018,7 +2038,11 @@ pub fn rain_move(
     if frame.stage_type == STAGE_TYPE_MISC && frame.stage != "Ocrogh" && frame.stage != "Omori" {
         fade_everywhere = true;
         weather.rain.status |= 1;
-        fade_max_dist = if frame.stage == "Orichh" { 2300.0 } else { 1200.0 };
+        fade_max_dist = if frame.stage == "Orichh" {
+            2300.0
+        } else {
+            1200.0
+        };
     } else {
         overhead = overhead_bg_chk(collision, frame.eye);
         let (hit1, point1) = forward_overhead_bg_chk(collision, frame.eye, frame.center, 700.0);
@@ -2089,12 +2113,11 @@ pub fn rain_move(
                 );
                 let mul = weather.rain.center_delta_mul;
                 let delta = weather.rain.center_delta;
-                weather.rain.eff[i].pos.x += 20.0
-                    * (wind_pow.x + 10.0 * (delta.x * mul) + 0.08 * (i & 7) as f32);
-                weather.rain.eff[i].pos.y +=
-                    20.0 * (-2.5 + wind_pow.y + (delta.y * mul) * 10.0);
-                weather.rain.eff[i].pos.z += 20.0
-                    * (wind_pow.z + 10.0 * (delta.z * mul) + 0.08 * (i & 3) as f32);
+                weather.rain.eff[i].pos.x +=
+                    20.0 * (wind_pow.x + 10.0 * (delta.x * mul) + 0.08 * (i & 7) as f32);
+                weather.rain.eff[i].pos.y += 20.0 * (-2.5 + wind_pow.y + (delta.y * mul) * 10.0);
+                weather.rain.eff[i].pos.z +=
+                    20.0 * (wind_pow.z + 10.0 * (delta.z * mul) + 0.08 * (i & 3) as f32);
 
                 let base = weather.rain.eff[i].base_pos;
                 let mut probe = Vec3::new(
@@ -2427,7 +2450,8 @@ pub fn kazanbai_move(
                 weather.snow.eff[i].pos.x += wind_pow.x * (speed * 0.028);
                 weather.snow.eff[i].pos.z += wind_pow.z * (speed * 0.028);
                 let base = weather.snow.eff[i].base_pos;
-                weather.snow.eff[i].pos.y = (ground - base.y) - (1.0 - weather.snow.eff[i].scale) * 7.0;
+                weather.snow.eff[i].pos.y =
+                    (ground - base.y) - (1.0 - weather.snow.eff[i].scale) * 7.0;
                 if weather.snow.eff[i].timer != 0 {
                     weather.snow.eff[i].timer = weather.snow.eff[i].timer.wrapping_sub(1);
                 }
@@ -2480,11 +2504,7 @@ fn snow_heading(frame: &Frame) -> Vec3 {
 
 /// `dKyr_kazanbai_tamari_move` (`d_kankyo_rain.cpp:1630-1712`): the banked layer that sits in the
 /// second half of the array and fades in and out on its own timer.
-pub fn kazanbai_tamari_move(
-    weather: &mut Weather,
-    snow_count: i32,
-    collision: Option<&Collision>,
-) {
+pub fn kazanbai_tamari_move(weather: &mut Weather, snow_count: i32, collision: Option<&Collision>) {
     if snow_count == 0 {
         return;
     }
@@ -2528,8 +2548,7 @@ pub fn kazanbai_tamari_move(
                 if weather.snow.eff[i].timer != 0 {
                     weather.snow.eff[i].timer = weather.snow.eff[i].timer.wrapping_sub(1);
                 }
-                let drift =
-                    weather.snow.eff[i].wind_speed * weather.snow.eff[i].scale * 0.02;
+                let drift = weather.snow.eff[i].wind_speed * weather.snow.eff[i].scale * 0.02;
                 weather.snow.eff[i].pos.x += wind_pow.x * drift;
                 weather.snow.eff[i].pos.z += wind_pow.z * drift;
                 weather.snow.eff[i].pos.y =
@@ -2607,9 +2626,9 @@ pub fn housi_move(weather: &mut Weather, frame: &Frame, housi_count: i32) {
                     weather.housi.effect[i].pos.z += rate * (wind_pow.z * 5.0);
                     weather.housi.effect[i].pos.y -= rate * 0.6;
                     weather.housi.effect[i].pos.x += wave * rate;
-                    weather.housi.effect[i].pos.y += rate * 0.5 * fsin(weather.housi.effect[i].scale.y);
-                    weather.housi.effect[i].pos.z +=
-                        fsin(weather.housi.effect[i].scale.z) * rate;
+                    weather.housi.effect[i].pos.y +=
+                        rate * 0.5 * fsin(weather.housi.effect[i].scale.y);
+                    weather.housi.effect[i].pos.z += fsin(weather.housi.effect[i].scale.z) * rate;
                     weather.housi.effect[i].scale.x += 0.03;
                     weather.housi.effect[i].scale.y += 0.02;
                     weather.housi.effect[i].scale.z += 0.01;
@@ -2722,13 +2741,7 @@ pub fn wether_move_star(weather: &mut Weather, frame: &Frame, colpat_weather: u8
     if weather.colpat_curr != 0 && weather.colpat_blend > 0.5 {
         target = 0.0;
     }
-    add_calc(
-        &mut weather.star_count_target,
-        target,
-        0.1,
-        0.01,
-        0.000001,
-    );
+    add_calc(&mut weather.star_count_target, target, 0.1, 0.01, 0.000001);
     weather.star_count = (weather.star_count_target * 1000.0) as i16;
 
     if !weather.star_initialized {
@@ -2984,8 +2997,7 @@ pub fn poison_move(weather: &mut Weather, frame: &Frame) {
                             }
                         }
                     }
-                    if weather.poison.eff[i].pos.y > ceiling
-                        && weather.poison.eff[i].alpha <= 0.001
+                    if weather.poison.eff[i].pos.y > ceiling && weather.poison.eff[i].alpha <= 0.001
                     {
                         weather.poison.eff[i].pos.y = 0.0;
                     } else if weather.poison.eff[i].pos.y < 0.0
@@ -3140,8 +3152,7 @@ pub fn cloud_shadow_move(weather: &mut Weather, frame: &Frame, moya_mode: u8, mo
                 );
                 weather.cloud.eff[i].wind_speed = 0.7 + rnd_f(&mut weather.seed, 0.3);
                 weather.cloud.eff[i].alpha = 0.0;
-                weather.cloud.eff[i].anim_counter =
-                    rnd_f(&mut weather.seed, 65535.0) as u16;
+                weather.cloud.eff[i].anim_counter = rnd_f(&mut weather.seed, 65535.0) as u16;
                 weather.cloud.eff[i].vel_rndm = Vec3::new(
                     rnd_f(&mut weather.seed, 360.0),
                     rnd_f(&mut weather.seed, 360.0),
@@ -3153,7 +3164,8 @@ pub fn cloud_shadow_move(weather: &mut Weather, frame: &Frame, moya_mode: u8, mo
             1 | 2 => {
                 let base = weather.cloud.eff[i].base_pos;
                 let pos = base + weather.cloud.eff[i].pos;
-                weather.cloud.eff[i].anim_counter = weather.cloud.eff[i].anim_counter.wrapping_add(120);
+                weather.cloud.eff[i].anim_counter =
+                    weather.cloud.eff[i].anim_counter.wrapping_add(120);
                 chase_f(
                     &mut weather.cloud.eff[i].m34,
                     weather.cloud.eff[i].wind_speed,
@@ -3374,10 +3386,7 @@ pub fn vrkumo_move(weather: &mut Weather, frame: &Frame) {
             if weather.vrkumo.inst[index].dist_falloff < 0.05 {
                 (0.0, 0.1)
             } else {
-                (
-                    (weather.vrkumo.inst[index].dist_falloff - 0.05) / 0.15,
-                    0.1,
-                )
+                ((weather.vrkumo.inst[index].dist_falloff - 0.05) / 0.15, 0.1)
             }
         } else {
             (ceiling, 0.1)
@@ -3407,7 +3416,12 @@ pub fn wave_move(weather: &mut Weather, frame: &Frame) {
     if weather.wave_chan.wave_flat_inter >= 1.0 || !frame.has_view {
         return;
     }
-    let spawn = set_eyevect_calc2(frame.eye, frame.center, weather.wave_chan.wave_spawn_dist, 0.0);
+    let spawn = set_eyevect_calc2(
+        frame.eye,
+        frame.center,
+        weather.wave_chan.wave_spawn_dist,
+        0.0,
+    );
     let mut wind_pow = weather.wind_vecpow();
     let mut wind_power = weather.wind_pow();
     if frame.stage_type == STAGE_TYPE_MISC {
@@ -3606,7 +3620,11 @@ pub fn kamome_move(weather: &mut Weather, frame: &Frame) {
                 };
                 let old_y = ssin(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0;
                 let old_x = fsin(f32::from(weather.wind_eff.kamome_eff[i].angle_x)).abs() * 3200.0;
-                let old = Vec3::new(old_y, old_x, scos(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0);
+                let old = Vec3::new(
+                    old_y,
+                    old_x,
+                    scos(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0,
+                );
                 let turn = (weather.wind_eff.kamome_eff[i].angle_y_speed
                     * weather.wind_eff.kamome_eff[i].scale) as i16;
                 weather.wind_eff.kamome_eff[i].angle_y =
@@ -3615,13 +3633,13 @@ pub fn kamome_move(weather: &mut Weather, frame: &Frame) {
                     weather.wind_eff.kamome_eff[i].angle_x.wrapping_add(15);
                 let new_y = ssin(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0;
                 let new_x = fsin(f32::from(weather.wind_eff.kamome_eff[i].angle_x)).abs() * 3200.0;
-                let new =
-                    Vec3::new(new_y, new_x, scos(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0);
-                weather.wind_eff.kamome_eff[i].pos = Vec3::new(
-                    frame.eye.x + new.x,
-                    new.y + 4800.0,
-                    frame.eye.z + new.z,
+                let new = Vec3::new(
+                    new_y,
+                    new_x,
+                    scos(weather.wind_eff.kamome_eff[i].angle_y) * 7000.0,
                 );
+                weather.wind_eff.kamome_eff[i].pos =
+                    Vec3::new(frame.eye.x + new.x, new.y + 4800.0, frame.eye.z + new.z);
                 if weather.wind_eff.kamome_eff[i].timer != 0 && spawn_birds {
                     add_calc(
                         &mut weather.wind_eff.kamome_eff[i].scale,
@@ -3762,8 +3780,7 @@ pub fn wind_move(weather: &mut Weather, frame: &Frame, collision: Option<&Collis
                         }
                     }
 
-                    weather.wind_eff.wind_eff[i].m2c =
-                        rnd_f(&mut weather.seed, 65535.0) as i16;
+                    weather.wind_eff.wind_eff[i].m2c = rnd_f(&mut weather.seed, 65535.0) as i16;
                     weather.wind_eff.wind_eff[i].angle_xz = atan2s(wind_vec.x, wind_vec.z);
                     weather.wind_eff.wind_eff[i].angle_y = atan2s(wind_vec.y, flat);
                     weather.wind_eff.wind_eff[i].m28 = 0;
@@ -3798,7 +3815,13 @@ pub fn wind_move(weather: &mut Weather, frame: &Frame, collision: Option<&Collis
                 } else {
                     let target_xz = atan2s(wind_vec.x, wind_vec.z);
                     let target_y = atan2s(wind_vec.y, flat);
-                    add_calc_angle_s(&mut weather.wind_eff.wind_eff[i].angle_y, target_y, 10, 1000, 1);
+                    add_calc_angle_s(
+                        &mut weather.wind_eff.wind_eff[i].angle_y,
+                        target_y,
+                        10,
+                        1000,
+                        1,
+                    );
                     add_calc_angle_s(
                         &mut weather.wind_eff.wind_eff[i].angle_xz,
                         target_xz,
@@ -3850,7 +3873,13 @@ pub fn wind_move(weather: &mut Weather, frame: &Frame, collision: Option<&Collis
                         weather.wind_eff.wind_eff[i].state = 2;
                     }
                     if weather.wind_eff.wind_eff[i].state_timer > 0.5 {
-                        add_calc(&mut weather.wind_eff.wind_eff[i].alpha, 1.0, 0.5, 0.05, 0.001);
+                        add_calc(
+                            &mut weather.wind_eff.wind_eff[i].alpha,
+                            1.0,
+                            0.5,
+                            0.05,
+                            0.001,
+                        );
                     }
                 } else {
                     add_calc(
@@ -3869,7 +3898,13 @@ pub fn wind_move(weather: &mut Weather, frame: &Frame, collision: Option<&Collis
                             };
                     }
                     if weather.wind_eff.wind_eff[i].state_timer < 0.5 {
-                        add_calc(&mut weather.wind_eff.wind_eff[i].alpha, 0.0, 0.5, 0.05, 0.001);
+                        add_calc(
+                            &mut weather.wind_eff.wind_eff[i].alpha,
+                            0.0,
+                            0.5,
+                            0.05,
+                            0.001,
+                        );
                     }
                 }
             }
@@ -3893,11 +3928,7 @@ fn ground_y(collision: Option<&Collision>, probe: Vec3) -> f32 {
 
 /// `wether_move_windline` (`d_kankyo_wether.cpp:400-444`): how many streaks the room asks for, and
 /// the one-time arming of the whole layer.
-pub fn wether_move_windline(
-    weather: &mut Weather,
-    frame: &Frame,
-    collision: Option<&Collision>,
-) {
+pub fn wether_move_windline(weather: &mut Weather, frame: &Frame, collision: Option<&Collision>) {
     weather.windline_count = 0;
     if frame.path_wind_effect && frame.stage != "GTower" {
         weather.windline_count = (weather.wind_pow() * 10.0) as i32;

@@ -2,11 +2,11 @@ use bevy_ecs::prelude::*;
 
 use super::font::{CharQuad, FontBank};
 use super::msgdata::MsgLenState;
-use super::msglayout::MsgLayoutState;
 use super::msgget::{MsgArchive, MsgGet};
 use super::msghio::MsgMeterHio;
+use super::msglayout::MsgLayoutState;
 use super::msgproc::{
-    MsgGameInfo, MeterMsgHio, MsgIconPic, fop_msgm_out_font_draw, fop_msgm_out_font_set,
+    MeterMsgHio, MsgGameInfo, MsgIconPic, fop_msgm_out_font_draw, fop_msgm_out_font_set,
     fop_msgm_value_increase,
 };
 use super::{
@@ -140,7 +140,8 @@ pub trait QuadFont {
 
 impl QuadFont for FontBank {
     fn qmetrics(&self, slot: usize) -> Metrics {
-        self.get(slot).map_or_else(Metrics::default, |font| font.metrics())
+        self.get(slot)
+            .map_or_else(Metrics::default, |font| font.metrics())
     }
 
     fn qchar_width(&self, slot: usize, code: u16) -> i32 {
@@ -380,7 +381,8 @@ impl PaneState {
             self.pos_center[0] - self.size[0] / 2.0f32,
             self.pos_center[1] - self.size[1] / 2.0f32,
         ];
-        self.pane.move_to(self.pos_top_left[0], self.pos_top_left[1]);
+        self.pane
+            .move_to(self.pos_top_left[0], self.pos_top_left[1]);
         self.pane.resize(self.size[0], self.size[1]);
     }
 
@@ -1437,8 +1439,6 @@ pub struct Msg2Ctx<'a, F: MsgArchive + ?Sized> {
     pub stick: Msg2Stick,
 }
 
-
-
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct Msg2Box {
     pub msg_no: u32,
@@ -1651,15 +1651,27 @@ impl Msg2Box {
 
     pub fn out_font_hide(&mut self, index: usize) {
         for i in 0..MSG2_BUTTONS {
-            if let Some(icon) = self.bbutton_icon.get_mut(i).and_then(|row| row.get_mut(index)) {
+            if let Some(icon) = self
+                .bbutton_icon
+                .get_mut(i)
+                .and_then(|row| row.get_mut(index))
+            {
                 icon.visible = false;
                 icon.rotate(0.0f32);
             }
-            if let Some(kage) = self.bbutton_kage.get_mut(i).and_then(|row| row.get_mut(index)) {
+            if let Some(kage) = self
+                .bbutton_kage
+                .get_mut(i)
+                .and_then(|row| row.get_mut(index))
+            {
                 kage.visible = false;
                 kage.rotate(0.0f32);
             }
-            if let Some(timer) = self.bbutton_timer.get_mut(i).and_then(|row| row.get_mut(index)) {
+            if let Some(timer) = self
+                .bbutton_timer
+                .get_mut(i)
+                .and_then(|row| row.get_mut(index))
+            {
                 *timer = -1;
             }
         }
@@ -1975,12 +1987,7 @@ impl Msg2Box {
         data.space_flag = 0;
     }
 
-    pub fn yose_select<F: FontSlot + ?Sized>(
-        &mut self,
-        font: &F,
-        index: usize,
-        len: &MsgLenState,
-    ) {
+    pub fn yose_select<F: FontSlot + ?Sized>(&mut self, font: &F, index: usize, len: &MsgLenState) {
         let line_count = match self.msg_data.get_mut(index) {
             Some(data) => {
                 data.count = data.string_length(font, *len) as i32;
@@ -1999,9 +2006,10 @@ impl Msg2Box {
     }
 
     pub fn text_position(&mut self, index: usize) {
-        let shift_y = self.half_line_space.wrapping_mul(
-            3i32.wrapping_sub(self.line_shift.get(index).copied().unwrap_or(0)),
-        ) as f32;
+        let shift_y = self
+            .half_line_space
+            .wrapping_mul(3i32.wrapping_sub(self.line_shift.get(index).copied().unwrap_or(0)))
+            as f32;
         for pane in [
             self.text_pane.get_mut(index),
             self.ruby_pane.get_mut(index),
@@ -2077,8 +2085,14 @@ impl Msg2Box {
             {
                 icon_color = 0xFFFF_FFFF;
             }
-            let icon = self.bbutton_icon.get_mut(i).and_then(|row| row.get_mut(index));
-            let kage = self.bbutton_kage.get_mut(i).and_then(|row| row.get_mut(index));
+            let icon = self
+                .bbutton_icon
+                .get_mut(i)
+                .and_then(|row| row.get_mut(index));
+            let kage = self
+                .bbutton_kage
+                .get_mut(i)
+                .and_then(|row| row.get_mut(index));
             let timer = self
                 .bbutton_timer
                 .get_mut(i)
@@ -2121,7 +2135,14 @@ impl Msg2Box {
         if stop {
             let below = self.pane_below;
             let extra = i32::from(self.mesg_entry.field_0x16);
-            self.message_out(font, usize::from(below), line.wrapping_add(extra), len, layout, hio);
+            self.message_out(
+                font,
+                usize::from(below),
+                line.wrapping_add(extra),
+                len,
+                layout,
+                hio,
+            );
         }
     }
 
@@ -2205,8 +2226,9 @@ impl Msg2Box {
             .map(|p| p.state.pos_top_left[1])
             .unwrap_or(0.0f32);
         let shift = self.line_shift.get(index).copied().unwrap_or(0);
-        let temp_f2 =
-            (board_y - shadow_y) + pane_y + (self.half_line_space as f32 * 2i32.saturating_sub(shift) as f32);
+        let temp_f2 = (board_y - shadow_y)
+            + pane_y
+            + (self.half_line_space as f32 * 2i32.saturating_sub(shift) as f32);
         let temp_r27 = temp_r6.wrapping_mul(shift);
         let var_r26 = (temp_f2 as i32).wrapping_add(temp_r27);
         let var_r30 = (temp_f2 - hio.field_0x38 as f32) as i32;
@@ -2293,8 +2315,9 @@ impl Msg2Box {
                 self.stick_state = 1;
                 self.screen_data_set(usize::from(below));
                 self.scroll_phase = 3;
-                self.scroll_line =
-                    self.scroll_line.wrapping_sub(i32::from(self.mesg_entry.field_0x16));
+                self.scroll_line = self
+                    .scroll_line
+                    .wrapping_sub(i32::from(self.mesg_entry.field_0x16));
                 self.status = STATUS_UNK5;
                 env.se = Some(Msg2Se::Scroll1);
             }
@@ -2306,7 +2329,9 @@ impl Msg2Box {
             self.stick_state = 2;
             self.screen_data_set(usize::from(above));
             self.scroll_phase = 1;
-            self.scroll_line = self.scroll_line.wrapping_add(i32::from(self.mesg_entry.field_0x16));
+            self.scroll_line = self
+                .scroll_line
+                .wrapping_add(i32::from(self.mesg_entry.field_0x16));
             self.status = STATUS_UNK5;
             env.se = Some(Msg2Se::Scroll1);
         } else {
@@ -2326,8 +2351,9 @@ impl Msg2Box {
                 self.stick_state = 1;
                 self.screen_data_set(usize::from(below));
                 self.scroll_phase = 3;
-                self.scroll_line =
-                    self.scroll_line.wrapping_sub(i32::from(self.mesg_entry.field_0x16));
+                self.scroll_line = self
+                    .scroll_line
+                    .wrapping_sub(i32::from(self.mesg_entry.field_0x16));
                 self.status = STATUS_UNK5;
                 env.se = Some(Msg2Se::Scroll1);
             }
@@ -2363,7 +2389,14 @@ impl Msg2Box {
             if stop {
                 let below = self.pane_below;
                 let extra = i32::from(self.mesg_entry.field_0x16);
-                self.message_out(font, usize::from(below), line.wrapping_add(extra), len, layout, hio);
+                self.message_out(
+                    font,
+                    usize::from(below),
+                    line.wrapping_add(extra),
+                    len,
+                    layout,
+                    hio,
+                );
             }
         } else if self.open_t == self.pop_speed {
             self.status = self
@@ -2486,7 +2519,14 @@ impl Msg2Box {
                 let line = self.scroll_line;
                 let extra = i32::from(self.mesg_entry.field_0x16);
                 if stop {
-                    self.message_out(font, usize::from(new_below), line.wrapping_add(extra), len, layout, hio);
+                    self.message_out(
+                        font,
+                        usize::from(new_below),
+                        line.wrapping_add(extra),
+                        len,
+                        layout,
+                        hio,
+                    );
                 } else {
                     self.message_pane_hide(usize::from(new_below));
                     self.out_font_hide(usize::from(new_below));
@@ -2518,7 +2558,14 @@ impl Msg2Box {
                 let line = self.scroll_line;
                 let extra = i32::from(self.mesg_entry.field_0x16);
                 if self.scroll_line > 0 {
-                    self.message_out(font, usize::from(new_above), line.wrapping_sub(extra), len, layout, hio);
+                    self.message_out(
+                        font,
+                        usize::from(new_above),
+                        line.wrapping_sub(extra),
+                        len,
+                        layout,
+                        hio,
+                    );
                 } else {
                     self.message_pane_hide(usize::from(new_above));
                     self.out_font_hide(usize::from(new_above));
@@ -2641,11 +2688,7 @@ impl Msg2Box {
 
         self.arrow_move();
 
-        let ruby_dy = if opt_ruby {
-            MSG2_RUBY_OFF_DY
-        } else {
-            0.0f32
-        };
+        let ruby_dy = if opt_ruby { MSG2_RUBY_OFF_DY } else { 0.0f32 };
 
         let hio_x = hio.field_0x58 as f32;
         let hio_ruby = hio.field_0x38 as i32;
@@ -2704,10 +2747,7 @@ impl Msg2Box {
             }
         }
 
-        let ruby_visible = self
-            .ruby_pane
-            .get(1)
-            .is_some_and(|p| p.is_visible());
+        let ruby_visible = self.ruby_pane.get(1).is_some_and(|p| p.is_visible());
         for i in 0..MSG2_PANES {
             if opt_ruby {
                 if let Some(p) = self.ruby_pane.get_mut(i) {
@@ -2722,10 +2762,7 @@ impl Msg2Box {
                         p.show();
                     }
                 }
-                if self
-                    .ruby_sdw_pane
-                    .get(i)
-                    .is_some_and(|p| p.is_visible())
+                if self.ruby_sdw_pane.get(i).is_some_and(|p| p.is_visible())
                     && let Some(p) = self.ruby_sdw_pane.get_mut(i)
                 {
                     p.show();
@@ -2840,10 +2877,7 @@ impl Msg2Box {
                 if (r17 as f32) > var_f31 && (r17 as f32) < var_f30 - scale as f32 {
                     let icon = self.bbutton_icon.get_mut(j).and_then(|row| row.get_mut(i));
                     let kage = self.bbutton_kage.get_mut(j).and_then(|row| row.get_mut(i));
-                    let timer = self
-                        .bbutton_timer
-                        .get_mut(j)
-                        .and_then(|row| row.get_mut(i));
+                    let timer = self.bbutton_timer.get_mut(j).and_then(|row| row.get_mut(i));
                     if let (Some(icon), Some(kage), Some(timer)) = (icon, kage, timer) {
                         fop_msgm_out_font_draw(
                             out_hio, icon, kage, r18, r17, scale, timer, r14, icon_num,

@@ -7,8 +7,7 @@ use crate::text::driver::TextFlags;
 use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgproc::{
-    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
-    fop_msgm_message_set,
+    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs, fop_msgm_message_set,
 };
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
@@ -19,24 +18,18 @@ use super::actor::Actor;
 use super::area::StageName;
 use super::daynight::{DayNight, TIME_NIGHT};
 use super::door::StayRoom;
-use super::transition::{NextStage, Target};
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
+use super::fade::{BLACK_COLOR, Fade, SAFTY_WHITE_COLOR};
 use super::flags::{Collect, EventFlags, EventReg, SYMBOL_DIN, SYMBOL_NAYRU};
 use super::inventory::{Equipped, check_get_item};
 use super::player::Player;
 use super::stream::{angle_s, cos_s, sin_s};
+use super::transition::NextStage;
 use super::walk;
 
 pub const KNOB00_ACTORS: [&str; 8] = [
-    "KNOB00",
-    "KNOB01",
-    "KNOB02",
-    "KNOB03",
-    "KNOB00D",
-    "KNOB01D",
-    "KNOB02D",
-    "KNOB03D",
+    "KNOB00", "KNOB01", "KNOB02", "KNOB03", "KNOB00D", "KNOB01D", "KNOB02D", "KNOB03D",
 ];
 
 pub fn is_knob00(name: &str) -> bool {
@@ -392,10 +385,6 @@ pub struct Knob00 {
     bgw: bool,
     bgw_moved: bool,
     bck: usize,
-    fade_rate: f32,
-    fade_dur: f32,
-    fade_white: bool,
-    fade_out: bool,
     anim: BckAnm,
     msg: DoorMsg,
     seed: [i32; 3],
@@ -458,10 +447,6 @@ impl Knob00 {
             bgw: false,
             bgw_moved: true,
             bck: BCK_ADOOR,
-            fade_rate: 1.0,
-            fade_dur: 1.0,
-            fade_white: false,
-            fade_out: false,
             anim: BckAnm::new(),
             msg: DoorMsg::new(),
             seed: [0; 3],
@@ -551,14 +536,6 @@ impl Knob00 {
 
     pub fn bgw_is_used(&self) -> bool {
         self.bgw
-    }
-
-    pub fn fade(&self) -> Option<(f32, f32, bool)> {
-        if self.fade_out {
-            Some((self.fade_rate, self.fade_dur, self.fade_white))
-        } else {
-            None
-        }
     }
 
     pub fn event_reset_pending(&self) -> bool {
@@ -740,11 +717,7 @@ impl Knob00 {
         let delta = player - here;
         let bearing = angle_s(delta.x.atan2(delta.z));
         let angle = bearing.wrapping_sub(yaw).unsigned_abs();
-        if angle < FRONT_HALF_TURN as u16 {
-            0
-        } else {
-            1
-        }
+        if angle < FRONT_HALF_TURN as u16 { 0 } else { 1 }
     }
 
     fn check_face(&self, here: Vec3, yaw: i16, stay: i8, player: Vec3) -> u8 {
@@ -860,20 +833,23 @@ impl Knob00 {
         // the deck that would order the change is the demo event it falls back
         // to. There is exactly one in the game that leads into a house, and it
         // runs on the island the stage name picks out, so a door anywhere else
-        // keeps its faithful behaviour of opening and changing nothing.
+        // keeps its faithful behaviour of opening and changing nothing. The
+        // destination, its layer included, is the one `cut_move_START_TALE1`
+        // writes (`sim/ba1.rs`): `"LinkRM", 200/202, room 0, layer 8`.
         if self.from_room == ROOM_NONE
             && self.to_room == ROOM_NONE
             && env.stage == HOUSE_MOUTH_STAGE
         {
-            env.next.target = Some(Target {
-                stage: HOUSE_STAGE.to_string(),
-                room: HOUSE_ROOM,
-                start: if env.clear_count == 0 {
+            env.next.set(
+                HOUSE_STAGE,
+                HOUSE_ROOM,
+                if env.clear_count == 0 {
                     HOUSE_SPAWN
                 } else {
                     HOUSE_SPAWN_CLEARED
                 },
-            });
+                super::ba1::NEXT_STAGE_TALE_LAYER,
+            );
         }
     }
 
@@ -974,10 +950,11 @@ impl Knob00 {
             let b_var4 = arg1 == DEMO_OPEN_PULL;
             let tmp = b_var4 == b_var3;
             if self.anim.check_pass(OPEN_FADE_FRAME) {
-                self.fade_rate = 0.0;
-                self.fade_dur = OPEN_FADE_RATE;
-                self.fade_white = tmp;
-                self.fade_out = true;
+                env.fade.set_rate(0.0);
+                env.fade.fade_out(
+                    OPEN_FADE_RATE,
+                    if tmp { SAFTY_WHITE_COLOR } else { BLACK_COLOR },
+                );
             }
         }
         if arg1 == DEMO_OPEN_PUSH || arg1 == DEMO_OPEN_PUSH2 {
@@ -1211,11 +1188,7 @@ impl Knob00 {
     /// `demoProc`'s advance cases (`d_a_knob00.cpp:455-458`) pick the push or
     /// pull animation from the front selection, which is what `prm2c6` holds.
     fn open_arg(&self) -> i32 {
-        if self.prm2c6 == M2C6_FRONT {
-            0
-        } else {
-            1
-        }
+        if self.prm2c6 == M2C6_FRONT { 0 } else { 1 }
     }
 
     fn action_demo(&mut self, env: &mut Env<'_>) -> bool {
@@ -1470,6 +1443,9 @@ struct Env<'a> {
     events: &'a mut SimEvents,
     list: &'a EventList,
     active: &'a mut ActiveEvent,
+    /// `mDoGph_gInf_c`'s fade, which `openProc`'s 15-frame mark starts
+    /// (`d_a_knob00.cpp:246-252`).
+    fade: &'a mut Fade,
     procs: &'a mut MsgProcs,
     info: &'a mut MsgGameInfo,
     one: &'a mut Msg1Box,
@@ -1570,6 +1546,7 @@ pub fn control(
     mut regs: ResMut<EventReg>,
     mut names: ResMut<NameEntry>,
     mut events: ResMut<SimEvents>,
+    mut fade: ResMut<Fade>,
     mut players: Query<&mut Player>,
     prooms: Query<&Actor, (With<Player>, Without<Knob00>)>,
     mut doors: Query<(&mut Actor, &mut Knob00)>,
@@ -1581,7 +1558,10 @@ pub fn control(
     for (actor, mut door) in &mut doors {
         let staff_cut = active.staff_cut(&read.list, STAFF_SHUTTER_DOOR);
         let mut player_handle = players.iter_mut().next();
-        let ppos = player_handle.as_mut().map(|link| link.pos).unwrap_or(Vec3::ZERO);
+        let ppos = player_handle
+            .as_mut()
+            .map(|link| link.pos)
+            .unwrap_or(Vec3::ZERO);
         let pyaw = player_handle
             .as_mut()
             .map_or(0, |link| walk::to_s16(link.yaw));
@@ -1611,6 +1591,7 @@ pub fn control(
             player: player_handle.as_mut().map(|link| &mut **link),
             next: &mut next,
             stage: &read.stage.0,
+            fade: &mut fade,
         };
         door.execute(&mut env);
     }

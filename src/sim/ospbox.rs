@@ -22,9 +22,9 @@ const SPEC_SHIFT: u32 = 0x08; // <- d_a_obj_ospbox.h:15 (PRM_SPEC_S)
 /// three bits (`:140`), so only indices 0..=7 are ever read - the eight entries the decomp lists.
 const PF_NAME: [&str; 8] = [
     "Ospbox", // <- d_a_obj_ospbox.cpp:124 (fpcNm_Obj_Ospbox_e)
-    "Pig",   // <- d_a_obj_ospbox.cpp:125 (fpcNm_KB_e)
-    "Pig",   // <- d_a_obj_ospbox.cpp:126
-    "Pig",   // <- d_a_obj_ospbox.cpp:127
+    "Pig",    // <- d_a_obj_ospbox.cpp:125 (fpcNm_KB_e)
+    "Pig",    // <- d_a_obj_ospbox.cpp:126
+    "Pig",    // <- d_a_obj_ospbox.cpp:127
     "Ospbox", // <- d_a_obj_ospbox.cpp:128
     "Ospbox", // <- d_a_obj_ospbox.cpp:129
     "Ospbox", // <- d_a_obj_ospbox.cpp:130

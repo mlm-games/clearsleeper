@@ -47,7 +47,11 @@ pub fn rot_x(value: Vec3, angle: i16) -> Vec3 {
         return value;
     }
     let (sin_x, cos_x) = sin_cos(angle);
-    Vec3::new(value.x, value.y * cos_x - value.z * sin_x, value.y * sin_x + value.z * cos_x)
+    Vec3::new(
+        value.x,
+        value.y * cos_x - value.z * sin_x,
+        value.y * sin_x + value.z * cos_x,
+    )
 }
 
 pub fn rot_y(value: Vec3, angle: i16) -> Vec3 {
@@ -55,7 +59,11 @@ pub fn rot_y(value: Vec3, angle: i16) -> Vec3 {
         return value;
     }
     let (sin_y, cos_y) = sin_cos(angle);
-    Vec3::new(value.x * cos_y + value.z * sin_y, value.y, -value.x * sin_y + value.z * cos_y)
+    Vec3::new(
+        value.x * cos_y + value.z * sin_y,
+        value.y,
+        -value.x * sin_y + value.z * cos_y,
+    )
 }
 
 pub fn rot_z(value: Vec3, angle: i16) -> Vec3 {
@@ -63,7 +71,11 @@ pub fn rot_z(value: Vec3, angle: i16) -> Vec3 {
         return value;
     }
     let (sin_z, cos_z) = sin_cos(angle);
-    Vec3::new(value.x * cos_z - value.y * sin_z, value.x * sin_z + value.y * cos_z, value.z)
+    Vec3::new(
+        value.x * cos_z - value.y * sin_z,
+        value.x * sin_z + value.y * cos_z,
+        value.z,
+    )
 }
 
 pub fn zxy_rot_m(value: Vec3, angle: [i16; 3]) -> Vec3 {

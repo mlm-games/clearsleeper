@@ -4,9 +4,9 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bomb;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
@@ -450,10 +450,7 @@ fn frame_max(bck: i32) -> i16 {
 }
 
 fn pick(table: &[i32; 3], part: u8) -> i32 {
-    table
-        .get(usize::from(part))
-        .copied()
-        .unwrap_or(table[0])
+    table.get(usize::from(part)).copied().unwrap_or(table[0])
 }
 
 fn rnd(seed: &mut [i32; 3]) -> f32 {
@@ -839,11 +836,7 @@ struct Part {
 }
 
 impl Part {
-    fn touch<'a>(
-        writes: &'a mut Vec<Part>,
-        peers: &[Part],
-        kind: u8,
-    ) -> Option<&'a mut Gohdan> {
+    fn touch<'a>(writes: &'a mut Vec<Part>, peers: &[Part], kind: u8) -> Option<&'a mut Gohdan> {
         if let Some(index) = writes.iter().position(|slot| slot.state.part == kind) {
             return writes.get_mut(index).map(|slot| &mut slot.state);
         }
@@ -1456,11 +1449,7 @@ impl Gohdan {
                         } else {
                             self.shape_angle[1].wrapping_sub(0x4000)
                         };
-                        self.roll_yaw = if part == PART_RIGHT {
-                            0x4000
-                        } else {
-                            -0x4000
-                        };
+                        self.roll_yaw = if part == PART_RIGHT { 0x4000 } else { -0x4000 };
                         sink.se(SE_CM_BST_HAND_GRIP);
                     }
                     break;
@@ -1519,7 +1508,13 @@ impl Gohdan {
         }
     }
 
-    fn paa_attack(&mut self, env: &Env<'_>, peers: &[Part], writes: &mut Vec<Part>, sink: &mut Sink<'_>) {
+    fn paa_attack(
+        &mut self,
+        env: &Env<'_>,
+        peers: &[Part],
+        writes: &mut Vec<Part>,
+        sink: &mut Sink<'_>,
+    ) {
         let mut r27 = true;
         let mut r26 = false;
         add_calc_angle_s2(&mut self.shape_angle[0], 0, 10, 0x200);
@@ -1591,11 +1586,7 @@ impl Gohdan {
                         }
                         self.set_hand_at(true);
                     }
-                    let s_var6 = if part == PART_LEFT {
-                        0x4000
-                    } else {
-                        -0x4000
-                    };
+                    let s_var6 = if part == PART_LEFT { 0x4000 } else { -0x4000 };
                     add_calc_angle_s2(
                         &mut self.shape_angle[1],
                         self.facing.wrapping_add(s_var6),
@@ -1725,11 +1716,7 @@ impl Gohdan {
                 }
                 3 => {
                     r27 = false;
-                    let s_var5 = if part == PART_LEFT {
-                        0x4000
-                    } else {
-                        -0x4000
-                    };
+                    let s_var5 = if part == PART_LEFT { 0x4000 } else { -0x4000 };
                     add_calc_angle_s2(
                         &mut self.shape_angle[1],
                         self.facing.wrapping_add(s_var5),
@@ -1737,7 +1724,12 @@ impl Gohdan {
                         0x1000,
                     );
                     add_calc2(&mut self.pos.x, self.target_pos.x, 1.0, self.speed.x.abs());
-                    add_calc2(&mut self.pos.y, self.target_pos.y, 1.0, self.speed.y.abs() + 10.0);
+                    add_calc2(
+                        &mut self.pos.y,
+                        self.target_pos.y,
+                        1.0,
+                        self.speed.y.abs() + 10.0,
+                    );
                     add_calc2(&mut self.pos.z, self.target_pos.z, 1.0, self.speed.z.abs());
                     let left = if part == PART_LEFT {
                         self.pos
@@ -1762,11 +1754,7 @@ impl Gohdan {
                     r27 = false;
                     self.pos.y += self.speed.y;
                     if self.timers[0] <= 1 {
-                        self.roll_yaw = if part == PART_RIGHT {
-                            0x4000
-                        } else {
-                            -0x4000
-                        };
+                        self.roll_yaw = if part == PART_RIGHT { 0x4000 } else { -0x4000 };
                         add_calc_angle_s2(&mut self.shape_angle[2], self.roll_yaw, 1, 0x1000);
                         self.set_hand_at(true);
                         self.speed.y -= REG0_F3 + 60.0;
@@ -1782,11 +1770,7 @@ impl Gohdan {
                         }
                     } else {
                         self.speed.y += REG0_F14 + 1.0;
-                        self.roll_yaw = if part == PART_RIGHT {
-                            -0x1000
-                        } else {
-                            0x1000
-                        };
+                        self.roll_yaw = if part == PART_RIGHT { -0x1000 } else { 0x1000 };
                         add_calc_angle_s2(&mut self.shape_angle[2], self.roll_yaw, 10, 0x200);
                     }
                     break;
@@ -2090,8 +2074,13 @@ impl Gohdan {
             if !shell.free || shell.rest_time <= 1 {
                 continue;
             }
-            if !touches_cyl(self.hand_centre, self.hand_radius, self.hand_height, shell.pos, 0.0)
-            {
+            if !touches_cyl(
+                self.hand_centre,
+                self.hand_radius,
+                self.hand_height,
+                shell.pos,
+                0.0,
+            ) {
                 continue;
             }
             self.bomb = Some(shell.entity);
@@ -2305,13 +2294,16 @@ impl Gohdan {
                 _ => break,
             }
         }
-        self.shape_angle[0] = ang(
-            self.sway * sin_s(((self.sway_clock as i32) * (REG0_S6 as i32 + BOB_X)) as i16),
+        self.shape_angle[0] =
+            ang(self.sway * sin_s(((self.sway_clock as i32) * (REG0_S6 as i32 + BOB_X)) as i16));
+        self.shape_angle[2] =
+            ang(self.sway * sin_s(((self.sway_clock as i32) * (REG0_S6 as i32 + HUKKI_X)) as i16));
+        add_calc2(
+            &mut self.pos.y,
+            REG0_F11 + 400.0,
+            0.05,
+            self.offset.y * 40.0,
         );
-        self.shape_angle[2] = ang(
-            self.sway * sin_s(((self.sway_clock as i32) * (REG0_S6 as i32 + HUKKI_X)) as i16),
-        );
-        add_calc2(&mut self.pos.y, REG0_F11 + 400.0, 0.05, self.offset.y * 40.0);
         add_calc2(&mut self.offset.z, REG0_F11 + 50.0, 1.0, 2.0);
         add_calc2(&mut self.offset.y, 1.0, 1.0, 0.02);
     }
@@ -2399,8 +2391,13 @@ impl Gohdan {
         if self.hurt_timer == 0 {
             let mut b_var1 = false;
             if self.part == PART_HEAD {
-                if touches_cyl(self.head_centre, self.head_radius, self.head_height, player, reach)
-                {
+                if touches_cyl(
+                    self.head_centre,
+                    self.head_radius,
+                    self.head_height,
+                    player,
+                    reach,
+                ) {
                     b_var1 = true;
                 }
             } else {
@@ -2452,7 +2449,13 @@ impl Gohdan {
             return;
         }
         if !self.hand_tg
-            || !touches_cyl(self.hand_centre, self.hand_radius, self.hand_height, player, reach)
+            || !touches_cyl(
+                self.hand_centre,
+                self.hand_radius,
+                self.hand_height,
+                player,
+                reach,
+            )
         {
             return;
         }
@@ -2515,7 +2518,12 @@ impl Gohdan {
         }
         for index in 0..BEAM_COUNT {
             if self.beam_at[index]
-                && touches(self.beam_pos[index], BEAM_RADIUS, player, PLAYER_BODY_RADIUS)
+                && touches(
+                    self.beam_pos[index],
+                    BEAM_RADIUS,
+                    player,
+                    PLAYER_BODY_RADIUS,
+                )
             {
                 self.at_hit = true;
                 sink.hurt_player(AT_POWER_BEAM);
@@ -2567,7 +2575,8 @@ impl Gohdan {
                         }
                         if i32::from(item_no) != ITEM_NO_NONE {
                             sink.se(SE_OBJ_BOMB_EXPLODE);
-                            let pos_vec = self.joint_off(joint, 0, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
+                            let pos_vec =
+                                self.joint_off(joint, 0, [REG0_F2 + 60.0, REG0_F3, REG0_F4]);
                             self.item_pos = pos_vec;
                             sink.spawn_item(
                                 u32::from(item_no),
@@ -3143,7 +3152,12 @@ impl Gohdan {
                 }
                 DEMO_HAND_0 => {
                     let left = self.peer(PART_LEFT, peers).pos;
-                    add_calc2(&mut self.cam_centre.x, left.x - 1200.0, 0.1, self.cam_step * 40.0);
+                    add_calc2(
+                        &mut self.cam_centre.x,
+                        left.x - 1200.0,
+                        0.1,
+                        self.cam_step * 40.0,
+                    );
                     add_calc2(&mut self.cam_step, 1.0, 1.0, 0.01);
                     add_calc2(&mut self.cam_eye.x, left.x, 0.02, 50.0);
                     add_calc2(&mut self.cam_eye.z, left.z, 0.02, 50.0);
@@ -3181,7 +3195,12 @@ impl Gohdan {
                 }
                 DEMO_HAND_1 => {
                     let right = self.peer(PART_RIGHT, peers).pos;
-                    add_calc2(&mut self.cam_centre.x, right.x - 1200.0, 0.1, self.cam_step * 40.0);
+                    add_calc2(
+                        &mut self.cam_centre.x,
+                        right.x - 1200.0,
+                        0.1,
+                        self.cam_step * 40.0,
+                    );
                     add_calc2(&mut self.cam_step, 1.0, 1.0, 0.01);
                     add_calc2(&mut self.cam_eye.x, right.x, 0.02, 50.0);
                     add_calc2(&mut self.cam_eye.z, right.z, 0.02, 50.0);
@@ -3360,30 +3379,21 @@ impl Gohdan {
                     if self.demo_count == REG0_S4 + DEMO_MSG_I + (REG0_S4 + 20) {
                         self.msg_end = true;
                     }
-                    if self.demo_count
-                        == REG0_S4 + DEMO_MSG_I + (REG0_S4 + 20) + REG0_S4 + 20
-                    {
+                    if self.demo_count == REG0_S4 + DEMO_MSG_I + (REG0_S4 + 20) + REG0_S4 + 20 {
                         self.message_set(MSG_DEAD_D, sink);
                     }
-                    if self.demo_count
-                        == REG0_S4 + DEMO_MSG_L + (REG0_S4 + DEMO_MSG_J + REG0_S4)
-                    {
+                    if self.demo_count == REG0_S4 + DEMO_MSG_L + (REG0_S4 + DEMO_MSG_J + REG0_S4) {
                         self.msg_end = true;
                     }
-                    if self.demo_count
-                        != REG0_S4 + DEMO_MSG_K + (REG0_S4 + DEMO_MSG_J + REG0_S4)
-                    {
+                    if self.demo_count != REG0_S4 + DEMO_MSG_K + (REG0_S4 + DEMO_MSG_J + REG0_S4) {
                         break;
                     }
                     self.demo += 1;
                     self.demo_count = 0;
                     self.cam_step = 0.0;
                     self.cam_eye = Vec3::new(0.0, REG0_F16 + 4800.0, 0.0);
-                    self.cam_centre = Vec3::new(
-                        REG0_F13 + -700.0,
-                        REG0_F14 + 100.0,
-                        REG0_F15 + -300.0,
-                    );
+                    self.cam_centre =
+                        Vec3::new(REG0_F13 + -700.0, REG0_F14 + 100.0, REG0_F15 + -300.0);
                     sink.bgm(STRM_BST_CLEAR);
                     self.blure = 1;
                     arm = 52;
@@ -3410,11 +3420,8 @@ impl Gohdan {
                     self.demo_count = 0;
                     self.cam_step = 0.0;
                     self.cam_eye = Vec3::new(0.0, REG0_F16 + 4800.0, 0.0);
-                    self.cam_centre = Vec3::new(
-                        REG0_F13 + -700.0,
-                        REG0_F14 + 100.0,
-                        REG0_F15 + -300.0,
-                    );
+                    self.cam_centre =
+                        Vec3::new(REG0_F13 + -700.0, REG0_F14 + 100.0, REG0_F15 + -300.0);
                     self.damage = 10;
                     self.kan_state = 4;
                     self.kan_amount = 1.0;
@@ -3437,7 +3444,12 @@ impl Gohdan {
                 }
                 55 => {
                     add_calc2(&mut self.cam_eye.x, self.pos.x, 0.2, 20.0);
-                    add_calc2(&mut self.cam_eye.y, self.pos.y + 100.0 + REG0_F10, 0.2, 20.0);
+                    add_calc2(
+                        &mut self.cam_eye.y,
+                        self.pos.y + 100.0 + REG0_F10,
+                        0.2,
+                        20.0,
+                    );
                     add_calc2(&mut self.cam_eye.z, self.pos.z, 0.2, 20.0);
                     self.cam_centre = self.pos;
                     self.cam_centre.x -= REG0_F11 + 1300.0;
@@ -3522,7 +3534,12 @@ impl Gohdan {
             .iter()
             .find(|slot| slot.state.part == kind)
             .map(|slot| slot.state)
-            .or_else(|| peers.iter().find(|slot| slot.state.part == kind).map(|s| s.state))
+            .or_else(|| {
+                peers
+                    .iter()
+                    .find(|slot| slot.state.part == kind)
+                    .map(|s| s.state)
+            })
             .unwrap_or_else(|| Gohdan::spawn(u32::from(kind)))
     }
 
@@ -3651,13 +3668,16 @@ impl Gohdan {
         let r29 = ang(f1 * sin_s(((self.sway_clock as i32) * SHAKE_YAW_A) as i16));
         let mut r27 = ang(f1 * cos_s(((self.sway_clock as i32) * SHAKE_YAW_B) as i16));
         let f1_2 = self.shake_alt as f32 * (REG0_F14 + 150.0);
-        let r29 = r29
-            .wrapping_add(ang(f1_2 * sin_s(((boss.sway_clock as i32) * SHAKE_YAW_C) as i16)));
-        r27 = r27
-            .wrapping_add(ang(f1_2 * cos_s(((boss.sway_clock as i32) * SHAKE_YAW_D) as i16)));
+        let r29 = r29.wrapping_add(ang(
+            f1_2 * sin_s(((boss.sway_clock as i32) * SHAKE_YAW_C) as i16)
+        ));
+        r27 = r27.wrapping_add(ang(
+            f1_2 * cos_s(((boss.sway_clock as i32) * SHAKE_YAW_D) as i16)
+        ));
         let f1_3 = self.shake_far as f32 * (REG0_F14 + 100.0);
-        r27 = r27
-            .wrapping_add(ang(f1_3 * cos_s(((boss.sway_clock as i32) * SHAKE_YAW_E) as i16)));
+        r27 = r27.wrapping_add(ang(
+            f1_3 * cos_s(((boss.sway_clock as i32) * SHAKE_YAW_E) as i16)
+        ));
         self.model_yaw = self.shape_angle[1].wrapping_add(r29);
         self.model_pitch = self.shape_angle[0].wrapping_add(r27);
         self.model_roll = self.shape_angle[2];
@@ -3727,18 +3747,9 @@ pub struct Watch<'w, 's> {
         'w,
         's,
         (Entity, &'static mut Actor, &'static mut bomb::Bomb),
-        (
-            With<bomb::Bomb>,
-            Without<Gohdan>,
-            Without<pickup::Pickup>,
-        ),
+        (With<bomb::Bomb>, Without<Gohdan>, Without<pickup::Pickup>),
     >,
-    items: Query<
-        'w,
-        's,
-        (Entity, &'static Actor),
-        (With<pickup::Pickup>, Without<Gohdan>),
-    >,
+    items: Query<'w, 's, (Entity, &'static Actor), (With<pickup::Pickup>, Without<Gohdan>)>,
 }
 
 pub fn control(
@@ -3828,7 +3839,8 @@ pub fn control(
                 mem: &mut mem,
             };
             let prev = me.state.pos;
-            me.state.execute(prev, &mut env, &parts, &shells, &mut writes, &mut sink);
+            me.state
+                .execute(prev, &mut env, &parts, &shells, &mut writes, &mut sink);
         }
         parts[index] = me;
         for slot in writes.drain(..) {

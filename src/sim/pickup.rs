@@ -53,7 +53,11 @@ impl Pickup {
     /// Hearts double the forward speed before the create.
     pub fn thrown(parameters: u32, speed_f: f32, speed_y: f32, gravity: f32) -> Self {
         let item = (parameters & 0xFF) as u8;
-        let speed_f = if is_heart(item) { 2.0 * speed_f } else { speed_f };
+        let speed_f = if is_heart(item) {
+            2.0 * speed_f
+        } else {
+            speed_f
+        };
         Self {
             item,
             timer: 0,
@@ -196,7 +200,9 @@ pub fn control(
             }
         }
         if marker.is_some() {
-            commands.entity(entity).try_remove::<super::chest::ChestOpen>();
+            commands
+                .entity(entity)
+                .try_remove::<super::chest::ChestOpen>();
         }
         chest.opened = true;
         chest_flags.open(super::chest::stage_of(&chest), chest.index);

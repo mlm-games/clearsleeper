@@ -7,7 +7,7 @@ use super::event::{ActiveEvent, EventList};
 use super::flags::{Arrivals, OrderFlags, StoryBits};
 use super::health::Health;
 use super::intent::{DoIntent, MoveIntent};
-use super::inventory::{Equipped, BOW_SLOT};
+use super::inventory::{BOW_SLOT, Equipped};
 use super::layer::SEA;
 use super::player::Player;
 use super::select::Select;

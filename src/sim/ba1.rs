@@ -1,14 +1,94 @@
+//! Link's Grandma - `fpcNm_NPC_BA1_e`, `d_a_npc_ba1.cpp`, archive `Ba` (`res/Object/Ba.h`).
+//!
+//! She is the only actor in the game that hands the player a house:
+//! `cut_move_START_TALE1` (`d_a_npc_ba1.cpp:1217-1245`) is the single call site of
+//! `dComIfGp_setNextStage("LinkRM", 200, 0, 8, 0.0f, 0, 1, 0)` in the whole decomp
+//! (`202` once `dComIfGs_getClearCount() != 0`, and `"LinkRM", 201, 0, 9` at `:1549`
+//! for the healed branch of `wait_2`), so the house entry is an actor path here rather
+//! than a check on a door.
+//!
+//! The parameter byte picks her placement variant (`decideType`/`charDecide`,
+//! `:890-913`), and each variant is a proc machine over four states (`mStatus`), a
+//! message table and an event order (`m812`):
+//!
+//! | prm | init | proc | states | orders (`m812`) | placement |
+//! |-----|------|------|--------|-----------------|-----------|
+//! | 0 | `init_BA1_0` `:149` | `wait_action1` `:1634` | 7 `wait_0`, 1 `wait_1`, 2 `talk_1` | 6 `tale_1` (the proximity trigger), 1 speak, 2 cantalk, 4 `Ba1_Get_Itm` | the house, before `UNK_0520` |
+//! | 1 | `init_BA1_1` `:160` | `wait_action2` `:1684` | 3 `wait_2`, 2 `talk_1` | 1, 2, 4, and 6 (`wait_2`'s healed arm, which also latches `m7FF` and the 201 exit) | the sick Grandma |
+//! | 2 | `init_BA1_2` `:180` | `demo_action1` `:1712` | none | none | the demo's own stand-in |
+//! | 3 | `init_BA1_3` `:187` | `wait_action3` `:1727` | 4 `ZZZwai`, 5 `talk_2` | 1, 2 (+ cantalkitem), 4, and 5 (`event_proc`'s `Ba1_Get_Itm` arm before `GRANDMA_HEALED`) | in bed |
+//! | 4 | `init_BA1_4` `:207` | `wait_action4` `:1755` | 6 `wait_3`, 2 `talk_1` | 1, 2, 4 | healed |
+//!
+//! `mStatus` is the state index of `setStt` (`:1362-1395`) and the row of `setAnm`'s
+//! table (`:425`); `mAnmNum` is the row of `setAnm_NUM` (`:404`); `mActNo` is the row
+//! of `event_actionInit` (`:1043-1094`), the eleven `eInit_*` helpers (`:915-1040`),
+//! four of which are the `eMove_*` waits `event_action` switches on (`:1096-1204`).
+//!
+//! `m812` is both the order and the early-out: every wait state returns at once while
+//! it is `1` or `>= 3`, and `eventOrder` (`:541-555`) turns `m812 >= 3` into
+//! `mEventIdTable[m812 - 3]`, the `l_evn_tbl` row of that number. `privateCut`
+//! (`:1248-1292`) runs her own two cuts, and `event_proc` (`:1300-1345`) ends the
+//! event when the stage's script says so.
+//!
+//! What is left to other layers, and why:
+//! * the demo player's (`dComIfGp_demo_getActor`, `:1783-1816`) own branch runs off
+//!   `demoActorID` (`f_op_actor.h:281`), the port's `Actor::demo_actor_id`, which the
+//!   demo manager's `appendActor` writes; what that branch reads from the demo --
+//!   `get_P_BtpData("Ba")` and `dDemo_setDemoData`'s animation -- belongs to the demo
+//!   layer (`sim/demo.rs`) and is not the actor's to copy.
+//! * the animation player (`mDoExt_McaMorf`, `:276-292`) is [`Ba1::step_morf`]: the
+//!   cursor is `J3DFrameCtrl`'s own port ([`FrameCtrl`]) over the row's `dRes_ID_BA_BCK_*`,
+//!   whose frame count only the archive has ([`Ba1Anms`], `assets::load_ba_anms`). With no
+//!   asset root there is no count, so the cursor takes no step - the absent-archive arm
+//!   [`Ba1::step_morf`] records.
+//! * the head texture pattern's frame count (`m_hed_tex_pttrn->getFrameMax()`, `:363`)
+//!   comes from the row's `dRes_ID_BA_BTP_*` the same way; both `plyTexPttrnAnm` and
+//!   `demo` read it.
+//! * `dComIfGp_evmng_setGoal` (`:922`) lands on [`ActiveEvent::set_goal`], the event
+//!   director's `mGoal` (`d_event_manager.cpp:637-644`), which the player's own demo cut
+//!   reads as the `pos` it was not given (`d_a_player_main.cpp:10388-10390`, `event.rs`'s
+//!   `link_cut`); `player->mDemo.setMoveAngle` (`:958`) lands on
+//!   [`ItemPartner::move_angle`], the port's `mDemoMoveAngle` (`d_a_player.h:140-141`),
+//!   which `walk`'s demo move and `link_cut`'s `WAIT_TURN` read. The third write,
+//!   `player->onNoResetFlg0(daPyFlg0_NO_DRAW)` (`:971`), lands on [`Player::no_draw`];
+//!   a viewer that honours it is the shell's to fill.
+//! * the other three `_draw` calls are [`Ba1::control_draw`], the port's stand-in for the
+//!   draw pass the shell runs (the port has no per-actor draw callback): `shadowDraw`
+//!   (`:1819-1838`) registers with `sim/shadow.rs`'s registry, `dSnap_RegistFig`
+//!   (`:1868`) with `sim/snap.rs`'s packet, both under `fopAc_Draw`'s gate, and the
+//!   `l_HIO.mPrmTbl.m18 != 0` block (`:1870-1881`) writes only to a local `somevec` in both
+//!   of its arms, so it has no effect to port. The head pattern's entry and the cloth model
+//!   geometry (`:1860-1866`) are the renderer's, and the cloth model is a `Ba_cloth` BDL no
+//!   variant of this actor has in the port.
+//! * `fopAcM_OffStatus`'s two clears (`:172`, `:196`) land on the port's per-actor status
+//!   word, `registry::ActorRegistry`'s entries (`registry.rs:437-512` are the
+//!   `fopAcM_*Status`/`*Condition` family). `fopAc_Create` seeds the word from the profile
+//!   (`f_op_actor.cpp:265`; hers is `:2123`), [`Ba1::control_draw`] writes the `NODRAW`
+//!   condition through `ActorRegistry::set_draw_condition`, and [`Ba1::control`] reads the
+//!   `NOCULLEXEC` half through `ActorRegistry::execute_gate`.
+
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use glam::{Quat, Vec3};
+use glam::{Mat4, Quat, Vec3};
 
 use super::actor::Actor;
-use super::event::{ActiveEvent, EventList};
-use super::flags::{Collect, EventFlags, StoryBits};
+use super::anim_clock::{FrameCtrl, Mode, STATE_STOP};
+use super::collision::{Collision, GroundHit};
+use super::event::{ActiveEvent, EventList, ItemPartner};
+use super::flags::{Collect, EventFlags, OrderFlags, StoryBits, TmpBits};
 use super::inventory::{Equipped, Got};
+use super::jpa::Clip;
 use super::player::Player;
+use super::registry::{
+    ActorRegistry, CONDITION_NO_EXEC, STATUS_CULL, STATUS_NO_CULL_EXEC, STATUS_SHOW_MAP,
+    STATUS_UNK40000,
+};
+use super::shadow::{ShadowControl, ground_probe};
+use super::snap::{DSNAP_TYPE_NPC_BA1, SnapPacket};
 use super::stream::{add_calc_angle_s2, calc_speed};
-use super::transition::{NextStage, Target};
+use super::transition::NextStage;
 use super::walk::{add_calc_angle_s, chase_f, from_s16, to_s16};
 use crate::assets::MsgArchives;
 use crate::text::driver::TextFlags;
@@ -16,15 +96,15 @@ use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgget::MsgArchive;
 use crate::text::msgproc::{
-    FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
+    DA_EVT_MODE_NONE, FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
     fop_msgm_message_set, fop_msgm_message_set_actor,
 };
 use crate::text::{
-    STATUS_BOX_CLOSED, STATUS_BOX_OPENING, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED,
-    STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS, STATUS_TYPING,
+    STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
+    STATUS_MSG_ENDS,
 };
 
-pub const GRAMMARIAN_ACTOR: &str = "Ba1";
+pub const BA1_ACTOR: &str = "Ba1";
 pub const ARC_NAME: &str = "Ba";
 
 pub const EVENT_NAMES: [&str; 6] = [
@@ -48,6 +128,18 @@ const _: () = assert!(EVENT_NAMES.len() == EVENT_ID_COUNT);
 pub const CUT_NAMES: [&str; 2] = ["ACTION", "START_TALE1"];
 pub const CUT_ACTION: i8 = 0;
 pub const CUT_START_TALE1: i8 = 1;
+
+/// `dEvtCnd_CANTALK_e` and `dEvtCnd_CANTALKITEM_e` (`f_op_actor.h:145`, `:150`), the
+/// two conditions `eventOrder` raises (`d_a_npc_ba1.cpp:544-547`).
+pub const EVT_CND_CANTALK: u16 = 0x0001;
+pub const EVT_CND_CANTALKITEM: u16 = 0x0020;
+
+/// `g_profile_NPC_BA1`'s status word (`d_a_npc_ba1.cpp:2123`), which `fopAc_Create` copies
+/// into `actor_status` (`f_op_actor.cpp:265`): the map icon byte `0x08` and
+/// `fopAcStts_SHOWMAP_e | fopAcStts_NOCULLEXEC_e | fopAcStts_CULL_e | fopAcStts_UNK40000_e`.
+/// The two `fopAcM_OffStatus` calls below clear bits out of it.
+pub const PROFILE_STATUS: u32 =
+    0x08 | STATUS_SHOW_MAP | STATUS_NO_CULL_EXEC | STATUS_CULL | STATUS_UNK40000;
 
 pub const PRM_SHIFT: u32 = 0x00;
 pub const PRM_MASK: u32 = 0xFF;
@@ -117,11 +209,22 @@ pub const STAGE_PLAY: i8 = 3;
 pub const STAGE_TEARDOWN: i8 = 9;
 
 pub const ORDER_NONE: i8 = 0;
+/// `m812 == 1`: `fopAcM_orderSpeakEvent` (`:549`), the generic talk event `0x1EA`.
 pub const ORDER_SPEAK: i8 = 1;
+/// `m812 == 2`: `dEvtCnd_CANTALK_e` only, the "she may be talked to" frame.
 pub const ORDER_CANTALK: i8 = 2;
+/// `m812 == 3`, `l_evn_tbl[0]` (`:139-146`): `Use_Fairy`.
 pub const ORDER_EVENT_0: i8 = 3;
+/// `eventOrder`'s `m812 - 3` offset into `mEventIdTable`.
 pub const ORDER_OFFSET: i8 = 3;
-pub const ORDER_MARRIED: i8 = 4;
+/// `m812 == 4`, `l_evn_tbl[1]`: `Ba1_Get_Itm`. `talk_1`'s `0x800` arm and
+/// `ZZZwai`'s fairy arm write it (`:1511`, `:1601`).
+pub const ORDER_EVENT_1: i8 = 4;
+/// `m812 == 5`, `l_evn_tbl[2]`: `Ganbaru`, the event `event_proc`'s `Ba1_Get_Itm`
+/// arm orders when `GRANDMA_HEALED` is still clear (`:1322`).
+pub const ORDER_EVENT_2: i8 = 5;
+/// `m812 == 6`, `l_evn_tbl[3]`: `tale_1`, the one `wait_0` races the player to
+/// (`:1417`).
 pub const ORDER_APPROACH: i8 = 6;
 pub const EVENT_IDX_SPEAK: usize = 0x1EA;
 
@@ -218,7 +321,12 @@ pub const REG_A60F_LIMIT: u8 = 3;
 pub const REG_LETTER: u16 = 0x9D03;
 pub const LETTER_SEND: u8 = 1;
 
-pub const TMP_BIT_0310: u32 = 0x0310;
+/// `dSv_event_tmp_flag_c::UNK_0310` (`d_save_event_tmp_flag.inc:28`), the bit
+/// `wait_0` sets the moment the player comes within `HIO_IDLE_AREA` and
+/// `wait_action1` consumes on the next create. It is the tmp store's own flag, not
+/// `dSv_event_flag_c::UNK_0310` at the same number (`tagba1.rs`'s neighbours read
+/// that one).
+pub const TMP_BIT_0310: u16 = 0x0310;
 
 pub const COLLECT_ARYLL: u8 = 0;
 pub const COLLECT_SICK: u8 = 1;
@@ -299,16 +407,36 @@ pub const IDLE_TIMER: i16 = 60;
 pub const BLINK_TIMER_BASE: i16 = 30;
 pub const BLINK_TIMER_SPREAD: i16 = 60;
 
+/// `shadowDraw`'s magnitudes (`:1819-1838`): the caster point is `current.pos.y + 150.0f`, the
+/// real shadow's `casterSize` is `800.0f`, the fallback quad's `scaleXZ` is `40.0f`;
+/// `shadowDraw` passes `current.pos.y` as `y`, `0` as `rotY`, `1.0f` as `scaleZ` and the
+/// `mObjAcch.GetGroundH()`/`mObjAcch.m_gnd` probe as the ground, and ignores the returned id
+/// because the real arm is the one that issues one (`sim/shadow.rs` documents that absence).
 pub const SHADOW_LIFT: f32 = 150.0;
 pub const SHADOW_RADIUS: f32 = 800.0;
 pub const SHADOW_HEIGHT: f32 = 40.0;
+pub const SHADOW_ROT_Y: i16 = 0;
+pub const SHADOW_SCALE_Z: f32 = 1.0;
 
+/// `d_a_npc_ba1.cpp:1217-1245` and `:1549`: the three `dComIfGp_setNextStage` calls.
+/// The stage is `LinkRM` in all three, and the fourth argument - the layer - is `8`
+/// for the two `START_TALE1` points and `9` for the healed `wait_2` exit, which is
+/// what selects the house's tale variant and its finale variant.
+/// `dComIfGp_setNextStage(i_stageName, i_point, i_roomNo, i_layer, i_lastSpeed,
+/// i_lastMode, i_setPoint, i_wipe)` (`d_com_inf_game.h:2245`) is called as
+/// `("LinkRM", 200, 0, 8, 0.0f, 0, 1, 0)` and `("LinkRM", 202, 0, 8, 0.0f, 0, 1, 0)`
+/// by `cut_move_START_TALE1`, and as `("LinkRM", 201, 0, 9, 0.0f, 0, 1, 0)` by
+/// `wait_2`; the port's seam carries stage, room, point and layer, and each trailing
+/// argument's own boundary is named on [`NextStage::set`](super::transition::NextStage::set)
+/// (the `setPoint` these three pass as `1` and the `wipe` they pass as `0` are part of it).
 pub const NEXT_STAGE_LINK_RM: &str = "LinkRM";
 pub const NEXT_STAGE_TALE_CLEARED: u8 = 202;
 pub const NEXT_STAGE_TALE: u8 = 200;
 pub const NEXT_STAGE_TALE_ROOM: u8 = 0;
+pub const NEXT_STAGE_TALE_LAYER: i8 = 8;
 pub const NEXT_STAGE_MARRIED: u8 = 201;
 pub const NEXT_STAGE_MARRIED_ROOM: u8 = 0;
+pub const NEXT_STAGE_MARRIED_LAYER: i8 = 9;
 
 pub const RND_MUL: [i32; 3] = [0xAB, 0xAC, 0xAA];
 pub const RND_MOD: [i32; 3] = [0x763D, 0x7663, 0x7673];
@@ -330,7 +458,9 @@ pub struct AnmPrm {
     pub loop_mode: i32,
 }
 
-const BCK: [i32; BCK_ROWS] = [
+/// `anmNum_toResID` (`d_a_npc_ba1.cpp:301-317`), one `dRes_ID_BA_BCK_*` per `BCK_ROWS` row of
+/// the `ANM_NUM` table. `assets::load_ba_anms` reads each id's frame count out of `Ba.arc`.
+pub const BCK: [i32; BCK_ROWS] = [
     BCK_WAIT01,
     BCK_TALK01,
     BCK_TALK02,
@@ -343,68 +473,324 @@ const BCK: [i32; BCK_ROWS] = [
     BCK_GETUP,
 ];
 
-const BTP: [i32; BTP_ROWS] = [
-    BTP_MABA01,
-    BTP_T01,
-    BTP_T02,
-    BTP_T03,
-    BTP_T04,
-    BTP_T05,
-    BTP_T06,
-    BTP_T07,
-    BTP_T08,
-    BTP_T09,
-    BTP_T10,
-    BTP_WAKE,
+/// `btpNum_toResID` (`d_a_npc_ba1.cpp:319-336`), one `dRes_ID_BA_BTP_*` per `BTP_ROWS` row of
+/// the pattern table. `assets::load_ba_anms` reads each id's frame count out of `Ba.arc`.
+pub const BTP: [i32; BTP_ROWS] = [
+    BTP_MABA01, BTP_T01, BTP_T02, BTP_T03, BTP_T04, BTP_T05, BTP_T06, BTP_T07, BTP_T08, BTP_T09,
+    BTP_T10, BTP_WAKE,
 ];
 
+/// The `Ba` object archive's animation frame counts, keyed by the resource id
+/// `dComIfG_getObjectIDRes("Ba", id)` takes - the ids of [`BCK`] and [`BTP`] themselves.
+///
+/// `mDoExt_McaMorf::setAnm`'s `mFrameCtrl.init(mpAnm->getFrameMax())` (`m_Do_ext.cpp:1421`)
+/// and `plyTexPttrnAnm`'s `m_hed_tex_pttrn->getFrameMax()` (`d_a_npc_ba1.cpp:363`) are the two
+/// readers, and both are `J3DAnmBase::getFrameMax()` (`J3DAnimation.h:318`) over the count the
+/// archive's `ANK1`/`TPT1` block carries. `assets::load_ba_anms` fills the table; with no asset
+/// root it is empty, which each reader reports as the absent archive.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct Ba1Anms {
+    frames: HashMap<u16, i16>,
+}
+
+impl Ba1Anms {
+    pub fn insert(&mut self, id: u16, frames: i16) {
+        self.frames.insert(id, frames);
+    }
+
+    /// `J3DAnmBase::getFrameMax()` for the object `dComIfG_getObjectIDRes("Ba", id)` returns.
+    pub fn frame_max(&self, id: u16) -> Option<i16> {
+        self.frames.get(&id).copied()
+    }
+}
+
 const ANM_NUM: [AnmPrm; ANM_NUM_ROWS] = [
-    AnmPrm { anm: 0, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 1, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 3, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 4, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_NONE },
-    AnmPrm { anm: 5, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 6, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 7, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 8, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 9, btp: 0x0B, morf: 8.0, speed: 1.0, loop_mode: LOOP_NONE },
-    AnmPrm { anm: 0, btp: 9, morf: 0.0, speed: 1.0, loop_mode: LOOP_LOOP },
+    AnmPrm {
+        anm: 0,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 1,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 3,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 4,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_NONE,
+    },
+    AnmPrm {
+        anm: 5,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 6,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 7,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 8,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 9,
+        btp: 0x0B,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_NONE,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 9,
+        morf: 0.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
 ];
 
 const ANM_STT: [AnmPrm; ANM_STT_ROWS] = [
-    AnmPrm { anm: -1, btp: -1, morf: 0.0, speed: 0.0, loop_mode: LOOP_NULL },
-    AnmPrm { anm: 0, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: -1, btp: -1, morf: 0.0, speed: 0.0, loop_mode: LOOP_NULL },
-    AnmPrm { anm: 0, btp: 2, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 7, btp: 7, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: -1, btp: -1, morf: 0.0, speed: 0.0, loop_mode: LOOP_NULL },
-    AnmPrm { anm: 0, btp: 9, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 0, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
+    AnmPrm {
+        anm: -1,
+        btp: -1,
+        morf: 0.0,
+        speed: 0.0,
+        loop_mode: LOOP_NULL,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: -1,
+        btp: -1,
+        morf: 0.0,
+        speed: 0.0,
+        loop_mode: LOOP_NULL,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 2,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 7,
+        btp: 7,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: -1,
+        btp: -1,
+        morf: 0.0,
+        speed: 0.0,
+        loop_mode: LOOP_NULL,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 9,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
 ];
 
 const ANM_ATR: [AnmPrm; ANM_ATR_ROWS] = [
-    AnmPrm { anm: 0, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 1, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 3, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 0, btp: 1, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 2, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 1, btp: 3, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 3, btp: 2, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 3, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 4, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 2, btp: 6, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 3, btp: 5, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 3, btp: 6, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 7, btp: 7, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 6, btp: 8, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 6, btp: 1, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 5, btp: 0x0A, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 5, btp: 1, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 5, btp: 9, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 5, btp: 0, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
-    AnmPrm { anm: 0, btp: 8, morf: 8.0, speed: 1.0, loop_mode: LOOP_LOOP },
+    AnmPrm {
+        anm: 0,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 1,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 3,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 1,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 2,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 1,
+        btp: 3,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 3,
+        btp: 2,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 3,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 4,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 2,
+        btp: 6,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 3,
+        btp: 5,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 3,
+        btp: 6,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 7,
+        btp: 7,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 6,
+        btp: 8,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 6,
+        btp: 1,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 5,
+        btp: 0x0A,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 5,
+        btp: 1,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 5,
+        btp: 9,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 5,
+        btp: 0,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
+    AnmPrm {
+        anm: 0,
+        btp: 8,
+        morf: 8.0,
+        speed: 1.0,
+        loop_mode: LOOP_LOOP,
+    },
 ];
 
 const _: () = assert!(ANM_NUM.len() == ANM_NUM_ROWS);
@@ -446,7 +832,7 @@ impl Jnt {
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
-pub struct Grammarian {
+pub struct Ba1 {
     pub prm: i8,
     pub kind: i8,
     pub kind_type: i8,
@@ -460,7 +846,6 @@ pub struct Grammarian {
     pub partner: Option<Entity>,
     pub partner_baba: bool,
     pub order: i8,
-    pub cantalk_item: bool,
     pub xy_callbacks: bool,
     pub stt: i8,
     pub prev_stt: i8,
@@ -477,7 +862,11 @@ pub struct Grammarian {
     pub anm_num: i8,
     pub btp_num: i8,
     pub btp_frame: u8,
+    /// `m_hed_tex_pttrn->getFrameMax()` (`:363`): the loaded pattern's own frame count, which
+    /// [`Ba1::set_btp`] reads out of the archive.
     pub btp_frame_max: u8,
+    /// `m_hed_tex_pttrn != NULL` (`:363`, `:1791`): whether the load found a pattern at all.
+    pub tex_pattern_live: bool,
     pub blink_timer: i16,
     pub ev_timer: i16,
     pub idle_timer: i16,
@@ -489,14 +878,18 @@ pub struct Grammarian {
     pub head_only_follow: bool,
     pub morf_stopped: bool,
     pub primed: bool,
-    pub draw_skip: bool,
+    /// `mbInitGrandma0` (`:1853`, `:1897-1901`): the one-tick create guard both
+    /// `_draw` and `_execute` return on.
+    pub init_grandma0: bool,
     pub hide_model: bool,
     pub angle_locked: bool,
     pub move_locked: bool,
     pub no_collision: bool,
     pub slim_collision: bool,
-    pub heal_reg: u8,
-    pub heal_told: bool,
+    /// `m7F2` (`:261`): the event register `UNK_A60F` this build reads at create.
+    pub unk_7f2: u8,
+    /// `m7FA` (`:709`, `:1286`): whether she has told the player about the soup.
+    pub unk_7fa: bool,
     pub unk_7f0: bool,
     pub unk_7fb: bool,
     pub unk_7ff: bool,
@@ -506,7 +899,20 @@ pub struct Grammarian {
     pub speed_f: f32,
     pub speed_y: f32,
     pub gravity: f32,
+    /// `mPrevMorfFrame` (`:137`, `:277-280`): the frame `play` was on last tick.
     pub prev_morf_frame: f32,
+    /// `mpMorf->getFrame()` (`d_a_npc_ba1.cpp:280`), the cursor [`Ba1::step_morf`] stepped.
+    pub morf_frame: f32,
+    /// `mDoExt_McaMorf::play`'s return (`m_Do_ext.cpp:1471-1472`), which `mbMorfAnimStopped`
+    /// takes: `mDoExt_baseAnm::isStop` (`m_Do_ext.h:40-42`).
+    pub morf_played: bool,
+    /// `mpMorf->mFrameCtrl` (`m_Do_ext.h:283-317`): the cursor over the row's own BCK,
+    /// initialised by `mDoExt_McaMorf::setAnm` (`m_Do_ext.cpp:1414-1437`).
+    pub morf: FrameCtrl,
+    /// Whether `self.morf` has a frame count at all: `setAnm`'s
+    /// `mFrameCtrl.init(mpAnm->getFrameMax())` (`m_Do_ext.cpp:1421`) has nothing to read for a
+    /// row the `Ba` archive did not name, so the cursor is left idle.
+    pub morf_live: bool,
     pub eye_offset: f32,
     pub eye_offset_zero: f32,
     pub home: Vec3,
@@ -530,7 +936,7 @@ pub struct Grammarian {
     pub seed: [i32; 3],
 }
 
-impl Grammarian {
+impl Ba1 {
     pub fn spawn(parameters: u32) -> Self {
         Self {
             prm: ((parameters >> PRM_SHIFT) & PRM_MASK) as i8,
@@ -546,7 +952,6 @@ impl Grammarian {
             partner: None,
             partner_baba: false,
             order: ORDER_NONE,
-            cantalk_item: false,
             xy_callbacks: false,
             stt: 0,
             prev_stt: 0,
@@ -564,6 +969,7 @@ impl Grammarian {
             btp_num: BTP_NUM_INITIAL,
             btp_frame: 0,
             btp_frame_max: 0,
+            tex_pattern_live: false,
             blink_timer: 0,
             ev_timer: 0,
             idle_timer: 0,
@@ -575,14 +981,14 @@ impl Grammarian {
             head_only_follow: false,
             morf_stopped: false,
             primed: false,
-            draw_skip: false,
+            init_grandma0: false,
             hide_model: false,
             angle_locked: false,
             move_locked: false,
             no_collision: false,
             slim_collision: false,
-            heal_reg: 0,
-            heal_told: false,
+            unk_7f2: 0,
+            unk_7fa: false,
             unk_7f0: false,
             unk_7fb: false,
             unk_7ff: false,
@@ -593,6 +999,10 @@ impl Grammarian {
             speed_y: 0.0,
             gravity: GRAVITY,
             prev_morf_frame: 0.0,
+            morf_frame: 0.0,
+            morf_played: false,
+            morf: FrameCtrl::default(),
+            morf_live: false,
             eye_offset: 0.0,
             eye_offset_zero: 0.0,
             home: Vec3::ZERO,
@@ -621,8 +1031,35 @@ impl Grammarian {
         (CULL_MIN, CULL_MAX)
     }
 
+    /// `_draw`'s `if(mbInitGrandma0 || m7F7) return TRUE;` (`:1853-1855`), the half of `_draw`
+    /// the renderer can gate on: the event's own model hide. The registrations that follow it -
+    /// `shadowDraw` and `dSnap_RegistFig` - are [`Ba1::control_draw`]'s, and the shell's actor
+    /// view honours this gate (`lib.rs`'s `actor_views`).
     pub fn drawn(&self) -> bool {
-        !(self.draw_skip || self.hide_model)
+        !(self.init_grandma0 || self.hide_model)
+    }
+
+    /// `daNpc_Ba1_c::shadowDraw` (`:1819-1838`): the caster point lifted by [`SHADOW_LIFT`],
+    /// registered with `sim/shadow.rs` against the ground probe. `mShadowID` is not stored: the
+    /// id it carries is the real arm's, which the port never issues.
+    pub fn shadow_draw(
+        &self,
+        pos: Vec3,
+        view: Mat4,
+        ground: Option<&GroundHit>,
+        shadow: &mut ShadowControl,
+    ) -> u32 {
+        let point = Vec3::new(pos.x, pos.y + SHADOW_LIFT, pos.z);
+        shadow.set_shadow(
+            point,
+            pos.y,
+            ground.map_or(super::shadow::NO_GROUND, |hit| hit.height),
+            ground.map(|hit| hit.normal),
+            SHADOW_HEIGHT,
+            SHADOW_ROT_Y,
+            SHADOW_SCALE_Z,
+            &view,
+        )
     }
 
     pub fn default_jnt_param() -> JntParam {
@@ -643,8 +1080,8 @@ impl Grammarian {
 const _: () = assert!(BCK_ROWS == 10);
 const _: () = assert!(BTP_ROWS == 12);
 
-pub fn is_grammarian(name: &str) -> bool {
-    name == GRAMMARIAN_ACTOR
+pub fn is_ba1(name: &str) -> bool {
+    name == BA1_ACTOR
 }
 
 pub fn cut_action_of(name: &str) -> Option<i8> {
@@ -675,7 +1112,11 @@ fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
 
 fn target_angle_x(from: Vec3, to: Vec3) -> i16 {
     let delta = to - from;
-    to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
+    to_s16(
+        delta
+            .y
+            .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+    )
 }
 
 fn abs_xz(value: Vec3) -> f32 {
@@ -775,7 +1216,7 @@ fn set_empty_bottle_item_in(equipped: &mut Equipped, item: u8) {
     set_bottle_item_in(equipped, ITEM_EMPTY_BOTTLE, item);
 }
 
-impl Grammarian {
+impl Ba1 {
     fn jnt_angle(&self, row: usize, axis: usize) -> i16 {
         self.jnt
             .angles
@@ -934,8 +1375,65 @@ impl Grammarian {
         out_y
     }
 
-    pub fn set_btp(&mut self, btp: i8) -> bool {
-        if table_of(&BTP, i32::from(btp)).is_none() {
+    /// `mDoExt_McaMorf::play(&eyePos, 0, 0)` (`m_Do_ext.cpp:1462-1472`), minus the animation
+    /// sound: the cursor takes its one step and the return is `isStop()` - `STATE_STOP` off the
+    /// step that ran into an end, or a rate of zero (`m_Do_ext.h:40-42`). The reference's own
+    /// `getFrame() < mPrevMorfFrame` override stays at the call site, `set_mtx`.
+    ///
+    /// A row whose BCK the archive did not name has no frame count for `setAnm`'s
+    /// `mFrameCtrl.init(getFrameMax())` (`:1421`) to initialise over, so the cursor takes no
+    /// step and `play` reports the not-stopped `false` a cursor that has not reached an end
+    /// reports.
+    fn step_morf(&mut self) {
+        if !self.morf_live {
+            self.morf_played = false;
+            return;
+        }
+        self.morf.update();
+        self.morf_played = self.morf.check_state(STATE_STOP) || self.morf.rate() == 0.0;
+        self.morf_frame = self.morf.frame();
+    }
+
+    /// `dNpc_setAnmIDRes` (`d_npc.cpp:546-563`) -> `mDoExt_McaMorf::setAnm` (`m_Do_ext.cpp:1414-1437`):
+    /// the row's `anmNum_toResID` object is fetched and the cursor re-initialised over it -
+    /// `init(getFrameMax())` for the end, `setPlayMode(loopMode)`, `setPlaySpeed(speed)`,
+    /// `setFrame(0.0f)` and `setLoopFrame(getFrame())`. `mMorf` (the 8-frame blend every table
+    /// row carries) only reaches the render side, which draws no morf blend here, so it is not
+    /// tracked. Only `EMode_LOOP` and `EMode_NONE` occur in the three tables; `LOOP_NULL`'s `-1`
+    /// never reaches here because `set_anm`/`set_anm_NUM`/`setAnm_ATR` skip negative rows.
+    fn set_morf(&mut self, prm: AnmPrm, anms: &Ba1Anms) {
+        let end = table_of(&BCK, i32::from(prm.anm))
+            .and_then(|id| u16::try_from(*id).ok())
+            .and_then(|id| anms.frame_max(id));
+        let attribute = if prm.loop_mode == LOOP_LOOP {
+            Mode::Loop
+        } else {
+            Mode::None
+        };
+        self.morf = FrameCtrl::default();
+        self.morf_live = end.is_some();
+        if let Some(end) = end {
+            self.morf.set_end(end);
+        }
+        self.morf.set_attribute(attribute);
+        self.morf.set_rate(prm.speed);
+        self.morf.set_frame(0.0);
+        self.morf.set_loop_point(0);
+    }
+
+    /// `daNpc_Ba1_c::setBtp` (`:339-352`): the row's `btpNum_toResID` object is loaded and
+    /// `mHeadBtpAnm.init` fits it to the model; `i_param_1` (`i_modify`) only picks who owns the
+    /// `J3DTexNoAnm` array, a render-side concern. `o_retval` is the init's own success, so the
+    /// two counters move only when the object is there - and `getFrameMax()`, which
+    /// `plyTexPttrnAnm` (`:363`) and `demo` (`:1793`) read, is that object's frame count. It is
+    /// an `s16` that `mBlinkFrame`'s `u8` narrows (`:365`), which is what `as u8` writes here.
+    pub fn set_btp(&mut self, btp: i8, anms: &Ba1Anms) -> bool {
+        let frames = table_of(&BTP, i32::from(btp))
+            .and_then(|id| u16::try_from(*id).ok())
+            .and_then(|id| anms.frame_max(id));
+        self.tex_pattern_live = frames.is_some();
+        self.btp_frame_max = frames.unwrap_or(0) as u8;
+        if !self.tex_pattern_live {
             return false;
         }
         self.btp_frame = 0;
@@ -943,8 +1441,8 @@ impl Grammarian {
         true
     }
 
-    pub fn ini_tex_pttrn_anm(&mut self, btp: i8) -> bool {
-        self.set_btp(btp)
+    pub fn ini_tex_pttrn_anm(&mut self, btp: i8, anms: &Ba1Anms) -> bool {
+        self.set_btp(btp, anms)
     }
 
     pub fn ply_tex_pttrn_anm(&mut self) {
@@ -962,44 +1460,43 @@ impl Grammarian {
         }
     }
 
-    pub fn set_anm_tex(&mut self, btp: i8) {
+    pub fn set_anm_tex(&mut self, btp: i8, anms: &Ba1Anms) {
         if self.btp_num != btp {
             self.btp_num = btp;
             let btp = self.btp_num;
-            self.ini_tex_pttrn_anm(btp);
+            self.ini_tex_pttrn_anm(btp, anms);
         }
     }
 
-    pub fn set_anm_anm(&mut self, prm: AnmPrm) {
+    pub fn set_anm_anm(&mut self, prm: AnmPrm, anms: &Ba1Anms) {
         if self.anm_num == prm.anm {
             return;
         }
         self.anm_num = prm.anm;
-        let _ = table_of(&BCK, i32::from(prm.anm)).copied();
-        let _ = (prm.morf, prm.speed, prm.loop_mode);
+        self.set_morf(prm, anms);
         self.prev_morf_frame = 0.0;
         self.morf_stopped = false;
     }
 
-    pub fn set_anm_num(&mut self, index: i32, modify: bool) {
+    pub fn set_anm_num(&mut self, index: i32, modify: bool, anms: &Ba1Anms) {
         let Some(prm) = table_of(&ANM_NUM, index).copied() else {
             return;
         };
         if modify {
-            self.set_anm_tex(prm.btp);
+            self.set_anm_tex(prm.btp, anms);
         }
-        self.set_anm_anm(prm);
+        self.set_anm_anm(prm, anms);
     }
 
-    pub fn set_anm(&mut self) {
+    pub fn set_anm(&mut self, anms: &Ba1Anms) {
         let Some(prm) = table_of(&ANM_STT, i32::from(self.stt)).copied() else {
             return;
         };
         if prm.btp >= 0 {
-            self.set_anm_tex(prm.btp);
+            self.set_anm_tex(prm.btp, anms);
         }
         if prm.anm >= 0 {
-            self.set_anm_anm(prm);
+            self.set_anm_anm(prm, anms);
         }
     }
 
@@ -1007,12 +1504,12 @@ impl Grammarian {
 
     pub fn ctrl_anm_tag(&mut self) {}
 
-    pub fn chng_anm_atr(&mut self, atr: u8) {
+    pub fn chng_anm_atr(&mut self, atr: u8, anms: &Ba1Anms) {
         if atr >= ATR_LIMIT || atr == self.atr {
             return;
         }
         self.atr = atr;
-        self.set_anm_atr(true);
+        self.set_anm_atr(true, anms);
     }
 
     pub fn ctrl_anm_atr(&mut self) {
@@ -1027,14 +1524,14 @@ impl Grammarian {
         }
     }
 
-    pub fn set_anm_atr(&mut self, modify: bool) {
+    pub fn set_anm_atr(&mut self, modify: bool, anms: &Ba1Anms) {
         let Some(prm) = table_of(&ANM_ATR, i32::from(self.atr)).copied() else {
             return;
         };
         if modify {
-            self.set_anm_tex(prm.btp);
+            self.set_anm_tex(prm.btp, anms);
         }
-        self.set_anm_anm(prm);
+        self.set_anm_anm(prm, anms);
     }
 
     pub fn anm_atr(&mut self, param: u16, ctx: &mut Ctx) {
@@ -1042,7 +1539,7 @@ impl Grammarian {
             ANM_ATR_PARAM_6 => {
                 if self.atr_ready == 0 {
                     let atr = ctx.text.info.mesg_anime;
-                    self.chng_anm_atr(atr);
+                    self.chng_anm_atr(atr, ctx.anms);
                     self.atr_ready = self.atr_ready.wrapping_add(1);
                 }
                 let tag = ctx.text.info.mesg_anime_tag;
@@ -1059,7 +1556,7 @@ impl Grammarian {
         self.ctrl_anm_atr();
     }
 
-    pub fn set_stt(&mut self, stt: i8) {
+    pub fn set_stt(&mut self, stt: i8, anms: &Ba1Anms) {
         let prev = self.stt;
         self.idle_timer = 0;
         self.stt = stt;
@@ -1083,7 +1580,7 @@ impl Grammarian {
             }
             _ => {}
         }
-        self.set_anm();
+        self.set_anm(anms);
     }
 
     pub fn set_attention(&mut self, pos: Vec3, set_eye_pos: bool) {
@@ -1103,10 +1600,6 @@ impl Grammarian {
         self.item_no
     }
 
-    pub fn cantalk_item(&self) -> bool {
-        self.cantalk_item
-    }
-
     pub fn has_xy_callbacks(&self) -> bool {
         self.xy_callbacks
     }
@@ -1123,7 +1616,7 @@ impl Grammarian {
     }
 }
 
-impl Grammarian {
+impl Ba1 {
     pub fn event_slot(&self) -> Option<usize> {
         usize::try_from(self.event_index).ok()
     }
@@ -1138,7 +1631,15 @@ impl Grammarian {
         i32::try_from(self.staff_idx).unwrap_or(-1)
     }
 
-    pub fn end_event(&mut self) {
+    /// `daNpc_Ba1_c::endEvent` (`:1294-1298`): `dComIfGp_event_reset()` then `m80E = 0xFF`.
+    /// The reset is `dEvent_c::reset` (`d_event.h:131`) = `mEventFlag |= 8`, which
+    /// `dEvt_control_c::check` (`d_event.cpp:546-554`) turns into `endProc` - `mMode =
+    /// dEvtMode_NONE_e` and the flag word cleared (`:622-655`). `MsgGameInfo::event_mode` is the
+    /// port's `mMode` (`text/msgproc.rs:363`), which is the write every other module's
+    /// `dComIfGp_event_reset` makes (`npc_p1.rs`'s `reset_event`, `makar.rs`'s, `ivan.rs`'s,
+    /// `servant.rs`'s); `m80E` is [`Ba1::atr`].
+    pub fn end_event(&mut self, ctx: &mut Ctx) {
+        ctx.text.info.event_mode = DA_EVT_MODE_NONE;
         self.atr = ATR_NONE;
     }
 
@@ -1147,7 +1648,10 @@ impl Grammarian {
     }
 
     pub fn xy_event_cb(&self) -> i16 {
-        self.event_ids.get(EVENT_USE_FAIRY).copied().unwrap_or(NO_INDEX)
+        self.event_ids
+            .get(EVENT_USE_FAIRY)
+            .copied()
+            .unwrap_or(NO_INDEX)
     }
 
     pub fn chk_talk(&mut self, ctx: &Ctx) -> bool {
@@ -1214,20 +1718,18 @@ impl Grammarian {
                     *msg_no = MSG_7F9;
                 }
             }
-            MSG_7FF => {
-                match ctx.text.select_num() {
-                    0 => *msg_no = MSG_800,
-                    1 => *msg_no = MSG_802,
-                    _ => {}
-                }
-            }
+            MSG_7FF => match ctx.text.select_num() {
+                0 => *msg_no = MSG_800,
+                1 => *msg_no = MSG_802,
+                _ => {}
+            },
             _ => ret = STATUS_MSG_ENDS,
         }
         ret
     }
 
     pub fn get_msg_ba1_0(&self, ctx: &Ctx) -> u32 {
-        if self.heal_told {
+        if self.unk_7fa {
             return MSG_7D8;
         }
         if self.hold_event {
@@ -1237,11 +1739,7 @@ impl Grammarian {
                 MSG_7E6
             };
         }
-        if self.unk_7fb {
-            MSG_7E5
-        } else {
-            MSG_7E4
-        }
+        if self.unk_7fb { MSG_7E5 } else { MSG_7E4 }
     }
 
     pub fn get_msg_ba1_1(&self, ctx: &Ctx) -> u32 {
@@ -1281,17 +1779,17 @@ impl Grammarian {
         }
         if ctx.stories.test(EVENT_BIT_2A20) {
             ctx.stories.set_reg(REG_A60F, 0);
-            if self.heal_reg >= REG_A60F_LIMIT {
-                if self.heal_told {
+            if self.unk_7f2 >= REG_A60F_LIMIT {
+                if self.unk_7fa {
                     return MSG_7FD;
                 }
-                self.heal_told = true;
+                self.unk_7fa = true;
                 return MSG_7FC;
             }
-            if self.heal_told {
+            if self.unk_7fa {
                 return MSG_7FA;
             }
-            self.heal_told = true;
+            self.unk_7fa = true;
             return MSG_7FB;
         }
         MSG_7F1
@@ -1365,7 +1863,7 @@ impl Grammarian {
                 MSG_7F0 => ctx.stories.set(EVENT_BIT_0740),
                 MSG_800 => {
                     if self.msg_no != MSG_7F9 {
-                        self.order = ORDER_MARRIED;
+                        self.order = ORDER_EVENT_1;
                     }
                     self.fairy_used = false;
                 }
@@ -1375,9 +1873,9 @@ impl Grammarian {
             self.item_no = ITEM_NONE;
             self.order_talk = false;
             let prev = self.prev_stt;
-            self.set_stt(prev);
+            self.set_stt(prev, ctx.anms);
             self.idle_timer = IDLE_TIMER;
-            self.end_event();
+            self.end_event(ctx);
             self.hold_event = false;
         }
         ret
@@ -1388,7 +1886,7 @@ impl Grammarian {
     }
 }
 
-impl Grammarian {
+impl Ba1 {
     fn turn_home(&self, actor: &mut Actor) {
         actor.angle[1] = add_calc_angle_s(
             actor.angle[1],
@@ -1443,13 +1941,13 @@ impl Grammarian {
         }
         if self.order_talk {
             if self.chk_talk(ctx) {
-                self.set_stt(STT_TALK);
+                self.set_stt(STT_TALK, ctx.anms);
                 self.head_only_follow = false;
             }
             return true;
         }
         if self.hold_event {
-            self.set_anm_num(i32::from(ANM_NUM_HOLD), true);
+            self.set_anm_num(i32::from(ANM_NUM_HOLD), true, ctx.anms);
             self.order = ORDER_SPEAK;
             self.look_state = LOOK_NONE;
             self.look_angle = actor.angle[1].wrapping_add(HOLD_LOOK_OFFSET);
@@ -1466,15 +1964,18 @@ impl Grammarian {
         }
         if self.order_talk {
             if self.unk_7ff {
-                ctx.next.target = Some(Target {
-                    stage: NEXT_STAGE_LINK_RM.to_owned(),
-                    room: NEXT_STAGE_MARRIED_ROOM,
-                    start: NEXT_STAGE_MARRIED,
-                });
+                // `dComIfGp_setNextStage("LinkRM", 201, 0, 9, 0.0f, 0, 1, 0)` (`:1549`),
+                // layer 9 rather than 8: the healed house is the other variant.
+                ctx.next.set(
+                    NEXT_STAGE_LINK_RM,
+                    NEXT_STAGE_MARRIED_ROOM,
+                    NEXT_STAGE_MARRIED,
+                    NEXT_STAGE_MARRIED_LAYER,
+                );
                 return true;
             }
             if self.chk_talk(ctx) {
-                self.set_stt(STT_TALK);
+                self.set_stt(STT_TALK, ctx.anms);
                 self.head_only_follow = false;
             }
             return true;
@@ -1507,12 +2008,12 @@ impl Grammarian {
         }
         if self.fairy_used {
             self.fairy_used = false;
-            self.order = ORDER_MARRIED;
+            self.order = ORDER_EVENT_1;
             return true;
         }
         if self.order_talk {
             if self.chk_talk(ctx) {
-                self.set_stt(STT_TALK_5);
+                self.set_stt(STT_TALK_5, ctx.anms);
             }
             return true;
         }
@@ -1588,7 +2089,21 @@ impl Grammarian {
         self.kind >= 0
     }
 
+    /// `daNpc_Ba1_c::createInit` (`:222-270`) plus `CreateHeap`'s own pattern load
+    /// (`:2049-2050`: `mBtpNum = 1; iniTexPttrnAnm(false);`), with four create-time omissions
+    /// the port has no counterpart for: `attention_info.flags` and its two distances
+    /// (`:226-228`) are per-actor attention state - the `dAttention_c` request data this sim has
+    /// no member for, `lock.rs` being a reduced stand-in that reads none of it - `mStts.Init`
+    /// and `mCyl.Set(dNpc_cyl_src)` (`:263-265`) are the collision row `bodies.rs`
+    /// already carries for `"Ba1"`, `mpMorf->setMorf(0.0f)` (`:266`) sets the render-side morf
+    /// blend the tables push at every `setAnm`, and `mEventCut.setActorInfo2("Ba1", this)`
+    /// (`:231`) is the event staff the port looks up by name in the stage's own list.
     pub fn create_init(&mut self, actor: &mut Actor, ctx: &mut Ctx) -> bool {
+        // `CreateHeap`'s own pattern load; its failure (`if(!iniTexPttrnAnm(false)) return FALSE;`,
+        // `:2050-2053`) is not a create failure here - with no asset root there is no pattern and
+        // no frame count, and this actor still exists, the same way an absent message archive
+        // leaves dialogue empty rather than the world unpopulated.
+        self.ini_tex_pttrn_anm(BTP_NUM_INITIAL, ctx.anms);
         for (slot, name) in EVENT_NAMES.iter().enumerate() {
             let id = ctx
                 .list
@@ -1599,8 +2114,7 @@ impl Grammarian {
                 *entry = id;
             }
         }
-        self.staff_idx = ctx.list.staff_of(GRAMMARIAN_ACTOR).unwrap_or(NO_STAFF);
-        self.cantalk_item = false;
+        self.staff_idx = ctx.list.staff_of(BA1_ACTOR).unwrap_or(NO_STAFF);
         self.attn_dist_talk = ATTN_DIST_TALK;
         self.attn_dist_speak = ATTN_DIST_SPEAK;
         self.gravity = GRAVITY;
@@ -1619,7 +2133,7 @@ impl Grammarian {
         }
         self.angle = actor.angle;
         self.shape_angle = actor.angle;
-        self.heal_reg = ctx.stories.reg(REG_A60F);
+        self.unk_7f2 = ctx.stories.reg(REG_A60F);
         self.set_attention(ctx.pos, true);
         true
     }
@@ -1639,6 +2153,11 @@ impl Grammarian {
         }
         ret = ctx.stories.test(EVENT_BIT_0001);
         if ret {
+            // `fopAcM_OffStatus(this, fopAcStts_NOCULLEXEC_e)` (`:172`): with the bit clear,
+            // `fopAc_Execute`'s `!CheckStatus(NOCULLEXEC) || !CheckCondition(NODRAW)` gate
+            // (`f_op_actor.cpp:189`) stops letting a non-drawn actor skip its execute, which is
+            // what makes the sick Grandma keep animating off-screen.
+            ctx.registry.off_status(ctx.proc_id, STATUS_NO_CULL_EXEC);
             if ctx.collect_at(COLLECT_SICK) != 0 {
                 actor.pos = Vec3::from_array(SICK_POS);
                 actor.angle[1] = SICK_ANGLE;
@@ -1662,7 +2181,11 @@ impl Grammarian {
         if ret {
             self.attn_dist_talk = ATTN_DIST_TALK_SICK;
             self.attn_dist_speak = ATTN_DIST_SPEAK_SICK;
-            self.draw_skip = true;
+            // `fopAcM_OffStatus(this, fopAcStts_CULL_e | fopAcStts_NOCULLEXEC_e)` (`:196`):
+            // both culls come off the profile's word, so the sick Grandma draws whatever the
+            // frustum says and keeps executing while undrawn.
+            ctx.registry
+                .off_status(ctx.proc_id, STATUS_CULL | STATUS_NO_CULL_EXEC);
             self.set_action(Proc::Wait3, actor, ctx);
             self.gravity = GRAVITY_SICK;
             self.xy_callbacks = true;
@@ -1710,13 +2233,17 @@ impl Grammarian {
         match self.stage {
             STAGE_INIT => {
                 if ctx.stories.test(EVENT_BIT_2A80) {
-                    self.heal_told = ctx.tmp.test(TMP_BIT_0310);
-                    if self.heal_told {
+                    self.unk_7fa = ctx.tmp.test(TMP_BIT_0310);
+                    if self.unk_7fa {
                         ctx.tmp.clear(TMP_BIT_0310);
                     }
-                    self.set_stt(STT_WAIT_1);
+                    self.set_stt(STT_WAIT_1, ctx.anms);
+                } else if ctx.tmp.test(TMP_BIT_0310) {
+                    // The tale's own latch routes her to the speaking state even
+                    // before the story bit lands (`:1647-1650`).
+                    self.set_stt(STT_WAIT_1, ctx.anms);
                 } else {
-                    self.set_stt(STT_WAIT_7);
+                    self.set_stt(STT_WAIT_7, ctx.anms);
                 }
                 self.stage = self.stage.wrapping_add(1);
             }
@@ -1738,7 +2265,7 @@ impl Grammarian {
     pub fn wait_action2(&mut self, actor: &mut Actor, ctx: &mut Ctx) {
         match self.stage {
             STAGE_INIT => {
-                self.set_stt(STT_WAIT_3);
+                self.set_stt(STT_WAIT_3, ctx.anms);
                 self.stage = self.stage.wrapping_add(1);
             }
             STAGE_RUN | STAGE_SEARCHED | STAGE_PLAY => {
@@ -1765,7 +2292,7 @@ impl Grammarian {
     pub fn wait_action3(&mut self, actor: &mut Actor, ctx: &mut Ctx) {
         match self.stage {
             STAGE_INIT => {
-                self.set_stt(STT_SICK);
+                self.set_stt(STT_SICK, ctx.anms);
                 self.stage = self.stage.wrapping_add(1);
             }
             STAGE_RUN | STAGE_SEARCHED | STAGE_PLAY => {
@@ -1785,7 +2312,7 @@ impl Grammarian {
     pub fn wait_action4(&mut self, actor: &mut Actor, ctx: &mut Ctx) {
         match self.stage {
             STAGE_INIT => {
-                self.set_stt(STT_WAIT_6);
+                self.set_stt(STT_WAIT_6, ctx.anms);
                 self.stage = self.stage.wrapping_add(1);
             }
             STAGE_RUN | STAGE_SEARCHED | STAGE_PLAY => {
@@ -1803,12 +2330,16 @@ impl Grammarian {
     }
 }
 
-impl Grammarian {
+impl Ba1 {
+    /// `daNpc_Ba1_c::eventOrder` (`:541-555`): `eventInfo.onCondition` is the shared
+    /// order word (`f_op_actor.h:170-172`), which the port clears once per tick in
+    /// `flags::clear_order_flags`.
     pub fn event_order(&mut self, ctx: &mut Ctx) {
         let condition = self.order;
         if condition == ORDER_SPEAK || condition == ORDER_CANTALK {
+            ctx.order_flags.set(EVT_CND_CANTALK);
             if self.kind == 3 && !ctx.stories.test(EVENT_BIT_2A20) {
-                self.cantalk_item = true;
+                ctx.order_flags.set(EVT_CND_CANTALKITEM);
             }
             if condition == ORDER_SPEAK {
                 ctx.active.order(ctx.list, EVENT_IDX_SPEAK, ctx.entity);
@@ -1836,14 +2367,23 @@ impl Grammarian {
         }
     }
 
-    pub fn partner_search_sub(&mut self, others: &Query<(Entity, &Actor), Without<Grammarian>>) -> bool {
+    /// `partner_srch_sub` (`:835-848`) takes the *first* actor `searchActor_Fa`
+    /// names, and `eMove_CHK_FAIRY_MOV_1` then asks that actor for its baba mode
+    /// (`:1164-1167`). The baba bit is read here, where the query is still in hand.
+    pub fn partner_search_sub(
+        &mut self,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
+    ) -> bool {
         self.partner = None;
+        self.partner_baba = false;
         let found = others
             .iter()
-            .find(|entry| super::npc_fa1::is_npc_fa1(&entry.1.name))
-            .map(|entry| entry.0);
-        self.partner = found;
-        found.is_some()
+            .find(|entry| super::npc_fa1::is_npc_fa1(&entry.1.name));
+        if let Some((entity, _, fairy)) = found {
+            self.partner = Some(entity);
+            self.partner_baba = fairy.is_some_and(|fairy| fairy.is_baba());
+        }
+        self.partner.is_some()
     }
 
     pub fn partner_search(&mut self) {
@@ -1852,16 +2392,25 @@ impl Grammarian {
         }
     }
 
-    pub fn demo(&mut self, actor: &Actor, ctx: &Ctx) -> bool {
-        if ctx.demo_actor.unwrap_or(0) == 0 {
+    /// `daNpc_Ba1_c::demo` (`:1783-1816`). The demo *player*
+    /// (`dComIfGp_demo_getActor`, `dDemo_setDemoData` and the `"Ba"` BTP pattern it
+    /// hands over) is `sim/demo.rs`'s: this reads only the actor's own
+    /// `demoActorID` (`f_op_actor.h:281`), advances the head pattern and copies
+    /// `m78A`/`shape_angle`. `mBtpNum` takes `dRes_ID_BA_BTP_BA_T02_e` as a *number*,
+    /// which is the reference's own quirk: `:1801` stores the resource id where
+    /// `btpNum_toResID` expects a row.
+    pub fn demo(&mut self, actor: &Actor) -> bool {
+        if actor.demo_actor_id == 0 {
             if self.in_demo {
                 self.in_demo = false;
             }
         } else {
             self.in_demo = true;
-            self.btp_frame = self.btp_frame.wrapping_add(1);
-            if self.btp_frame >= self.btp_frame_max {
-                self.btp_frame = self.btp_frame_max;
+            if self.tex_pattern_live {
+                self.btp_frame = self.btp_frame.wrapping_add(1);
+                if self.btp_frame >= self.btp_frame_max {
+                    self.btp_frame = self.btp_frame_max;
+                }
             }
             self.btp_num = BTP_DEMO_T02_RES;
             self.btp_frame = 0;
@@ -1871,8 +2420,20 @@ impl Grammarian {
         self.in_demo
     }
 
+    /// `daNpc_Ba1_c::setMtx` (`:273-299`), whose animation half is [`Ba1::step_morf`]:
+    /// `mbMorfAnimStopped` is `play`'s own answer with the reference's
+    /// `getFrame() < mPrevMorfFrame` override (`:277-279`), and `mPrevMorfFrame` moves
+    /// on here. OMITTED: `mObjAcch.CrrPos` - the acch's own stored ground hit, which
+    /// [`Ba1::control_draw`] re-queries when the shadow pass needs it - `tevStr`'s room and
+    /// polygon colour and the cloth model (`:282-297`).
     pub fn set_mtx(&mut self, actor: &Actor) {
         if !self.in_demo {
+            self.step_morf();
+            self.morf_stopped = self.morf_played;
+            if self.morf_frame < self.prev_morf_frame {
+                self.morf_stopped = true;
+            }
+            self.prev_morf_frame = self.morf_frame;
             self.ply_tex_pttrn_anm();
         }
         self.set_attention(actor.pos, false);
@@ -1885,8 +2446,11 @@ impl Grammarian {
         }
     }
 
+    /// `daNpc_Ba1_c::eInit_SET_PLYER_GOL_` (`:915-923`): the point 50 units in front of her is
+    /// the event's walk target, `dComIfGp_evmng_setGoal` (`d_com_inf_game.h:3739`) handing it to
+    /// `dEvent_manager_c::setGoal` (`d_event_manager.cpp:637-640`).
     pub fn ev_goal(&mut self, ctx: &mut Ctx) {
-        ctx.event_goal = Some(rotated_y(
+        ctx.active.set_goal(rotated_y(
             Vec3::from_array(EV_GOAL_OFFSET),
             ctx.pos,
             ctx.angle[1],
@@ -1900,18 +2464,22 @@ impl Grammarian {
             ctx.angle[1],
         );
         let yaw = target_angle_y(target, ctx.pos);
+        // `player->setPlayerPosAndAngle(&target, angle)` (`:933-936`) writes
+        // `current.pos`/`old.pos` and both angles (`d_a_player_main.cpp:13021-13040`)
+        // and nothing else - the port's `Player` has no separate shape angle.
         if let Some(player) = ctx.player.as_deref_mut() {
             player.pos = target;
             player.yaw = from_s16(yaw);
-            player.face = 0.0;
-            player.speed = 0.0;
-            player.speed_y = 0.0;
-            player.drift = Vec3::ZERO;
         }
     }
 
+    /// `daNpc_Ba1_c::eInit_SET_PLYER_TRN_ANG_` (`:955-963`): `player->mDemo.setMoveAngle` writes
+    /// `daPy_demo_c::mDemoMoveAngle` (`d_a_player.h:140-141`), the angle the player's own
+    /// `WAIT_TURN` cut turns to (`d_a_player_main.cpp:10496-10498`) and its walk cut faces
+    /// (`:10453`). The port's carrier is [`ItemPartner::move_angle`], which `link_cut` reads for
+    /// that turn and `walk`'s demo move reads as its heading.
     pub fn ev_player_turn(&mut self, ctx: &mut Ctx) {
-        ctx.player_demo_angle = Some(target_angle_y(player_pos(ctx), ctx.pos));
+        ctx.partner.move_angle = target_angle_y(player_pos(ctx), ctx.pos);
     }
 
     pub fn ev_fairy_end(&mut self) {
@@ -1934,10 +2502,16 @@ impl Grammarian {
         prm_1: Option<i32>,
     ) {
         if let Some(value) = prm_0 {
-            match value {
-                0 => ctx.player_no_draw = true,
-                1 => ctx.player_no_draw = false,
-                _ => {}
+            // `player->onNoResetFlg0(daPyFlg0_NO_DRAW)` / `offNoResetFlg0`, the pair
+            // `d_a_npc_ba1.cpp:971-974` calls. It is a no-reset flag: the player never
+            // clears it itself, only this actor's own two arms do.
+            let no_draw = match value {
+                0 => Some(true),
+                1 => Some(false),
+                _ => None,
+            };
+            if let (Some(no_draw), Some(player)) = (no_draw, ctx.player.as_deref_mut()) {
+                player.no_draw = no_draw;
             }
         }
         if let Some(value) = prm_1 {
@@ -1945,7 +2519,7 @@ impl Grammarian {
                 0 => self.hide_model = true,
                 1 => self.hide_model = false,
                 2 => {
-                    self.set_anm_num(ANM_NUM_WAKE, true);
+                    self.set_anm_num(ANM_NUM_WAKE, true, ctx.anms);
                     self.hide_model = true;
                     return;
                 }
@@ -1965,18 +2539,13 @@ impl Grammarian {
         }
     }
 
-    pub fn event_action_init(
-        &mut self,
-        cut: Option<usize>,
-        actor: &mut Actor,
-        ctx: &mut Ctx,
-    ) {
+    pub fn event_action_init(&mut self, cut: Option<usize>, actor: &mut Actor, ctx: &mut Ctx) {
         let Some(act_no) = cut.and_then(|at| ctx.list.cut_number(at, CUT_KEY_ACT_NO)) else {
             return;
         };
         self.act_no = act_no as i8;
         match self.act_no {
-            EV_ACT_LOOK => self.set_anm_num(ANM_NUM_GETUP, true),
+            EV_ACT_LOOK => self.set_anm_num(ANM_NUM_GETUP, true, ctx.anms),
             EV_ACT_GOAL => self.ev_goal(ctx),
             EV_ACT_PLAYER_INIT => self.ev_player_init(ctx),
             EV_ACT_FAIRY_END => self.ev_fairy_end(),
@@ -2038,7 +2607,10 @@ impl Grammarian {
         ret
     }
 
-    pub fn ev_move_chk_fairy(&mut self, others: &Query<(Entity, &Actor), Without<Grammarian>>) -> bool {
+    pub fn ev_move_chk_fairy(
+        &mut self,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
+    ) -> bool {
         if calc_timer(&mut self.ev_timer) == 0 {
             return !self.partner_search_sub(others);
         }
@@ -2062,7 +2634,7 @@ impl Grammarian {
 
     pub fn ev_move_chk_fairy_mov(
         &mut self,
-        others: &Query<(Entity, &Actor), Without<Grammarian>>,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
         ctx: &mut Ctx,
     ) -> bool {
         let mut ret = false;
@@ -2081,7 +2653,7 @@ impl Grammarian {
     pub fn event_action(
         &mut self,
         actor: &mut Actor,
-        others: &Query<(Entity, &Actor), Without<Grammarian>>,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
         ctx: &mut Ctx,
     ) -> bool {
         match self.act_no {
@@ -2098,6 +2670,12 @@ impl Grammarian {
         self.ev_set_timer(timer);
     }
 
+    /// `daNpc_Ba1_c::cut_move_START_TALE1` (`:1217-1245`): the tale's timer runs out
+    /// and the house is entered. This is the game's only `setNextStage("LinkRM", ...)`
+    /// for a house: `("LinkRM", 200, 0, 8, 0.0f, 0, 1, 0)` on a first playthrough and
+    /// `("LinkRM", 202, 0, 8, 0.0f, 0, 1, 0)` once `dComIfGs_getClearCount()` is not
+    /// zero (`:1219-1242`) - room `0`, layer `8`, wipe `0`. The write goes through
+    /// the port's own [`NextStage`] seam, layer included.
     pub fn cut_move_start_tale1(&mut self, ctx: &mut Ctx) -> bool {
         if calc_timer(&mut self.ev_timer) == 0 {
             let start = if ctx.clear_count != 0 {
@@ -2105,11 +2683,12 @@ impl Grammarian {
             } else {
                 NEXT_STAGE_TALE
             };
-            ctx.next.target = Some(Target {
-                stage: NEXT_STAGE_LINK_RM.to_owned(),
-                room: NEXT_STAGE_TALE_ROOM,
+            ctx.next.set(
+                NEXT_STAGE_LINK_RM,
+                NEXT_STAGE_TALE_ROOM,
                 start,
-            });
+                NEXT_STAGE_TALE_LAYER,
+            );
         }
         self.ev_timer == 0
     }
@@ -2128,7 +2707,7 @@ impl Grammarian {
         &mut self,
         staff: i32,
         actor: &mut Actor,
-        others: &Query<(Entity, &Actor), Without<Grammarian>>,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
         ctx: &mut Ctx,
     ) {
         if staff < 0 {
@@ -2154,14 +2733,19 @@ impl Grammarian {
             CUT_START_TALE1 => self.cut_move_start_tale1(ctx),
             _ => true,
         };
-        let _ = cut_end;
+        // `dComIfGp_evmng_cutEnd(i_staffIdx)` (`:1289`): the cut's end flag is this
+        // actor's to set, and the event director holds the cut until it lands
+        // (`sim/event.rs`'s own `hold_cut` for "Ba1").
+        if cut_end {
+            ctx.active.end_staff_cut(ctx.list, ctx.flags, BA1_ACTOR);
+        }
     }
 
     pub fn event_proc(
         &mut self,
         staff: i32,
         actor: &mut Actor,
-        others: &Query<(Entity, &Actor), Without<Grammarian>>,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
         ctx: &mut Ctx,
     ) {
         let ended = self
@@ -2179,7 +2763,9 @@ impl Grammarian {
                         self.order = ORDER_SPEAK;
                         self.unk_7f0 = true;
                     } else {
-                        self.order = ORDER_MARRIED;
+                        // `m812 = 5`, `l_evn_tbl[2]` (`:1322`): the "Ganbaru" event,
+                        // not the fairy one `m812 = 4` orders.
+                        self.order = ORDER_EVENT_2;
                     }
                 }
                 Some(EVENT_GANBARU) => {
@@ -2192,7 +2778,7 @@ impl Grammarian {
                 }
                 _ => {}
             }
-            self.end_event();
+            self.end_event(ctx);
             return;
         }
         if !ctx.cut_proc {
@@ -2204,7 +2790,7 @@ impl Grammarian {
     pub fn execute(
         &mut self,
         actor: &mut Actor,
-        others: &Query<(Entity, &Actor), Without<Grammarian>>,
+        others: &Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
         ctx: &mut Ctx,
     ) {
         if !self.primed {
@@ -2213,14 +2799,14 @@ impl Grammarian {
             self.primed = true;
         }
         self.jnt.param = Self::default_jnt_param();
-        if self.draw_skip && ctx.demo_actor.unwrap_or(0) == 0 {
+        if self.init_grandma0 && actor.demo_actor_id == 0 {
             return;
         }
         self.move_locked = false;
-        self.draw_skip = false;
+        self.init_grandma0 = false;
         self.partner_search();
         self.check_order(ctx);
-        if !self.demo(actor, ctx) {
+        if !self.demo(actor) {
             let mut cond: i32 = -1;
             if ctx.text.info.event_run_check() && !self.check_command_talk(ctx) {
                 cond = self.is_event_entry();
@@ -2232,6 +2818,9 @@ impl Grammarian {
                 self.run_proc(actor, ctx);
             }
             if !self.move_locked {
+                // `fopAcM_posMoveF(this, mStts.GetCCMoveP())` (`:1916`): the speed
+                // integration, with the collision system's own movement correction
+                // (`GetCCMoveP`) left to `sim/contact.rs`, which owns the push.
                 let (delta, next_speed) = calc_speed(
                     self.speed_f,
                     actor.angle[1],
@@ -2262,9 +2851,7 @@ impl Grammarian {
 }
 
 fn player_pos(ctx: &Ctx) -> Vec3 {
-    ctx.player
-        .as_deref()
-        .map_or(ctx.pos, |player| player.pos)
+    ctx.player.as_deref().map_or(ctx.pos, |player| player.pos)
 }
 
 fn player_eye_pos(ctx: &Ctx, offset_y: f32) -> Vec3 {
@@ -2349,17 +2936,33 @@ impl Text<'_> {
 
 pub struct Ctx<'a> {
     pub entity: Entity,
+    /// `fopAcM_GetID`: the actor's `fpc_ProcID`, the key every [`ActorRegistry`] status and
+    /// condition call takes.
+    pub proc_id: u32,
     pub pos: Vec3,
     pub angle: [i16; 3],
     pub player: Option<&'a mut Player>,
+    /// `daPy_demo_c`'s own state, `mDemoMoveAngle` among it: `ev_player_turn`'s destination.
+    pub partner: &'a mut ItemPartner,
     pub clear_count: u8,
     pub collect: &'a Collect,
     pub equipped: &'a mut Equipped,
     pub got: &'a Got,
     pub stories: &'a mut StoryBits,
-    pub tmp: &'a mut EventFlags,
+    /// `save.getTmp()`: `dComIfGs_isTmpBit`'s own flag store (`d_com_inf_game.h:1376`).
+    pub tmp: &'a mut TmpBits,
+    /// The event-data flags `dComIfGp_evmng_cutEnd` sets this actor's cut flag in
+    /// (`ActiveEvent::end_staff_cut`).
+    pub flags: &'a mut EventFlags,
+    /// `eventInfo.onCondition`'s word (`f_op_actor.h:170-172`).
+    pub order_flags: &'a mut OrderFlags,
+    /// `actor_status`/`actor_condition` (`f_op_actor_mng.h:179-250`): the two
+    /// `fopAcM_OffStatus` clears write here.
+    pub registry: &'a mut ActorRegistry,
     pub list: &'a EventList,
     pub active: &'a mut ActiveEvent,
+    /// The `Ba` archive's animation frame counts ([`Ba1Anms`]).
+    pub anms: &'a Ba1Anms,
     pub next: &'a mut NextStage,
     pub text: &'a mut Text<'a>,
     pub attention: bool,
@@ -2368,31 +2971,15 @@ pub struct Ctx<'a> {
     pub talk_xy: bool,
     pub present_done: bool,
     pub present_item: u8,
-    pub demo_actor: Option<i32>,
     pub select_item: [u8; ITEM_BUTTON_COUNT],
     pub cut_action: Option<i8>,
     pub cut_advance: bool,
     pub cut_proc: bool,
-    pub event_goal: Option<Vec3>,
-    pub player_demo_angle: Option<i16>,
-    pub player_no_draw: bool,
 }
 
 impl Ctx<'_> {
     pub fn collect_at(&self, idx: u8) -> u8 {
         self.collect.check(idx)
-    }
-
-    pub fn event_goal(&self) -> Option<Vec3> {
-        self.event_goal
-    }
-
-    pub fn player_demo_angle(&self) -> Option<i16> {
-        self.player_demo_angle
-    }
-
-    pub fn player_draw_disabled(&self) -> bool {
-        self.player_no_draw
     }
 }
 
@@ -2401,11 +2988,17 @@ pub struct World<'w> {
     pub stories: ResMut<'w, StoryBits>,
     pub list: Res<'w, EventList>,
     pub active: ResMut<'w, ActiveEvent>,
+    pub partner: ResMut<'w, ItemPartner>,
+    pub anms: Res<'w, Ba1Anms>,
     pub equipped: ResMut<'w, Equipped>,
     pub got: Res<'w, Got>,
     pub collect: Res<'w, Collect>,
-    pub tmp: ResMut<'w, EventFlags>,
+    pub tmp: ResMut<'w, TmpBits>,
+    pub flags: ResMut<'w, EventFlags>,
+    pub order_flags: ResMut<'w, OrderFlags>,
+    pub registry: ResMut<'w, ActorRegistry>,
     pub next: ResMut<'w, NextStage>,
+    pub attention: Res<'w, super::lock::Lock>,
 }
 
 #[derive(SystemParam)]
@@ -2422,8 +3015,8 @@ pub struct Msg<'w, 's> {
 pub fn control(
     mut world: World,
     mut msg: Msg,
-    others: Query<(Entity, &Actor), Without<Grammarian>>,
-    mut actors: Query<(Entity, &mut Actor, &mut Grammarian)>,
+    others: Query<(Entity, &Actor, Option<&super::npc_fa1::NpcFa1>), Without<Ba1>>,
+    mut actors: Query<(Entity, &mut Actor, &mut Ba1)>,
 ) {
     let mut player = msg.players.iter_mut().next();
     let clear_count = msg.text_flags.clear_count;
@@ -2431,9 +3024,30 @@ pub fn control(
         .archive
         .as_deref()
         .map(|archive| archive as &dyn MsgArchive);
-    for (entity, mut actor, mut gram) in &mut actors {
+    for (entity, mut actor, mut ba1) in &mut actors {
         let actor = &mut *actor;
-        let gram = &mut *gram;
+        let ba1 = &mut *ba1;
+        let Some(proc_id) = world.registry.proc_id(entity) else {
+            // The management create pass (`registry::control`) registers a fresh actor before
+            // the actor methods run, so an unregistered entity waits one tick for it.
+            continue;
+        };
+        if !ba1.entered {
+            // `fopAc_Create` (`f_op_actor.cpp:265`) copies `profile->status` into
+            // `actor_status` before `_create` runs, so the clears `init_BA1_1`/`init_BA1_3`
+            // make find the profile's two cull bits set.
+            world.registry.set_status(proc_id, PROFILE_STATUS);
+        }
+        let Some(entry) = world.registry.entry(proc_id).copied() else {
+            continue;
+        };
+        // `fopAc_Execute` (`f_op_actor.cpp:180-203`): a `NOCULLEXEC` actor whose last draw was
+        // rejected skips its method and takes the `NOEXEC` condition.
+        if !world.registry.execute_gate(&entry) {
+            world.registry.on_condition(proc_id, CONDITION_NO_EXEC);
+            continue;
+        }
+        world.registry.off_condition(proc_id, CONDITION_NO_EXEC);
         let mut text = Text {
             procs: &mut msg.procs,
             info: &mut msg.info,
@@ -2444,43 +3058,120 @@ pub fn control(
         };
         let mut ctx = Ctx {
             entity,
+            proc_id,
             pos: actor.pos,
             angle: actor.angle,
             player: player.as_deref_mut(),
+            partner: &mut *world.partner,
             clear_count,
             collect: &*world.collect,
             equipped: &mut *world.equipped,
             got: &*world.got,
             stories: &mut *world.stories,
             tmp: &mut *world.tmp,
+            flags: &mut *world.flags,
+            order_flags: &mut *world.order_flags,
+            registry: &mut *world.registry,
             list: &*world.list,
             active: &mut *world.active,
+            anms: &*world.anms,
             next: &mut *world.next,
             text: &mut text,
-            attention: false,
+            attention: world.attention.chk_attention(entity),
             demo_accept: false,
             talk_command: false,
             talk_xy: false,
             present_done: false,
             present_item: ITEM_NONE,
-            demo_actor: None,
             select_item: [ITEM_NONE; ITEM_BUTTON_COUNT],
             cut_action: None,
             cut_advance: false,
             cut_proc: false,
-            event_goal: None,
-            player_demo_angle: None,
-            player_no_draw: false,
         };
-        if !gram.entered {
-            gram.entered = true;
-            if !gram.decide_type() {
+        if !ba1.entered {
+            ba1.entered = true;
+            if !ba1.decide_type() {
                 continue;
             }
-            if !gram.create_init(actor, &mut ctx) {
+            if !ba1.create_init(actor, &mut ctx) {
                 continue;
             }
         }
-        gram.execute(actor, &others, &mut ctx);
+        ba1.execute(actor, &others, &mut ctx);
     }
+}
+
+/// `daNpc_Ba1_c::_draw`'s registrations (`:1867-1868`), for the draw pass the shell runs: the
+/// port has no per-actor draw callback, so this system stands in for it at the end of the tick,
+/// under the half of `fopAc_Draw` the sim can evaluate - the `NODRAW` status bit and, for a
+/// `CULL` actor, `fopAcM_cullingCheck` with the cull box `fopAcM_setCullSizeBox(this, -50, -20,
+/// -50, 50, 120, 50)` (`:1987`) and the matrix `setMtx` builds (`:288-291`).
+///
+/// The pass leaves `fopAcCnd_NODRAW_e` in the registry entry
+/// (`ActorRegistry::set_draw_condition`), which the next tick's execute gate reads and which
+/// `lib.rs`'s `actor_views` reads to skip the drawn geometry, so a culled or hidden actor
+/// disappears from both.
+pub fn control_draw(
+    mut world: DrawWorld,
+    mut actors: Query<(Entity, &Actor, &Ba1)>,
+    player: Query<&Player>,
+) {
+    let view = world
+        .camera
+        .as_deref()
+        .and_then(super::camera::Camera::view);
+    let clip = view.map(Clip::new);
+    let view_mtx = view.map(|view| view.view);
+    let player_pos = player.iter().next().map_or(Vec3::ZERO, |player| player.pos);
+    for (entity, actor, ba1) in &mut actors {
+        let Some(proc_id) = world.registry.proc_id(entity) else {
+            continue;
+        };
+        let model =
+            Mat4::from_translation(actor.pos) * Mat4::from_rotation_y(from_s16(ba1.shape_angle[1]));
+        let gate = world.registry.entry(proc_id).is_some_and(|entry| {
+            world
+                .registry
+                .draw_gate(entry, clip.as_ref(), model, Some((CULL_MIN, CULL_MAX)))
+        });
+        // `fopAc_Draw` records the *gate*, not `_draw`'s own early-out (`f_op_actor.cpp:141-148`):
+        // a gate that passed leaves `NODRAW` clear even when the actor's `_draw` returns before
+        // drawing, which is what keeps the demo stand-in executing.
+        world.registry.set_draw_condition(proc_id, gate);
+        if !gate {
+            continue;
+        }
+        // `_draw`'s `if(mbInitGrandma0 || m7F7) return TRUE;` (`:1853-1855`) sits above both
+        // registrations.
+        if !ba1.drawn() {
+            continue;
+        }
+        // `shadowDraw()` (`:1819-1838`): the acch's stored ground hit is re-queried here,
+        // because the port stores no acch (`set_mtx`). Retail's `j3dSys` always carries a view;
+        // without one the shadow matrices have no space to land in, so the registration waits.
+        let ground = ground_probe(world.collision.as_deref(), actor.pos);
+        if let Some(view) = view_mtx {
+            ba1.shadow_draw(actor.pos, view, ground.as_ref(), &mut *world.shadow);
+        }
+        // `dSnap_RegistFig(DSNAP_TYPE_NPC_BA1, this, 1.0f, 1.0f, 1.0f)` (`:1868`).
+        world.snap.regist_fig(
+            DSNAP_TYPE_NPC_BA1,
+            proc_id,
+            actor.pos,
+            ba1.shape_angle[1],
+            1.0,
+            1.0,
+            1.0,
+            player_pos,
+        );
+    }
+}
+
+#[derive(SystemParam)]
+pub struct DrawWorld<'w> {
+    pub registry: ResMut<'w, ActorRegistry>,
+    pub snap: ResMut<'w, SnapPacket>,
+    pub shadow: ResMut<'w, ShadowControl>,
+    pub camera: Option<Res<'w, super::camera::Camera>>,
+    pub collision: Option<Res<'w, Collision>>,
 }

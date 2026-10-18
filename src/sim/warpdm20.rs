@@ -11,9 +11,10 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList, Stage};
+use super::events::{SimEvent, SimEvents};
 use super::flags::{EventFlags, EventReg};
 use super::player::Player;
-use super::player_status::{STTS0_SHIP_RIDE, PlayerStatus};
+use super::player_status::{PlayerStatus, STTS0_SHIP_RIDE};
 use super::sea::Sea;
 use super::ship::Ship;
 use crate::text::msgproc::MsgGameInfo;
@@ -69,15 +70,16 @@ const PARTICLE_NORMAL: u16 = 0x83d8; // <- d_a_warpdm20.cpp:165
 const PARTICLE_DEMO: u16 = 0x82bd; // <- d_a_warpdm20.cpp:214
 /// `static char* action_table[] = { "WAIT", "WARP", "DEAD", "WAIT_DEAD", "WAIT2",
 /// "RETURN_WAIT" };` (`:227-234`), paired with `event_init_tbl` / `event_action_tbl` (`:19-34`).
-/// The six names and their order are transcribed as [`ACTIONS`] so the `init_tbl` / `action_tbl`
-/// pairing has a named shape even though `demo_proc`'s dispatch is dropped.
+/// `dComIfGp_evmng_getMyActIdx` compares each row against the current cut's own name
+/// (`d_event_manager.cpp:461-487` reads `getMyNowCutName`, i.e. `dEvDtCut_c::getName`), which is
+/// [`EventList::cut_name`], so the six names and their order are the dispatch table's whole shape.
 const ACTIONS: [&str; 6] = [
-    "WAIT",           // <- d_a_warpdm20.cpp:228
-    "WARP",           // <- d_a_warpdm20.cpp:229
-    "DEAD",           // <- d_a_warpdm20.cpp:230
-    "WAIT_DEAD",      // <- d_a_warpdm20.cpp:231
-    "WAIT2",          // <- d_a_warpdm20.cpp:232
-    "RETURN_WAIT",    // <- d_a_warpdm20.cpp:233
+    "WAIT",        // <- d_a_warpdm20.cpp:228
+    "WARP",        // <- d_a_warpdm20.cpp:229
+    "DEAD",        // <- d_a_warpdm20.cpp:230
+    "WAIT_DEAD",   // <- d_a_warpdm20.cpp:231
+    "WAIT2",       // <- d_a_warpdm20.cpp:232
+    "RETURN_WAIT", // <- d_a_warpdm20.cpp:233
 ];
 /// `const u32 daWarpdm20_c::m_heapsize = 0x3000;` (`:39`) and the `fopAcM_entrySolidHeap(this,
 /// CheckCreateHeap, 0x3000)` guard (`:137`) - heap work.
@@ -89,11 +91,30 @@ const RESIDX_COUNT: usize = 4; // <- d_a_warpdm20.cpp:37-38
 /// (`:134`). `m2D6` is read NOWHERE else in the translation unit - grep `m2D6` and the only hits
 /// are the write at `:134` and the field declaration - so per RULE 7 the parameter is not stored.
 const TYPE_MASK: u32 = 0xF; // <- d_a_warpdm20.cpp:45
+/// `cXyz sp08(current.pos); sp08.z += 1000.0f; dComIfGp_evmng_setGoal(&sp08);` (`:305-307`).
+const WAIT_DEAD_GOAL_Z: f32 = 1000.0; // <- d_a_warpdm20.cpp:306
+/// `mDoAud_seStart(JA_SE_LK_HL_WAPR_D_IN)` (`:279`) - a 2D sound, so a plain
+/// [`SimEvent::Se`](super::events::SimEvent::Se).
+const SE_WAPR_D_IN: u32 = 0x288D; // <- JAZelAudio_SE.h:587
+/// `mDoAud_seStart(JA_SE_LK_HL_WAPR_U_OUT)` (`:318`, `:369`) - the `VERSION > VERSION_JPN` arm of
+/// the two dead / return-wait inits; this build is `VERSION_NTSC_U`.
+const SE_WAPR_U_OUT: u32 = 0x2890; // <- JAZelAudio_SE.h:590
+/// `fopAcM_seStart(this, JA_SE_OBJ_HL_WARP_OFF, 0)` (`:332`) - a point sound at the actor, so
+/// [`SimEvent::SeAt`](super::events::SimEvent::SeAt), the same split `iceisland.rs` records for
+/// `fopAcM_seStartCurrent` and `jstudio.rs` for the demo's own `JSND` adaptor.
+const SE_HL_WARP_OFF: u32 = 0x6A56; // <- JAZelAudio_SE.h:2101
+/// `fopAcM_seStart(this, JA_SE_OBJ_HL_WAPR_EFF, 0)` (`:174`).
+const SE_HL_WAPR_EFF: u32 = 0x1088; // <- JAZelAudio_SE.h:322
 /// `if (demoActorID == 0) { set_effect(0x83d8); checkOrder(); demo_proc(); eventOrder(); } else
 /// { demo_execute(); }` (`:164-171`). `demoActorID` is never set by `_create` (`:131-143`), so it
 /// takes `sBs_ClearArea`'s zero (`f_pc_base.cpp:97-98`) and the DEMO branch is dead for a
 /// stage-placed actor.
 const DEMO_ID_NONE: u32 = 0; // <- d_a_warpdm20.cpp:164
+
+/// `mStaffIdx = dComIfGp_evmng_getMyStaffId("Gdemo20");` (`:236`) - the only staff name this
+/// translation unit looks up, used by [`WarpDm20::demo_proc`] through
+/// [`ActiveEvent::staff_cut`](super::event::ActiveEvent::staff_cut).
+const STAFF_NAME: &str = "Gdemo20"; // <- d_a_warpdm20.cpp:236
 
 /// The six `event_init_tbl` / `event_action_tbl` entries (`:19-34`), indexed by
 /// `dComIfGp_evmng_getMyActIdx`'s position in [`ACTIONS`].
@@ -123,6 +144,21 @@ impl Action {
             Action::WaitDead => ACTIONS[3],
             Action::Wait2 => ACTIONS[4],
             Action::ReturnWait => ACTIONS[5],
+        }
+    }
+
+    /// The other half of that pairing: the row `dComIfGp_evmng_getMyActIdx` returns when the
+    /// current cut is named [`Action::name`]'s string, which is the index into `event_init_tbl` /
+    /// `event_action_tbl` (`:19-34`).
+    pub fn from_index(index: usize) -> Option<Self> {
+        match index {
+            0 => Some(Action::Wait),
+            1 => Some(Action::Warp),
+            2 => Some(Action::Dead),
+            3 => Some(Action::WaitDead),
+            4 => Some(Action::Wait2),
+            5 => Some(Action::ReturnWait),
+            _ => None,
         }
     }
 }
@@ -156,9 +192,10 @@ pub struct WarpDm20 {
     pub ripple: Vec3,
     /// `m2F8` (`d_a_warpdm20.h:67`) - `set_wpsenko`'s one-shot guard (`:468-471`).
     pub wpsenko: bool,
-    /// `mStaffIdx` (`d_a_warpdm20.h:64`) from `dComIfGp_evmng_getMyStaffId("Gdemo20")` (`:236`).
-    /// Only `demo_proc` reads it, and that is dropped, so it is not stored.
-    /// `demoActorID` (`:164`) - never written by `_create`, so [`DEMO_ID_NONE`] always holds.
+    /// `mStaffIdx` (`d_a_warpdm20.h:64`) from `dComIfGp_evmng_getMyStaffId("Gdemo20")` (`:236`) is
+    /// resolved by name inside [`WarpDm20::demo_proc`] each tick, the house shape `event.rs` uses,
+    /// so no index is stored. `demoActorID` (`:164`) - never written by `_create`, so
+    /// [`DEMO_ID_NONE`] always holds.
     /// One-shot guard so `CreateInit`'s `onEventBit` (`:126`) runs exactly once, on the first tick.
     pub entered: bool,
     /// `set_effect` (`:449-464`) returns FALSE when `mRippleCallback.getEmitter() != NULL` - i.e. it
@@ -420,6 +457,114 @@ impl WarpDm20 {
         // the same omission `dai.rs:351-355` records for `dEvtCnd_CANTALK_e`.
     }
 
+    /// `daWarpdm20_c::demo_proc` (`:225-251`).
+    ///
+    /// ```
+    /// static char* action_table[] = { "WAIT", "WARP", "DEAD", "WAIT_DEAD", "WAIT2",
+    ///                                 "RETURN_WAIT" };
+    /// mStaffIdx = dComIfGp_evmng_getMyStaffId("Gdemo20");
+    /// if (dComIfGp_event_runCheck() && !eventInfo.checkCommandTalk() && mStaffIdx != -1) {
+    ///     s32 iVar1 = dComIfGp_evmng_getMyActIdx(mStaffIdx, action_table, ARRAY_SIZE(action_table),
+    ///                                            FALSE, 0);
+    ///     if (iVar1 == -1) {
+    ///         dComIfGp_evmng_cutEnd(mStaffIdx);
+    ///     } else {
+    ///         if (dComIfGp_evmng_getIsAddvance(mStaffIdx)) {
+    ///             (this->*event_init_tbl[iVar1])(mStaffIdx);
+    ///         }
+    ///         if ((this->*event_action_tbl[iVar1])(mStaffIdx)) {
+    ///             dComIfGp_evmng_cutEnd(mStaffIdx);
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// `getMyStaffId("Gdemo20")` is a name lookup into the running manager, which
+    /// [`ActiveEvent::staff_cut`] performs (`d_event_manager.cpp:412-438` walks the running events
+    /// for the slot), and its `-1` is the `None` that also covers `mStaffIdx == -1` here. The
+    /// dispatch index is the position of the current cut's own name in [`ACTIONS`] - exactly what
+    /// `dComIfGp_evmng_getMyActIdx` compares (`d_event_manager.cpp:474-486`), not a separate action
+    /// label `EventList` would have to carry. `getIsAddvance` is the run's own `advance`, and
+    /// `cutEnd` is [`ActiveEvent::end_staff_cut`]'s flag write.
+    ///
+    /// `eventInfo.checkCommandTalk()` is `mCommand == dEvtCmd_INTALK_e` (`f_op_actor.h:174`), the
+    /// per-actor latch `dEvent_manager_c` writes when it routes a TALK command to this actor. This
+    /// actor never registers a talk condition - the only order in the translation unit is
+    /// `fopAcM_orderOtherEventId(this, mEventIdx, 0xff, 0xffff, 0, 1)` (`:387`), whose `0xff` name
+    /// and `0xffff` actor argument are the "no talk" pair - so the manager can never pick it as a
+    /// talk target and the gate is provably false for this actor. It is not transcribed as a
+    /// standing `false`: the port has no per-actor command word to read.
+    ///
+    /// DROPPED, all of it renderer or particle work: `initWait` / `initWaitDead` / `initReturnWait`'s
+    /// `mRippleCallback.getEmitter()->playCreateParticle()` (`:256`, `:291`, `:368`), `initWaitDead`'s
+    /// `init_bck_anm(GDEMO20_1A)` and its BRK frame / BCK speed writes (`:309-316`), `actWaitDead`'s
+    /// BTK / BRK plays (`:322-330`) and `actDead`'s BTK / BRK plays plus its emitter-scale chase
+    /// (`:336-362`). Every one of the six `act*` bodies is `animPlay()` and a constant, so the
+    /// cut-end answer is the constant.
+    ///
+    /// `actDead` (`:334-364`) returns `mpBckAnm->play()` - TRUE only when the closing BCK has run to
+    /// its end - so its cut can only end on an animation this checkout has no frame count for (bug
+    /// class 2). The TEAR stays open: see the note on [`WarpDm20::demo_proc`]. `m2CC = 0` rides that
+    /// same answer, so `lit` is not cleared here.
+    fn demo_proc(
+        &mut self,
+        active: &mut ActiveEvent,
+        list: &EventList,
+        info: &MsgGameInfo,
+        flags: &mut EventFlags,
+        events: &mut SimEvents,
+        origin: Vec3,
+    ) {
+        if !info.event_run_check() {
+            return;
+        }
+        let Some((cut, advance)) = active.staff_cut(list, STAFF_NAME) else {
+            return;
+        };
+        let Some(action) = list
+            .cut_name(cut)
+            .and_then(|name| ACTIONS.iter().position(|row| *row == name))
+            .and_then(Action::from_index)
+        else {
+            // `if (iVar1 == -1) { dComIfGp_evmng_cutEnd(mStaffIdx); }` (`:242-244`)
+            active.end_staff_cut(list, flags, STAFF_NAME);
+            return;
+        };
+        if advance {
+            // `if (dComIfGp_evmng_getIsAddvance(mStaffIdx))` (`:246`)
+            match action {
+                // `initWait` (`:254-258`) is the emitter alone.
+                Action::Wait => {}
+                // `initWait2` (`:267-270`): `dComIfGp_evmng_setGoal(&current.pos);`
+                Action::Wait2 => active.set_goal(origin),
+                // `initWarp` (`:278-281`): `mDoAud_seStart(JA_SE_LK_HL_WAPR_D_IN);
+                // dComIfGp_evmng_setGoal(&current.pos);`
+                Action::Warp => {
+                    events.list.push(SimEvent::Se(SE_WAPR_D_IN));
+                    active.set_goal(origin);
+                }
+                // `initWaitDead` (`:290-320`): the goal sits 1000 units along +z, `m2CC` goes to 1,
+                // and the out sound plays.
+                Action::WaitDead => {
+                    active.set_goal(origin + Vec3::Z * WAIT_DEAD_GOAL_Z);
+                    self.lit = true;
+                    events.list.push(SimEvent::Se(SE_WAPR_U_OUT));
+                }
+                // `initDead` (`:330-334`): `fopAcM_seStart(this, JA_SE_OBJ_HL_WARP_OFF, 0);`
+                Action::Dead => events.list.push(SimEvent::SeAt(SE_HL_WARP_OFF, origin)),
+                // `initReturnWait` (`:367-372`) is the out sound and the emitter.
+                Action::ReturnWait => events.list.push(SimEvent::Se(SE_WAPR_U_OUT)),
+            }
+        }
+        // `if ((this->*event_action_tbl[iVar1])(mStaffIdx)) { dComIfGp_evmng_cutEnd(mStaffIdx); }`
+        // (`:248-250`). `actDead`'s own answer is the BCK stop, which this checkout cannot carry:
+        // the arm reports NO end and the cut holds, the same sink `jbaba.rs`'s `mode_spawn` and
+        // `gryw.rs`'s `spawn_act_proc` document for their own animation-gated exits.
+        if action != Action::Dead {
+            active.end_staff_cut(list, flags, STAFF_NAME);
+        }
+    }
+
     /// `daWarpdm20_c::_execute` (`:163-179`), reduced to `set_mtx` plus the two live branches.
     ///
     /// ```
@@ -437,12 +582,7 @@ impl WarpDm20 {
     ///
     /// `demoActorID` (`:164`) is never written by `_create` (`:131-143`), so it holds
     /// [`DEMO_ID_NONE`] and `demo_execute` is dead for a stage-placed actor. DROPPED: `set_effect`
-    /// (`:165`) - particle emitter setup, RULE 3b; `demo_proc` (`:167`) - it needs
-    /// `dComIfGp_evmng_getMyActIdx(mStaffIdx, action_table, 6, FALSE, 0)` to resolve a cut's ACTION
-    /// name against [`ACTIONS`], and the sim's `EventList` exposes the cut NAME, not the action label
-    /// (`Event` has `name`, `priority`, `staffs`, `finish_flags`, `end_sound` -
-    /// `src/sim/event.rs:203-209`), so the index has no counterpart; the `JA_SE_OBJ_HL_WAPR_EFF` sound
-    /// (`:174`) - no modelled audio channel for a positional SE.
+    /// (`:165`) - particle emitter setup, RULE 3b.
     ///
     /// Returns TRUE when `checkOrder` asked for the actor to be deleted (`fopAcM_delete(this)`,
     /// `:401`).
@@ -453,15 +593,23 @@ impl WarpDm20 {
         list: &EventList,
         info: &MsgGameInfo,
         ctx: &Ctx<'_>,
+        flags: &mut EventFlags,
+        events: &mut SimEvents,
         entity: Entity,
     ) -> bool {
         // `set_effect(0x83d8);` (:165) - one-shot, recorded on the component.
         self.effect_built = true;
         // `checkOrder();` (:166)
         let deleted = self.check_order(active, info, ctx);
-        // `demo_proc();` (:167) - dropped, see above.
+        // `demo_proc();` (:167)
+        self.demo_proc(active, list, info, flags, events, ctx.origin);
         // `eventOrder();` (:168)
         self.event_order(active, list, entity);
+        // `if (m2CC != 0) { fopAcM_seStart(this, JA_SE_OBJ_HL_WAPR_EFF, 0); }` (:173-175) - a point
+        // sound at the actor, once per tick while the hole is lit.
+        if self.lit {
+            events.list.push(SimEvent::SeAt(SE_HL_WAPR_EFF, ctx.origin));
+        }
         // `set_mtx();` (:177)
         self.set_mtx(actor, ctx.sea);
         deleted
@@ -499,7 +647,10 @@ struct Ctx<'a> {
 /// `dEvent_manager_c::getMyStaffId` scans (`d_event_manager.cpp:412`). The `hbrf1.rs:258` /
 /// `hole.rs:293` house reduction.
 fn demo_running(active: &ActiveEvent, slot: usize) -> bool {
-    matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+    matches!(
+        active.stage_of(slot),
+        Some(Stage::Play) | Some(Stage::Close)
+    )
 }
 
 pub fn is_warp_dm20(name: &str) -> bool {
@@ -516,6 +667,7 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     info: Res<MsgGameInfo>,
     mut flags: ResMut<EventFlags>,
+    mut events: ResMut<SimEvents>,
     mut commands: Commands,
 ) {
     let sea_ref = sea.as_deref();
@@ -537,7 +689,16 @@ pub fn control(
             sea: sea_ref,
             flags: &regs,
         };
-        let deleted = hole.execute(&mut actor, &mut active, &list, &info, &ctx, entity);
+        let deleted = hole.execute(
+            &mut actor,
+            &mut active,
+            &list,
+            &info,
+            &ctx,
+            &mut flags,
+            &mut events,
+            entity,
+        );
         // `fopAcM_delete(this);` (:401) - a real delete request in retail, so `commands.despawn()`.
         if deleted {
             let _ = commands.entity(entity).despawn();

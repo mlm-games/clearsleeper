@@ -318,8 +318,8 @@ impl Boko {
                 self.slack -= 1;
             }
             let span = Vec3::new(self.top.x - self.root.x, f1 - f30, self.top.z - self.root.z);
-            let tilt = self.shape[0]
-                .wrapping_sub(walk::to_s16(-span.y.atan2(span.x.hypot(span.z))));
+            let tilt =
+                self.shape[0].wrapping_sub(walk::to_s16(-span.y.atan2(span.x.hypot(span.z))));
             self.turn_x = ((tilt) as f32 * FLAT_RATE) as i16;
             if self.turn_x == 0 && tilt != 0 {
                 self.turn_x = tilt.wrapping_neg();

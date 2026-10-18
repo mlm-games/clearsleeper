@@ -62,7 +62,11 @@ impl Atdoor {
         } else {
             (ACT_CLOSE_WAIT, 0)
         };
-        Self { sw_bit, action, open }
+        Self {
+            sw_bit,
+            action,
+            open,
+        }
     }
 
     /// `daAtdoor_actionWait` (`:109-111`) does nothing.

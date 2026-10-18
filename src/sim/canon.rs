@@ -342,9 +342,7 @@ impl Canon {
         add_calc_angle_s2(&mut self.yaw, self.yaw_want, AIM_SCALE, AIM_STEP);
         match self.mode {
             MODE_WAIT => self.wait_mode(blasts, spins, switches, events),
-            MODE_ATTACK => self.attack_mode(
-                pos, angle, blasts, spins, switches, events, commands,
-            ),
+            MODE_ATTACK => self.attack_mode(pos, angle, blasts, spins, switches, events, commands),
             MODE_DELETE => {}
             MODE_SW_WAIT => {
                 if self.appear_switch != NO_SWITCH && switches.test(self.appear_switch) {

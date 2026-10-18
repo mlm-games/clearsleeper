@@ -1,4 +1,3 @@
-
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::{Mat4, Vec3, Vec4};
@@ -878,8 +877,18 @@ impl Bgn3 {
         self.check_ground(actor);
         self.body.at_set = false;
         self.head.at_set = false;
-        add_calc2(&mut actor.pos.x, END_SLIDE_X, END_SLIDE_SCALE, END_SLIDE_STEP);
-        add_calc2(&mut actor.pos.z, END_SLIDE_Z, END_SLIDE_SCALE, END_SLIDE_STEP);
+        add_calc2(
+            &mut actor.pos.x,
+            END_SLIDE_X,
+            END_SLIDE_SCALE,
+            END_SLIDE_STEP,
+        );
+        add_calc2(
+            &mut actor.pos.z,
+            END_SLIDE_Z,
+            END_SLIDE_SCALE,
+            END_SLIDE_STEP,
+        );
     }
 
     pub fn ke_control(ke: &mut Ke, scale: f32, hio: &Bgn3Hio) {
@@ -930,12 +939,9 @@ impl Bgn3 {
         if self.cool_hit != 0 {
             return;
         }
-        if let Some(hit) = hits
-            .iter()
-            .find(|at| {
-                at.obj.chk_at_type(OBJ_TG_TYPE) && at.hits(self.head.centre, self.head.radius)
-            })
-        {
+        if let Some(hit) = hits.iter().find(|at| {
+            at.obj.chk_at_type(OBJ_TG_TYPE) && at.hits(self.head.centre, self.head.radius)
+        }) {
             let mut info = CcAtInfo {
                 mp_obj: Some(hit.obj.clone()),
                 p_particle_pos: None,
@@ -1073,8 +1079,7 @@ impl Bgn3 {
             self.parts[i].scale = SEG_SCALE * SIZE_D[i];
         }
         self.part_control(actor, hio);
-        let model =
-            base * zrot(actor.shape_angle[2]) * Mat4::from_scale(Vec3::splat(MODEL_SCALE));
+        let model = base * zrot(actor.shape_angle[2]) * Mat4::from_scale(Vec3::splat(MODEL_SCALE));
         self.body.centre = point(&model, Vec3::ZERO);
         self.body.radius = RADIUS_BODY;
         for i in 0..KE_HAIRS {

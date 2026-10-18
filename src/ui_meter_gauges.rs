@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::j2d::{self, Kind, Screen};
 use crate::sim::flags::Collect;
-use crate::text::msgproc::{fop_msgm_value_increase, MsgAppend, MsgProcs};
+use crate::text::msgproc::{MsgAppend, MsgProcs, fop_msgm_value_increase};
 
 pub const SCREEN_MAIN_PARTS1: &str = "main_parts1.blo";
 pub const SCREEN_MAIN_PARTS3: &str = "main_parts3.blo";

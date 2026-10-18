@@ -152,11 +152,7 @@ pub fn control(
         }
         if let Some((stage, start, room)) = door.dropped() {
             next.exit = Some(start);
-            next.target = Some(super::transition::Target {
-                stage,
-                room,
-                start,
-            });
+            next.target = Some(super::transition::Target { stage, room, start });
             let _ = commands.entity(entity).despawn();
         }
     }

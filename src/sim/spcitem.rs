@@ -77,13 +77,8 @@ impl SpcItem {
     /// test, keeping `dBgS_Acch::GroundCheck`'s "was not already resting" guard so a settled item
     /// reports a landing only every other tick (`tww/src/d/d_bg_s_acch.cpp:115,137-148`).
     fn step(&mut self, actor: &mut Actor, solid: Option<&Collision>) {
-        let (travel, _) = stream::calc_speed(
-            0.0,
-            actor.angle[1],
-            self.speed_y,
-            self.gravity(),
-            MAX_FALL,
-        );
+        let (travel, _) =
+            stream::calc_speed(0.0, actor.angle[1], self.speed_y, self.gravity(), MAX_FALL);
         self.speed_y = travel.y;
         let step = travel;
         actor.pos += step;

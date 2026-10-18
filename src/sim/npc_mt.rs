@@ -42,14 +42,7 @@ pub const FIGURE_COMP: [u16; 17] = [
     0x84FF, 0x83FF, 0x82FF, 0x81FF, 0x80FF,
 ];
 pub const FIGURE_ROOM_NAME: [&str; 8] = [
-    "Pfigure",
-    "figureA",
-    "figureB",
-    "figureC",
-    "figureD",
-    "figureE",
-    "figureF",
-    "figureG",
+    "Pfigure", "figureA", "figureB", "figureC", "figureD", "figureE", "figureF", "figureG",
 ];
 pub const FIGURE_ROOM_FIRST: i32 = 1;
 pub const FIGURE_ROOM_LAST: i32 = 7;
@@ -349,7 +342,7 @@ pub const CHARA_FIG_ROOM: [u8; CHARA_DATA_SIZE as usize] = [
     0x06, 0x06, 0x06, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
     0x07, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
     0x05, 0x05, 0x05, 0x05, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-    0x04, 0x04, 0x04, 0x04, 0x04, 0x04
+    0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
 ];
 
 pub fn is_npc_mt(name: &str) -> bool {
@@ -381,7 +374,10 @@ pub fn fig_room_id(table_index: u8) -> u8 {
     if table_index >= CHARA_DATA_SIZE {
         return PHOTO_NONE;
     }
-    CHARA_FIG_ROOM.get(usize::from(table_index)).copied().unwrap_or(0)
+    CHARA_FIG_ROOM
+        .get(usize::from(table_index))
+        .copied()
+        .unwrap_or(0)
 }
 
 pub fn is_figure_get(stories: &StoryBits, figure_no: u8) -> u8 {
@@ -390,7 +386,12 @@ pub fn is_figure_get(stories: &StoryBits, figure_no: u8) -> u8 {
     }
     if figure_no / 8 < FIGURE_GROUPS {
         let bit = figure_no % 8;
-        let reg = stories.reg(FIGURE_COMP.get(usize::from(figure_no / 8)).copied().unwrap_or(0));
+        let reg = stories.reg(
+            FIGURE_COMP
+                .get(usize::from(figure_no / 8))
+                .copied()
+                .unwrap_or(0),
+        );
         return u8::from(reg & (1 << bit) != 0);
     }
     0
@@ -399,7 +400,10 @@ pub fn is_figure_get(stories: &StoryBits, figure_no: u8) -> u8 {
 pub fn set_figure(stories: &mut StoryBits, figure: u8) {
     if figure < TOTAL_FIGURE_COUNT {
         let bit = figure % 8;
-        let id = FIGURE_COMP.get(usize::from(figure / 8)).copied().unwrap_or(0);
+        let id = FIGURE_COMP
+            .get(usize::from(figure / 8))
+            .copied()
+            .unwrap_or(0);
         let mut reg = stories.reg(id);
         reg |= 1 << bit;
         stories.set_reg(id, reg);
@@ -789,8 +793,16 @@ impl NpcMt {
     }
 
     fn jnt_limit(&self, target: i16, slot: usize, axis: usize) -> i16 {
-        let max = self.jnt_max.get(slot).and_then(|row| row.get(axis)).copied();
-        let min = self.jnt_min.get(slot).and_then(|row| row.get(axis)).copied();
+        let max = self
+            .jnt_max
+            .get(slot)
+            .and_then(|row| row.get(axis))
+            .copied();
+        let min = self
+            .jnt_min
+            .get(slot)
+            .and_then(|row| row.get(axis))
+            .copied();
         match (max, min) {
             (Some(max), Some(min)) => {
                 if target > max {
@@ -849,7 +861,9 @@ impl NpcMt {
         let mut done = 0;
         for slot in 0..2 {
             let max_step = self.jnt_step[slot][axis];
-            if angles[slot].wrapping_sub(self.jnt_angle[slot][axis]).unsigned_abs()
+            if angles[slot]
+                .wrapping_sub(self.jnt_angle[slot][axis])
+                .unsigned_abs()
                 <= (max_step / 2) as u16
             {
                 done += 1;
@@ -998,7 +1012,12 @@ impl Ctx<'_> {
 }
 
 impl NpcMt {
-    pub fn phase_1(&mut self, stories: &mut StoryBits, tmp: &mut EventFlags, start_point: bool) -> bool {
+    pub fn phase_1(
+        &mut self,
+        stories: &mut StoryBits,
+        tmp: &mut EventFlags,
+        start_point: bool,
+    ) -> bool {
         let mut stop = false;
         if stories.test(BIT_3D08) {
             stop = true;
@@ -1489,7 +1508,10 @@ impl NpcMt {
         } else {
             EMODE_NONE
         };
-        let end = BCK_FRAME_MAX.get(usize::from(param_1)).copied().unwrap_or(0);
+        let end = BCK_FRAME_MAX
+            .get(usize::from(param_1))
+            .copied()
+            .unwrap_or(0);
         self.morph.set_anm(attribute, end, ANM_FIRST);
         self.morph.set_morf(blend);
         self.bck_index = param_1;
@@ -1525,7 +1547,10 @@ impl NpcMt {
         if self.get_item_event_idx < 0 {
             return false;
         }
-        if ctx.active.end_check(usize::from(self.get_item_event_idx as u16)) {
+        if ctx
+            .active
+            .end_check(usize::from(self.get_item_event_idx as u16))
+        {
             self.ev_flag |= EV_FLAG_8;
             return true;
         }
@@ -1640,12 +1665,7 @@ impl NpcMt {
             if self.cut_turn_speed != 0 {
                 target = self.cut_turn_speed;
             }
-            stream::add_calc_angle_s2(
-                &mut self.turn_vel,
-                target,
-                TURN_SPEED,
-                TURN_MAX_STEP,
-            );
+            stream::add_calc_angle_s2(&mut self.turn_vel, target, TURN_SPEED, TURN_MAX_STEP);
         } else {
             self.turn_vel = 0;
         }
@@ -1664,7 +1684,12 @@ impl NpcMt {
         let _ = ctx;
     }
 
-    pub fn delete(&mut self, stories: &mut StoryBits, tmp: &mut EventFlags, next_stage: Option<&str>) {
+    pub fn delete(
+        &mut self,
+        stories: &mut StoryBits,
+        tmp: &mut EventFlags,
+        next_stage: Option<&str>,
+    ) {
         let Some(next) = next_stage else {
             return;
         };
@@ -1736,10 +1761,7 @@ pub fn control(
 ) {
     let player = msg.players.iter().next().copied().map(|link| link.pos);
     let clear_count = msg.text_flags.clear_count;
-    let archive = msg
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = msg.archive.as_deref().map(|held| held as &dyn MsgArchive);
     let event_mode = msg.info.event_run_check();
     let pressed = world.do_intent.0;
     let next_stage = world
@@ -1752,11 +1774,7 @@ pub fn control(
         let npc = &mut *npc;
         if !npc.entered {
             npc.entered = true;
-            let done = npc.phase_1(
-                &mut world.stories,
-                &mut world.tmp,
-                npc.start_stage_point,
-            );
+            let done = npc.phase_1(&mut world.stories, &mut world.tmp, npc.start_stage_point);
             if done {
                 npc.done = true;
                 continue;

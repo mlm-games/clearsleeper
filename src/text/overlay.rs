@@ -60,10 +60,7 @@ pub fn render(world: &mut World, width: usize, height: usize) -> Overlay {
         draw_msg1(world, &mut canvas, &mut fonts);
     }
     world.insert_resource(fonts);
-    let lit = canvas
-        .pixels
-        .chunks_exact(4)
-        .any(|pixel| pixel[3] > 0);
+    let lit = canvas.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0);
     Overlay {
         canvas,
         live: live && lit,

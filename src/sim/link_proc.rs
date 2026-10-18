@@ -737,26 +737,98 @@ impl Proc {
             Proc::Subjectivity => MODE_00000001 | MODE_00000004 | MODE_00001000 | MODE_SUBJECT,
             Proc::Call => MODE_00000001 | MODE_00000080 | MODE_00000100,
             Proc::ControllWait => MODE_00000001,
-            Proc::Wait => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000100 | MODE_00001000 | MODE_00020000,
-            Proc::FreeWait => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000400 | MODE_00020000,
-            Proc::Move => MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000100 | MODE_00001000 | MODE_00020000,
-            Proc::AtnMove => MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000100 | MODE_00001000 | MODE_00020000,
-            Proc::AtnActorWait => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000100 | MODE_00001000 | MODE_00020000,
-            Proc::AtnActorMove => MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000100 | MODE_00001000 | MODE_00020000,
-            Proc::SideStep => MODE_MIDAIR | MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00000400 | MODE_00001000,
-            Proc::SideStepLand => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00001000,
-            Proc::CrouchDefense => MODE_00000001 | MODE_00000100 | MODE_CROUCH | MODE_08000000 | MODE_SUBJECT | MODE_40000000,
+            Proc::Wait => {
+                MODE_00000001
+                    | MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+            }
+            Proc::FreeWait => {
+                MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000400 | MODE_00020000
+            }
+            Proc::Move => {
+                MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+            }
+            Proc::AtnMove => {
+                MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+            }
+            Proc::AtnActorWait => {
+                MODE_00000001
+                    | MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+            }
+            Proc::AtnActorMove => {
+                MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+            }
+            Proc::SideStep => {
+                MODE_MIDAIR
+                    | MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000080
+                    | MODE_00000400
+                    | MODE_00001000
+            }
+            Proc::SideStepLand => {
+                MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000080 | MODE_00001000
+            }
+            Proc::CrouchDefense => {
+                MODE_00000001
+                    | MODE_00000100
+                    | MODE_CROUCH
+                    | MODE_08000000
+                    | MODE_SUBJECT
+                    | MODE_40000000
+            }
             Proc::CrouchDefenseSlip => MODE_00000400 | MODE_CROUCH | MODE_SUBJECT | MODE_40000000,
             Proc::Crouch => MODE_00000001 | MODE_00000100 | MODE_CROUCH,
             Proc::CrawlStart => MODE_00000100 | MODE_00008000 | MODE_CRAWL | MODE_02000000,
-            Proc::CrawlMove => MODE_00000100 | MODE_00008000 | MODE_CRAWL | MODE_02000000 | MODE_08000000,
-            Proc::CrawlAutoMove => MODE_00000100 | MODE_00008000 | MODE_CRAWL | MODE_02000000 | MODE_04000000 | MODE_08000000,
+            Proc::CrawlMove => {
+                MODE_00000100 | MODE_00008000 | MODE_CRAWL | MODE_02000000 | MODE_08000000
+            }
+            Proc::CrawlAutoMove => {
+                MODE_00000100
+                    | MODE_00008000
+                    | MODE_CRAWL
+                    | MODE_02000000
+                    | MODE_04000000
+                    | MODE_08000000
+            }
             Proc::CrawlEnd => MODE_00008000 | MODE_CRAWL | MODE_02000000,
             Proc::WhideReady => MODE_00000001 | MODE_WHIDE,
             Proc::WhideWait => MODE_00000001 | MODE_00000004 | MODE_WHIDE | MODE_00000100,
             Proc::WhideMove => MODE_00000004 | MODE_WHIDE,
             Proc::WhidePeep => MODE_00000001 | MODE_00000004 | MODE_WHIDE | MODE_00000400,
-            Proc::WaitTurn => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000100 | MODE_00001000 | MODE_00004000 | MODE_00020000,
+            Proc::WaitTurn => {
+                MODE_00000001
+                    | MODE_00000004
+                    | MODE_00000040
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00004000
+                    | MODE_00020000
+            }
             Proc::MoveTurn => MODE_00000004 | MODE_00000040 | MODE_00004000 | MODE_00020000,
             Proc::Slip => MODE_00000100,
             Proc::SlideFront => MODE_00000400 | MODE_00008000,
@@ -769,7 +841,9 @@ impl Proc {
             Proc::SideRoll => MODE_00000400 | MODE_00008000,
             Proc::BackJump => MODE_MIDAIR | MODE_00000004 | MODE_00000040 | MODE_00000400,
             Proc::BackJumpLand => MODE_00000001 | MODE_00000004 | MODE_00000040 | MODE_00000400,
-            Proc::AutoJump => MODE_MIDAIR | MODE_00000004 | MODE_00000400 | MODE_00001000 | MODE_00004000,
+            Proc::AutoJump => {
+                MODE_MIDAIR | MODE_00000004 | MODE_00000400 | MODE_00001000 | MODE_00004000
+            }
             Proc::Land => MODE_00000001 | MODE_00000004 | MODE_00001000 | MODE_00004000,
             Proc::LandDamage => MODE_00000001 | MODE_DAMAGE | MODE_00000400,
             Proc::Fall => MODE_MIDAIR | MODE_00000004 | MODE_00001000,
@@ -787,7 +861,9 @@ impl Proc {
             Proc::PushMove => MODE_PUSHPULL,
             Proc::PullMove => MODE_00000400 | MODE_PUSHPULL,
             Proc::SwimUp => MODE_00000400 | MODE_SWIM | MODE_04000000,
-            Proc::SwimWait => MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_SWIM | MODE_04000000,
+            Proc::SwimWait => {
+                MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_SWIM | MODE_04000000
+            }
             Proc::SwimMove => MODE_00000080 | MODE_00000400 | MODE_SWIM | MODE_04000000,
             Proc::LadderUpStart => MODE_00000400 | MODE_LADDER,
             Proc::LadderUpEnd => MODE_00000400 | MODE_LADDER,
@@ -838,7 +914,9 @@ impl Proc {
             Proc::Damage => MODE_DAMAGE | MODE_00000080 | MODE_00000400,
             Proc::PolyDamage => MODE_DAMAGE | MODE_00000400,
             Proc::LargeDamage => MODE_MIDAIR | MODE_DAMAGE,
-            Proc::LargeDamageUp => MODE_DAMAGE | MODE_00000400 | MODE_00008000 | MODE_02000000 | MODE_08000000,
+            Proc::LargeDamageUp => {
+                MODE_DAMAGE | MODE_00000400 | MODE_00008000 | MODE_02000000 | MODE_08000000
+            }
             Proc::LargeDamageWall => MODE_MIDAIR | MODE_DAMAGE | MODE_00000400,
             Proc::LavaDamage => MODE_MIDAIR | MODE_DAMAGE,
             Proc::ElecDamage => MODE_00000001 | MODE_DAMAGE | MODE_00008000,
@@ -848,7 +926,9 @@ impl Proc {
             Proc::GrabMiss => MODE_00000001 | MODE_00000400 | MODE_GRAB,
             Proc::GrabThrow => MODE_00000001 | MODE_00000400 | MODE_GRAB,
             Proc::GrabPut => MODE_00000001 | MODE_00000400 | MODE_GRAB,
-            Proc::GrabWait => MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_00004000 | MODE_GRAB,
+            Proc::GrabWait => {
+                MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_00004000 | MODE_GRAB
+            }
             Proc::GrabHeavyWait => MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_GRAB,
             Proc::GrabRebound => MODE_00000001 | MODE_00000400 | MODE_GRAB,
             Proc::RopeSubject => MODE_00000001 | MODE_00000004 | MODE_00001000 | MODE_SUBJECT,
@@ -861,18 +941,38 @@ impl Proc {
             Proc::RopeMove => MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_SUBJECT,
             Proc::RopeThrowCatch => MODE_00000001 | MODE_00000400,
             Proc::RopeUpHang => MODE_ROPE | MODE_04000000,
-            Proc::BoomerangSubject => MODE_00000001 | MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_00020000 | MODE_SUBJECT,
-            Proc::BoomerangMove => MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_00020000 | MODE_SUBJECT,
+            Proc::BoomerangSubject => {
+                MODE_00000001
+                    | MODE_00000004
+                    | MODE_00000100
+                    | MODE_00001000
+                    | MODE_00020000
+                    | MODE_SUBJECT
+            }
+            Proc::BoomerangMove => {
+                MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_00020000 | MODE_SUBJECT
+            }
             Proc::BoomerangCatch => MODE_00000001 | MODE_00000400 | MODE_00001000,
-            Proc::HookshotSubject => MODE_00000001 | MODE_00000004 | MODE_00000100 | MODE_HOOKSHOT | MODE_00001000 | MODE_SUBJECT,
-            Proc::HookshotMove => MODE_00000004 | MODE_00000100 | MODE_HOOKSHOT | MODE_00001000 | MODE_SUBJECT,
+            Proc::HookshotSubject => {
+                MODE_00000001
+                    | MODE_00000004
+                    | MODE_00000100
+                    | MODE_HOOKSHOT
+                    | MODE_00001000
+                    | MODE_SUBJECT
+            }
+            Proc::HookshotMove => {
+                MODE_00000004 | MODE_00000100 | MODE_HOOKSHOT | MODE_00001000 | MODE_SUBJECT
+            }
             Proc::HookshotFly => MODE_MIDAIR | MODE_HOOKSHOT,
             Proc::ShipReady => MODE_HANG | MODE_00000400 | MODE_INSHIP,
             Proc::ShipJumpRide => MODE_00000400 | MODE_INSHIP,
             Proc::ShipSteer => MODE_00000080 | MODE_00000100 | MODE_INSHIP | MODE_40000000,
             Proc::ShipPaddle => MODE_00000080 | MODE_00000100 | MODE_INSHIP | MODE_40000000,
             Proc::ShipScope => MODE_00000100 | MODE_INSHIP | MODE_40000000,
-            Proc::ShipBoomerang => MODE_00000100 | MODE_INSHIP | MODE_00020000 | MODE_SUBJECT | MODE_40000000,
+            Proc::ShipBoomerang => {
+                MODE_00000100 | MODE_INSHIP | MODE_00020000 | MODE_SUBJECT | MODE_40000000
+            }
             Proc::ShipHookshot => MODE_00000100 | MODE_INSHIP | MODE_SUBJECT | MODE_40000000,
             Proc::ShipBow => MODE_00000100 | MODE_INSHIP | MODE_SUBJECT | MODE_40000000,
             Proc::ShipCannon => MODE_00000100 | MODE_INSHIP | MODE_40000000,
@@ -881,7 +981,9 @@ impl Proc {
             Proc::ShipRestart => MODE_00000400 | MODE_INSHIP,
             Proc::FanSwing => MODE_00000400 | MODE_08000000,
             Proc::FanGlide => MODE_MIDAIR | MODE_00000080 | MODE_00000400,
-            Proc::BowSubject => MODE_00000001 | MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_SUBJECT,
+            Proc::BowSubject => {
+                MODE_00000001 | MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_SUBJECT
+            }
             Proc::BowMove => MODE_00000004 | MODE_00000100 | MODE_00001000 | MODE_SUBJECT,
             Proc::VomitReady => MODE_MIDAIR | MODE_00000400,
             Proc::VomitWait => MODE_00000001 | MODE_00008000 | MODE_04000000,
@@ -894,7 +996,9 @@ impl Proc {
             Proc::IceSlipFall => MODE_MIDAIR,
             Proc::IceSlipFallUp => MODE_00000400 | MODE_00008000 | MODE_02000000 | MODE_08000000,
             Proc::IceSlipAlmostFall => MODE_00000001,
-            Proc::BootsEquip => MODE_00000001 | MODE_MIDAIR | MODE_00000400 | MODE_00004000 | MODE_08000000,
+            Proc::BootsEquip => {
+                MODE_00000001 | MODE_MIDAIR | MODE_00000400 | MODE_00004000 | MODE_08000000
+            }
             Proc::NotUse => MODE_00000001 | MODE_00000400,
             Proc::BottleDrink => MODE_00000001 | MODE_00000400,
             Proc::BottleOpen => MODE_00000001 | MODE_00000400,
@@ -948,7 +1052,9 @@ impl Proc {
             Proc::DemoSurprisedWait => MODE_00000001,
             Proc::DemoPowerUpWait => MODE_00000001 | MODE_00000400 | MODE_00008000,
             Proc::DemoPowerUp => MODE_00000001 | MODE_00000400 | MODE_00008000,
-            Proc::DemoShipSit => MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_INSHIP | MODE_00080000,
+            Proc::DemoShipSit => {
+                MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_INSHIP | MODE_00080000
+            }
             Proc::DemoLastCombo => MODE_00000001 | MODE_00008000,
             Proc::DemoHandUp => MODE_00000001 | MODE_00000080 | MODE_00000100 | MODE_00080000,
             Proc::DemoIceSlip => MODE_00000001 | MODE_00000400,
@@ -996,11 +1102,7 @@ pub const ROLLING: &[Proc] = &[
 ];
 
 /// `SWIMMING`.
-pub const SWIMMING: &[Proc] = &[
-    Proc::SwimUp,
-    Proc::SwimWait,
-    Proc::SwimMove,
-];
+pub const SWIMMING: &[Proc] = &[Proc::SwimUp, Proc::SwimWait, Proc::SwimMove];
 
 /// `SWORD`.
 pub const SWORD: &[Proc] = &[
@@ -1033,10 +1135,7 @@ pub const SWORD: &[Proc] = &[
 ];
 
 /// `SIDESTEP`.
-pub const SIDESTEP: &[Proc] = &[
-    Proc::SideStep,
-    Proc::SideStepLand,
-];
+pub const SIDESTEP: &[Proc] = &[Proc::SideStep, Proc::SideStepLand];
 
 /// `SLIDING`.
 pub const SLIDING: &[Proc] = &[
@@ -1047,10 +1146,7 @@ pub const SLIDING: &[Proc] = &[
 ];
 
 /// `TURNING`.
-pub const TURNING: &[Proc] = &[
-    Proc::WaitTurn,
-    Proc::MoveTurn,
-];
+pub const TURNING: &[Proc] = &[Proc::WaitTurn, Proc::MoveTurn];
 
 /// `HANGING`.
 pub const HANGING: &[Proc] = &[
@@ -1088,11 +1184,7 @@ pub const LOW: &[Proc] = &[
 ];
 
 /// `PUSHING`.
-pub const PUSHING: &[Proc] = &[
-    Proc::PushPullWait,
-    Proc::PushMove,
-    Proc::PullMove,
-];
+pub const PUSHING: &[Proc] = &[Proc::PushPullWait, Proc::PushMove, Proc::PullMove];
 
 /// `every group above, in first-mention order`.
 pub const LOCOMOTION: &[Proc] = &[

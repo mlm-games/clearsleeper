@@ -1,4 +1,5 @@
 use clearsleeper::j3d::bdl::{BdlError, parse};
+use clearsleeper::sim::demo::{DemoActor, DemoNodeTable, DemoObject, DemoObjectRef};
 
 struct Synthetic {
     bytes: Vec<u8>,
@@ -38,6 +39,7 @@ fn synthetic() -> Synthetic {
     jnt1[0..2].copy_from_slice(&2_u16.to_be_bytes());
     jnt1[4..8].copy_from_slice(&0x18_u32.to_be_bytes());
     jnt1[8..12].copy_from_slice(&0x98_u32.to_be_bytes());
+    jnt1[0x0C..0x10].copy_from_slice(&0x9C_u32.to_be_bytes());
     for translation in [[0.0_f32, 0.0, 0.0], [0.0, 0.0, 5.0]] {
         let mut init = vec![0_u8; 0x40];
         for (axis, value) in [4_usize, 8, 12].into_iter().zip([1.0_f32; 3]) {
@@ -50,6 +52,17 @@ fn synthetic() -> Synthetic {
     }
     jnt1.extend(0_u16.to_be_bytes());
     jnt1.extend(1_u16.to_be_bytes());
+    // The `ResNTAB` at JNT1+0x14: `mEntryNum`, then one `{mKeyCode, mOffs}` per joint, then the
+    // NUL-terminated names the offsets point at. The key codes are `calcKeyCode`'s
+    // `keyCode * 3 + byte` (`JUTNameTab.cpp:380-385`).
+    jnt1.extend(2_u16.to_be_bytes());
+    jnt1.extend(0_u16.to_be_bytes());
+    jnt1.extend(0x11AE_u16.to_be_bytes());
+    jnt1.extend(12_u16.to_be_bytes());
+    jnt1.extend(0x052C_u16.to_be_bytes());
+    jnt1.extend(17_u16.to_be_bytes());
+    jnt1.extend(b"root\0");
+    jnt1.extend(b"arm\0");
 
     let mut drw1 = vec![0_u8; 0x0C];
     drw1[0..2].copy_from_slice(&1_u16.to_be_bytes());
@@ -217,6 +230,53 @@ fn golden_strip_winding_joint_chain_and_colors() {
     assert_eq!(&texture.rgba[8..12], &[255, 255, 255, 255]);
     assert_eq!(&texture.rgba[32..36], &[255, 255, 255, 255]);
     assert_eq!(&texture.rgba[288..292], &[255, 255, 255, 255]);
+}
+
+#[test]
+fn golden_joint_name_table_resolves_node_ids() {
+    let synthetic = synthetic();
+    let mesh = parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).expect("synthetic bdl parses");
+    assert_eq!(mesh.joint_names, vec!["root".to_owned(), "arm".to_owned()]);
+    assert_eq!(mesh.find_node_id(b"root"), Some(0));
+    assert_eq!(mesh.find_node_id(b"arm"), Some(1));
+    assert_eq!(mesh.find_node_id(b"ar"), None, "the compare is not a prefix");
+    assert_eq!(mesh.find_node_id(b"leg"), None);
+    let node = mesh.find_node_id(b"arm").expect("arm is joint 1");
+    let transform = mesh.node_transform(node).expect("joint 1 has a node matrix");
+    assert_eq!(transform.w_axis.truncate().to_array(), [0.0, 0.0, 5.0]);
+    assert_eq!(mesh.node_transform(2), None);
+}
+
+#[test]
+fn golden_node_table_resolves_a_demo_stage_object_lookup() {
+    let synthetic = synthetic();
+    let mesh = parse(&synthetic.bytes, [0.0, 0.0], 0.0, None).expect("synthetic bdl parses");
+    let table = DemoNodeTable::new(
+        mesh.joint_names.clone(),
+        mesh.joint_matrices.clone(),
+        mesh.materials.clone(),
+    );
+    let mut object = DemoObject::default();
+    let id = object.push_actor(None).expect("a demo actor slot");
+    object
+        .get_actor_mut(id)
+        .expect("the slot exists")
+        .set_model(Some(table.clone()));
+
+    let parent = DemoObjectRef::Actor(id);
+    assert_eq!(object.find_node_id(parent, b"arm"), Some(1));
+    assert_eq!(object.find_node_id(parent, b"leg"), None);
+    let transform = object
+        .node_transform(parent, 1)
+        .expect("joint 1 has a node matrix");
+    assert_eq!(transform.w_axis.truncate().to_array(), [0.0, 0.0, 5.0]);
+    assert_eq!(object.node_transform(parent, 2), None);
+
+    let mut bare = DemoActor::new(None);
+    assert_eq!(bare.find_node_id(b"root"), None, "no model, no node table");
+    assert_eq!(bare.node_transform(0), None);
+    bare.set_model(Some(table));
+    assert_eq!(bare.find_node_id(b"root"), Some(0));
 }
 
 #[test]

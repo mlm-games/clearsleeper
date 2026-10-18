@@ -604,7 +604,12 @@ impl Dr2 {
                     aim.y += REG0_F5 + ATTACH_PITCH + self.lift;
                     let target =
                         atan2s(aim.y, (aim.x * aim.x + aim.z * aim.z).sqrt()).wrapping_neg();
-                    add_calc_angle_s2(&mut self.rock_ang[ANGLE_X], target, ATTACH_SCALE, ATTACH_MAX);
+                    add_calc_angle_s2(
+                        &mut self.rock_ang[ANGLE_X],
+                        target,
+                        ATTACH_SCALE,
+                        ATTACH_MAX,
+                    );
                     if !probe.down {
                         self.state = STATE_LIFT;
                     }
@@ -645,11 +650,8 @@ impl Dr2 {
                     self.fragments[idx].rot = self.rock_ang;
                     let along = (REG0_F2 + SHATTER_SPREAD) * HSX[idx];
                     let across = (REG0_F2 + SHATTER_SPREAD) * HSZ[idx];
-                    self.fragments[idx].vel = Vec3::new(
-                        along * cos + across * sin,
-                        0.0,
-                        across * cos - along * sin,
-                    );
+                    self.fragments[idx].vel =
+                        Vec3::new(along * cos + across * sin, 0.0, across * cos - along * sin);
                 }
                 self.state_shatter_done();
             }

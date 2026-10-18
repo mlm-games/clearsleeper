@@ -97,9 +97,7 @@ impl RoHat {
         let wall_hit = flat != to;
         actor.pos = flat;
         let ground_hit = ground::grounded(solid, actor.pos);
-        if ground_hit
-            && let Some(level) = ground::surface(solid, actor.pos)
-        {
+        if ground_hit && let Some(level) = ground::surface(solid, actor.pos) {
             actor.pos.y = level;
         }
 
@@ -120,10 +118,7 @@ pub fn is_rohat(name: &str) -> bool {
     ROHAT_ACTORS.contains(&name)
 }
 
-pub fn control(
-    collision: Option<Res<Collision>>,
-    mut hats: Query<(&mut Actor, &mut RoHat)>,
-) {
+pub fn control(collision: Option<Res<Collision>>, mut hats: Query<(&mut Actor, &mut RoHat)>) {
     for (mut actor, mut hat) in &mut hats {
         let actor = &mut *actor;
         hat.execute(actor, collision.as_deref());

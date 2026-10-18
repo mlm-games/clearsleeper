@@ -477,9 +477,13 @@ impl JntCtrl {
         self.field_0x30 = self.chk_lim(i32::from(target_x), 1, 0);
         let pitch_head = self.field_0x2c;
         let pitch_backbone = self.field_0x30;
-        self.angles[0][0] =
-            add_calc_angle_l(i32::from(self.angles[0][0]), pitch_head, JNT_SCALE as i32, step, 4)
-                as i16;
+        self.angles[0][0] = add_calc_angle_l(
+            i32::from(self.angles[0][0]),
+            pitch_head,
+            JNT_SCALE as i32,
+            step,
+            4,
+        ) as i16;
         self.angles[1][0] = add_calc_angle_l(
             i32::from(self.angles[1][0]),
             pitch_backbone,
@@ -718,7 +722,9 @@ impl NpcHi1 {
 
     /// `daNpc_Hi1_c::setAnm` (`:327-335`).
     fn set_anm(&mut self) {
-        let row = usize::try_from(self.state).unwrap_or(0).min(ANM_TABLE_SET.len() - 1);
+        let row = usize::try_from(self.state)
+            .unwrap_or(0)
+            .min(ANM_TABLE_SET.len() - 1);
         let prm = ANM_TABLE_SET[row];
         self.init_tex_pttrn_anm(prm.btp, true);
         self.set_anm_anm(&prm);
@@ -786,11 +792,7 @@ impl NpcHi1 {
 
     /// `daNpc_Hi1_c::getMsg_HI1_0` (`:403-405`) and `getMsg` (`:408-419`).
     fn get_msg(&self) -> u32 {
-        if self.anm_type == TYPE_NORMAL {
-            0
-        } else {
-            0
-        }
+        if self.anm_type == TYPE_NORMAL { 0 } else { 0 }
     }
 
     /// `fopNpc_npc_c::talk` (`d_npc.cpp:664-697`).
@@ -876,14 +878,8 @@ impl NpcHi1 {
             _ => {}
         }
         let free = self.head_only_follow;
-        self.jnt.look_at_target_2(
-            &mut actor.angle[1],
-            dst,
-            src,
-            target_y,
-            HIO_FIELD_12,
-            free,
-        );
+        self.jnt
+            .look_at_target_2(&mut actor.angle[1], dst, src, target_y, HIO_FIELD_12, free);
     }
 
     /// `daNpc_Hi1_c::setStt` (`:642-662`).
@@ -1151,11 +1147,7 @@ impl NpcHi1 {
             .cut_text(cut, "ActorName")
             .filter(|name| *name != "Player")
             .map(str::to_owned);
-        self.cut.set_id = ctx
-            .list
-            .cut_number(cut, "SetId")
-            .unwrap_or(0)
-            .max(0) as u16;
+        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
         self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
         self.cut.turn_type = ctx
             .list
@@ -1166,10 +1158,7 @@ impl NpcHi1 {
             .list
             .cut_number(cut, "Timer")
             .unwrap_or(CUT_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx
-            .list
-            .cut_number(cut, "TurnSpeed")
-            .unwrap_or(0) as i16;
+        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
         self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
         self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
         self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
@@ -1211,11 +1200,7 @@ impl NpcHi1 {
         self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
         self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
         self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
-        self.cut.set_id = ctx
-            .list
-            .cut_number(cut, "SetId")
-            .unwrap_or(0)
-            .max(0) as u16;
+        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
         self.cut.speed = ctx
             .list
             .cut_float(cut, "Speed")
@@ -1261,10 +1246,7 @@ impl NpcHi1 {
             .list
             .cut_number(cut, "Timer")
             .unwrap_or(CUT_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx
-            .list
-            .cut_number(cut, "TurnSpeed")
-            .unwrap_or(0) as i16;
+        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
         self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
         self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
         self.cut.field_0x44 = 0.0;
@@ -1359,8 +1341,7 @@ impl NpcHi1 {
             return;
         }
         let name = self.cut.actor_name.as_ref();
-        let Some((pos, angle)) = ctx.find_target(self.cut.set_id, name, from)
-        else {
+        let Some((pos, angle)) = ctx.find_target(self.cut.set_id, name, from) else {
             ctx.end_staff_cut(STAFF_HI1);
             self.cut.pos = Vec3::ZERO;
             return;
@@ -1610,10 +1591,7 @@ pub fn control(
     let clear_count = world.text_flags.clear_count;
     let event_run = msg.info.event_run_check();
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut hi1) in &mut actors {
         if !hi1.entered && hi1.create_refused() {
             let _ = commands.entity(entity).despawn();

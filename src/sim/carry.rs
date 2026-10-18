@@ -109,9 +109,7 @@ pub fn control(
     match carry.held {
         Some(held) => {
             let releasing = pressed;
-            if !releasing
-                && let Ok(mut cask) = casks.get_mut(held)
-            {
+            if !releasing && let Ok(mut cask) = casks.get_mut(held) {
                 cask.carry_step(true);
             }
             let chain = chain_from(&carryables, held);

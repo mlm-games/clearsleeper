@@ -175,9 +175,7 @@ impl JntHit {
     fn point(frames: &[Mat4], joint: u16, offset: Vec3) -> Vec3 {
         frames
             .get(usize::from(joint))
-            .map_or(offset, |frame| {
-                (frame * offset.extend(1.0)).truncate()
-            })
+            .map_or(offset, |frame| (frame * offset.extend(1.0)).truncate())
     }
 
     /// `csXyz(cos(x)sin(y), -sin(x), cos(x)cos(y))` for the attacker's `shape_angle`.
@@ -243,8 +241,10 @@ impl JntHit {
                         } else {
                             0.0
                         };
-                        ((is_zero(across) && is_zero(beyond)),
-                            (across * across + beyond * beyond).sqrt())
+                        (
+                            (is_zero(across) && is_zero(beyond)),
+                            (across * across + beyond * beyond).sqrt(),
+                        )
                     }
                     None => {
                         let value = min_limit(gap.length() - radius, 0.0);
@@ -268,12 +268,7 @@ impl JntHit {
                             }
                             if !is_throw(shape)
                                 && JntHit::buffer_update(
-                                    &frames,
-                                    &mut slot,
-                                    &mut held,
-                                    joint,
-                                    facing,
-                                    hit,
+                                    &frames, &mut slot, &mut held, joint, facing, hit,
                                 )
                             {
                                 best = hit;
@@ -286,12 +281,7 @@ impl JntHit {
                             }
                             if !is_throw(shape)
                                 && JntHit::buffer_update(
-                                    &frames,
-                                    &mut slot,
-                                    &mut held,
-                                    joint,
-                                    facing,
-                                    hit,
+                                    &frames, &mut slot, &mut held, joint, facing, hit,
                                 )
                             {
                                 best = hit;
@@ -318,14 +308,7 @@ impl JntHit {
                         return (IDX_DELETE, hit);
                     }
                     if !is_throw(shape)
-                        && JntHit::buffer_update(
-                            &frames,
-                            &mut slot,
-                            &mut held,
-                            joint,
-                            facing,
-                            hit,
-                        )
+                        && JntHit::buffer_update(&frames, &mut slot, &mut held, joint, facing, hit)
                     {
                         best = hit;
                     }
@@ -343,9 +326,21 @@ impl JntHit {
             return (IDX_DELETE, point);
         }
         let surface = match nearest_shape {
-            CYL => cyl_surface(point - nearest_a, nearest_a, nearest_b, nearest_radius, facing),
+            CYL => cyl_surface(
+                point - nearest_a,
+                nearest_a,
+                nearest_b,
+                nearest_radius,
+                facing,
+            ),
             SPH => sph_surface(point - nearest_a, nearest_a, nearest_radius, facing),
-            _ => cyl2_surface(point - nearest_a, nearest_a, nearest_b, nearest_radius, facing),
+            _ => cyl2_surface(
+                point - nearest_a,
+                nearest_a,
+                nearest_b,
+                nearest_radius,
+                facing,
+            ),
         };
         (nearest_joint, surface)
     }

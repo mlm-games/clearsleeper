@@ -156,7 +156,11 @@ impl Raft {
             Mode::CraneWait => self.timer = HOLD,
             Mode::CraneDown | Mode::CraneTurn | Mode::CraneReset => self.swing = PENDULUM,
             Mode::PathMove => self.flip(),
-            Mode::Wait | Mode::CraneUp | Mode::Stop | Mode::PathMoveTerry | Mode::StopTerry
+            Mode::Wait
+            | Mode::CraneUp
+            | Mode::Stop
+            | Mode::PathMoveTerry
+            | Mode::StopTerry
             | Mode::StopBombTerry => {}
         }
     }

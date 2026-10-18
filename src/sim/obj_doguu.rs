@@ -766,15 +766,7 @@ impl Text<'_> {
         let Some(archive) = self.archive else {
             return FPC_M_ERROR_PROCESS_ID;
         };
-        fop_msgm_message_set_actor(
-            self.procs,
-            self.info,
-            archive,
-            0,
-            msg_no,
-            None,
-            eye_pos,
-        )
+        fop_msgm_message_set_actor(self.procs, self.info, archive, 0, msg_no, None, eye_pos)
     }
 }
 
@@ -836,11 +828,7 @@ impl ObjDoguu {
             return;
         }
         let act = ctx.manager.get_my_act_idx(staff, &CUT_NAME_TABLE, true, 0);
-        self.act = if act == -1 {
-            ACT_IDX_NONE
-        } else {
-            act as i8
-        };
+        self.act = if act == -1 { ACT_IDX_NONE } else { act as i8 };
         if self.act == ACT_IDX_NONE {
             ctx.manager.cut_end(staff);
             return;

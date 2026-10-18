@@ -182,9 +182,12 @@ impl Shelf {
     }
 
     /// `mode_wait` (`:112-126`). `hold_event()` (`:99-104`) is
-    /// `fopAcM_SearchByName(fpcNm_NPC_BA1_e)` followed by `daNpc_Ba1_c::holdEventOn()`, and no
-    /// `fpcNm_NPC_BA1_e` module exists in this sim, so the call is dropped - everything around it
-    /// is kept, including the `quake = false; event = true;` that follows (`:117-118`).
+    /// `fopAcM_SearchByName(fpcNm_NPC_BA1_e)` followed by `daNpc_Ba1_c::holdEventOn()`,
+    /// which is `sim::ba1::Ba1::hold_event_on`; the call sits inside the
+    /// `quake && groundma && !UNK_0001` arm, and `control` feeds `quake` false because
+    /// no `dDetect_c` exists (see the module header), so it is unreachable here and the
+    /// fetch is left to whoever lands the detector. The `quake = false; event = true;`
+    /// that follows (`:117-118`) is kept.
     fn mode_wait(&mut self, quake: bool, quake_used: bool) {
         let mut quake = quake;
         let mut event = false;

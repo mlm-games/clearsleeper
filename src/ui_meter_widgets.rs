@@ -10,7 +10,7 @@ use crate::sim::player_status::{PlayerStatus, STTS0_BOW_AIM};
 use crate::text::msgproc::MsgProcs;
 use crate::ui_meter_gauges as gauges;
 use crate::ui_meter_gauges::{
-    self, boss_gauge_collect, GaugeEnv, GaugeOutput, MeterGauges, MeterTuning,
+    self, GaugeEnv, GaugeOutput, MeterGauges, MeterTuning, boss_gauge_collect,
 };
 use crate::ui_meter_vitals as vitals;
 use crate::ui_meter_vitals::{self, Vitals, VitalsEnv};
@@ -1414,7 +1414,13 @@ pub fn alpha_open(timer: &mut i16, value: &mut i16) -> f32 {
     }
 }
 
-pub fn add_calc_angle_s(value: &mut i16, target: i16, scale: i16, max_step: i16, min_step: i16) -> i16 {
+pub fn add_calc_angle_s(
+    value: &mut i16,
+    target: i16,
+    scale: i16,
+    max_step: i16,
+    min_step: i16,
+) -> i16 {
     let mut diff = target.wrapping_sub(*value);
     if *value != target {
         let mut step = diff / scale;
@@ -1445,7 +1451,8 @@ pub fn rand(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * MUL[lane]) % MOD[lane];
     }
-    let sum = (seed[0] as f32) / SCALE[0] + (seed[1] as f32) / SCALE[1] + (seed[2] as f32) / SCALE[2];
+    let sum =
+        (seed[0] as f32) / SCALE[0] + (seed[1] as f32) / SCALE[1] + (seed[2] as f32) / SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -1788,12 +1795,12 @@ pub fn key_rnd_light_frame(widget: &mut Widget, input: &mut Input) {
     widget.key_light_frame[0] = base + rand_fx(&mut input.seed, f32::from(jitter[0])) as i16;
     widget.key_light_frame[1] = (widget.key_light_frame[0] + span[0])
         + rand_fx(&mut input.seed, f32::from(jitter[1])) as i16;
-    widget.key_light_frame[2] =
-        (widget.key_light_frame[1] + span[1]) + rand_fx(&mut input.seed, f32::from(jitter[2])) as i16;
-    widget.key_light_frame[3] =
-        (widget.key_light_frame[2] + span[2]) + rand_fx(&mut input.seed, f32::from(jitter[3])) as i16;
-    widget.key_light_frame[4] =
-        (widget.key_light_frame[3] + span[3]) + rand_fx(&mut input.seed, f32::from(jitter[4])) as i16;
+    widget.key_light_frame[2] = (widget.key_light_frame[1] + span[1])
+        + rand_fx(&mut input.seed, f32::from(jitter[2])) as i16;
+    widget.key_light_frame[3] = (widget.key_light_frame[2] + span[2])
+        + rand_fx(&mut input.seed, f32::from(jitter[3])) as i16;
+    widget.key_light_frame[4] = (widget.key_light_frame[3] + span[3])
+        + rand_fx(&mut input.seed, f32::from(jitter[4])) as i16;
 }
 
 pub fn key_alpha(widget: &mut Widget, input: &mut Input) {
@@ -1902,8 +1909,7 @@ pub fn compass_get_on_proc(widget: &mut Widget, input: &mut Input) {
     match widget.compass_state {
         COMPASS_CLOSED => {
             if widget.map_control.shown != 0
-                && (input.status_flags & ST_SHIP_RIDE == 0
-                    || input.save_table != SAVE_TABLE_TOTG)
+                && (input.status_flags & ST_SHIP_RIDE == 0 || input.save_table != SAVE_TABLE_TOTG)
             {
                 widget.compass_state = COMPASS_DIR_OPENING;
                 widget.compass_map_flag = 1;
@@ -2222,8 +2228,8 @@ pub fn compass_value_init(widget: &mut Widget, input: &mut Input) {
     let needle_offset_y = widget.pane.compass_frame.height() / 2.0;
     let back_offset_x = widget.pane.clock_needle_back.width() / 2.0;
     let back_offset_y = widget.pane.clock_needle_back.height() / 2.0;
-    let shift = -(widget.pane.compass_frame.pos_top_left_orig.x
-        + widget.pane.compass_frame.size_orig.x);
+    let shift =
+        -(widget.pane.compass_frame.pos_top_left_orig.x + widget.pane.compass_frame.size_orig.x);
     widget.pane.compass_base.pane_trans(shift, 0.0);
     widget.pane.compass_frame.pane_trans(shift, 0.0);
     widget
@@ -2268,11 +2274,10 @@ pub fn compass_alpha(widget: &mut Widget) {
 }
 
 pub fn compass_init(widget: &mut Widget, input: &mut Input) {
-    widget.pane.compass_needle_mag.set_mirror(
-        true,
-        F2::new(-1.0, 0.0),
-        F2::new(1.0, 1.0),
-    );
+    widget
+        .pane
+        .compass_needle_mag
+        .set_mirror(true, F2::new(-1.0, 0.0), F2::new(1.0, 1.0));
     widget
         .pane
         .compass_needle
@@ -2427,10 +2432,10 @@ pub fn clock_hide(widget: &mut Widget) {
 }
 
 pub fn clock_init(widget: &mut Widget) {
-    let x = widget.pane.compass_frame.pos_top_left_orig.x
-        + widget.pane.clock_clip.pos_top_left_orig.x;
-    let y = widget.pane.compass_frame.pos_top_left_orig.y
-        + widget.pane.clock_clip.pos_top_left_orig.y;
+    let x =
+        widget.pane.compass_frame.pos_top_left_orig.x + widget.pane.clock_clip.pos_top_left_orig.x;
+    let y =
+        widget.pane.compass_frame.pos_top_left_orig.y + widget.pane.clock_clip.pos_top_left_orig.y;
     for index in 0..3 {
         widget.pane.clock_star_night[index].user_area = 1;
         widget.pane.clock_star_day[index].user_area = 1;
@@ -2545,8 +2550,8 @@ pub fn star_light_frame(widget: &mut Widget, input: &mut Input, slot: usize) {
     let span = widget.tuning.star_span;
     let jitter = widget.tuning.star_jitter;
     widget.star_frame[slot] = base + rand_fx(&mut input.seed, f32::from(jitter[0])) as i16;
-    widget.star_frame[slot + 1] = (widget.star_frame[slot] + span[0])
-        + rand_fx(&mut input.seed, f32::from(jitter[1])) as i16;
+    widget.star_frame[slot + 1] =
+        (widget.star_frame[slot] + span[0]) + rand_fx(&mut input.seed, f32::from(jitter[1])) as i16;
 }
 
 pub fn clock_multi_init(widget: &mut Widget) {
@@ -2715,8 +2720,8 @@ pub fn ammo_init(widget: &mut Widget, input: &Input) {
 }
 
 pub fn ammo_move(widget: &mut Widget, input: &mut Input) {
-    let shift = widget.pane.ammo_glow[0].pos_center_orig.x
-        - widget.pane.ammo_glow[1].pos_center_orig.x;
+    let shift =
+        widget.pane.ammo_glow[0].pos_center_orig.x - widget.pane.ammo_glow[1].pos_center_orig.x;
     let flags = input.status_flags;
     let aiming = input.bow_aim
         && flags & ST_SCREEN_OFF == 0
@@ -2936,15 +2941,11 @@ pub fn direction_anime(widget: &mut Widget) {
                 step -= DIR_HALF;
             }
             let ratio = value_increase(10, step as i32, ALPHA_SQUARE);
-            let shift =
-                (ratio * (DIR_TRANS_TABLE[1] - DIR_TRANS_TABLE[0]) as f32) + DIR_TRANS_TABLE[0] as f32;
-            let scale =
-                (ratio * (DIR_SCALE_TABLE[1] - DIR_SCALE_TABLE[0])) + DIR_SCALE_TABLE[0];
+            let shift = (ratio * (DIR_TRANS_TABLE[1] - DIR_TRANS_TABLE[0]) as f32)
+                + DIR_TRANS_TABLE[0] as f32;
+            let scale = (ratio * (DIR_SCALE_TABLE[1] - DIR_SCALE_TABLE[0])) + DIR_SCALE_TABLE[0];
             direction_trans_scale(&mut widget.pane.direction_arrow[index], shift, scale, index);
-            widget
-                .pane
-                .direction_arrow[index]
-                .set_now_alpha(ratio * DIR_ALPHA);
+            widget.pane.direction_arrow[index].set_now_alpha(ratio * DIR_ALPHA);
             dir_paint(&mut widget.pane.direction_arrow[index], 0, ratio);
             if step == DIR_PEAK {
                 widget.pane.direction_arrow[index].user_area = DIR_GROW;
@@ -2952,17 +2953,9 @@ pub fn direction_anime(widget: &mut Widget) {
         } else if widget.pane.direction_arrow[index].user_area == DIR_GROW {
             let early = widget.dir_timer <= DIR_HALF;
             let ratio = if early {
-                value_increase(
-                    10,
-                    (widget.dir_timer - DIR_PEAK) as i32,
-                    ALPHA_SQUARE,
-                )
+                value_increase(10, (widget.dir_timer - DIR_PEAK) as i32, ALPHA_SQUARE)
             } else {
-                value_increase(
-                    10,
-                    (widget.dir_timer - DIR_HALF) as i32,
-                    ALPHA_SQUARE,
-                )
+                value_increase(10, (widget.dir_timer - DIR_HALF) as i32, ALPHA_SQUARE)
             };
             let from = if early { 1 } else { 2 };
             let shift = (ratio * (DIR_TRANS_TABLE[from + 1] - DIR_TRANS_TABLE[from]) as f32)
@@ -3053,7 +3046,11 @@ pub fn item_move_move(widget: &mut Widget, input: &mut Input) {
                 .get((slot - SLOT_BEAST_FIRST) as usize)
                 .map_or(TEXTURE_BOW, |item| item_texture(*item))
         } else {
-            let mut item = input.equip_slot.get(slot as usize).copied().unwrap_or(ITEM_BOW);
+            let mut item = input
+                .equip_slot
+                .get(slot as usize)
+                .copied()
+                .unwrap_or(ITEM_BOW);
             if item == ITEM_MAGIC_ARROW || item == ITEM_LIGHT_ARROW {
                 item = ITEM_BOW;
             }
@@ -3081,10 +3078,8 @@ pub fn item_move_move(widget: &mut Widget, input: &mut Input) {
         widget.item_parts.pos_center.x = origin.x + (dx * ratio);
         widget.item_parts.pos_center.y = origin.y + (dy * ratio);
         let scale = widget.tuning.icon_scale;
-        let width = widget.item_parts.size_orig.x * scale
-            - widget.pane.item_name[0].size_orig.x;
-        let height = widget.item_parts.size_orig.y * scale
-            - widget.pane.item_name[0].size_orig.y;
+        let width = widget.item_parts.size_orig.x * scale - widget.pane.item_name[0].size_orig.x;
+        let height = widget.item_parts.size_orig.y * scale - widget.pane.item_name[0].size_orig.y;
         match widget.tuning.item_move_mode {
             1 => {
                 widget.item_parts.size.x = widget.item_parts.size_orig.x * scale;
@@ -3092,8 +3087,7 @@ pub fn item_move_move(widget: &mut Widget, input: &mut Input) {
             }
             2 => {
                 widget.item_parts.size.x = widget.item_parts.size_orig.x * scale - (width * ratio);
-                widget.item_parts.size.y =
-                    widget.item_parts.size_orig.y * scale - (height * ratio);
+                widget.item_parts.size.y = widget.item_parts.size_orig.y * scale - (height * ratio);
             }
             _ => {
                 widget.item_parts.size.x = widget.item_parts.size_orig.x;
@@ -3117,7 +3111,9 @@ pub fn item_move_draw(widget: &mut Widget) -> Option<Quad> {
             widget.item_parts.pos_top_left.x,
             widget.item_parts.pos_top_left.y,
         );
-        widget.item_icon.resize(widget.item_parts.size.x, widget.item_parts.size.y);
+        widget
+            .item_icon
+            .resize(widget.item_parts.size.x, widget.item_parts.size.y);
         let quad = widget.item_icon.quad();
         if widget.item_move_timer >= limit {
             widget.item_move_flag = 0;
@@ -3134,16 +3130,13 @@ pub fn swim_trans_y(widget: &mut Widget, offset: f32) {
                 + widget.pane.bubble[index].size_orig.y / 2.0);
     }
     widget.pane.gauge_frame.pos_center_orig.y = offset
-        + (widget.pane.gauge_frame.pos_top_left_orig.y
-            + widget.pane.gauge_frame.size_orig.y / 2.0);
+        + (widget.pane.gauge_frame.pos_top_left_orig.y + widget.pane.gauge_frame.size_orig.y / 2.0);
     widget.pane.gauge_frame.pane_trans(0.0, 0.0);
     widget.pane.gauge_mask.pos_center_orig.y = offset
-        + (widget.pane.gauge_mask.pos_top_left_orig.y
-            + widget.pane.gauge_mask.size_orig.y / 2.0);
+        + (widget.pane.gauge_mask.pos_top_left_orig.y + widget.pane.gauge_mask.size_orig.y / 2.0);
     widget.pane.gauge_mask.pane_trans(0.0, 0.0);
     widget.pane.gauge_blink.pos_center_orig.y = offset
-        + (widget.pane.gauge_blink.pos_top_left_orig.y
-            + widget.pane.gauge_blink.size_orig.y / 2.0);
+        + (widget.pane.gauge_blink.pos_top_left_orig.y + widget.pane.gauge_blink.size_orig.y / 2.0);
     widget.pane.gauge_blink.pane_trans(0.0, 0.0);
     widget.pane.gauge_kilari.pos_center_orig.y = offset
         + (widget.pane.gauge_kilari.pos_top_left_orig.y
@@ -3229,18 +3222,9 @@ pub fn swim_move(widget: &mut Widget, input: &mut Input) {
                 widget.pane.gauge_soul.user_area = 0;
                 widget.pane.gauge_blink.user_area = input.air.count as i16;
                 rotate_z(&mut widget.pane.gauge_soul, 0.0, 0.0);
-                widget
-                    .pane
-                    .gauge_frame
-                    .set_black(widget.swim_base_black);
-                widget
-                    .pane
-                    .gauge_frame
-                    .set_white(widget.swim_base_white);
-                widget
-                    .pane
-                    .gauge_soul
-                    .set_black(widget.swim_mask_black);
+                widget.pane.gauge_frame.set_black(widget.swim_base_black);
+                widget.pane.gauge_frame.set_white(widget.swim_base_white);
+                widget.pane.gauge_soul.set_black(widget.swim_mask_black);
                 widget.pane.gauge_main.set_black(widget.swim_mask_black);
                 widget.swim_tekari_frame = 0;
                 widget.swim_low.r = 200;
@@ -3330,10 +3314,16 @@ pub fn swim_open_proc(widget: &mut Widget) {
         widget.pane.gauge_kilari.pane_scale_xy((alpha * 0.3) + 0.7);
     } else if step < 12 {
         let alpha = value_increase(2, (step - 10) as i32, ALPHA_SQUARE);
-        widget.pane.gauge_kilari.pane_scale_xy(1.0 - (alpha * 0.100000024));
+        widget
+            .pane
+            .gauge_kilari
+            .pane_scale_xy(1.0 - (alpha * 0.100000024));
     } else if step < 14 {
         let alpha = value_increase(2, (step - 12) as i32, ALPHA_SQUARE);
-        widget.pane.gauge_kilari.pane_scale_xy((alpha * 0.100000024) + 0.9);
+        widget
+            .pane
+            .gauge_kilari
+            .pane_scale_xy((alpha * 0.100000024) + 0.9);
     } else if step == 14 {
         widget.pane.gauge_kilari.pane_scale_xy(1.0);
     }
@@ -3448,8 +3438,7 @@ pub fn swim_main_blink(widget: &mut Widget, input: &mut Input) {
                 ALPHA_ROOT,
             );
             widget.swim_blink_steps = (widget.tuning.blink_steps as f32
-                + ratio
-                    * (widget.tuning.blink_short as f32 - widget.tuning.blink_steps as f32))
+                + ratio * (widget.tuning.blink_short as f32 - widget.tuning.blink_steps as f32))
                 as i32;
             let low = Color::rgba(
                 widget.tuning.low_r,
@@ -3524,17 +3513,17 @@ pub fn swim_tekari_scroll(widget: &mut Widget) {
     let end_c = end_b + widget.tuning.tekari_ramp_b;
     let end_d = end_c + widget.tuning.tekari_hold_b;
     let left = (0.0
-        + (widget.pane.gauge_frame.pos_center_orig.x
-            - widget.pane.gauge_frame.size_orig.x / 2.0)) as i16;
+        + (widget.pane.gauge_frame.pos_center_orig.x - widget.pane.gauge_frame.size_orig.x / 2.0))
+        as i16;
     let top = (1.0
-        + (widget.pane.gauge_frame.pos_center_orig.y
-            - widget.pane.gauge_frame.size_orig.y / 2.0)) as i16;
+        + (widget.pane.gauge_frame.pos_center_orig.y - widget.pane.gauge_frame.size_orig.y / 2.0))
+        as i16;
     let right = (0.0
-        + (widget.pane.gauge_frame.pos_center_orig.x
-            + widget.pane.gauge_frame.size_orig.x / 2.0)) as i16;
+        + (widget.pane.gauge_frame.pos_center_orig.x + widget.pane.gauge_frame.size_orig.x / 2.0))
+        as i16;
     let bottom = (1.0
-        + (widget.pane.gauge_frame.pos_center_orig.y
-            + widget.pane.gauge_frame.size_orig.y / 2.0)) as i16;
+        + (widget.pane.gauge_frame.pos_center_orig.y + widget.pane.gauge_frame.size_orig.y / 2.0))
+        as i16;
     let frame = widget.swim_tekari_frame;
     let scroll = if frame < ramp {
         let ratio = value_increase(ramp as i32, frame as i32, ALPHA_SQUARE);
@@ -3602,8 +3591,8 @@ pub fn swim_light_anime(widget: &mut Widget, input: &mut Input, index: usize) {
     let end = fade + birth;
     let step = widget.pane.bubble[index].user_area;
     let wave = (f32::from(step) * 0.5235988).sin();
-    widget.pane.bubble[index].pos_center.x = widget.pane.bubble[index].pos_center_orig.x
-        + (widget.swim_bubble_sway[index] * wave);
+    widget.pane.bubble[index].pos_center.x =
+        widget.pane.bubble[index].pos_center_orig.x + (widget.swim_bubble_sway[index] * wave);
     widget.pane.bubble[index].pos_center.y =
         widget.pane.bubble[index].pos_center.y - widget.swim_bubble_rise[index];
     widget.pane.bubble[index].size.x = widget.tuning.bubble_size;
@@ -3916,7 +3905,8 @@ pub fn draw(widget: &mut Widget, input: &Input, peers: &mut dyn Peers) -> DrawOu
         ..DrawOut::default()
     };
     out.quads.push(widget.pane.anchor.quad());
-    out.quads.extend(widget.pane.dungeon_item.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.dungeon_item.iter().map(Pane::quad));
     out.quads.push(widget.pane.boss_health.quad());
     out.quads.push(widget.pane.boss_health_bar.quad());
     out.quads.push(widget.pane.boss_health_back.quad());
@@ -3924,22 +3914,28 @@ pub fn draw(widget: &mut Widget, input: &Input, peers: &mut dyn Peers) -> DrawOu
     out.quads.push(widget.pane.boss_frame_2.quad());
     out.quads.push(widget.pane.boss_mark.quad());
     out.quads.push(widget.pane.boss_mark_2.quad());
-    out.quads.extend(widget.pane.boss_name.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.boss_name.iter().map(Pane::quad));
     out.quads.push(widget.pane.boss_name_2.quad());
     out.quads.push(widget.pane.boss_name_3.quad());
     out.quads.push(widget.pane.boss_name_4.quad());
     out.quads.push(widget.pane.boss_name_5.quad());
     out.quads.push(widget.pane.boss_name_6.quad());
-    out.quads.extend(widget.pane.magic_bar.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.magic_bar.iter().map(Pane::quad));
     out.quads.push(widget.pane.magic_bar_back_3.quad());
     out.quads.push(widget.pane.magic_bar_back_1.quad());
     out.quads.push(widget.pane.magic_key_1.quad());
     out.quads.push(widget.pane.compass_face.quad());
     out.quads.push(widget.pane.compass_base.quad());
-    out.quads.extend(widget.pane.clock_star_day.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.clock_circle.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.clock_star_night.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.clock_cloud.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.clock_star_day.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.clock_circle.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.clock_star_night.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.clock_cloud.iter().map(Pane::quad));
     out.quads.push(widget.pane.clock_needle.quad());
     out.quads.push(widget.pane.clock_needle_back.quad());
     out.quads.push(widget.pane.clock_ring_1.quad());
@@ -3949,11 +3945,15 @@ pub fn draw(widget: &mut Widget, input: &Input, peers: &mut dyn Peers) -> DrawOu
     out.quads.push(widget.pane.compass_frame.quad());
     out.quads.push(widget.pane.key_back_1.quad());
     out.quads.push(widget.pane.key_back_2.quad());
-    out.quads.extend(widget.pane.key_digit_1.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.key_digit_2.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.key_digit_1.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.key_digit_2.iter().map(Pane::quad));
     out.quads.push(widget.pane.key_frame.quad());
-    out.quads.extend(widget.pane.rupee_digit_1.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.rupee_digit_2.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.rupee_digit_1.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.rupee_digit_2.iter().map(Pane::quad));
     out.quads.push(widget.pane.rupee_back.quad());
     out.quads.push(widget.pane.rupee_light.quad());
     out.quads.extend(widget.pane.bubble.iter().map(Pane::quad));
@@ -3963,8 +3963,10 @@ pub fn draw(widget: &mut Widget, input: &Input, peers: &mut dyn Peers) -> DrawOu
     out.quads.push(widget.pane.gauge_soul.quad());
     out.quads.push(widget.pane.gauge_main.quad());
     out.quads.push(widget.pane.gauge_kilari.quad());
-    out.quads.extend(widget.pane.ammo_frame.iter().map(Pane::quad));
-    out.quads.extend(widget.pane.ammo_glow.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.ammo_frame.iter().map(Pane::quad));
+    out.quads
+        .extend(widget.pane.ammo_glow.iter().map(Pane::quad));
     out.quads
         .extend(widget.pane.direction_arrow.iter().map(Pane::quad));
     out.clock = widget.clock;
@@ -4046,7 +4048,12 @@ pub fn execute(widget: &mut Widget, input: &mut Input, peers: &mut dyn Peers) ->
         scale_y,
     );
     for index in 0..2 {
-        child_pane_trans(&mut widget.pane.item_white[index], &tuning, &center, scale_x);
+        child_pane_trans(
+            &mut widget.pane.item_white[index],
+            &tuning,
+            &center,
+            scale_x,
+        );
         child_pane_trans(&mut widget.pane.item_back[index], &tuning, &center, scale_x);
     }
     child_pane_trans(&mut widget.pane.heart_count_a, &tuning, &center, scale_x);
@@ -4113,9 +4120,24 @@ pub fn execute(widget: &mut Widget, input: &mut Input, peers: &mut dyn Peers) ->
     }
     child_pane_trans(&mut widget.pane.magic_bar_base, &tuning, &center, scale_x);
     for index in 0..2 {
-        child_pane_trans(&mut widget.pane.magic_name_1[index], &tuning, &center, scale_x);
-        child_pane_trans(&mut widget.pane.magic_name_2[index], &tuning, &center, scale_x);
-        child_pane_trans(&mut widget.pane.magic_icon[index], &tuning, &center, scale_x);
+        child_pane_trans(
+            &mut widget.pane.magic_name_1[index],
+            &tuning,
+            &center,
+            scale_x,
+        );
+        child_pane_trans(
+            &mut widget.pane.magic_name_2[index],
+            &tuning,
+            &center,
+            scale_x,
+        );
+        child_pane_trans(
+            &mut widget.pane.magic_icon[index],
+            &tuning,
+            &center,
+            scale_x,
+        );
     }
     child_pane_trans_only(
         &mut widget.pane.magic_gauge_base,

@@ -622,10 +622,8 @@ impl Apzl {
             let spin = (index as i16).wrapping_mul(ARROW_SPIN);
             let (sin, cos) = from_s16(spin).sin_cos();
             self.arrow_local[index] = [
-                (blank % 4) as f32 * BOARD_TILE_STEP - BOARD_TILE_ORIGIN
-                    + BOARD_ARROW_LIFT * sin,
-                BOARD_TILE_ORIGIN - (blank / 4) as f32 * BOARD_TILE_STEP
-                    - BOARD_ARROW_LIFT * cos,
+                (blank % 4) as f32 * BOARD_TILE_STEP - BOARD_TILE_ORIGIN + BOARD_ARROW_LIFT * sin,
+                BOARD_TILE_ORIGIN - (blank / 4) as f32 * BOARD_TILE_STEP - BOARD_ARROW_LIFT * cos,
                 0.0,
             ];
             self.arrow_spin[index] = spin;
@@ -958,8 +956,9 @@ impl Apzl {
                     self.sound_timer = SOUND_WAIT_FRAMES;
                 }
                 ACT_EVENT_END => {
-                    let count =
-                        usize::try_from(self.given_rupee_count).unwrap_or(RUPEE_MAX).min(RUPEE_MAX);
+                    let count = usize::try_from(self.given_rupee_count)
+                        .unwrap_or(RUPEE_MAX)
+                        .min(RUPEE_MAX);
                     for slot in 0..count {
                         let entity = self
                             .rupee_ids

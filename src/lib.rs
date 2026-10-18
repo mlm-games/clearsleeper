@@ -14,21 +14,25 @@ use repose_core::{ImageFit, Modifier, Signal, signal};
 use repose_ui::{Image, ImageExt, Spacer, ViewExt, ZStack};
 
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
+mod web;
+
+#[cfg(target_os = "android")]
+mod android;
 
 pub mod archive;
 pub mod assets;
 pub mod audio;
 pub mod bti;
-pub mod j3d;
 pub mod config;
 pub mod dff;
+pub mod disc;
 pub mod dzs;
 pub mod gx_decode;
 pub mod hud;
 pub mod input;
 pub mod intro;
 pub mod j2d;
+pub mod j3d;
 pub mod menus;
 pub mod movie;
 pub mod panes;
@@ -36,6 +40,7 @@ pub mod quit;
 pub mod save;
 pub mod shot;
 pub mod sim;
+pub mod source;
 pub mod text;
 pub mod ui_file_select;
 pub mod ui_menu_collect;
@@ -59,7 +64,7 @@ pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
     pub audio: repame_audio::Audio,
-pub room: Option<j3d::bdl::RoomMesh>,
+    pub room: Option<j3d::bdl::RoomMesh>,
     pub actor_model: Option<j3d::bdl::RoomMesh>,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
     /// are its own, so it is presented alone rather than mixed into a room.
@@ -67,6 +72,13 @@ pub room: Option<j3d::bdl::RoomMesh>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
     rooms: Vec<u8>,
+    /// The mounted room set's own `SCLS` tables, keyed by room: the table
+    /// `dLib_setNextStageBySclsNum` reads through `dComIfG_roomControl_getStatusRoomDt(room)`
+    /// (`d_lib.cpp:245-246`). [`sim::transition::NextStage::scls`] is the request these resolve.
+    room_exits: Vec<(u8, Vec<dzs::StageExit>)>,
+    /// `dComIfGp_getStartStageLayer` (`d_com_inf_game.h:285`): the layer the stage was
+    /// entered on, which every room read of the session keeps.
+    start_layer: i8,
     room_tick: u64,
     room_actors: Vec<Entity>,
     sea_shade: f32,
@@ -132,6 +144,8 @@ impl App {
             menu: menus::Menu::new(),
             stage: None,
             rooms: Vec::new(),
+            room_exits: Vec::new(),
+            start_layer: sim::transition::LAYER_NONE,
             room_tick: 0,
             room_actors: Vec::new(),
             sea_shade,
@@ -158,7 +172,7 @@ impl App {
             quit: quit::Quit::default(),
         };
         app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
-        app.movie = movie::Movie::open(&movie::title_path()).ok();
+        app.movie = movie::title_path().and_then(|path| movie::Movie::open(&path).ok());
         app.actor_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
         if app.actor_model.is_none() {
@@ -176,10 +190,24 @@ impl App {
             assets::load_stage(assets::SEA_STAGE),
             self.stage.as_ref(),
         );
-        self.rooms = self.stage.as_ref().map(assets::start_set).unwrap_or_default();
-        self.sim
-            .world
-            .insert_resource(sim::door::StayRoom(-1));
+        self.rooms = self
+            .stage
+            .as_ref()
+            .map(assets::start_set)
+            .unwrap_or_default();
+        self.start_layer = sim::transition::LAYER_NONE;
+        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
+        let set = self.stage.as_ref().and_then(|tables| {
+            load_rooms(tables, &self.rooms, stories, sim::transition::LAYER_NONE)
+        });
+        let particle_no = self
+            .stage
+            .as_ref()
+            .and_then(|tables| tables.stag())
+            .map_or(sim::jpa::NO_SCENE, |stag| stag.particle_no());
+        let room_particle_no = set.as_ref().and_then(|set| set.particle_no);
+        self.mount_scene_particles(particle_no, room_particle_no);
+        self.sim.world.insert_resource(sim::door::StayRoom(-1));
         self.room_tick = 0;
         self.room_actors.clear();
         let spawn = self.sim.world.resource::<sim::area::Area>().spawn;
@@ -187,11 +215,6 @@ impl App {
             target: spawn,
             ..OrbitCamera::default()
         });
-        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
-        let set = self
-            .stage
-            .as_ref()
-            .and_then(|tables| load_rooms(tables, &self.rooms, stories));
         if let Some(set) = set {
             self.install_room_set(set, 0);
         }
@@ -397,7 +420,10 @@ impl App {
                 return;
             }
         }
-        if let Some((w, h, pixels)) = self.movie.as_mut().and_then(|m| m.frame(self.movie_frame).ok())
+        if let Some((w, h, pixels)) = self
+            .movie
+            .as_mut()
+            .and_then(|m| m.frame(self.movie_frame).ok())
         {
             self.movie_size = (w, h);
             self.movie_pixels = movie::to_rgba(&pixels);
@@ -405,7 +431,9 @@ impl App {
     }
 
     fn movie_interval(&self) -> f32 {
-        self.movie.as_ref().map_or(1.0 / 30.0, movie::Movie::interval)
+        self.movie
+            .as_ref()
+            .map_or(1.0 / 30.0, movie::Movie::interval)
     }
 
     fn start_movie_sound(&mut self) {
@@ -525,7 +553,8 @@ impl App {
     /// The particles `cc_at_check` queued this frame. `pump_damage_fx` turns each
     /// one into emitters before the view reads them.
     pub fn particles(&self) -> &[sim::damage_fx::DamageParticle] {
-        &self.sim
+        &self
+            .sim
             .world
             .resource::<sim::damage_fx::DamageParticles>()
             .items
@@ -553,6 +582,8 @@ impl App {
                 | sim::events::SimEvent::Credits
                 | sim::events::SimEvent::CreditsDone
                 | sim::events::SimEvent::Se(_)
+                | sim::events::SimEvent::SeAt(_, _)
+                | sim::events::SimEvent::SeStop(_)
                 | sim::events::SimEvent::Bgm(_)
                 | sim::events::SimEvent::StealItem(_) => None,
             };
@@ -580,7 +611,10 @@ impl App {
     /// so the flag is cleared rather than turned into a sound of its own.
     fn pump_hit_audio(&mut self) {
         let (se, bgm_hit_sound) = {
-            let mut hit = self.sim.world.resource_mut::<sim::damage_resolve::HitAudio>();
+            let mut hit = self
+                .sim
+                .world
+                .resource_mut::<sim::damage_resolve::HitAudio>();
             hit.enemy_damage = false;
             (std::mem::take(&mut hit.se), hit.bgm_hit_sound.take())
         };
@@ -831,11 +865,29 @@ impl App {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(grandma) = entity.get::<sim::ba1::Ba1>() {
+                // `fopAc_Draw`'s own gate (`f_op_actor.cpp:129-148`), which
+                // `ba1::control_draw` evaluates and leaves as `fopAcCnd_NODRAW_e`: a culled or
+                // no-draw actor's `_draw` never runs, so nothing of hers is emitted.
+                let culled = self
+                    .sim
+                    .world
+                    .resource::<sim::registry::ActorRegistry>()
+                    .entry_of(entity.id())
+                    .is_some_and(|entry| entry.condition & sim::registry::CONDITION_NO_DRAW != 0);
+                if culled {
+                    continue;
+                }
+                // `_draw`'s `if(mbInitGrandma0 || m7F7) return TRUE;` (`d_a_npc_ba1.cpp:1853-1855`):
+                // the event's own model hide, which the box stands in for.
+                if !grandma.drawn() {
+                    continue;
+                }
+                (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::lenzo::Lenzo>()
                 || entity.contains::<sim::zunari::Zunari>()
                 || entity.contains::<sim::aryll::Aryll>()
                 || entity.contains::<sim::medli::Medli>()
-                || entity.contains::<sim::grammarian::Grammarian>()
             {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::zelda::Zelda>() {
@@ -845,8 +897,7 @@ impl App {
                 (view::ActorKind::Talker, 0, 30.0, 12.0)
             } else if entity.contains::<sim::tingle::Tingle>() {
                 (view::ActorKind::Scenery, 0, 24.0, 10.0)
-            } else if entity.contains::<sim::chest::Chest>()
-                || entity.contains::<sim::tbox::Tbox>()
+            } else if entity.contains::<sim::chest::Chest>() || entity.contains::<sim::tbox::Tbox>()
             {
                 if entity.get::<sim::chest::Chest>().is_some_and(|c| c.opened) {
                     continue;
@@ -900,12 +951,7 @@ impl App {
                 if field.phase == sim::barrier::Phase::Cut {
                     continue;
                 }
-                (
-                    view::ActorKind::Fire,
-                    0,
-                    field.height(),
-                    field.radius(true),
-                )
+                (view::ActorKind::Fire, 0, field.height(), field.radius(true))
             } else if let Some(hook) = entity.get::<sim::hookshot::Hookshot>() {
                 if hook.phase == sim::hookshot::Phase::Wait {
                     continue;
@@ -1483,35 +1529,77 @@ impl App {
             } else if entity.contains::<sim::cafelmp::Cafelmp>() {
                 let (min, max) = sim::cafelmp::Cafelmp::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::xfuta::Xfuta>() {
                 let (min, max) = sim::xfuta::Xfuta::spawn(glam::Vec3::ZERO).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::mjdoor::MjDoor>() {
-                let (min, max) = sim::mjdoor::MjDoor::spawn(0, &sim::flags::Switches::default()).cull();
+                let (min, max) =
+                    sim::mjdoor::MjDoor::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::turu::Turu>() {
                 let (min, max) = sim::turu::Turu::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::spcitem::SpcItem>() {
-                let (min, max) = sim::spcitem::SpcItem::spawn(0, &sim::flags::EventFlags::default()).cull();
+                let (min, max) =
+                    sim::spcitem::SpcItem::spawn(0, &sim::flags::EventFlags::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::doguud::DoguuD>() {
                 let (min, max) = sim::doguud::DoguuD::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::eayogn::Eayogn>() {
                 let (min, max) = sim::eayogn::Eayogn::spawn(&sim::flags::Collect::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::ktaruo::Ktaruo>() {
                 let (min, max) = sim::ktaruo::Ktaruo::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if let Some(doc) = entity.get::<sim::npc_ds1::NpcDs1>() {
                 let (min, max) = doc.cull();
                 lift = min[1];
@@ -1519,31 +1607,68 @@ impl App {
             } else if entity.contains::<sim::plant::Plant>() {
                 let (min, max) = sim::plant::Plant::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::amiprop::Amiprop>() {
                 let (min, max) = sim::amiprop::Amiprop::spawn(0, [0i16; 3]).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::msdansb::Msdansb>() {
-                let (min, max) = sim::msdansb::Msdansb::spawn(0, 0.0, &sim::flags::Switches::default()).cull();
+                let (min, max) =
+                    sim::msdansb::Msdansb::spawn(0, 0.0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::yboil::Yboil>() {
-                let (min, max) = sim::yboil::Yboil::spawn(0, &sim::flags::EventFlags::default()).cull();
+                let (min, max) =
+                    sim::yboil::Yboil::spawn(0, &sim::flags::EventFlags::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::lamp::Lamp>() {
                 let (min, max) = sim::lamp::Lamp::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::rflw::Rflw>() {
                 let (min, max) = sim::rflw::Rflw::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::gtaki::Gtaki>() {
                 let (min, max) = sim::gtaki::Gtaki::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if let Some(plate) = entity.get::<sim::swtact::Swtact>() {
                 if !plate.mark {
                     continue;
@@ -1552,51 +1677,114 @@ impl App {
                     continue;
                 };
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::nzg::Nzg>() {
                 let (min, max) = sim::nzg::Nzg::spawn(0).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::hys::Hys>() {
                 let (min, max) = sim::hys::Hys::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::syan::Syan>() {
                 let (min, max) = sim::syan::Syan::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::ebomzo::Ebomzo>() {
-                let (min, max) = sim::ebomzo::Ebomzo::spawn(0, &sim::flags::Switches::default()).cull();
+                let (min, max) =
+                    sim::ebomzo::Ebomzo::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::sk2::Sk2>() {
                 let (min, max) = sim::sk2::Sk2::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::rohat::RoHat>() {
                 let (min, max) = sim::rohat::RoHat::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::vfan::Vfan>() {
                 let (min, max) = sim::vfan::Vfan::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::htobi3::Htobi3>() {
                 let (min, max) = sim::htobi3::Htobi3::spawn(0).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::branch::Branch>() {
                 let (min, max) = sim::branch::Branch::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::hami3::Hami3>() {
-                let (min, max) = sim::hami3::Hami3::spawn(0, &sim::flags::Switches::default()).cull();
+                let (min, max) =
+                    sim::hami3::Hami3::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::atdoor::Atdoor>() {
-                let (min, max) = sim::atdoor::Atdoor::spawn(0, &sim::flags::Switches::default()).cull();
+                let (min, max) =
+                    sim::atdoor::Atdoor::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if let Some(x) = entity.get::<sim::npc_ah::NpcAh>() {
                 let (min, max) = x.cull();
                 lift = min[1];
@@ -1623,7 +1811,12 @@ impl App {
                 }
                 let (min, max) = x.cull();
                 lift = min[1];
-                (view::ActorKind::Pickup, sim::dekuitem::ITEM_NO, max[1] - min[1], max[0])
+                (
+                    view::ActorKind::Pickup,
+                    sim::dekuitem::ITEM_NO,
+                    max[1] - min[1],
+                    max[0],
+                )
             } else if let Some(x) = entity.get::<sim::ospbox::Ospbox>() {
                 let (min, max) = x.cull();
                 lift = min[1];
@@ -1755,7 +1948,12 @@ impl App {
             } else if entity.contains::<sim::grid::Grid>() {
                 let (min, max) = sim::grid::Grid::spawn(0).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if let Some(x) = entity.get::<sim::obj_correct::ObjCorrect>() {
                 let (min, max) = x.cull();
                 lift = min[1];
@@ -1831,31 +2029,67 @@ impl App {
             } else if entity.contains::<sim::gaship::Gaship>() {
                 let (min, max) = sim::gaship::Gaship::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::hhyu::Hhyu>() {
                 let (min, max) = sim::hhyu::Hhyu::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::xtower::Xtower>() {
-                let (min, max) = sim::xtower::Xtower::spawn(&sim::flags::EventFlags::default()).cull();
+                let (min, max) =
+                    sim::xtower::Xtower::spawn(&sim::flags::EventFlags::default()).cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::dmgroom::Dmgroom>() {
                 let (min, max) = sim::dmgroom::Dmgroom::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::komore::Komore>() {
                 let (min, max) = sim::komore::Komore::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::pbka::Pbka>() {
                 let (min, max) = sim::pbka::Pbka::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if entity.contains::<sim::dummy::Dummy>() {
                 let (min, max) = sim::dummy::Dummy::spawn().cull();
                 lift = min[1];
-                (view::ActorKind::Scenery, 0, max[1] - min[1], (max[0] - min[0]) * 0.5)
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
             } else if let Some(door) = entity.get::<sim::swtdoor::Swtdoor>() {
                 let (min, max) = door.cull();
                 lift = min[1] + door.sink;
@@ -1884,12 +2118,7 @@ impl App {
                 if cell.open() {
                     continue;
                 }
-                (
-                    view::ActorKind::Scenery,
-                    0,
-                    sim::door::JAIL_HEIGHT,
-                    40.0,
-                )
+                (view::ActorKind::Scenery, 0, sim::door::JAIL_HEIGHT, 40.0)
             } else {
                 continue;
             };
@@ -1927,7 +2156,7 @@ impl App {
     pub fn advance(&mut self, dt: Duration) -> u32 {
         if self.intro.is_some() {
             self.step_intro();
-} else if self.menu.screen == menus::Screen::Title {
+        } else if self.menu.screen == menus::Screen::Title {
             self.step_movie(dt);
         } else if self.movie_sound {
             self.audio.stop_cue(audio::MOVIE_CUE);
@@ -1935,6 +2164,8 @@ impl App {
         let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
             && self.menu.screen == menus::Screen::Playing;
         let steps = if held { 0 } else { self.sim.step(dt) };
+        self.drain_demo_creates();
+        self.drain_demo_gaps();
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
         if game_over && self.menu.screen == menus::Screen::Playing {
             self.menu.screen = menus::Screen::GameOver;
@@ -1950,12 +2181,61 @@ impl App {
         self.stage.as_ref()
     }
 
+    /// Spawn what a `CREATER` staff asked for. `fopAcM_create` (`d_event_data.cpp:560`) runs the
+    /// spawn branch the name is keyed on, and in this port that branch is
+    /// `sim::spawn_actor`'s single if/else chain, which needs `&mut World` - so the request waits
+    /// in `sim::demo::DemoCreates` and is drained here, the same shape `kalle_demos` uses for the
+    /// actors its own demo spawns.
+    fn drain_demo_creates(&mut self) {
+        let creates: Vec<sim::demo::DemoCreate> =
+            std::mem::take(&mut self.sim.world.resource_mut::<sim::demo::DemoCreates>().list);
+        for create in creates {
+            let source = dzs::StageActor {
+                name: create.name.clone(),
+                parameters: create.parameters,
+                pos: create.pos.to_array(),
+                angle: create.angle,
+                set_id: create.set_id,
+                room: create.room,
+                scale: create.scale.to_array(),
+            };
+            let entity = sim::spawn_actor(&mut self.sim.world, &source);
+            let Some(id) = create.demo_actor_id else {
+                continue;
+            };
+            if let Some(mut actor) = self.sim.world.get_mut::<sim::actor::Actor>(entity) {
+                actor.demo_actor_id = id;
+            }
+            self.sim
+                .world
+                .resource_mut::<sim::demo::DemoManager>()
+                .object_mut()
+                .bind_actor(id, entity);
+        }
+    }
+
+    /// Every command the demo reader could not represent, logged once per step. The reader
+    /// records them per command (`sim::demo::DemoCommandGap`); retail has no equivalent surface,
+    /// and a command with no representable value left its model untouched rather than writing a
+    /// stand-in.
+    fn drain_demo_gaps(&mut self) {
+        let gaps = self
+            .sim
+            .world
+            .resource_mut::<sim::demo::DemoManager>()
+            .take_gaps();
+        for gap in gaps {
+            log::warn!("clearsleeper: demo command gap ({gap})");
+        }
+    }
+
     fn apply_exit(&mut self) {
         let next =
             std::mem::take(&mut *self.sim.world.resource_mut::<sim::transition::NextStage>());
-        let dest = match (next.target, next.exit) {
-            (Some(target), _) => target,
-            (None, Some(exit_id)) => {
+        let layer = next.layer;
+        let dest = match (next.target, next.exit, next.scls) {
+            (Some(target), _, _) => target,
+            (None, Some(exit_id), _) => {
                 let Some(exit) = self.stage.as_ref().and_then(|tables| tables.exit(exit_id)) else {
                     log::warn!("clearsleeper: exit {exit_id} has no destination");
                     return;
@@ -1966,7 +2246,30 @@ impl App {
                     start: exit.start,
                 }
             }
-            (None, None) => return,
+            // `dLib_setNextStageBySclsNum(i_sclsnum, room_no)` (`d_lib.cpp:237-256`):
+            // `dComIfG_roomControl_getStatusRoomDt(room)->getSclsInfo()` for a room (`:245-246`),
+            // the stage's own `getSclsInfo()` for `room_no == -1` (`:242-243`), and the entry's
+            // stage/start/room at `:250-255`. The table is what this shell loaded.
+            (None, None, Some((scls, room))) => {
+                let entry = if room >= 0 {
+                    self.room_exits
+                        .iter()
+                        .find(|(no, _)| *no == room as u8)
+                        .and_then(|(_, exits)| exits.get(usize::from(scls)))
+                } else {
+                    self.stage.as_ref().and_then(|tables| tables.exit(scls))
+                };
+                let Some(entry) = entry else {
+                    log::warn!("clearsleeper: scene number {scls} of room {room} resolves nothing");
+                    return;
+                };
+                sim::transition::Target {
+                    stage: entry.stage.clone(),
+                    room: entry.room,
+                    start: entry.start,
+                }
+            }
+            (None, None, None) => return,
         };
         let Some(tables) = assets::load_stage_tables(&dest.stage) else {
             return;
@@ -1976,7 +2279,7 @@ impl App {
         else {
             return;
         };
-        self.swap_stage(tables, rooms, spawn, yaw);
+        self.swap_stage(tables, rooms, spawn, yaw, layer);
     }
 
     pub fn swap_stage(
@@ -1985,12 +2288,35 @@ impl App {
         rooms: Vec<u8>,
         spawn: glam::Vec3,
         yaw: f32,
+        layer: i8,
     ) {
+        // `dScnKy_env_light_c::init`'s time arms (`d_kankyo.cpp:467-481`): the pending time a cut
+        // asked for with `dKy_set_nexttime` (`d_event_data.cpp:45-46`) becomes the clock as the
+        // next stage mounts and the pending slot goes back to `-1.0f`, then the new stage's own
+        // `dStage_stagInfo_GetTimeH` write (`:472-475`), then the event-night-stop zero
+        // (`:479-481`).
+        let flags = self
+            .sim
+            .world
+            .get_resource::<sim::flags::EventFlags>()
+            .copied()
+            .unwrap_or_default();
+        let collect = self
+            .sim
+            .world
+            .get_resource::<sim::flags::Collect>()
+            .copied()
+            .unwrap_or_default();
+        let night_stop = sim::daynight::check_event_night_stop(&flags, &collect);
+        self.sim
+            .world
+            .resource_mut::<sim::daynight::DayNight>()
+            .apply_stage_init(tables.stag().map(|stag| stag.time_h), night_stop);
         let has_sea = tables.has_sea_actor();
         {
-            let tool_id = tables.stag().map_or(-1i32, |stag| {
-                i32::from(stag.camera_map_tool_id)
-            });
+            let tool_id = tables
+                .stag()
+                .map_or(-1i32, |stag| i32::from(stag.camera_map_tool_id));
             let mut room = self.sim.world.resource_mut::<sim::cam_room::CamRoom>();
             room.set_stage(&tables);
             let resolved = room.type_from_map_tool_id(tool_id, -1);
@@ -2005,6 +2331,18 @@ impl App {
         }
         let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
         let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
+        let set = if rooms.is_empty() {
+            None
+        } else {
+            load_rooms(&tables, &rooms, stories, layer)
+        };
+        // `dScnPly_ply_c` phase 2 mounts this stage's particle archive (`d_s_play.cpp:1378-1379`)
+        // ahead of the new stage's own create pass, with the room `FILI` number
+        // (`d_s_room.cpp:237-241`) as the fallback the reader's first-read rule leaves it.
+        let particle_no = tables
+            .stag()
+            .map_or(sim::jpa::NO_SCENE, |stag| stag.particle_no());
+        self.mount_scene_particles(particle_no, set.as_ref().and_then(|set| set.particle_no));
         *self.sim.world.resource_mut::<sim::transition::NextStage>() =
             sim::transition::NextStage::default();
         {
@@ -2038,15 +2376,16 @@ impl App {
             rooms.first().map_or(-1, |room| *room as i8),
         ));
         self.room_actors.clear();
-        self.sim.world.resource_mut::<sim::flags::ZoneActors>().clear();
+        self.sim
+            .world
+            .resource_mut::<sim::flags::ZoneActors>()
+            .clear();
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::weight::init(&mut self.sim.world);
         sim::spawn_actors(&mut self.sim.world, &tables);
         Self::install_tag_events(&mut self.sim.world, tables.actors());
-        if !rooms.is_empty() {
-            if let Some(set) = load_rooms(&tables, &rooms, stories) {
-                self.install_room_set(set, frame);
-            }
+        if let Some(set) = set {
+            self.install_room_set(set, frame);
         }
         *self.sim.world.resource_mut::<sim::swim::Swim>() = sim::swim::Swim::default();
         *self.sim.world.resource_mut::<sim::roll::Roll>() = sim::roll::Roll::default();
@@ -2062,6 +2401,7 @@ impl App {
             sim::collision::MoveFrom(spawn);
         self.stage = Some(tables);
         self.rooms = rooms;
+        self.start_layer = layer;
     }
 
     fn install_tag_events(world: &mut World, sources: &[dzs::StageActor]) {
@@ -2080,7 +2420,10 @@ impl App {
             .iter(world)
             .filter(|(_, actor)| sim::flags::is_tag_event(&actor.name))
             .filter_map(|(entity, actor)| {
-                let index = indices.get((actor.parameters >> 24) as usize).copied().flatten()?;
+                let index = indices
+                    .get((actor.parameters >> 24) as usize)
+                    .copied()
+                    .flatten()?;
                 let source = sources.iter().find(|source| {
                     source.name == actor.name
                         && source.pos[0].to_bits() == actor.pos.x.to_bits()
@@ -2117,7 +2460,28 @@ impl App {
         }
     }
 
-fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
+    /// `dScnPly_ply_c` phase 2's stage-side half: `dStage_stagInfo_GetParticleNo` read off the
+    /// stage's stag info (`d_s_play.cpp:1378-1379`) hands `dPa_control_c::readScene` the
+    /// `Pscene%03d.jpc` that `createScene` mounts (`d_particle.cpp:757-780`), and the room-side
+    /// half is `dStage_FileList_dt_GetParticleNo` off the first room that names one
+    /// (`d_s_room.cpp:237-241`); `readScene`'s first-read rule is what makes the room's the
+    /// fallback. Every stage load runs it - the boot stage through [`App::reset_world`], every
+    /// transition through [`App::swap_stage`].
+    fn mount_scene_particles(&mut self, particle_no: u8, room_particle_no: Option<u8>) {
+        sim::jpa::mount_scene_archive(
+            &mut self.sim.world.resource_mut::<sim::jpa::Jpa>(),
+            particle_no,
+            room_particle_no,
+        );
+    }
+
+    fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
+        // `d_s_room.cpp:220-231`: the room's `LBNK` names the demo archive the cut models come out
+        // of, and the mount is what makes them readable.
+        self.sim
+            .world
+            .resource_mut::<sim::demo::RoomDemoArchive>()
+            .name_from_room(set.demo_archive.as_deref());
         self.sim
             .world
             .resource_mut::<sim::cam_room::CamRoom>()
@@ -2141,6 +2505,7 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
             }
         }
         self.room = set.mesh;
+        self.room_exits = set.exits;
         self.room_tick = frame;
         self.install_room_actors(set.actors);
     }
@@ -2148,7 +2513,11 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
     fn install_room_actors(&mut self, actors: Vec<dzs::StageActor>) {
         for entity in std::mem::take(&mut self.room_actors) {
             let world = &mut self.sim.world;
-            if world.resource_entities().iter().any(|(_, held)| held == entity) {
+            if world
+                .resource_entities()
+                .iter()
+                .any(|(_, held)| held == entity)
+            {
                 continue;
             }
             if world.entities().contains(entity) {
@@ -2192,7 +2561,7 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
             return;
         }
         let rooms = requested.to_vec();
-        match load_rooms(tables, &rooms, stories) {
+        match load_rooms(tables, &rooms, stories, self.start_layer) {
             Some(set) => {
                 let frame = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
                 self.install_room_set(set, frame);
@@ -2203,11 +2572,20 @@ fn install_room_set(&mut self, set: assets::RoomSet, frame: u64) {
     }
 }
 
-fn load_rooms(
+/// `dComIfG_play_c::getLayerNo` (`d_com_inf_game.cpp:184-216`): a start-stage layer
+/// from `dComIfGp_setNextStage` wins for the whole stage session, and only
+/// [`sim::transition::LAYER_NONE`] falls through to the story-bit table
+/// [`sim::layer::no`] holds.
+pub(crate) fn load_rooms(
     tables: &dzs::StageTables,
     rooms: &[u8],
     stories: sim::flags::StoryBits,
+    layer: i8,
 ) -> Option<assets::RoomSet> {
+    if layer >= 0 {
+        let layer = layer as u8;
+        return assets::load_room_set(tables, rooms, move |_room| layer);
+    }
     assets::load_room_set(tables, rooms, |room| {
         sim::layer::no(tables.name(), room, &stories)
     })
@@ -2219,13 +2597,35 @@ impl Default for App {
     }
 }
 
-/// Platform entry: desktop window or, on the web, the `wasm_bindgen(start)`
-/// hook; the shell loop stages input, steps the sim, pumps audio, composes.
+/// Platform entry: the desktop window, or on the web the shell loop [`web::boot`] starts once a
+/// disc image is installed; the loop stages input, steps the sim, pumps audio, composes.
+///
+/// Desktop resolves its image here, before anything reads assets: `--disc <path>` or a bare
+/// image path, else `disc.iso`/`disc.rvz` beside the executable or in the data dir, else the
+/// extracted [`assets::ASSETS_ENV`] tree. An image that is named or found but unreadable exits
+/// with the typed reason on stderr rather than opening a window over a session without assets.
 #[cfg(not(target_os = "android"))]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub fn run() {
     use std::time::Duration;
     use web_time::Instant;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+            println!("{}", source::USAGE);
+            return;
+        }
+        match source::install_launch(args) {
+            Ok(Some(summary)) => eprintln!("clearsleeper: disc image {summary}"),
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("clearsleeper: {error}");
+                eprintln!("{}", source::USAGE);
+                std::process::exit(1);
+            }
+        }
+    }
 
     let mut app = App::new_live();
     let mut last = Instant::now();
@@ -2383,6 +2783,15 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
     rlobkit_app_events::android_log::init(env!("CARGO_PKG_NAME"), "warn");
     rlobkit_app_events::system_bars::set_immersive_sticky(true);
     repose_core::locals::set_theme_default(repose_core::locals::Theme::default());
+    match android::install_source(&android_app) {
+        Ok(Some(summary)) => log::info!("clearsleeper: disc image {summary}"),
+        Ok(None) => log::warn!(
+            "clearsleeper: no disc image picked or found; {} is unset on a device, so the \
+             session boots without assets",
+            assets::ASSETS_ENV
+        ),
+        Err(error) => log::error!("clearsleeper: disc image rejected ({error})"),
+    }
     let mut app = App::new_live();
     let mut last = std::time::Instant::now();
     if let Err(e) = repame_shell::run_android(android_app, move |sched, ctx| {

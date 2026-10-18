@@ -685,11 +685,8 @@ impl Title {
             self.m020 = (self.rnd_f(WIND_FRAME) + WIND_BASE) as i32;
             let angle_x = self.rnd_fx(WIND_YAW) as i16;
             let angle_z = self.rnd_fx(WIND_TILT) as i16;
-            self.wind = Emitter::spawn_angled(
-                PA_TITLEWIND,
-                self.smoke_plain(),
-                [angle_x, 0, angle_z],
-            );
+            self.wind =
+                Emitter::spawn_angled(PA_TITLEWIND, self.smoke_plain(), [angle_x, 0, angle_z]);
         } else {
             self.m020 -= 1;
         }
@@ -784,10 +781,9 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut titles: Query<&mut Title, (With<Title>, Without<Player>)>,
 ) {
-    let (trig_a, trig_b, trig_start) =
-        pad.map_or((false, false, false), |pad| {
-            (pad.trig.a, pad.trig.b, pad.trig.start)
-        });
+    let (trig_a, trig_b, trig_start) = pad.map_or((false, false, false), |pad| {
+        (pad.trig.a, pad.trig.b, pad.trig.start)
+    });
     let pressed = trig_a || trig_b || trig_start;
 
     for mut title in &mut titles {

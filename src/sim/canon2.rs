@@ -242,20 +242,8 @@ impl Canon2 {
                 pitch_goal = low;
             }
         }
-        let yaw = add_calc_angle_s(
-            self.shape_angle[1],
-            yaw_goal,
-            AIM_SCALE,
-            AIM_MAX,
-            AIM_MIN,
-        );
-        let pitch = add_calc_angle_s(
-            self.shape_angle[0],
-            pitch_goal,
-            AIM_SCALE,
-            AIM_MAX,
-            AIM_MIN,
-        );
+        let yaw = add_calc_angle_s(self.shape_angle[1], yaw_goal, AIM_SCALE, AIM_MAX, AIM_MIN);
+        let pitch = add_calc_angle_s(self.shape_angle[0], pitch_goal, AIM_SCALE, AIM_MAX, AIM_MIN);
         self.shape_angle[1] = yaw;
         self.shape_angle[0] = pitch;
         yaw != yaw_goal || pitch != pitch_goal
@@ -266,8 +254,7 @@ impl Canon2 {
         self.muzzle = self.muzzle_of(pos);
         events.list.push(SimEvent::Se(SE_CANNON_FIRE));
         events.list.push(SimEvent::Se(SE_BOMB_EXPLODE));
-        let span =
-            (f32::from(PITCH_HOME) + PITCH_DIV - f32::from(self.shape_angle[0])) / PITCH_DIV;
+        let span = (f32::from(PITCH_HOME) + PITCH_DIV - f32::from(self.shape_angle[0])) / PITCH_DIV;
         self.flight = (span * FLIGHT_SCALE * FLIGHT_TURNS + FLIGHT_MIN) as i16;
         self.flight_max = self.flight;
         self.rounds -= 1;
@@ -278,13 +265,7 @@ impl Canon2 {
     /// `1 - (t - 0.5)^2 * 4` and lifted by the barrel tangent scaled on the chord length. Each
     /// tick the live shell centre is published as the `AT_TYPE_BOMB` origin, which is what
     /// `mCyl2.SetC(m62C); dComIfG_Ccsp()->Set(&mCyl2)` (`:358-359`) registers in retail.
-    fn fly(
-        &mut self,
-        pos: Vec3,
-        sea: Option<&Sea>,
-        blasts: &mut Blasts,
-        events: &mut SimEvents,
-    ) {
+    fn fly(&mut self, pos: Vec3, sea: Option<&Sea>, blasts: &mut Blasts, events: &mut SimEvents) {
         self.land = self.get_bul_end_pos(pos, sea);
         let running = self.flight != COUNT_UNDER;
         if running {
@@ -361,12 +342,8 @@ impl Canon2 {
         if staff == NO_STAFF {
             return;
         }
-        let action = manager.get_my_act_idx(
-            staff,
-            &[CUT_NAME][..CUT_COUNT],
-            ACT_FORCE,
-            ACT_NAME_TYPE,
-        );
+        let action =
+            manager.get_my_act_idx(staff, &[CUT_NAME][..CUT_COUNT], ACT_FORCE, ACT_NAME_TYPE);
         if action == -1 {
             manager.cut_end(staff);
             return;

@@ -3,13 +3,13 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow::{Arrow, TYPE_FIRE};
-use crate::sim::collision::Collision;
 use super::event_manager::EventManager;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 use super::ground;
 use super::stream::{cos_s, sin_s};
 use super::walk::within;
+use crate::sim::collision::Collision;
 
 /// `d_a_ep.cpp` is `g_profile_EP`, process `fpcNm_EP_e`; the OBJNAME row is `"bonbori"`, NOT the
 /// arcname `"Ep"` (`dComIfG_resLoad(&i_this->mPhase, "Ep")`, `d_a_ep.cpp:640`). `src/sim/torch.rs`
@@ -241,8 +241,7 @@ impl Ep {
         if !manager.get_is_advance(self.cut) {
             return false;
         }
-        let action =
-            manager.get_my_act_idx(self.cut, &[ACT_WAIT, ACT_FIRE][..ACT_COUNT], false, 0);
+        let action = manager.get_my_act_idx(self.cut, &[ACT_WAIT, ACT_FIRE][..ACT_COUNT], false, 0);
         if action == 1 {
             events.list.push(SimEvent::Se(SE_TORCH_IGNITION));
             true

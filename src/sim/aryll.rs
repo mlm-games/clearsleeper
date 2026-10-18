@@ -23,7 +23,7 @@ use crate::text::msgproc::{
 use crate::text::{
     STATUS_BOX_CLOSED, STATUS_BOX_CLOSING, STATUS_BOX_OPENING, STATUS_CLOSE_WAIT,
     STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-    STATUS_TYPING, STATUS_SCOPE_WAIT, STATUS_UNK0,
+    STATUS_SCOPE_WAIT, STATUS_TYPING, STATUS_UNK0,
 };
 
 const PROJECT_LIFT: f32 = 2000.0;
@@ -263,20 +263,7 @@ pub const RND_SEED: i32 = 100;
 pub const ANM_NUM_ROWS: usize = 14;
 
 pub const BCK_FRAME_MAX: [f32; ANM_NUM_ROWS] = [
-    49.0,
-    58.0,
-    39.0,
-    36.0,
-    39.0,
-    35.0,
-    59.0,
-    29.0,
-    35.0,
-    35.0,
-    44.0,
-    49.0,
-    43.0,
-    129.0,
+    49.0, 58.0, 39.0, 36.0, 39.0, 35.0, 59.0, 29.0, 35.0, 35.0, 44.0, 49.0, 43.0, 129.0,
 ];
 
 pub const ATR_SEVEN_FRAME: f32 = 23.0;
@@ -716,7 +703,11 @@ impl Jnt {
     }
 
     pub fn backbone_angle(&self, axis: usize) -> i16 {
-        if axis == 0 { self.backbone_x } else { self.backbone_y }
+        if axis == 0 {
+            self.backbone_x
+        } else {
+            self.backbone_y
+        }
     }
 
     pub fn set_head_angle(&mut self, axis: usize, value: i16) {
@@ -2123,19 +2114,19 @@ impl Aryll {
 
     fn partner_set_focus(&mut self) {
         self.partner_focus = true;
-}
+    }
 
-fn player_reset_flag(&mut self) {
+    fn player_reset_flag(&mut self) {
         self.player_reset = PLAYER_RESET_FLAG;
-}
+    }
 
-fn cam_clr_flag_focus(&mut self) {
-    self.cam_focus_flag &= !CAMERA_FLAG_FOCUS;
-}
+    fn cam_clr_flag_focus(&mut self) {
+        self.cam_focus_flag &= !CAMERA_FLAG_FOCUS;
+    }
 
-fn cam_set_flag_focus(&mut self) {
-    self.cam_focus_flag |= CAMERA_FLAG_FOCUS;
-}
+    fn cam_set_flag_focus(&mut self) {
+        self.cam_focus_flag |= CAMERA_FLAG_FOCUS;
+    }
 
     fn cam_subject_lock_off(&mut self) {
         self.cam_subject = None;
@@ -2152,9 +2143,7 @@ fn cam_set_flag_focus(&mut self) {
                 temp_msg_no = self.scope_msg_no;
                 self.scope_msg_no = MSG_BC1;
                 if self.chk_telescope_sph(ctx.project, 0.0, HIO_SPH_RANGE) {
-                    self.scope_msg_no = if ctx
-                        .scope_zoom
-                        .is_some_and(|zoom| zoom >= HIO_ZOOM_BIRD)
+                    self.scope_msg_no = if ctx.scope_zoom.is_some_and(|zoom| zoom >= HIO_ZOOM_BIRD)
                     {
                         MSG_BCB
                     } else {
@@ -2164,10 +2153,7 @@ fn cam_set_flag_focus(&mut self) {
             }
             SCOPE_PHASE_ZOOM => {
                 self.scope_msg_no = MSG_BCA;
-                if ctx
-                    .scope_zoom
-                    .is_some_and(|zoom| zoom >= HIO_ZOOM_FOCUS)
-                {
+                if ctx.scope_zoom.is_some_and(|zoom| zoom >= HIO_ZOOM_FOCUS) {
                     if scope_mesg_status == STATUS_CLOSE_WAIT {
                         ctx.text.force_send_on();
                     }
@@ -2463,16 +2449,14 @@ fn cam_set_flag_focus(&mut self) {
                 player_eye_pos_p = None;
                 self.eye_live = false;
             }
-            LOOK_ACTOR => {
-                match ctx.proc_eye {
-                    Some((pos, eye)) => {
-                        self.player_eye = Vec3::new(pos.x, eye.y, pos.z);
-                        player_eye_pos_p = Some(self.player_eye);
-                        self.eye_live = true;
-                    }
-                    None => player_eye_pos_p = None,
+            LOOK_ACTOR => match ctx.proc_eye {
+                Some((pos, eye)) => {
+                    self.player_eye = Vec3::new(pos.x, eye.y, pos.z);
+                    player_eye_pos_p = Some(self.player_eye);
+                    self.eye_live = true;
                 }
-            }
+                None => player_eye_pos_p = None,
+            },
             _ => {
                 player_eye_pos_p = None;
                 self.eye_live = false;
@@ -2733,10 +2717,9 @@ fn player_pos(ctx: &Ctx) -> Vec3 {
 }
 
 fn player_eye_pos_of(ctx: &Ctx, offset_y: f32) -> Vec3 {
-    ctx.player
-        .map_or(ctx.pos, |player| {
-            Vec3::new(player.pos.x, player.pos.y + offset_y, player.pos.z)
-        })
+    ctx.player.map_or(ctx.pos, |player| {
+        Vec3::new(player.pos.x, player.pos.y + offset_y, player.pos.z)
+    })
 }
 
 fn rotated_y(offset: Vec3, pos: Vec3, yaw: i16) -> Vec3 {
@@ -2749,7 +2732,11 @@ fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
 
 fn target_angle_x(from: Vec3, to: Vec3) -> i16 {
     let delta = to - from;
-    to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
+    to_s16(
+        delta
+            .y
+            .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+    )
 }
 
 fn add_calc_angle_l(value: i32, target: i32, scale: i32, max_step: i32, min_step: i32) -> i32 {

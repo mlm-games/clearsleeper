@@ -234,7 +234,9 @@ pub struct RacePaths {
 
 impl RacePaths {
     pub fn get(&self, id: u8, room: i8) -> Option<&RacePath> {
-        self.paths.iter().find(|path| path.id == id && path.room == room)
+        self.paths
+            .iter()
+            .find(|path| path.id == id && path.room == room)
     }
 }
 
@@ -441,12 +443,7 @@ impl GoalFlag {
         }
     }
 
-    pub fn create_buoy_races(
-        &mut self,
-        paths: &RacePaths,
-        room: i8,
-        out: &mut Vec<BuoyRaceSpawn>,
-    ) {
+    pub fn create_buoy_races(&mut self, paths: &RacePaths, room: i8, out: &mut Vec<BuoyRaceSpawn>) {
         for i in 0..self.num_ropes.clamp(0, ROPE_COUNT as i32) as usize {
             let buoys = self.num_rope_buoys[i].clamp(0, ROPE_MAX_BUOYS);
             let points: Vec<Vec3> = match paths.get(self.rope_path_ids[i], room) {
@@ -479,11 +476,9 @@ impl GoalFlag {
         player_along.y = 0.0;
 
         let pole_delta = self.goal_flag_pole_pos[1] - self.goal_flag_pole_pos[0];
-        let finish_line_len =
-            Vec3::new(pole_delta.x, 0.0, pole_delta.z).length();
+        let finish_line_len = Vec3::new(pole_delta.x, 0.0, pole_delta.z).length();
         let player_along_line = finish_line_dir.dot(player_along);
-        let finish_line_normal =
-            Vec3::new(finish_line_dir.z, 0.0, -finish_line_dir.x);
+        let finish_line_normal = Vec3::new(finish_line_dir.z, 0.0, -finish_line_dir.x);
         let player_finish_side = finish_line_normal.dot(player_from_line_start);
 
         let mut o_result = FINISH_NONE;
@@ -572,8 +567,9 @@ impl GoalFlag {
         let to = self.curr_arr as usize;
 
         self.wind_scale_phase = self.wind_scale_phase.wrapping_add(hio.wind_scale_phase_inc);
-        self.normal_flutter_phase =
-            self.normal_flutter_phase.wrapping_add(hio.normal_flutter_phase_inc);
+        self.normal_flutter_phase = self
+            .normal_flutter_phase
+            .wrapping_add(hio.normal_flutter_phase_inc);
         self.flag_wave_phase = self.flag_wave_phase.wrapping_add(hio.flag_wave_phase_inc);
 
         let scale_blend_factor = 0.5 + ssin(i32::from(self.wind_scale_phase)) * 0.5;
@@ -595,7 +591,14 @@ impl GoalFlag {
             for j in 0..CLOTH_ROWS as i32 {
                 let index = cloth_index(i, j);
                 self.pos_arr[to][index] = prev_pos_arr[index];
-                let factor = self.get_cloth_anim_factor(&prev_pos_arr, &prev_nrm_arr, &wind_vector, i, j, hio);
+                let factor = self.get_cloth_anim_factor(
+                    &prev_pos_arr,
+                    &prev_nrm_arr,
+                    &wind_vector,
+                    i,
+                    j,
+                    hio,
+                );
                 self.velocity[index] += factor;
                 self.velocity[index] *= CLOTH_VELOCITY_DAMP;
                 self.pos_arr[to][index] += self.velocity[index];
@@ -608,8 +611,7 @@ impl GoalFlag {
                 let index = cloth_index(k, l);
                 let mut dpos = curr_pos_arr[index];
                 let dk = (CLOTH_FALLOFF_CENTER - k as f32).abs();
-                let center_to_edge_falloff =
-                    (CLOTH_FALLOFF_EDGE - dk * dk) / CLOTH_FALLOFF_EDGE;
+                let center_to_edge_falloff = (CLOTH_FALLOFF_EDGE - dk * dk) / CLOTH_FALLOFF_EDGE;
                 dpos.z += CLOTH_WAVE_AMPLITUDE
                     * center_to_edge_falloff
                     * ssin(
@@ -643,9 +645,7 @@ impl GoalFlag {
         let index = cloth_index(i_col, i_row);
         let pos = i_pos_arr[index];
         let dot = i_wind_vec.dot(i_nrm_arr[index]);
-        if (i_row == 0 || i_row == CLOTH_LAST_ROW)
-            && (i_col == 0 || i_col == CLOTH_LAST_COL)
-        {
+        if (i_row == 0 || i_row == CLOTH_LAST_ROW) && (i_col == 0 || i_col == CLOTH_LAST_COL) {
             return Vec3::ZERO;
         }
         let mut anim_factor = i_nrm_arr[index] * dot;
@@ -838,13 +838,7 @@ pub const BGM_SEA_GOAL: u32 = 0x8000_000C;
 pub const BGM_SEA_FAIL: u32 = 0x8000_000D;
 pub const SE_SGAME_TIMER_0: u32 = 0x0847;
 
-pub const ACTION_NAMES: [&str; 5] = [
-    "00_dummy",
-    "01_dummy",
-    "02_dummy",
-    "03_dummy",
-    "04_dummy",
-];
+pub const ACTION_NAMES: [&str; 5] = ["00_dummy", "01_dummy", "02_dummy", "03_dummy", "04_dummy"];
 
 pub const STAFF_TAG_ID: i32 = 0;
 pub const EVT_CND_UNK2: u16 = 0x0002;
@@ -975,8 +969,7 @@ impl GoalFlag {
             self.race_start_state = 0;
         }
 
-        self.prev_player_line_side =
-            self.finish_side(player_pos.unwrap_or(Vec3::ZERO));
+        self.prev_player_line_side = self.finish_side(player_pos.unwrap_or(Vec3::ZERO));
         self.race_end_state = 0;
 
         for _ in 0..CREATED_WARMUP_FRAMES {
@@ -1046,7 +1039,9 @@ impl GoalFlag {
         } else {
             let timer_p = self.timer_proc_id != PROC_ID_NONE;
             let mgame_start_p = self.mgame_start_proc_id != PROC_ID_NONE
-                && procs.search_by_id(self.mgame_start_proc_id as u32).is_some();
+                && procs
+                    .search_by_id(self.mgame_start_proc_id as u32)
+                    .is_some();
 
             if action_idx == 1 && mgame_start_p {
                 self.mgame_start_count_start();
@@ -1088,7 +1083,9 @@ impl GoalFlag {
     ) -> bool {
         if self.mgame_start_proc_id != PROC_ID_NONE {
             if self.mgame_start_delete_check()
-                && procs.search_by_id(self.mgame_start_proc_id as u32).is_some()
+                && procs
+                    .search_by_id(self.mgame_start_proc_id as u32)
+                    .is_some()
             {
                 procs.delete(self.mgame_start_proc_id as u32);
                 self.mgame_start_proc_id = PROC_ID_NONE;
@@ -1120,11 +1117,7 @@ impl GoalFlag {
             self.race_end_state = 2;
         }
 
-        let rest_time_ms = if timer_p {
-            timer.get_rest_time_ms()
-        } else {
-            0
-        };
+        let rest_time_ms = if timer_p { timer.get_rest_time_ms() } else { 0 };
         if rest_time_ms == 0 {
             if timer_p {
                 let _ = timer.end(TIMER_END_ARG);
@@ -1277,16 +1270,7 @@ impl GoalFlag {
                 );
             }
             GoalFlagProc::RaceEnd => {
-                self.race_end(
-                    procs,
-                    manager,
-                    timer,
-                    next,
-                    hio,
-                    trig_a,
-                    trig_b,
-                    trig_start,
-                );
+                self.race_end(procs, manager, timer, next, hio, trig_a, trig_b, trig_start);
             }
         }
         self.flag_move(angle_y, wind_vec, hio);
@@ -1412,5 +1396,5 @@ pub fn control(
         );
         flag.mtx = flag.draw_mtx(angle_y);
         world.status.status0 &= !STTS0_TELESCOPE_LOOK;
-        }
+    }
 }

@@ -51,9 +51,9 @@ const FLAG_REQ_HEAVY: u32 = 0x8; // <- d_a_obj_swheavy.h:32
 /// (`d_a_obj_swheavy.cpp:13-23`), i.e. a flagless button whose spring never moves. No Wind Temple
 /// stage data in this checkout sets a `prm_get_type()` above 3.
 const SWHEAVY_FLAGS: [u32; 4] = [
-    0,          // <- d_a_obj_swheavy.cpp:16
-    0,          // <- d_a_obj_swheavy.cpp:26
-    FLAG_IS_TOGGLE | FLAG_REQ_HEAVY,      // <- d_a_obj_swheavy.cpp:36
+    0,                                                   // <- d_a_obj_swheavy.cpp:16
+    0,                                                   // <- d_a_obj_swheavy.cpp:26
+    FLAG_IS_TOGGLE | FLAG_REQ_HEAVY,                     // <- d_a_obj_swheavy.cpp:36
     FLAG_OBEY_SAVE | FLAG_STAY_PRESSED | FLAG_REQ_HEAVY, // <- d_a_obj_swheavy.cpp:46
 ];
 
@@ -323,7 +323,11 @@ impl SwHeavy {
     /// `eyePos.x = current.pos.x; eyePos.y = current.pos.y + m328 - -35.5f; eyePos.z =
     /// current.pos.z;` (`.cpp:415-417`).
     fn eye_pos(&self, actor: &Actor) -> Vec3 {
-        Vec3::new(actor.pos.x, actor.pos.y + self.travel + EYE_LIFT, actor.pos.z)
+        Vec3::new(
+            actor.pos.x,
+            actor.pos.y + self.travel + EYE_LIFT,
+            actor.pos.z,
+        )
     }
 
     /// `_execute` (`.cpp:397-419`): `set_push_flag()` (`:405`) folds to the two timer clears

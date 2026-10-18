@@ -1,8 +1,9 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryFilter;
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use super::actor::Actor;
+use super::jpa::Clip;
 
 pub const ERROR_PROC_ID: u32 = 0xFFFF_FFFF;
 pub const RESERVED_PROC_ID: u32 = 0xFFFF_FFFE;
@@ -312,9 +313,10 @@ impl ActorRegistry {
     }
 
     pub fn remove(&mut self, proc_id: u32) -> Option<ActorEntry> {
-        let index = self.entries.iter().position(|slot| {
-            slot.is_some_and(|entry| entry.proc_id == proc_id)
-        })?;
+        let index = self
+            .entries
+            .iter()
+            .position(|slot| slot.is_some_and(|entry| entry.proc_id == proc_id))?;
         let entry = self.entries[index].take();
         if entry.is_some() {
             self.free.push(index);
@@ -372,15 +374,18 @@ impl ActorRegistry {
     }
 
     pub fn is_first_creating(&self, proc_id: u32) -> bool {
-        self.entry(proc_id).is_some_and(|entry| entry.init_state == INIT_FIRST)
+        self.entry(proc_id)
+            .is_some_and(|entry| entry.init_state == INIT_FIRST)
     }
 
     pub fn is_deleting(&self, proc_id: u32) -> bool {
-        self.entry(proc_id).is_some_and(|entry| entry.init_state == INIT_DELETING)
+        self.entry(proc_id)
+            .is_some_and(|entry| entry.init_state == INIT_DELETING)
     }
 
     pub fn is_searchable(&self, proc_id: u32) -> bool {
-        self.entry(proc_id).is_some_and(|entry| entry.init_state == INIT_EXECUTING)
+        self.entry(proc_id)
+            .is_some_and(|entry| entry.init_state == INIT_EXECUTING)
     }
 
     pub fn request_delete(&mut self, proc_id: u32) -> bool {
@@ -496,7 +501,61 @@ impl ActorRegistry {
     }
 
     pub fn chk_condition(&self, proc_id: u32, flag: u32) -> u32 {
-        self.entry(proc_id).map_or(0, |entry| entry.condition & flag)
+        self.entry(proc_id)
+            .map_or(0, |entry| entry.condition & flag)
+    }
+
+    /// `fopAc_Draw`'s predicate (`f_op_actor.cpp:129-140`): the actor is drawn unless the
+    /// no-draw status bit is up, or the stop status is and a `CULL` actor's box is outside the
+    /// clipper. `dComIfGp_event_moveApproval` (`moveApproval`, whose `FORCE` arm bypasses both
+    /// tests) and a non-zero `fopAcM_GetCullSizeFar` have no port counterpart; every port
+    /// actor's is 0, retail's own default, which skips the far branch
+    /// (`f_op_actor_mng.cpp:602-648`). A missing clip or cull box leaves the actor drawn,
+    /// because the port cannot evaluate a test it has no inputs for.
+    ///
+    /// `cull` is the actor's `fopAc_CULLBOX_CUSTOM_e` box and `model` the matrix `fopAcM_SetMtx`
+    /// publishes (`f_op_actor_mng.cpp:284-286`), which for Ba1 is the morf's base TRM written by
+    /// `setMtx` (`d_a_npc_ba1.cpp:288-291`).
+    pub fn draw_gate(
+        &self,
+        entry: &ActorEntry,
+        clip: Option<&Clip>,
+        model: Mat4,
+        cull: Option<([f32; 3], [f32; 3])>,
+    ) -> bool {
+        if entry.status & STATUS_NO_DRAW != 0 {
+            return false;
+        }
+        if entry.status & self.stop_status != 0 {
+            return false;
+        }
+        if entry.status & STATUS_CULL != 0
+            && let (Some(clip), Some((min, max))) = (clip, cull)
+            && clip.clip_box(model, Vec3::from(min), Vec3::from(max))
+        {
+            return false;
+        }
+        true
+    }
+
+    /// `fopAc_Execute`'s `NOCULLEXEC` clause (`f_op_actor.cpp:180-193`): a `NOCULLEXEC` actor
+    /// whose last draw was rejected (`fopAcCnd_NODRAW_e`, written by [`ActorRegistry::draw_gate`]'s
+    /// caller) skips its execute. `moveApproval` is the other half of retail's condition and has
+    /// no port counterpart; `stopStatus` is 0 unless a caller sets one.
+    pub fn execute_gate(&self, entry: &ActorEntry) -> bool {
+        entry.status & STATUS_NO_CULL_EXEC == 0 || entry.condition & CONDITION_NO_DRAW == 0
+    }
+
+    /// The bookkeeping `fopAc_Draw` performs around `_draw` (`f_op_actor.cpp:141-150`):
+    /// `fopAcM_OnCondition(NODRAW)` when the gate rejected the actor and the matching
+    /// `OffCondition` when it ran, then `fopAcM_OffStatus(NODRAW)`.
+    pub fn set_draw_condition(&mut self, proc_id: u32, drawn: bool) {
+        if drawn {
+            self.off_condition(proc_id, CONDITION_NO_DRAW);
+        } else {
+            self.on_condition(proc_id, CONDITION_NO_DRAW);
+        }
+        self.off_status(proc_id, STATUS_NO_DRAW);
     }
 
     pub fn on_condition(&mut self, proc_id: u32, flag: u32) {
@@ -810,7 +869,9 @@ pub fn search_nearest_by_name<D: QueryFilter>(
     center: Vec3,
     radius: f32,
 ) -> Option<(Entity, Vec3)> {
-    nearest_match(registry, actors, center, radius, |_, actor, _| actor.name == name)
+    nearest_match(registry, actors, center, radius, |_, actor, _| {
+        actor.name == name
+    })
 }
 
 pub fn search_nearest_by_class<D: QueryFilter>(
@@ -832,7 +893,9 @@ pub fn search_nearest_by_group<D: QueryFilter>(
     center: Vec3,
     radius: f32,
 ) -> Option<(Entity, Vec3)> {
-    nearest_match(registry, actors, center, radius, |entry, _, _| entry.group == group)
+    nearest_match(registry, actors, center, radius, |entry, _, _| {
+        entry.group == group
+    })
 }
 
 pub fn delete_actor(world: &mut World, entity: Entity) -> bool {

@@ -3,8 +3,8 @@ use glam::Vec3;
 
 use crate::sim::bodies::AtMeta;
 use crate::sim::contact::{
-    self, AT_SPRM_NO_TG_HIT_INF_SET, AT_SPRM_SET, CcSystem, DivideInfo, GObjInf, GStts,
-    GSTTS_NO_ACTOR, ObjEntry, ObjSet, Stts,
+    self, AT_SPRM_NO_TG_HIT_INF_SET, AT_SPRM_SET, CcSystem, DivideInfo, GObjInf, GSTTS_NO_ACTOR,
+    GStts, ObjEntry, ObjSet, Stts,
 };
 use crate::sim::contact_run::ContactBodies;
 use crate::sim::damage_resolve::{
@@ -215,13 +215,7 @@ pub fn at_tg(at: &[AtObj], tg: &[TgObj<'_>]) -> Vec<Charge> {
 /// against each candidate's own TG volumes with the same `ChkNoHitAtTg` filter, and the cross
 /// point follows `CrossAtTg`'s convention: the TG core axis's own radius along the line back to
 /// the attack volume's centre.
-pub fn at_tg_swept(
-    at: &AtObj,
-    from: Vec3,
-    to: Vec3,
-    radius: f32,
-    tg: &[TgObj<'_>],
-) -> Vec<Charge> {
+pub fn at_tg_swept(at: &AtObj, from: Vec3, to: Vec3, radius: f32, tg: &[TgObj<'_>]) -> Vec<Charge> {
     let entry = at.entry(None);
     let mut charged: Vec<Charge> = Vec::new();
     for target in tg {

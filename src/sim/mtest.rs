@@ -25,14 +25,14 @@ use super::flags::Switches;
 /// eight is claimed by any other `*_ACTORS` array or `pub const &str` in `src/sim/`; note
 /// `movebox.rs` claims `"Ecube"` and `wall.rs` `"Wall"`, neither of which is one of these.
 pub const MTEST_ACTORS: [&str; 8] = [
-    "Mcube",    // <- d_stage.cpp:895, Type_Mcube   = 0  (d_a_obj_mtest.h:10)
-    "Mcyln",    // <- d_stage.cpp:896, Type_Mcyln   = 1  (d_a_obj_mtest.h:11)
-    "Mcube10",  // <- d_stage.cpp:897, Type_Mcube10 = 2  (d_a_obj_mtest.h:12)
-    "Mcyln10",  // <- d_stage.cpp:898, Type_Mcyln10 = 3  (d_a_obj_mtest.h:13)
-    "MwtrSB",   // <- d_stage.cpp:899, Type_MwtrSB  = 4  (d_a_obj_mtest.h:14)
-    "MygnSB",   // <- d_stage.cpp:900, Type_MygnSB  = 5  (d_a_obj_mtest.h:15)
-    "Owater",   // <- d_stage.cpp:901, Type_Owater  = 6  (d_a_obj_mtest.h:16)
-    "Astop",    // <- d_stage.cpp:902, Type_Astop   = 7  (d_a_obj_mtest.h:17)
+    "Mcube",   // <- d_stage.cpp:895, Type_Mcube   = 0  (d_a_obj_mtest.h:10)
+    "Mcyln",   // <- d_stage.cpp:896, Type_Mcyln   = 1  (d_a_obj_mtest.h:11)
+    "Mcube10", // <- d_stage.cpp:897, Type_Mcube10 = 2  (d_a_obj_mtest.h:12)
+    "Mcyln10", // <- d_stage.cpp:898, Type_Mcyln10 = 3  (d_a_obj_mtest.h:13)
+    "MwtrSB",  // <- d_stage.cpp:899, Type_MwtrSB  = 4  (d_a_obj_mtest.h:14)
+    "MygnSB",  // <- d_stage.cpp:900, Type_MygnSB  = 5  (d_a_obj_mtest.h:15)
+    "Owater",  // <- d_stage.cpp:901, Type_Owater  = 6  (d_a_obj_mtest.h:16)
+    "Astop",   // <- d_stage.cpp:902, Type_Astop   = 7  (d_a_obj_mtest.h:17)
 ];
 
 /// `daObjMtest::Act_c::Type` (`d_a_obj_mtest.h:9-19`). Every member is named, and each is cited
@@ -62,8 +62,8 @@ const SCALE_MULT: [[f32; 3]; 8] = [
     [1.0, 0.5, 1.0],    // Type_Mcyln
     [10.0, 10.0, 10.0], // Type_Mcube10
     [10.0, 5.0, 10.0],  // Type_Mcyln10
-    [0.2, 0.2, 0.2],   // Type_MwtrSB
-    [0.2, 0.2, 0.2],   // Type_MygnSB
+    [0.2, 0.2, 0.2],    // Type_MwtrSB
+    [0.2, 0.2, 0.2],    // Type_MygnSB
     [1.0, 1.0, 1.0],    // Type_Owater
     [40.0, 1.0, 40.0],  // Type_Astop
 ]; // <- d_a_obj_mtest.cpp:26-35
@@ -91,7 +91,6 @@ const CULL_WIDE_MIN: [f32; 3] = [-3000.0, -10.0, -3000.0]; // <- d_a_obj_mtest.c
 const CULL_WIDE_MAX: [f32; 3] = [3000.0, 10.0, 3000.0]; // <- d_a_obj_mtest.cpp:112
 const CULL_MIN: [f32; 3] = [-51.0, -1.0, -51.0]; // <- d_a_obj_mtest.cpp:114
 const CULL_MAX: [f32; 3] = [51.0, 101.0, 51.0]; // <- d_a_obj_mtest.cpp:114
-
 
 /// `prm_get_type() = daObj::PrmAbstract<PRM_TYPE_W, PRM_TYPE_S>(this, 3, 0)`
 /// (`d_a_obj_mtest.h:35`, `:22-23`) - `((1 << 3) - 1) & (param >> 0)` (`d_a_obj.h:12-15`) over the

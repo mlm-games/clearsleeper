@@ -801,7 +801,11 @@ pub fn shop_bought_error_status(item: u8, buy_price: i32, rupees: u32) -> u8 {
     if shop_max_check(item) {
         status |= BUY_ERROR_MAXIMUM;
     }
-    let price = if buy_price == BUY_ERROR_MAX_ITEM { 0 } else { buy_price };
+    let price = if buy_price == BUY_ERROR_MAX_ITEM {
+        0
+    } else {
+        buy_price
+    };
     if i32::try_from(rupees).unwrap_or(i32::MAX) < price {
         status |= BUY_ERROR_RUPEES;
     }
@@ -1111,7 +1115,11 @@ impl Zunari {
         };
         let at = temp as usize;
         let point = self.path_point_pos.get(at).copied().unwrap_or(Vec3::ZERO);
-        let mark_at: i8 = self.path_point_mark.get(at).copied().unwrap_or(NO_POINT as i8);
+        let mark_at: i8 = self
+            .path_point_mark
+            .get(at)
+            .copied()
+            .unwrap_or(NO_POINT as i8);
         let chase_result = chase_pos_xz(&mut actor.pos, point, HIO_CHASE_STEP);
         if chase_result {
             self.path_index = temp;
@@ -1488,9 +1496,7 @@ impl Zunari {
         } else if matches!(self.mode, MODE_TALK | MODE_BUMPED | MODE_FACE_ON) {
             if self.mode != MODE_FACE_ON
                 || self.shop_idx != NO_SHOP
-                || ctx
-                    .player
-                    .is_some_and(check_roten_base_talk_area)
+                || ctx.player.is_some_and(check_roten_base_talk_area)
             {
                 self.talk_condition = true;
             }
@@ -1754,7 +1760,10 @@ pub fn control(
             one: &mut msg.one,
             two: &mut msg.two,
             clear_count,
-            archive: msg.archive.as_deref().map(|archive| archive as &dyn MsgArchive),
+            archive: msg
+                .archive
+                .as_deref()
+                .map(|archive| archive as &dyn MsgArchive),
         };
         let talk_request = pressed
             && player.is_some_and(|player| {

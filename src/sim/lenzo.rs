@@ -6,8 +6,8 @@ use super::clock::Clock;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
 use super::flags::StoryBits;
-use super::inventory::Got;
 use super::intent::DoIntent;
+use super::inventory::Got;
 use super::pickup::Rupees;
 use super::player::Player;
 use super::stream;
@@ -94,9 +94,7 @@ pub const WEEKDAY_GANON: u16 = 0x3910;
 pub const WEEKDAY_PERL: u16 = 0x3920;
 pub const WEEKDAY_KOKIRI: u16 = 0x2D20;
 pub const WEEKDAY_ZOLA: u16 = 0x2D40;
-pub static WEEKDAY_TOWN: [u16; 7] = [
-    0x3002, 0x3001, 0x3008, 0x3004, 0x3020, 0x3010, 0x3180,
-];
+pub static WEEKDAY_TOWN: [u16; 7] = [0x3002, 0x3001, 0x3008, 0x3004, 0x3020, 0x3010, 0x3180];
 pub static WEEKDAY_FLAGS: [&[u16]; 7] = [
     &[WEEKDAY_ZELDA_AWAKENED],
     &[WEEKDAY_GANON],
@@ -329,16 +327,40 @@ pub static MSG_FIRST_ORDER_XY: [u32; 4] = [0x2A5E, 0x2A5F, 0x2A60, MSG_FIRST_END
 pub static MSG_SECOND_ORDER_XY: [u32; 4] = [0x2A61, 0x2A62, 0x2A60, MSG_SECOND_END_2];
 pub static MSG_THIRD_ORDER_XY: [u32; 3] = [0x2A64, 0x2A60, MSG_THIRD_END_2];
 pub static MSG_COLOR_XY: [u32; 8] = [
-    0x2A58, 0x2A59, 0x2A5A, MSG_COLOR_XY_A, 0x2A85, MSG_COLOR_XY_B, 0x2A5B, MSG_TAIL,
+    0x2A58,
+    0x2A59,
+    0x2A5A,
+    MSG_COLOR_XY_A,
+    0x2A85,
+    MSG_COLOR_XY_B,
+    0x2A5B,
+    MSG_TAIL,
 ];
 pub static MSG_XY_BUY_PHOTO: [u32; 9] = [
-    0x3788, 0x3789, MSG_BUY_ASK, 0x378C, MSG_BUY_TAIL, 0x378D, MSG_BUY_TAIL_2, 0x3786, MSG_TAIL,
+    0x3788,
+    0x3789,
+    MSG_BUY_ASK,
+    0x378C,
+    MSG_BUY_TAIL,
+    0x378D,
+    MSG_BUY_TAIL_2,
+    0x3786,
+    MSG_TAIL,
 ];
 
 pub static MSG_CAMERA: [[Vec3; 2]; 3] = [
-    [Vec3::new(-1336.0, -497.0, 928.0), Vec3::new(185.0, -26.0, 0.0)],
-    [Vec3::new(-1213.0, -902.0, -244.0), Vec3::new(284.0, 36.0, 280.0)],
-    [Vec3::new(-29.0, 252.0, -1634.0), Vec3::new(5.0, -91.0, 178.0)],
+    [
+        Vec3::new(-1336.0, -497.0, 928.0),
+        Vec3::new(185.0, -26.0, 0.0),
+    ],
+    [
+        Vec3::new(-1213.0, -902.0, -244.0),
+        Vec3::new(284.0, 36.0, 280.0),
+    ],
+    [
+        Vec3::new(-29.0, 252.0, -1634.0),
+        Vec3::new(5.0, -91.0, 178.0),
+    ],
 ];
 
 pub static COUNTER_POS: [Vec3; 2] = [
@@ -750,13 +772,14 @@ impl Lenzo {
         false
     }
 
-    pub fn init_tex_pattern_anm(&mut self, stories: &StoryBits, _modify: bool, param2: i32) -> bool {
+    pub fn init_tex_pattern_anm(
+        &mut self,
+        stories: &StoryBits,
+        _modify: bool,
+        param2: i32,
+    ) -> bool {
         let index = if param2 == -1 {
-            if stories.test(SAVE_POST_TALK) {
-                1
-            } else {
-                0
-            }
+            if stories.test(SAVE_POST_TALK) { 1 } else { 0 }
         } else {
             param2
         };
@@ -858,8 +881,7 @@ impl Lenzo {
                 if dis_xz_ang_y(pos, point).1 == yaw {
                     next = Step::Walk;
                     self.set_anm_tbl(ANM_WALK);
-                    self.mode_timer =
-                        self.jitter(MODE_TIMER_WALK_MIN, MODE_TIMER_WALK_SPAN);
+                    self.mode_timer = self.jitter(MODE_TIMER_WALK_MIN, MODE_TIMER_WALK_SPAN);
                 }
             }
             Step::Talk => {}
@@ -878,9 +900,9 @@ impl Lenzo {
         if !ctx.stories.test(SAVE_PATH_ARRIVED) {
             self.col_radius = RADIUS_WIDE;
             self.col_offset = Vec3::new(0.0, 0.0, NPC_COLLIDE_Z);
-            if link.is_some_and(|at| {
-                inside_cylinder(actor.pos + self.col_offset, self.col_radius, at)
-            }) {
+            if link
+                .is_some_and(|at| inside_cylinder(actor.pos + self.col_offset, self.col_radius, at))
+            {
                 self.order = ORDER_TOUCH;
             }
         } else if self.kind == STAGE_UB4 && (self.request & REQUEST_UB4_DONE) == 0 {
@@ -904,7 +926,8 @@ impl Lenzo {
                     }
                 }
             }
-            if self.kind == 1 && !self.attention
+            if self.kind == 1
+                && !self.attention
                 && link.is_some_and(|at| at.y < actor.pos.y - DESCEND_STEP)
             {
                 self.execute_set_mode(Step::Turn, actor.pos, actor.angle[1]);
@@ -1191,8 +1214,7 @@ impl Lenzo {
                             ctx.stories.set(SAVE_ORDER_PROGRESS);
                         } else {
                             let tag = ctx.tag_photo.map_or(0, |(no, _)| no);
-                            self.msg_tbl =
-                                MSG_TALK_PHOTO.get(usize::from(tag)).map(|row| &row[..]);
+                            self.msg_tbl = MSG_TALK_PHOTO.get(usize::from(tag)).map(|row| &row[..]);
                             self.cam_tbl = None;
                         }
                         let msg = self.message_at();
@@ -1452,8 +1474,7 @@ impl Lenzo {
             } else {
                 self.progress_msg(ctx)
             };
-        } else if ctx.got.has(GOT_PICTO_BOX_SLOT, GOT_BIT)
-            || ctx.got.has(GOT_DELUXE_SLOT, GOT_BIT)
+        } else if ctx.got.has(GOT_PICTO_BOX_SLOT, GOT_BIT) || ctx.got.has(GOT_DELUXE_SLOT, GOT_BIT)
         {
             if ctx.stories.test(SAVE_POST_TALK) {
                 self.msg_tbl = Some(&MSG_SECOND_PHOTO[..]);

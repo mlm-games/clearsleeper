@@ -666,8 +666,8 @@ impl Shand {
             let ahead = self.field_31c[i + 1].pos;
             let delta = self.field_31c[i].pos - ahead;
             let yaw = atan2s(delta.x, delta.z);
-            let pitch = atan2s(delta.y, (delta.x * delta.x + delta.z * delta.z).sqrt())
-                .wrapping_neg();
+            let pitch =
+                atan2s(delta.y, (delta.x * delta.x + delta.z * delta.z).sqrt()).wrapping_neg();
             let abs_offset = link_pos(yaw, pitch, rel);
             self.field_31c[i].pos = ahead + abs_offset;
         }
@@ -679,8 +679,7 @@ impl Shand {
             self.field_31c[counter].field_18 = if counter < TAPER_B {
                 thickness
             } else {
-                thickness
-                    * (1.0 - (counter as i32 + TAPER_B_BIAS) as f32 * TAPER_B_STEP)
+                thickness * (1.0 - (counter as i32 + TAPER_B_BIAS) as f32 * TAPER_B_STEP)
             };
         }
     }
@@ -701,7 +700,11 @@ impl Shand {
             RETRACT_Z_STEP,
             RETRACT_Z_RATE,
         );
-        add_calc0(&mut self.field_300, RETRACT_WOBBLE_SCALE, RETRACT_WOBBLE_MAX);
+        add_calc0(
+            &mut self.field_300,
+            RETRACT_WOBBLE_SCALE,
+            RETRACT_WOBBLE_MAX,
+        );
         let seg_local = Vec3::new(0.0, self.field_2f8, self.field_2f4);
         let amplitude = self.field_300;
         let count = self.m_execute_count;

@@ -5,9 +5,9 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::area::StageName;
 use super::arrow;
-use super::boomerang;
 use super::bomb;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
@@ -23,8 +23,8 @@ use super::sea::Sea;
 use super::stream::{add_calc_angle_s2, sin_s};
 use super::swim;
 use super::tsubo;
-use super::water;
 use super::walk::{from_s16, to_s16};
+use super::water;
 
 pub const KS_ACTORS: [&str; 2] = ["kuro_s", "kuro_t"];
 
@@ -199,8 +199,8 @@ const TIMER_COUNT: usize = 4;
 const SWING_COUNT: usize = 5;
 
 const JOINT_TABLE: [i16; JOINT_COUNT] = [
-    0x20, 0x21, 0x25, 0x26, 0x02, 0x03, 0x04, 0x1E, 0x29, 0x1F, 0x24, 0x08, 0x06, 0x07, 0x05,
-    0x0C, 0x0A, 0x0B, 0x09, 0x0E,
+    0x20, 0x21, 0x25, 0x26, 0x02, 0x03, 0x04, 0x1E, 0x29, 0x1F, 0x24, 0x08, 0x06, 0x07, 0x05, 0x0C,
+    0x0A, 0x0B, 0x09, 0x0E,
 ];
 
 const CHILD_PARAM_SPAWNER: u32 = 3;
@@ -796,7 +796,12 @@ pub fn control(
     let stage = watch.stage.0.clone();
     let life = i32::from(watch.hearts.units);
     let held = watch.held;
-    let player_room = watch.homes.iter().next().map(|actor| actor.room).unwrap_or(0);
+    let player_room = watch
+        .homes
+        .iter()
+        .next()
+        .map(|actor| actor.room)
+        .unwrap_or(0);
     let pots: Vec<(Entity, Vec3, i8)> = watch
         .pots
         .iter()
@@ -1143,8 +1148,7 @@ impl Ks {
             self.gravity = 0.0;
             self.speed.y = 0.0;
         } else if self.water_in != 0
-            && (ground::grounded(solid, self.pos)
-                || self.pos.y > self.water_surface + WATER_ESCAPE)
+            && (ground::grounded(solid, self.pos) || self.pos.y > self.water_surface + WATER_ESCAPE)
         {
             self.water_in = 0;
         }
@@ -1176,8 +1180,7 @@ impl Ks {
                 PLAYER_TG_HEIGHT,
                 self.sph.centre,
                 self.sph.radius,
-            )
-        {
+            ) {
             1
         } else {
             0
@@ -1491,7 +1494,12 @@ impl Ks {
 
     fn kaze_rise(&mut self) {
         add_calc(&mut self.speed.y, self.climb, WIND_RISE_STEP, self.rise);
-        add_calc(&mut self.rise, WIND_RATE_TARGET, WIND_RATE_STEP, WIND_RATE_MAX);
+        add_calc(
+            &mut self.rise,
+            WIND_RATE_TARGET,
+            WIND_RATE_STEP,
+            WIND_RATE_MAX,
+        );
         if self.base_y + WIND_RISE_TARGET < self.pos.y || self.timers[1] == 0 {
             self.mode += 1;
         }
@@ -1593,9 +1601,7 @@ impl Ks {
                     self.joint_live = false;
                 }
                 self.angle[1] = env.facing(self.pos).wrapping_add(-32768);
-                self.angle[1] = self
-                    .angle[1]
-                    .wrapping_add(ang(self.rnd_fx(CLING_LEAP_SPIN)));
+                self.angle[1] = self.angle[1].wrapping_add(ang(self.rnd_fx(CLING_LEAP_SPIN)));
                 self.speed_f = CLING_LEAP;
                 self.gravity = GRAVITY;
                 self.speed.y = CLING_CLAW;
@@ -1605,8 +1611,7 @@ impl Ks {
             MODE_CLING_WAIT => self.cling_wait(env),
             _ => {}
         }
-        if self.mode == MODE_CLING_WAIT && self.body_atari_check(env, blow) && self.cling != 0
-        {
+        if self.mode == MODE_CLING_WAIT && self.body_atari_check(env, blow) && self.cling != 0 {
             sink.se(SE_LK_LAST_HIT);
             self.cling = 0;
         }

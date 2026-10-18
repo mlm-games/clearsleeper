@@ -104,13 +104,8 @@ impl Windmill {
     pub fn vane_step(&mut self, strength: f32) {
         self.previous = self.vane;
         let target = (strength * (VANE_TOP) as f32) as i16;
-        self.vane = walk::add_calc_angle_s(
-            self.vane,
-            target,
-            VANE_SCALE,
-            VANE_MAX_STEP,
-            VANE_MIN_STEP,
-        );
+        self.vane =
+            walk::add_calc_angle_s(self.vane, target, VANE_SCALE, VANE_MAX_STEP, VANE_MIN_STEP);
     }
 
     pub fn whirring(&self) -> bool {
@@ -118,11 +113,7 @@ impl Windmill {
     }
 
     pub fn sound(&self) -> u32 {
-        if self.tower() {
-            SE_TOWER
-        } else {
-            SE_PINWHEEL
-        }
+        if self.tower() { SE_TOWER } else { SE_PINWHEEL }
     }
 
     pub fn turn(&mut self) -> i16 {
@@ -199,7 +190,6 @@ impl Windmill {
     pub fn hub(&self) -> Vec3 {
         self.spin_tip(SPOKE_HUB)
     }
-
 }
 
 pub fn is_windmill(name: &str) -> bool {
@@ -226,8 +216,7 @@ pub fn striking(mill: &Windmill, base: Vec3, player: Vec3) -> bool {
                 .any(|(a, b)| sweep(*a, *b, player, GATE_RADIUS))
         } else {
             let hub = mill.hub();
-            mill
-                .blades()
+            mill.blades()
                 .iter()
                 .any(|tip| sweep(hub, *tip, player, BLADE_RADIUS))
         }
@@ -235,8 +224,7 @@ pub fn striking(mill: &Windmill, base: Vec3, player: Vec3) -> bool {
         false
     } else {
         let radii = Windmill::spoke_radii();
-        mill
-            .spokes()
+        mill.spokes()
             .iter()
             .zip(radii.iter())
             .any(|(spoke, radius)| (*spoke - player).length_squared() <= radius * radius)

@@ -1,5 +1,5 @@
-//! The J3D scene format: the `bdl4` model tree, the `btk` texture
-//! animation and the `bck` transform animation.
+//! The J3D scene format: the `bdl4` model tree and the `bck` transform, `btk` texture-SRT, `btp`
+//! texture-pattern and `brk` tev-register animations.
 //!
 //! These read blocks out of a model file and rebuild the scene graph they describe, so they sit
 //! below the game the way `libs/JSystem` sits below `src/d` in a decompilation project. Nothing
@@ -13,7 +13,10 @@
 
 pub mod bck;
 pub mod bdl;
+pub mod brk;
 pub mod btk;
+pub mod btp;
+pub mod ctrl;
 pub mod fifo;
 pub mod present;
 pub mod replay;

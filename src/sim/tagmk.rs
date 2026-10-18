@@ -366,11 +366,7 @@ impl Tagmk {
         // (`:51-55`) - RULE 10: the `s16` difference goes through `unsigned_abs`, because `abs` on a
         // signed type that can reach MIN is banned.
         let facing = walk::to_s16(player.yaw);
-        actor
-            .angle[1]
-            .wrapping_sub(facing)
-            .unsigned_abs()
-            >= AREA_FACING
+        actor.angle[1].wrapping_sub(facing).unsigned_abs() >= AREA_FACING
     }
 
     /// `execute` (`:402-445`) - the ten-arm dispatch plus the `default` arm's `actionWait`.
@@ -598,15 +594,19 @@ impl Tagmk {
                     // attention/catch channel. The trailing `10.0, 10.0, -2.1` triple is the item's
                     // launch velocity, which `fopAcM_createItemForKP2` hands to the item actor's own
                     // `create` rather than to `fopAc_prm`, so it is not invented here.
-                    self.pendant = Some(ctx.commands.spawn(Actor {
-                        name: super::pickup::ITEM_ACTORS[0].to_owned(),
-                        parameters: ITEM_JOY_PENDANT as u32,
-                        pos: PENDANT_POS,
-                        angle: [0, PENDANT_YAW, 0],
-                        set_id: 0,
-                        room: actor.room,
-                        ..Default::default()
-                    }).id());
+                    self.pendant = Some(
+                        ctx.commands
+                            .spawn(Actor {
+                                name: super::pickup::ITEM_ACTORS[0].to_owned(),
+                                parameters: ITEM_JOY_PENDANT as u32,
+                                pos: PENDANT_POS,
+                                angle: [0, PENDANT_YAW, 0],
+                                set_id: 0,
+                                room: actor.room,
+                                ..Default::default()
+                            })
+                            .id(),
+                    );
                 }
                 Some(DEMO_DELETE) => {
                     // ```
@@ -689,7 +689,8 @@ impl Ctx<'_, '_, '_> {
 
     /// `dComIfGp_evmng_cutEnd(mStaffIdx)` (`:177`, `:196`, `:252`).
     fn cut_end(&mut self) {
-        self.active.end_staff_cut(self.list, self.flags, STAFF_TAGMK);
+        self.active
+            .end_staff_cut(self.list, self.flags, STAFF_TAGMK);
     }
 }
 

@@ -12,9 +12,7 @@ use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
 use super::ground;
 use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
 use super::intent::{CameraYaw, MoveIntent};
-use super::jump::{
-    BACK_GRAVITY, BACK_RISE, BACK_SPEED, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET,
-};
+use super::jump::{BACK_GRAVITY, BACK_RISE, BACK_SPEED, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
 use super::link_proc::{WALK_ALLOWED, allows};
 use super::player::Player;
 use super::roll::Roll;
@@ -149,7 +147,11 @@ pub(super) fn chase_angle_s(value: &mut i16, target: i16, step: i16) -> bool {
         }
         return done;
     }
-    let step = if value.wrapping_sub(target) > 0 { -step } else { step };
+    let step = if value.wrapping_sub(target) > 0 {
+        -step
+    } else {
+        step
+    };
     *value = value.wrapping_add(step);
     if i32::from(step) * i32::from(value.wrapping_sub(target)) >= 0 {
         *value = target;

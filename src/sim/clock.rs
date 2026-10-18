@@ -62,11 +62,7 @@ impl Clock {
     pub fn moon(&self) -> u32 {
         let weekday = self.weekday();
         if self.time < NOON_LIMIT {
-            if weekday != 0 {
-                weekday - 1
-            } else {
-                WEEK - 1
-            }
+            if weekday != 0 { weekday - 1 } else { WEEK - 1 }
         } else {
             weekday
         }
@@ -103,7 +99,6 @@ impl Clock {
             false
         }
     }
-
 }
 
 pub fn control(got: Res<Got>, mut clock: ResMut<Clock>) {

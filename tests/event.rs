@@ -209,6 +209,18 @@ fn run_control(list: &EventList) -> World {
     world.insert_resource(LinkAnms::default());
     world.insert_resource(MsgBox::default());
     world.insert_resource(MsgTable::default());
+    world.insert_resource(clearsleeper::sim::demo::DemoManager::default());
+    world.insert_resource(clearsleeper::sim::demo::RoomDemoArchive::default());
+    world.insert_resource(clearsleeper::sim::demo::DemoReaders::default());
+    world.insert_resource(clearsleeper::sim::demo::DemoCreates::default());
+    world.insert_resource(clearsleeper::sim::fade::Fade::default());
+    world.insert_resource(clearsleeper::sim::fade::Wipe::default());
+    world.insert_resource(clearsleeper::sim::vibration::Vibration::default());
+    world.insert_resource(clearsleeper::sim::events::SimEvents::default());
+    world.insert_resource(clearsleeper::sim::jpa::Jpa::default());
+    world.insert_resource(clearsleeper::sim::area::StageName::default());
+    world.insert_resource(clearsleeper::sim::door::StayRoom::default());
+    world.insert_resource(clearsleeper::sim::daynight::DayNight::default());
     assert!(
         world.resource_mut::<ActiveEvent>().order(list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
@@ -1012,8 +1024,10 @@ fn golden_talk_msg_drives_one_message_through_open_type_and_close() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     app.sim.world.resource_mut::<MsgTable>().insert(
-        4242,
+        0,
         MsgEntry {
+            msg_no: 4242,
+            data_offs: 1,
             text: b"Hi\x00".to_vec(),
             draw_type: 0,
             textbox_type: 0,
@@ -1092,8 +1106,10 @@ fn golden_get_item_cut_presents_its_partner_from_the_cut_parameter() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     app.sim.world.resource_mut::<MsgTable>().insert(
-        116,
+        0,
         MsgEntry {
+            msg_no: 116,
+            data_offs: 1,
             text: b"Green rupee\x00".to_vec(),
             draw_type: 0,
             textbox_type: 0,
@@ -1245,8 +1261,10 @@ fn golden_talk_msg_ends_the_cut_when_current_message_is_the_end() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     app.sim.world.resource_mut::<MsgTable>().insert(
-        4242,
+        0,
         MsgEntry {
+            msg_no: 4242,
+            data_offs: 1,
             text: b"Hi\x00".to_vec(),
             draw_type: 0,
             textbox_type: 0,
@@ -1298,8 +1316,10 @@ fn golden_message_staff_creates_pushes_and_finishes_the_box() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     app.sim.world.resource_mut::<MsgTable>().insert(
-        500,
+        0,
         MsgEntry {
+            msg_no: 500,
+            data_offs: 1,
             text: b"OK\x00".to_vec(),
             draw_type: 0,
             textbox_type: 0,

@@ -276,8 +276,13 @@ impl Esa {
         let mut height = ground::surface(ctx.collision, probe).map_or(0.0, |y| y + GROUND_LIFT);
         // `s8 state = 1;` (:37)
         let mut state = STATE_GROUND;
-        if ctx.sea.is_some_and(|sea| sea.draw_contains(actor.pos.x, actor.pos.z)) {
-            let wave = ctx.sea.map_or(0.0, |sea| sea.height_at(actor.pos.x, actor.pos.z));
+        if ctx
+            .sea
+            .is_some_and(|sea| sea.draw_contains(actor.pos.x, actor.pos.z))
+        {
+            let wave = ctx
+                .sea
+                .map_or(0.0, |sea| sea.height_at(actor.pos.x, actor.pos.z));
             if height <= wave {
                 height = wave;
                 state = STATE_WATER;

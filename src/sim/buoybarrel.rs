@@ -135,7 +135,11 @@ impl BuoyBarrel {
     pub fn spawn(parameters: u32, home: Vec3) -> Self {
         let kind = ((parameters >> TYPE_SHIFT) & TYPE_MASK) as usize;
         let coming = parameters >> COMING_SHIFT & 1 != 0;
-        let jitter = if coming && kind != KIND_MINE { 1.0 } else { 0.0 };
+        let jitter = if coming && kind != KIND_MINE {
+            1.0
+        } else {
+            0.0
+        };
         Self {
             mode: Mode::Afloat,
             kind,
@@ -173,7 +177,6 @@ impl BuoyBarrel {
         (COLLIDE_H[self.kind], COLLIDE_R[self.kind])
     }
 
-
     pub fn strike_lift(&self) -> f32 {
         STRIKE_LIFT[self.kind]
     }
@@ -181,9 +184,6 @@ impl BuoyBarrel {
     pub fn damage_reach(&self) -> f32 {
         STRIKE_DAMAGE[self.kind]
     }
-
-
-
 
     pub fn spring(&mut self, decay: f32, damp: f32, cap: f32) {
         self.heave_vel += self.heave * -decay;
@@ -215,7 +215,11 @@ impl BuoyBarrel {
         } else {
             (SETTLED_DECAY, SETTLED_DAMP)
         };
-        self.spring(decay, damp, if self.coming { COMING_CAP } else { SETTLED_CAP });
+        self.spring(
+            decay,
+            damp,
+            if self.coming { COMING_CAP } else { SETTLED_CAP },
+        );
         self.bob();
         self.drift_x = (self.drift_x + (pos.x - self.home.x) * DRIFT_PUSH) * DRIFT_DECAY;
         self.drift_z = (self.drift_z + (pos.z - self.home.z) * DRIFT_PUSH) * DRIFT_DECAY;
@@ -243,7 +247,6 @@ impl BuoyBarrel {
         self.heave_vel *= damp;
         self.heave += self.heave_vel;
     }
-
 
     pub fn sink_depth(&self) -> f32 {
         -(BUOY_R[self.kind] * HEIGHT[self.kind] * SCALE[self.kind])
@@ -295,7 +298,6 @@ impl BuoyBarrel {
         }
     }
 
-
     pub fn crashed(&mut self) {
         self.trigger = TRIGGER_CRASH;
     }
@@ -311,7 +313,6 @@ impl BuoyBarrel {
     pub fn head_on(&self, gap: Vec3, heading: Vec3) -> bool {
         (gap.x * heading.x + gap.z * heading.z) < CRASH_DEPTH[self.kind] * CRASH_DEPTH[self.kind]
     }
-
 
     pub fn within(&self, range: f32, gap: Vec3) -> bool {
         gap.x * gap.x + gap.z * gap.z < range * range

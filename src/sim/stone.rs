@@ -34,7 +34,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::bombflower::{Blasts, BLAST_RADIUS};
+use super::bombflower::{BLAST_RADIUS, Blasts};
 use super::carry::Carry;
 use super::collision::Collision;
 use super::combat::Combat;
@@ -236,9 +236,16 @@ impl Stone {
     /// collider is the `M_cyl_src` cylinder (`:17-45`) moved to `current.pos` by
     /// `mCyl.MoveCAtTg(current.pos)` (`:715`), so the test is horizontal against `attr().m12`.
     ///
-    /// The vertical half of the `cM3dGCylS` overlap is not modelled: `cM3dGCylS::Height` is consumed
-    /// by the collision engine alone and its axis convention is not resolvable from anything in this
-    /// checkout - the same omission `fallrock.rs` documents at `d_a_fallrock.cpp:11-15`.
+    /// The vertical half of the `cM3dGCylS` overlap is not modelled. The convention IS readable -
+    /// `cM3d_Cross_CylPnt` (`c_m3d.cpp:1877-1888`) keeps a point strictly inside
+    /// `center.y < y < center.y + Height`, `cM3d_Cross_CylSph` (`:1398-1404`) tests the sphere's
+    /// `y ± R` against the same span, and `cM3d_Cross_CpsCyl` (`:1962-2064`) treats the cylinder
+    /// as the segment `center` to `center + (0, Height, 0)` with `Radius` around it - so `Height`
+    /// runs upward from the centre. What is missing is the geometry pair on the actor side: this
+    /// sim's AT/Tg reduction is `walk::within`, a point against a radius, and its `Collision`
+    /// carries no cylinder or capsule overlap (`cCcD_Obj::ChkAtHit` over `cM3d_Cross_CpsCyl` is
+    /// the `cCcD` registry RULE 3b lists as absent, the same gap `koisi.rs` and `fallrock.rs`
+    /// record).
     pub fn sword_struck(&self, centre: Vec3, at: Vec3, reach: f32) -> bool {
         self.hittable() && super::walk::within(at, centre, self.attr().radius + reach)
     }
@@ -250,9 +257,9 @@ impl Stone {
     pub fn bomb_struck(&self, centre: Vec3, blasts: &[Vec3]) -> bool {
         self.hittable()
             && self.kind != EKAO_KIND
-            && blasts
-                .iter()
-                .any(|origin| super::walk::within(*origin, centre, BLAST_RADIUS + self.attr().radius))
+            && blasts.iter().any(|origin| {
+                super::walk::within(*origin, centre, BLAST_RADIUS + self.attr().radius)
+            })
     }
 
     /// `damage_bg_proc_directly` (`:303-327`) guards on `m648 != 0` and then `m648 == 2`, so only a
@@ -421,7 +428,14 @@ pub fn control(
                 carry.held = None; // fopAcM_cancelCarryNow(this) (:255)
             }
             let action = if cut { DA_ITEM_ACT_3 } else { DA_ITEM_ACT_7 };
-            stone.damaged(action, &*actor, attr, &mut switches, &mut events, &mut commands);
+            stone.damaged(
+                action,
+                &*actor,
+                attr,
+                &mut switches,
+                &mut events,
+                &mut commands,
+            );
             stone.rubble(); // mode_fine_init() (:705)
             continue;
         }

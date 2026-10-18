@@ -25,9 +25,159 @@
       height: 100%;
       display: block;
     }
+    #disc-drop {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+      background: #86AD81;
+      font: 16px/1.5 system-ui, sans-serif;
+      color: #10231b;
+    }
+    #disc-drop.drag #disc-card {
+      border-color: #10231b;
+    }
+    #disc-card {
+      max-width: 30rem;
+      padding: 1.5rem 1.75rem;
+      border: 2px dashed rgba(16, 35, 27, 0.45);
+      border-radius: 0.75rem;
+      background: rgba(255, 255, 255, 0.35);
+      text-align: center;
+    }
+    #disc-card h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+    }
+    #disc-card p {
+      margin: 0.5rem 0 0;
+    }
+    #disc-pick {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: #10231b;
+      color: #f4fff9;
+      cursor: pointer;
+    }
+    #disc-pick input {
+      display: none;
+    }
+    #disc-note {
+      opacity: 0.7;
+      font-size: 0.85rem;
+    }
+    #disc-status {
+      min-height: 1.5rem;
+      font-weight: 600;
+    }
+    #disc-status[data-kind="error"] {
+      color: #7a1414;
+    }
   </style>
 </head>
 
-<body></body>
+<body>
+  <div id="disc-drop">
+    <div id="disc-card">
+      <h1>ClearSleeper</h1>
+      <p id="disc-hint">Drop a GameCube disc image to play: an ISO/GCM dump or an RVZ.</p>
+      <label id="disc-pick">Choose a file<input id="disc-file" type="file" accept=".iso,.gcm,.rvz" /></label>
+      <p id="disc-status" role="status"></p>
+      <p id="disc-note">The image is read in this tab. Nothing is uploaded. A full dump is over a
+        gigabyte, so a desktop browser is the realistic target.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    const drop = document.getElementById("disc-drop");
+    const status = document.getElementById("disc-status");
+    const file = document.getElementById("disc-file");
+
+    const say = (text, kind = "") => {
+      status.textContent = text;
+      if (kind) {
+        status.dataset.kind = kind;
+      } else {
+        delete status.dataset.kind;
+      }
+    };
+
+    // Trunk's glue sets `window.wasmBindings` and then fires this event, so either order works.
+    const bindingsReady = () => new Promise((resolve) => {
+      if (window.wasmBindings) {
+        resolve(window.wasmBindings);
+        return;
+      }
+      addEventListener("TrunkApplicationStarted", () => resolve(window.wasmBindings), { once: true });
+    });
+
+    let installing = false;
+
+    async function install(picked) {
+      if (installing) {
+        return;
+      }
+      installing = true;
+      say(`Reading ${picked.name} (${(picked.size / 1048576).toFixed(0)} MB)…`);
+      let bytes;
+      try {
+        bytes = new Uint8Array(await picked.arrayBuffer());
+      } catch (error) {
+        say(`Could not read ${picked.name}: ${error}`, "error");
+        installing = false;
+        return;
+      }
+      const bindings = await bindingsReady();
+      say(`Checking ${picked.name}…`);
+      let summary;
+      try {
+        summary = bindings.installDiscImage(bytes);
+      } catch (error) {
+        // The Rust side answers with the typed failure for this image.
+        say(`${error}`, "error");
+        installing = false;
+        return;
+      }
+      bytes = null;
+      say(`Starting ClearSleeper on ${summary}…`);
+      try {
+        bindings.boot();
+      } catch (error) {
+        say(`ClearSleeper failed to start: ${error}`, "error");
+        installing = false;
+        return;
+      }
+      drop.remove();
+    }
+
+    addEventListener("dragenter", (event) => {
+      event.preventDefault();
+      drop.classList.add("drag");
+    });
+    addEventListener("dragover", (event) => {
+      event.preventDefault();
+      drop.classList.add("drag");
+    });
+    addEventListener("dragleave", () => drop.classList.remove("drag"));
+    addEventListener("drop", (event) => {
+      event.preventDefault();
+      drop.classList.remove("drag");
+      const picked = event.dataTransfer?.files?.[0];
+      if (picked) {
+        install(picked);
+      }
+    });
+    file.addEventListener("change", () => {
+      const picked = file.files?.[0];
+      if (picked) {
+        install(picked);
+      }
+    });
+  </script>
+</body>
 
 </html>

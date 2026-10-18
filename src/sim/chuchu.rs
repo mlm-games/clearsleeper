@@ -4,8 +4,8 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
@@ -950,7 +950,9 @@ impl Chuchu {
     }
 
     pub fn attack_power(&self) -> u8 {
-        *AT_POWER.get(usize::from(self.colour)).unwrap_or(&AT_POWER[0])
+        *AT_POWER
+            .get(usize::from(self.colour))
+            .unwrap_or(&AT_POWER[0])
     }
 
     pub fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32) {
@@ -1273,14 +1275,26 @@ impl Chuchu {
         self.body_hit = self.touch
             && at != At::Idle
             && at != At::FanLight
-            && cyl_touches(actor.pos, BODY_RADIUS, self.body_height(), player_pos, at.reach());
+            && cyl_touches(
+                actor.pos,
+                BODY_RADIUS,
+                self.body_height(),
+                player_pos,
+                at.reach(),
+            );
     }
 
     pub fn touch_player(&mut self, actor: &Actor, player: &Player, health: &mut Health) {
         if !self.at_set || self.contact_gap != 0 {
             return;
         }
-        if cyl_touches(actor.pos, BODY_RADIUS, self.body_height(), player.pos, PLAYER_REACH) {
+        if cyl_touches(
+            actor.pos,
+            BODY_RADIUS,
+            self.body_height(),
+            player.pos,
+            PLAYER_REACH,
+        ) {
             health.damage(self.attack_power());
             self.contact_gap = CONTACT_GAP;
         }
@@ -1758,7 +1772,8 @@ impl Chuchu {
                         self.speed_f = 0.0;
                     }
                     if self.reaction != REACT_WIND {
-                        actor.angle[1] = search_angle(actor.pos, player.pos).wrapping_sub(BACK_TURN);
+                        actor.angle[1] =
+                            search_angle(actor.pos, player.pos).wrapping_sub(BACK_TURN);
                     }
                     self.step = DAMAGE_STEP_KNOCK;
                     run = true;
@@ -1809,8 +1824,7 @@ impl Chuchu {
                     if self.timers[TIMER_SPLIT] <= 1 {
                         self.anm_init(BCK_HUKKATSU, 0.0, EMODE_LOOP, 1.0);
                         self.timers[TIMER_SPLIT] = HUKKATSU_BASE;
-                        self.timers[TIMER_SPLIT] =
-                            self.timers[TIMER_SPLIT].wrapping_add(REG8_S6);
+                        self.timers[TIMER_SPLIT] = self.timers[TIMER_SPLIT].wrapping_add(REG8_S6);
                         self.step = DAMAGE_STEP_SPLIT;
                     }
                 }

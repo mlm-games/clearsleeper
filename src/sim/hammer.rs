@@ -207,7 +207,13 @@ fn launch(
     if side {
         hammer.begin(Swing::Side, SIDE_END, SIDE_RATE, SIDE_START, heading);
     } else {
-        hammer.begin(Swing::FrontReady, READY_END, READY_RATE, READY_START, heading);
+        hammer.begin(
+            Swing::FrontReady,
+            READY_END,
+            READY_RATE,
+            READY_START,
+            heading,
+        );
     }
 }
 

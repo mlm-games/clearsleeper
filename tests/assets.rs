@@ -54,31 +54,26 @@ fn yaz0_and_rarc_reject_unexpected_magic() {
     }
 }
 
-#[test]
-fn golden_bmg_message_table_parses_entries_and_control_tags() {
-    let mut text = Vec::new();
-    text.extend_from_slice(b"\x1a\x05\x00\x00\x01You got a ");
-    text.extend_from_slice(b"\x1a\x06\xff\x00\x00\x07Rupee\x1a\x06\xff\x00\x00\x00!");
-    text.push(0);
-
-    let mut bmg = vec![0_u8; 0x20];
-    bmg[0..4].copy_from_slice(b"MESG");
-    bmg[4..8].copy_from_slice(b"bmg1");
-    bmg[0x0C..0x10].copy_from_slice(&3_u32.to_be_bytes());
-
-    let mut info = vec![0_u8; 0x40];
+fn bmg(group: u16, entries: &[(u32, u16, u8, u8)]) -> Vec<u8> {
+    let header_len = 0x10 + entries.len() * 0x18;
+    let mut info = vec![0_u8; header_len];
     info[0..4].copy_from_slice(b"INF1");
-    info[4..8].copy_from_slice(&0x40_u32.to_be_bytes());
-    info[8..10].copy_from_slice(&2_u16.to_be_bytes());
+    info[4..8].copy_from_slice(&(header_len as u32).to_be_bytes());
+    info[8..10].copy_from_slice(&(entries.len() as u16).to_be_bytes());
     info[10..12].copy_from_slice(&0x18_u16.to_be_bytes());
-    info[0x10..0x14].copy_from_slice(&1_u32.to_be_bytes());
-    info[0x14..0x16].copy_from_slice(&116_u16.to_be_bytes());
-    info[0x1C] = 9;
-    info[0x1D] = 2;
-    info[0x2C..0x2E].copy_from_slice(&999_u16.to_be_bytes());
+    info[12..14].copy_from_slice(&group.to_be_bytes());
+    for (index, &(data_offs, msg_no, textbox_type, draw_type)) in entries.iter().enumerate() {
+        let entry = 0x10 + index * 0x18;
+        info[entry..entry + 4].copy_from_slice(&data_offs.to_be_bytes());
+        info[entry + 4..entry + 6].copy_from_slice(&msg_no.to_be_bytes());
+        info[entry + 0x0C] = textbox_type;
+        info[entry + 0x0D] = draw_type;
+    }
 
     let mut data_block = vec![0_u8];
-    data_block.extend_from_slice(&text);
+    data_block.extend_from_slice(b"\x1a\x05\x00\x00\x01You got a ");
+    data_block.extend_from_slice(b"\x1a\x06\xff\x00\x00\x07Rupee\x1a\x06\xff\x00\x00\x00!");
+    data_block.push(0);
     let mut dat = vec![0_u8; 8];
     dat[0..4].copy_from_slice(b"DAT1");
     dat[4..8].copy_from_slice(&(8_u32 + data_block.len() as u32).to_be_bytes());
@@ -88,23 +83,72 @@ fn golden_bmg_message_table_parses_entries_and_control_tags() {
     pad[0..4].copy_from_slice(b"PAD1");
     pad[4..8].copy_from_slice(&8_u32.to_be_bytes());
 
+    let mut bmg = vec![0_u8; 0x20];
+    bmg[0..4].copy_from_slice(b"MESG");
+    bmg[4..8].copy_from_slice(b"bmg1");
+    bmg[0x0C..0x10].copy_from_slice(&3_u32.to_be_bytes());
     bmg.extend_from_slice(&info);
     bmg.extend_from_slice(&dat);
     bmg.extend_from_slice(&pad);
+    bmg
+}
+
+#[test]
+fn golden_bmg_message_table_parses_entries_and_control_tags() {
+    let mut text = Vec::new();
+    text.extend_from_slice(b"\x1a\x05\x00\x00\x01You got a ");
+    text.extend_from_slice(b"\x1a\x06\xff\x00\x00\x07Rupee\x1a\x06\xff\x00\x00\x00!");
+    text.push(0);
+
+    let bmg = bmg(0, &[(1, 116, 9, 2), (0, 999, 0, 0)]);
 
     let mut table = MsgTable::default();
     assert!(msg_table_from_bmg(&bmg, &mut table).is_some());
-    let entry = table.get(116).expect("the entry parses");
+    let entry = table.entry_at(0, 0).expect("the entry parses");
+    assert_eq!(entry.msg_no, 116);
     assert_eq!(entry.text, text);
     assert_eq!(entry.draw_type, 2);
     assert_eq!(entry.textbox_type, 9);
     assert_eq!(entry.lines, 4);
-    assert!(table.get(999).is_none(), "an empty data offset is skipped");
+    assert_eq!(
+        table.entry_for_no(0, 116).map(|entry| entry.msg_no),
+        Some(116)
+    );
+    assert!(
+        table.entry_for_no(0, 999).is_none(),
+        "an empty data offset is skipped by the scan"
+    );
+    assert!(
+        table.entry_at(0, 1).is_some(),
+        "the position read still returns it"
+    );
 
     let mut junk = vec![0_u8; 0x20];
     junk[0..4].copy_from_slice(b"MESG");
     junk[4..8].copy_from_slice(b"not1");
     assert!(msg_table_from_bmg(&junk, &mut MsgTable::default()).is_none());
+}
+
+#[test]
+fn golden_bmg_groups_stay_apart() {
+    let mut table = MsgTable::default();
+    assert!(
+        msg_table_from_bmg(&bmg(0, &[(1, 116, 9, 2)]), &mut table).is_some(),
+        "the demo archive parses"
+    );
+    assert!(
+        msg_table_from_bmg(&bmg(1, &[(1, 116, 0, 1)]), &mut table).is_some(),
+        "the hyrule archive parses"
+    );
+    assert!(table.has_group(0));
+    assert!(table.has_group(1));
+    assert!(!table.has_group(2));
+    let demo = table.entry_at(0, 0).expect("group 0's first entry");
+    let hyrule = table.entry_at(1, 0).expect("group 1's first entry");
+    assert_eq!(demo.textbox_type, 9);
+    assert_eq!(hyrule.textbox_type, 0);
+    assert_eq!(demo.msg_no, hyrule.msg_no, "the groups overlap by design");
+    assert!(table.entry_at(2, 0).is_none(), "an absent group has none");
 }
 
 #[test]
@@ -570,6 +614,57 @@ fn golden_room_flow_reloads_set_across_cells() {
 
     app.advance(tick);
     assert_eq!(app.snapshot().tick, 1, "set must not reload while staying");
+}
+
+#[test]
+fn real_disc_room_fili_names_the_scene_particle_archive() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc room particle check");
+        return;
+    };
+    let tables = clearsleeper::assets::load_stage_tables(SEA_STAGE).expect("sea tables load");
+    assert_eq!(
+        tables.stag().map(|stag| stag.particle_no()),
+        Some(clearsleeper::sim::jpa::NO_SCENE),
+        "the sea stage names no Pscene of its own"
+    );
+    let set = clearsleeper::assets::load_room_set(&tables, &clearsleeper::assets::start_set(&tables), |_| 0)
+        .expect("start island room set loads from disc");
+    assert_eq!(
+        set.particle_no,
+        Some(20),
+        "the room's FILI names Pscene020.jpc"
+    );
+}
+
+#[test]
+fn real_disc_demo_morph_poses_the_cut_model() {
+    let Ok(_) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!("CS_ASSETS is not set; skipping real-disc demo morph check");
+        return;
+    };
+    let mut archive = clearsleeper::sim::demo::RoomDemoArchive::default();
+    archive.name_from_room(Some("Demo02"));
+    let mut table = archive.model(56).expect("ka.bdl is in Demo02");
+    let morph = archive
+        .morph(56, 72)
+        .expect("ka_wait1.bck pairs with ka.bdl's joints");
+    assert_eq!(morph.frame_max(), 60.0, "the ANK1 block's own frame count");
+    table.set_morph(morph);
+    table.set_frame(0.0);
+    let first: Vec<_> = (0..16)
+        .filter_map(|node| table.node_transform(node))
+        .collect();
+    assert_eq!(first.len(), 16, "the cut model's joints");
+    table.set_frame(30.0);
+    let later: Vec<_> = (0..16)
+        .filter_map(|node| table.node_transform(node))
+        .collect();
+    assert!(
+        (0..first.len()).any(|node| first[node] != later[node]),
+        "the morph poses the joints away from frame zero"
+    );
+    assert_eq!(table.morph_frame_max(), Some(60.0));
 }
 
 #[test]

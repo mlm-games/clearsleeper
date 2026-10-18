@@ -18,7 +18,9 @@ use crate::text::msgproc::{
     FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs, fop_msgm_message_set,
     fop_msgm_message_set_actor,
 };
-use crate::text::{STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED};
+use crate::text::{
+    STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
+};
 
 pub const NPC_BMSW_ACTORS: [&str; 1] = ["Bmsw"];
 
@@ -454,9 +456,7 @@ impl SwMail {
         } else {
             let x_angle = target_angle_x(self.target, ctx.eye);
             self.rot[0] = -x_angle;
-            self.rot[1] = self
-                .rot[1]
-                .wrapping_add((i32::from(self.no) * 0x80 + 0x1000) as i16);
+            self.rot[1] = self.rot[1].wrapping_add((i32::from(self.no) * 0x80 + 0x1000) as i16);
             self.rot[2] = 0;
             let pos_step = add_calc_pos(&mut self.pos, self.target, 0.5, HIO_44, 1.0);
             self.rot_target[0] += 4000 + REG0_S0;
@@ -886,7 +886,11 @@ impl JntCtrl {
         for row in 0..2 {
             let locked = (row == 0 && self.head_lock) || (row == 1 && self.backbone_lock);
             let mut angle = if locked { 0 } else { rest };
-            limitter(&mut angle, self.min_angles[row][axis], self.max_angles[row][axis]);
+            limitter(
+                &mut angle,
+                self.min_angles[row][axis],
+                self.max_angles[row][axis],
+            );
             rest = rest.wrapping_sub(angle);
             reached[row] = angle;
         }
@@ -1029,7 +1033,11 @@ fn target_angle_y(lhs: Vec3, rhs: Vec3) -> i16 {
 
 fn target_angle_x(lhs: Vec3, rhs: Vec3) -> i16 {
     let delta = rhs - lhs;
-    to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
+    to_s16(
+        delta
+            .y
+            .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+    )
 }
 
 fn calc_timer(value: &mut i16) -> i16 {
@@ -1258,7 +1266,11 @@ impl NpcBmsw {
         if max == 0 {
             return;
         }
-        self.anm_frame = if self.anm_frame >= max { 0 } else { self.anm_frame + 1 };
+        self.anm_frame = if self.anm_frame >= max {
+            0
+        } else {
+            self.anm_frame + 1
+        };
     }
 
     fn anm_frame_done(&self) -> bool {
@@ -1350,8 +1362,8 @@ impl NpcBmsw {
         let mut ret = MSG_CONTINUES;
         match *curr {
             0x1A2D | 0x1A31 | 0x1A32 | 0x1A35 | 0x1A37 | 0x1A41 | 0x1A42 | 0x1A47 | 0x1A4A
-            | 0x1A4C | 0x1A50 | 0x1A55 | 0x1A57 | 0x1A59 | 0x1A5A | 0x1A5D | 0x1A67
-            | 0x1A6D | 0x1A6E => *curr += 1,
+            | 0x1A4C | 0x1A50 | 0x1A55 | 0x1A57 | 0x1A59 | 0x1A5A | 0x1A5D | 0x1A67 | 0x1A6D
+            | 0x1A6E => *curr += 1,
             0x1A63 | 0x1A66 => *curr = 0x1A64,
             0x1A6A | 0x1A6B => *curr = 0x1A6C,
             0x1A52 => *curr = if mini_rupee < 15 { 0x1A51 } else { 0x1A53 },
@@ -1361,7 +1373,11 @@ impl NpcBmsw {
                     stories.set(FLAG_1A01);
                     *curr = 0x1A31;
                 } else if select == 1 {
-                    *curr = if mem.is_stage_boss_enemy() { 0x1A2F } else { 0x1A30 };
+                    *curr = if mem.is_stage_boss_enemy() {
+                        0x1A2F
+                    } else {
+                        0x1A30
+                    };
                 }
             }
             0x1A33 => {
@@ -1371,7 +1387,13 @@ impl NpcBmsw {
                     *curr = 0x1A34;
                 }
             }
-            0x1A34 => *curr = if !stories.test(FLAG_1A01) { 0x1A32 } else { 0x1A42 },
+            0x1A34 => {
+                *curr = if !stories.test(FLAG_1A01) {
+                    0x1A32
+                } else {
+                    0x1A42
+                }
+            }
             0x1A38 => {
                 *curr += 1;
                 stories.set_reg(REG_C203, 1);
@@ -1432,14 +1454,8 @@ impl NpcBmsw {
         } else {
             self.head_turn = 0;
         }
-        self.jnt.look_at_target(
-            &mut actor.angle[1],
-            dst,
-            src,
-            desired,
-            self.head_turn,
-            true,
-        );
+        self.jnt
+            .look_at_target(&mut actor.angle[1], dst, src, desired, self.head_turn, true);
         self.look_yaw = actor.angle[1];
     }
 
@@ -1485,8 +1501,13 @@ impl NpcBmsw {
             status = ctx.text.status().unwrap_or(NO_STATUS);
             if status == STATUS_MSG_DISPLAYED {
                 let mut curr = self.curr_msg_no;
-                let next =
-                    self.next_msg_status(&mut curr, ctx.select, ctx.stories, ctx.mem, ctx.mini_rupee);
+                let next = self.next_msg_status(
+                    &mut curr,
+                    ctx.select,
+                    ctx.stories,
+                    ctx.mem,
+                    ctx.mini_rupee,
+                );
                 self.curr_msg_no = curr;
                 ctx.text.set_status(next);
                 if next == STATUS_MSG_CONTINUES {
@@ -1961,7 +1982,11 @@ pub struct Msg<'w, 's> {
     pub players: Query<'w, 's, &'static Player>,
 }
 
-pub fn control(mut world: Env, mut msg: Msg, mut actors: Query<(Entity, &mut Actor, &mut NpcBmsw)>) {
+pub fn control(
+    mut world: Env,
+    mut msg: Msg,
+    mut actors: Query<(Entity, &mut Actor, &mut NpcBmsw)>,
+) {
     let player = msg.players.iter().next().copied();
     let clear_count = world.flags.clear_count;
     let select = msg.one.select_num;

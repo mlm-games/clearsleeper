@@ -225,7 +225,8 @@ const PL_CUT_REAL: [u8; 32] = [
 ];
 
 const PL_CUT_NO: [i16; 32] = [
-    255, 0, 4, 3, 3, 1, 0, 4, 4, 4, 1, 3, 1, 3, 1, 1, 1, 3, 1, 1, 0, 1, 0, 1, 0, 1, 1, 4, 0, 1, 1, 1,
+    255, 0, 4, 3, 3, 1, 0, 4, 4, 4, 1, 3, 1, 3, 1, 1, 1, 3, 1, 1, 0, 1, 0, 1, 0, 1, 1, 4, 0, 1, 1,
+    1,
 ];
 
 const CUT_PARTS_ARG: [u32; PART_ARG_COUNT] = [
@@ -583,11 +584,7 @@ fn cut_index(cut: u8) -> Option<i16> {
         return None;
     }
     let point = PL_CUT_NO.get(index).copied().unwrap_or(CUT_SKIP);
-    if point == CUT_SKIP {
-        None
-    } else {
-        Some(point)
-    }
+    if point == CUT_SKIP { None } else { Some(point) }
 }
 
 pub fn is_shock_bomb(name: &str, life: bomb::Life) -> bool {
@@ -1333,9 +1330,7 @@ impl Kanban {
                 if self.sea_water_check(actor, env, sink) {
                     self.mode = MODE_MOTHER_WATER;
                     self.state = STATE_MOTHER_SWIM_SETTLE;
-                } else if self.timer[TIMER_SHOCK] == 0
-                    && self.shock_damage_check(env, actor.pos)
-                {
+                } else if self.timer[TIMER_SHOCK] == 0 && self.shock_damage_check(env, actor.pos) {
                     let kick = self.rnd_f(SHOCK_JITTER) + SHOCK_RISE;
                     self.speed.y = kick;
                     self.gravity = WATER_GRAVITY;
@@ -1346,9 +1341,7 @@ impl Kanban {
                 if self.sea_water_check(actor, env, sink) {
                     self.mode = MODE_MOTHER_WATER;
                     self.state = STATE_MOTHER_SWIM_SETTLE;
-                } else if self.timer[TIMER_SHOCK] == 0
-                    && self.shock_damage_check(env, actor.pos)
-                {
+                } else if self.timer[TIMER_SHOCK] == 0 && self.shock_damage_check(env, actor.pos) {
                     let kick = self.rnd_f(SHOCK_JITTER) + SHOCK_RISE;
                     self.speed.y = kick;
                     self.gravity = WATER_GRAVITY;

@@ -365,7 +365,10 @@ impl JntCtrl {
             Some(point) => {
                 let delta = point - src;
                 let flat = (delta.x * delta.x + delta.z * delta.z).sqrt();
-                (walk::to_s16(delta.x.atan2(delta.z)), walk::to_s16(delta.y.atan2(flat)))
+                (
+                    walk::to_s16(delta.x.atan2(delta.z)),
+                    walk::to_s16(delta.y.atan2(flat)),
+                )
             }
             None => (default_y, 0),
         };
@@ -757,8 +760,7 @@ impl NpcHo {
                 *msg_no = 0x274D;
             }
             0x274E => {
-                if ctx.stories.reg(REG_C0FF) >= REG_C0FF_TRADE && !ctx.stories.test(FLAG_1C04)
-                {
+                if ctx.stories.reg(REG_C0FF) >= REG_C0FF_TRADE && !ctx.stories.test(FLAG_1C04) {
                     *msg_no = 0x274F;
                 } else {
                     msg_status = STATUS_MSG_ENDS;
@@ -1177,7 +1179,8 @@ impl Ctx<'_> {
         if self.active.staff_cut(self.list, STAFF_GIVEMAN).is_none() {
             return false;
         }
-        self.active.end_staff_cut(self.list, self.tmp, STAFF_GIVEMAN);
+        self.active
+            .end_staff_cut(self.list, self.tmp, STAFF_GIVEMAN);
         let _ = item;
         true
     }
@@ -1215,10 +1218,7 @@ pub fn control(
     let night_stop = world.daynight.night_stop;
     let day_night = world.daynight.daynight();
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut ho) in &mut actors {
         let tap = do_now && !ho.prev_do;
         ho.prev_do = do_now;

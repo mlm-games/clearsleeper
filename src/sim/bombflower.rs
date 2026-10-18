@@ -7,7 +7,7 @@ use super::collision::Collision;
 use super::combat::{HitPoints, actor_status};
 use super::damage_fx::DamageFxQueue;
 use super::damage_resolve::{
-    AT_SE_NONE, AT_SPL_UNK1, AT_TYPE_BOMB, CUT_TYPE_NONE, Atk, Attacker, CcAtInfo, HitAudio,
+    AT_SE_NONE, AT_SPL_UNK1, AT_TYPE_BOMB, Atk, Attacker, CUT_TYPE_NONE, CcAtInfo, HitAudio,
     HitStop, PlayerCut, Target, cc_at_check,
 };
 use super::enemy::Hurt;
@@ -19,7 +19,6 @@ use super::walk::within;
 
 pub const FLOWER_ACTORS: [&str; 2] = ["BFlower", "VbakH"];
 pub const BOMB_ACTOR: &str = "Bomb2";
-
 
 pub const SWITCH_SHIFT: u32 = 8;
 pub const SWITCH_MASK: u32 = 0xFF;
@@ -174,7 +173,11 @@ pub fn flower_control(
             }
             Flower::Live => {
                 let touched = home.is_some_and(|player| {
-                    within(player + Vec3::new(0.0, FLOWER_HEIGHT, 0.0), actor.pos, FLOWER_RADIUS)
+                    within(
+                        player + Vec3::new(0.0, FLOWER_HEIGHT, 0.0),
+                        actor.pos,
+                        FLOWER_RADIUS,
+                    )
                 });
                 if touched {
                     let prm = Crawler::make(START_FUSED, false);
@@ -205,7 +208,11 @@ pub fn crawler_control(
     players: Query<&Player>,
     mut foes: Query<
         (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
-        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
     >,
     mut events: ResMut<super::events::SimEvents>,
     mut published: ResMut<Blasts>,
@@ -215,11 +222,19 @@ pub fn crawler_control(
     mut fx: ResMut<DamageFxQueue>,
     mut fences: Query<
         (&Actor, &mut super::barricade::Barricade),
-        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
     >,
     mut floats: Query<
         (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
-        (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
     >,
     mut switches: ResMut<super::flags::Switches>,
     mut commands: Commands,
@@ -334,7 +349,14 @@ pub fn blast(
     origin: Vec3,
     atk: &Atk,
     published: &mut ResMut<Blasts>,
-    foes: &mut Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
+    foes: &mut Query<
+        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
+    >,
     owner: Option<Vec3>,
     zones: &mut ZoneActors,
     events: &mut super::events::SimEvents,
@@ -342,8 +364,22 @@ pub fn blast(
     stop: &mut HitStop,
     audio: &mut HitAudio,
     fx: &mut DamageFxQueue,
-    fences: &mut Query<(&Actor, &mut super::barricade::Barricade), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
-    floats: &mut Query<(Entity, &Actor, &mut super::buoybarrel::BuoyBarrel), (Without<Bombflower>, Without<Crawler>, Without<super::bomb::Bomb>)>,
+    fences: &mut Query<
+        (&Actor, &mut super::barricade::Barricade),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
+    >,
+    floats: &mut Query<
+        (Entity, &Actor, &mut super::buoybarrel::BuoyBarrel),
+        (
+            Without<Bombflower>,
+            Without<Crawler>,
+            Without<super::bomb::Bomb>,
+        ),
+    >,
     switches: &mut ResMut<super::flags::Switches>,
     commands: &mut Commands,
 ) {

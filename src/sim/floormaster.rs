@@ -4,8 +4,8 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::arrow;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::carry;
 use super::collision::Collision;
 use super::combat::Combat;
@@ -19,8 +19,8 @@ use super::iball;
 use super::item::Held;
 use super::jump;
 use super::player::Player;
-use super::ship::Ship;
 use super::roll;
+use super::ship::Ship;
 use super::stream;
 use super::tsubo;
 use super::walk;
@@ -196,23 +196,7 @@ const ANM_NONE: u8 = 0xF;
 const ANM_NO_INDEX: i8 = -1;
 const ANM_NO_NEXT: i8 = -1;
 
-const ANM_INDEX: [i8; PRM_COUNT] = [
-    ANM_NO_INDEX,
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    1,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-];
+const ANM_INDEX: [i8; PRM_COUNT] = [ANM_NO_INDEX, 0, 1, 2, 3, 4, 5, 6, 1, 7, 8, 9, 10, 11, 12];
 
 const ANM_BCK: [i32; PRM_COUNT] = [
     BCK_WAIT,
@@ -259,21 +243,8 @@ const ANM_SPEED: [f32; PRM_COUNT] = [
 ];
 
 const ANM_LOOP: [u8; PRM_COUNT] = [
-    EMODE_NONE,
-    EMODE_LOOP,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_LOOP,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_NONE,
-    EMODE_LOOP,
-    EMODE_LOOP,
+    EMODE_NONE, EMODE_LOOP, EMODE_NONE, EMODE_NONE, EMODE_NONE, EMODE_NONE, EMODE_NONE, EMODE_NONE,
+    EMODE_NONE, EMODE_LOOP, EMODE_NONE, EMODE_NONE, EMODE_NONE, EMODE_LOOP, EMODE_LOOP,
 ];
 
 const HIT_NONE: u8 = 0;
@@ -366,11 +337,8 @@ const AT_TYPE_LIGHT: u32 = 1 << 23;
 const SPH_SRC_RADIUS: f32 = 60.0;
 const CYL_SRC_RADIUS: f32 = 60.0;
 const CYL_HEIGHT: f32 = 150.0;
-const SPH_TG_TYPE: u32 = AT_TYPE_ALL
-    & !AT_TYPE_UNK8
-    & !AT_TYPE_WATER
-    & !AT_TYPE_UNK20000
-    & !AT_TYPE_UNK400000;
+const SPH_TG_TYPE: u32 =
+    AT_TYPE_ALL & !AT_TYPE_UNK8 & !AT_TYPE_WATER & !AT_TYPE_UNK20000 & !AT_TYPE_UNK400000;
 const CYL_TG_TYPE: u32 = AT_TYPE_ALL
     & !AT_TYPE_WATER
     & !AT_TYPE_UNK20000
@@ -710,11 +678,7 @@ impl At {
             Self::Bomb => damage::BOMB,
             Self::Boomerang => damage::BOMERANG,
             Self::Hammer => hammer::AT_POWER,
-            Self::Idle
-            | Self::Hookshot
-            | Self::Grapple
-            | Self::Wind
-            | Self::LightArrow => 0,
+            Self::Idle | Self::Hookshot | Self::Grapple | Self::Wind | Self::LightArrow => 0,
         }
     }
 }
@@ -1641,11 +1605,7 @@ impl Floormaster {
 
     fn set_collision(&mut self, actor: &Actor, busy: bool) {
         if self.is_body_appear() {
-            self.body_sph.radius = if busy {
-                HIO_0C8 * 1.5
-            } else {
-                HIO_0C8
-            };
+            self.body_sph.radius = if busy { HIO_0C8 * 1.5 } else { HIO_0C8 };
             self.body_sph.centre = self.hand;
             self.body_sph.registered = true;
         } else {
@@ -1698,7 +1658,15 @@ impl Floormaster {
                     let reach = flat(other.pos, ctx.player.pos);
                     if near < HIO_0E8
                         && (reach > REG12_F0 + 80.0 || ctx.carry_held == Some(other.entity))
-                        && matches!(other.sub, TSUBO_POT | TSUBO_BIG | TSUBO_JUG | TSUBO_STOOL | TSUBO_SKULL | TSUBO_PAIL)
+                        && matches!(
+                            other.sub,
+                            TSUBO_POT
+                                | TSUBO_BIG
+                                | TSUBO_JUG
+                                | TSUBO_STOOL
+                                | TSUBO_SKULL
+                                | TSUBO_PAIL
+                        )
                     {
                         self.target = Some(other.entity);
                         self.target_flag = TARGET_TSUBO;
@@ -1890,12 +1858,7 @@ impl Floormaster {
         }
     }
 
-    fn execute(
-        &mut self,
-        actor: &mut Actor,
-        mut ctx: Ctx<'_, '_>,
-        mut commands: &mut Commands,
-    ) {
+    fn execute(&mut self, actor: &mut Actor, mut ctx: Ctx<'_, '_>, mut commands: &mut Commands) {
         self.player_busy = ctx.busy;
         self.hand = actor.pos + turned(actor.shape_angle[1], HIO_HAND_OFFSET);
         self.tip = self.hand + turned(actor.shape_angle[1], HIO_TIP_OFFSET);
@@ -2400,12 +2363,7 @@ impl Floormaster {
         if self.is_link() {
             let aim = bearing(actor.pos, self.grab_pos);
             if distance_angle_s(actor.shape_angle[1], aim) > i32::from(HIO_09A) {
-                stream::add_calc_angle_s2(
-                    &mut actor.shape_angle[1],
-                    aim,
-                    TURN_DIV,
-                    TURN_CAP_NPC,
-                );
+                stream::add_calc_angle_s2(&mut actor.shape_angle[1], aim, TURN_DIV, TURN_CAP_NPC);
             }
             self.set_grab_pos(ctx);
             if self.player_grab_bomb(ctx) {
@@ -2575,7 +2533,12 @@ impl Floormaster {
         }
     }
 
-    fn mode_prepare_item(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_, '_>, commands: &mut Commands) {
+    fn mode_prepare_item(
+        &mut self,
+        actor: &mut Actor,
+        ctx: &mut Ctx<'_, '_>,
+        commands: &mut Commands,
+    ) {
         if self.check_tg_hit(actor, ctx) {
             return;
         }
@@ -2718,10 +2681,7 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     mut events: ResMut<SimEvents>,
     mut zones: ResMut<ZoneActors>,
-    mut bosses: Query<
-        (Entity, &mut Actor, &mut Floormaster),
-        (With<Floormaster>, Without<Player>),
-    >,
+    mut bosses: Query<(Entity, &mut Actor, &mut Floormaster), (With<Floormaster>, Without<Player>)>,
     // Carryables are read to build the loot list and later written when the boss
     // releases one, so the two passes never overlap in time but do touch the same
     // entities. `ParamSet` states that; separate queries are a B0001 on both
@@ -2805,7 +2765,11 @@ pub fn control(
             {
                 found = At::Hammer;
             }
-            if found == At::Idle && watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
+            if found == At::Idle
+                && watch.combat.active
+                && watch.combat.frame >= 1
+                && watch.combat.frame < 6
+            {
                 found = At::Sword;
             }
             if found == At::Idle && !blasts.is_empty() {
@@ -2846,8 +2810,7 @@ pub fn control(
                 if id == player_entity {
                     player.pos
                 } else {
-                    loot
-                        .iter()
+                    loot.iter()
                         .find(|loot| loot.entity == id)
                         .map_or(player.pos, |loot| loot.pos)
                 }

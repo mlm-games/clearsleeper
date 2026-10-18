@@ -5,7 +5,7 @@ use super::actor::Actor;
 use super::event::{ActiveEvent, EventList, Stage};
 use super::flags::{EventFlags, EventReg, StoryBits};
 use super::msg::{
-    MsgBox, MsgTable, MSG_BOX_CLOSED, MSG_CONTINUES, MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS,
+    MSG_BOX_CLOSED, MSG_CONTINUES, MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS, MsgBox, MsgTable,
 };
 use super::player::Player;
 use super::walk;
@@ -542,8 +542,9 @@ impl Figure {
                     let sub_y = input.c_stick_y;
                     if stick_x != 0.0 || stick_y != 0.0 || sub_y != 0.0 {
                         self.auto_spin = CHECK_AUTO_FRAMES;
-                        self.cam_spin =
-                            self.cam_spin.wrapping_add((stick_x * CHECK_TURN_STEP) as i16);
+                        self.cam_spin = self
+                            .cam_spin
+                            .wrapping_add((stick_x * CHECK_TURN_STEP) as i16);
                         self.cam_height += ((stick_y * CHECK_HEIGHT_STEP) as i16) as f32;
                         if self.cam_height < CHECK_HEIGHT_MIN {
                             self.cam_height = CHECK_HEIGHT_MIN;
@@ -676,7 +677,8 @@ impl Figure {
     fn update_camera(&mut self, actor: &Actor) {
         let temp = self.cam_height + CHECK_EYE_LIFT;
         self.cam_center = Vec3::new(0.0, temp, 0.0);
-        let turn = Quat::from_rotation_y(walk::from_s16(actor.angle[1].wrapping_add(self.cam_spin)));
+        let turn =
+            Quat::from_rotation_y(walk::from_s16(actor.angle[1].wrapping_add(self.cam_spin)));
         self.cam_eye = turn * Vec3::new(0.0, temp, CHECK_TARGET_DIST) + actor.pos;
         self.cam_center += actor.pos;
     }

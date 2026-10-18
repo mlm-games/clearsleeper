@@ -411,7 +411,10 @@ pub fn control(
 ) {
     // `dComIfGp_getShipActor()` - the one live `daShip_c`; `d_stage.cpp:650` is the only
     // `fpcNm_SHIP_e` row and `src/sim/ship.rs:12` claims it.
-    let ship = ships.iter().next().map(|(hull, _)| (hull.pos, hull.angle[1]));
+    let ship = ships
+        .iter()
+        .next()
+        .map(|(hull, _)| (hull.pos, hull.angle[1]));
     for (entity, mut actor, mut box_) in &mut boxes {
         // `m2F8 = dComIfGp_evmng_getMyStaffId("tkrSlv")` (:395). `ActiveEvent::staff_cut` answers the
         // staff id AND `dComIfGp_evmng_getIsAddvance` in one lookup, which is the whole of `m2F8`'s

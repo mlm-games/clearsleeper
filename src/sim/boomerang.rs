@@ -3,7 +3,6 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::bodies::AtMeta;
-use crate::sim::contact_hit::{AT_SPRM_NO_TG_HIT_INF, AtObj, TgObj};
 use super::combat::{HitPoints, actor_status};
 use super::contact_run::ContactBodies;
 use super::damage;
@@ -18,6 +17,7 @@ use super::registry::{ActorRegistry, ERROR_PROC_ID};
 use super::shape::Shape;
 use super::ship::Ship;
 use super::walk::{self, within};
+use crate::sim::contact_hit::{AT_SPRM_NO_TG_HIT_INF, AtObj, TgObj};
 
 pub const MODE_WAIT: u8 = 0;
 pub const MODE_THROW: u8 = 1;
@@ -110,7 +110,11 @@ impl Boomerang {
         let (sin, cos) = heading.sin_cos();
         let reach = self.reach(false);
         self.target = self.pos
-            + Vec3::new(reach * sin * pitch.cos(), -reach * pitch.sin(), reach * cos * pitch.cos());
+            + Vec3::new(
+                reach * sin * pitch.cos(),
+                -reach * pitch.sin(),
+                reach * cos * pitch.cos(),
+            );
         self.locks = locks;
         self.aim();
     }
@@ -119,7 +123,11 @@ impl Boomerang {
         let reach = self.reach(riding);
         let (sin, cos) = self.heading.sin_cos();
         self.target = self.pos
-            + Vec3::new(reach * sin * self.pitch.cos(), -reach * self.pitch.sin(), reach * cos * self.pitch.cos());
+            + Vec3::new(
+                reach * sin * self.pitch.cos(),
+                -reach * self.pitch.sin(),
+                reach * cos * self.pitch.cos(),
+            );
     }
 
     pub fn returning(&mut self) {
@@ -197,15 +205,13 @@ pub fn control(
     players: Query<&Player>,
     riding: Query<&Ship>,
     held: Option<ResMut<super::item::Held>>,
-    mut foes: Query<
-        (
-            Entity,
-            &super::actor::Actor,
-            Option<&ContactBodies>,
-            &mut HitPoints,
-            Option<&mut Hurt>,
-        ),
-    >,
+    mut foes: Query<(
+        Entity,
+        &super::actor::Actor,
+        Option<&ContactBodies>,
+        &mut HitPoints,
+        Option<&mut Hurt>,
+    )>,
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
     mut events: ResMut<SimEvents>,

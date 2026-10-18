@@ -41,7 +41,11 @@ impl TagMsg {
     pub fn spawn(actor: &Actor, source: &crate::dzs::StageActor) -> Self {
         let parameters = source.parameters;
         let message = source.angle[0] as u16;
-        let lift = if message != MSG_KEEP_HEIGHT { 150.0 } else { 0.0 };
+        let lift = if message != MSG_KEEP_HEIGHT {
+            150.0
+        } else {
+            0.0
+        };
         let pos = actor.pos;
         Self {
             swbit: ((parameters >> 8) & 0xFF) as u8,
@@ -61,11 +65,7 @@ impl TagMsg {
 
 fn abs_diff(a: i16, b: i16) -> i16 {
     let diff = a.wrapping_sub(b);
-    if diff < 0 {
-        diff.wrapping_neg()
-    } else {
-        diff
-    }
+    if diff < 0 { diff.wrapping_neg() } else { diff }
 }
 
 fn create_action(tag: &TagMsg, switches: &Switches, events: &EventFlags) -> u8 {
@@ -102,7 +102,8 @@ fn other_check(tag: &TagMsg, actor: &Actor, player: &Player) -> bool {
         return true;
     }
     let target_angle = to_s16((player.pos.x - actor.pos.x).atan2(player.pos.z - actor.pos.z));
-    if u32::from(tag.message) == u32::from(MSG_HIDE_LINK) && abs_diff(target_angle, actor.angle[1]) > 0x3000
+    if u32::from(tag.message) == u32::from(MSG_HIDE_LINK)
+        && abs_diff(target_angle, actor.angle[1]) > 0x3000
     {
         return false;
     }

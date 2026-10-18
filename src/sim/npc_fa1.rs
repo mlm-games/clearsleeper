@@ -3,10 +3,10 @@ use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
+use super::ba1::BA1_ACTOR;
 use super::collision::Collision;
 use super::events::{SimEvent, SimEvents};
 use super::ground;
-use super::grammarian::GRAMMARIAN_ACTOR;
 use super::health::Health;
 use super::player::Player;
 use super::walk;
@@ -17,8 +17,6 @@ pub const NPC_FA1_ACTORS: [&str; 1] = ["Sfairy"];
 pub fn is_npc_fa1(name: &str) -> bool {
     NPC_FA1_ACTORS.contains(&name)
 }
-
-
 
 // daNpc_Fa1_c::Type_e - d_a_npc_fa1.h:33-41
 const TYPE_NORMAL: i8 = 0; // <- :34
@@ -341,11 +339,7 @@ impl NpcFa1 {
             }
             self.init_normal_move();
         }
-        let probe = Vec3::new(
-            actor.pos.x,
-            actor.pos.y + GROUND_OFFSET,
-            actor.pos.z,
-        );
+        let probe = Vec3::new(actor.pos.x, actor.pos.y + GROUND_OFFSET, actor.pos.z);
         let ground_y = ctx.surface(probe).unwrap_or(0.0);
         self.ground_y = ground_y;
         if !self.is_hover() && ground_y != f32::NEG_INFINITY {
@@ -380,7 +374,11 @@ impl NpcFa1 {
             }
         }
         let rad = walk::from_s16(actor.angle[1]);
-        let speed = Vec3::new(self.speed_f * rad.sin(), self.speed_y, self.speed_f * rad.cos());
+        let speed = Vec3::new(
+            self.speed_f * rad.sin(),
+            self.speed_y,
+            self.speed_f * rad.cos(),
+        );
         actor.pos += speed;
     }
 
@@ -457,7 +455,8 @@ impl NpcFa1 {
     /// `daNpc_Fa1_c::straight` (`:436-444`).
     fn straight(&mut self, actor: &Actor) {
         self.scale_x = HIO_M10;
-        if !calc_timer_u8(&mut self.move_timer) && abs_xz(actor.pos - self.home_pos) > self.scale_x {
+        if !calc_timer_u8(&mut self.move_timer) && abs_xz(actor.pos - self.home_pos) > self.scale_x
+        {
             self.init_turn();
         }
     }
@@ -474,13 +473,8 @@ impl NpcFa1 {
         if calc_timer_u8(&mut self.move_timer) {
             let delta = actor.pos - self.home_pos;
             let want = atan2s(-delta.x, -delta.z);
-            actor.angle[1] = walk::add_calc_angle_s(
-                actor.angle[1],
-                want,
-                TURN_SCALE,
-                TURN_MAX,
-                TURN_MIN,
-            );
+            actor.angle[1] =
+                walk::add_calc_angle_s(actor.angle[1], want, TURN_SCALE, TURN_MAX, TURN_MIN);
         } else {
             self.init_straight();
         }
@@ -503,8 +497,8 @@ impl NpcFa1 {
         let mut want = actor.angle[1];
         if !calc_timer_i16(&mut self.area_timer) {
             self.area_flip ^= 1;
-            self.area_timer =
-                (rnd_u16(&mut self.seed, AREA_FLIP_TIMER_BASE, AREA_FLIP_TIMER_RANGE) & 0xFF) as i16;
+            self.area_timer = (rnd_u16(&mut self.seed, AREA_FLIP_TIMER_BASE, AREA_FLIP_TIMER_RANGE)
+                & 0xFF) as i16;
         }
         want = want.wrapping_add(if self.area_flip != 0 {
             -AREA_YAW_STEP
@@ -532,8 +526,8 @@ impl NpcFa1 {
         let mut want = target_angle_y(actor.pos, self.home_pos);
         if !calc_timer_i16(&mut self.area_timer) {
             self.area_flip ^= 1;
-            self.area_timer =
-                (rnd_u16(&mut self.seed, AREA_FLIP_TIMER_BASE, AREA_FLIP_TIMER_RANGE) & 0xFF) as i16;
+            self.area_timer = (rnd_u16(&mut self.seed, AREA_FLIP_TIMER_BASE, AREA_FLIP_TIMER_RANGE)
+                & 0xFF) as i16;
         }
         want = want.wrapping_add(if self.area_flip != 0 {
             -AREA_YAW_STEP
@@ -601,7 +595,11 @@ impl NpcFa1 {
             self.speed_y = self.max_fall;
         }
         let rad = walk::from_s16(actor.angle[1]);
-        let speed = Vec3::new(self.speed_f * rad.sin(), self.speed_y, self.speed_f * rad.cos());
+        let speed = Vec3::new(
+            self.speed_f * rad.sin(),
+            self.speed_y,
+            self.speed_f * rad.cos(),
+        );
         actor.pos += speed;
         self.bg_check(actor, ctx);
         let mut step = self.neck_angle;
@@ -1020,7 +1018,7 @@ pub fn control(
     let player = msg.players.iter().next().copied();
     let ba1 = others
         .iter()
-        .find(|(_, actor)| actor.name == GRAMMARIAN_ACTOR)
+        .find(|(_, actor)| actor.name == BA1_ACTOR)
         .map(|(_, actor)| actor.pos);
     let collision = world.collision.as_deref();
     for (entity, mut actor, mut fa1) in &mut actors {

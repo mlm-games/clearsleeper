@@ -213,11 +213,7 @@ impl ObjMmrr {
         };
         (
             [CULL_MIN.x, CULL_MIN.y, CULL_MIN.z],
-            [
-                CULL_HALF_X,
-                sin_val + CULL_HALF_Y,
-                cos_val + CULL_HALF_Z,
-            ],
+            [CULL_HALF_X, sin_val + CULL_HALF_Y, cos_val + CULL_HALF_Z],
         )
     }
 

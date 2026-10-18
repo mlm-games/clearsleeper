@@ -47,7 +47,6 @@ const HIO_MIN_BACKBONE_Y: i16 = -0x1F40; // <- field_0x14, :223
 const HIO_MAX_TURN_STEP: i16 = 0x07D0; // <- field_0x16, :224
 const HIO_MAX_HEAD_TURN_VEL: i16 = 0x0640; // <- field_0x18, :225
 
-
 // a_anm_idx_tbl - d_a_npc_nz.cpp:315-331 (mBckIdx, mSndIdx)
 const ANM_IDX_TBL: [(i8, i8); 15] = [
     (0x23, 0x12), // <- :316
@@ -271,7 +270,13 @@ fn add_calc2(value: &mut f32, target: f32, scale: f32, max_step: f32) {
 }
 
 /// `cLib_addCalcPosXZ` (`c_lib.cpp:105-131`), the XZ pair.
-fn add_calc_pos_xz(value: &mut Vec3, target: Vec3, scale: f32, max_step: f32, min_step: f32) -> f32 {
+fn add_calc_pos_xz(
+    value: &mut Vec3,
+    target: Vec3,
+    scale: f32,
+    max_step: f32,
+    min_step: f32,
+) -> f32 {
     if value.x != target.x || value.z != target.z {
         let mut diff = *value - target;
         let mut step = abs_xz(diff);
@@ -481,7 +486,10 @@ impl JntCtrl {
             Some(point) => {
                 let delta = point - src;
                 let flat = (delta.x * delta.x + delta.z * delta.z).sqrt();
-                (walk::to_s16(delta.x.atan2(delta.z)), walk::to_s16(delta.y.atan2(flat)))
+                (
+                    walk::to_s16(delta.x.atan2(delta.z)),
+                    walk::to_s16(delta.y.atan2(flat)),
+                )
             }
             None => (default_y, 0),
         };
@@ -1142,7 +1150,8 @@ impl NpcNz {
         if status == STATUS_BOX_CLOSED {
             self.cut.field_0x52 = 0;
             ctx.end_staff_cut();
-        } else if (status == crate::text::STATUS_BOX_OPENING || status == crate::text::STATUS_TYPING)
+        } else if (status == crate::text::STATUS_BOX_OPENING
+            || status == crate::text::STATUS_TYPING)
             && self.end_msg_no == self.curr_msg_no
         {
             self.end_msg_no = u32::MAX;
@@ -1493,10 +1502,7 @@ pub fn control(
     let message_rupee = msg.info.message_rupee;
     let send = msg.one.m116a;
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     let player = links.iter().next().map(|link| *link);
     let targets: Vec<Target> = others
         .iter()

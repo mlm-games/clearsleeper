@@ -214,8 +214,7 @@ impl Ylzou {
     }
 
     fn running(&self, active: &ActiveEvent) -> bool {
-        self.event
-            .is_some_and(|index| active.start_check(index))
+        self.event.is_some_and(|index| active.start_check(index))
     }
 
     fn regist(

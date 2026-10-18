@@ -19,7 +19,7 @@
 //! * `dComIfGp_getSelectItem(i_itemBtn)` (:125) — the X/Y/Z button→item map
 //!   (`d_com_inf_game.h:2882`) — and the `eventInfo` give-item channel that would call
 //!   `XyCheckCB`/`XyEventCB` (:488-489). `xy_check_cb` and `call_demo_start_check` are
-//!   transcribed in the same shape aryll.rs and grammarian.rs ship them, but nothing in
+//!   transcribed in the same shape aryll.rs and ba1.rs ship them, but nothing in
 //!   this crate can fire them, so `mDescendStartPos`/`mDescendStartAngle` stay zero.
 //! * `dBgS_ObjAcch::ChkRoofHit` (:638), `dBgS_AcchCir::ChkWallHit` (:651-653), the
 //!   `mStts` character-collision move `fopAcM_posMove(this, mStts.GetCCMoveP())` (:1357)
@@ -51,8 +51,8 @@ use super::player::Player;
 use super::sea::Sea;
 use super::stream;
 use super::vibration::Vibration;
-use super::water;
 use super::walk;
+use super::water;
 
 // OBJNAME("HyoiKam", fpcNm_NPC_KAM_e, 255, 0) - tww/src/d/d_stage.cpp:1170. (The
 // "Kamome" name at d_stage.cpp:646 is fpcNm_KAMOME_e, the unrelated d_a_kamome.cpp.)
@@ -177,9 +177,7 @@ const EVT_CND_CANTALKITEM: u16 = 0x0020; // <- f_op_actor.h:150, used :917
 
 /// `waitNpcAction`'s random tables :701-705. The last entry of each is never selected
 /// (`cLib_getRndValue(0, ARRAY_SSIZE(tbl)-2)`, :716, :721).
-const TURN_ANGLE_Y: [i16; 6] = [
-    0x1000, -0x0C00, -0x1000, 0x0800, 0x0C00, -0x0800,
-]; // <- l_turn_angleY, :701 (0xF400 / 0xF000 / 0xF800 in s16 form)
+const TURN_ANGLE_Y: [i16; 6] = [0x1000, -0x0C00, -0x1000, 0x0800, 0x0C00, -0x0800]; // <- l_turn_angleY, :701 (0xF400 / 0xF000 / 0xF800 in s16 form)
 const ANM_TYPE: [i32; 16] = [
     ANM_WAIT2, ANM_WAIT2, ANM_WAIT2, ANM_WAIT2, ANM_WAIT2, ANM_WAIT2, ANM_WAIT2, ANM_WAIT2,
     ANM_WAIT2, ANM_WAIT2, ANM_WAIT1, ANM_WAIT1, ANM_SING, ANM_WAIT1, ANM_SING, ANM_WAIT1,
@@ -1453,7 +1451,7 @@ impl Kamome {
         // `XyCheckCB` :124-130 whose input, `dComIfGp_getSelectItem(i_itemBtn)`
         // (d_com_inf_game.h:2882), is the X/Y/Z button->item map. `xy_check_cb` and
         // `call_demo_start_check` are transcribed in the same shape aryll.rs:264 and
-        // grammarian.rs:1146 ship them, but no crate channel fires them.
+        // ba1.rs:1268 ship them, but no crate channel fires them.
         actor.pos = self.descend_start_pos; // <- :1077
         actor.angle = self.descend_start_angle; // <- :1078
         self.shape_angle = actor.angle; // <- :1079
@@ -1484,13 +1482,8 @@ impl Kamome {
             actor.pos.y = link_head_top.y; // <- :1109
         }
         if actor.pos.y < link_head_top.y + DESCEND_CATCH_Y {
-            actor.angle[0] = walk::add_calc_angle_s(
-                actor.angle[0],
-                0,
-                TURN_SCALE_DESCEND,
-                TURN_MAX,
-                TURN_MIN,
-            ); // <- :1112
+            actor.angle[0] =
+                walk::add_calc_angle_s(actor.angle[0], 0, TURN_SCALE_DESCEND, TURN_MAX, TURN_MIN); // <- :1112
             self.shape_angle[0] = actor.angle[0]; // <- :1113
         }
 
@@ -1567,7 +1560,9 @@ impl Kamome {
     /// `setAnm` :1185-1239
     fn set_anm(&mut self, anm_idx: i32) {
         self.anm_idx = anm_idx; // <- :1215
-        let slot = usize::try_from(anm_idx).ok().filter(|slot| *slot < ANM_COUNT);
+        let slot = usize::try_from(anm_idx)
+            .ok()
+            .filter(|slot| *slot < ANM_COUNT);
         let Some(slot) = slot else {
             return;
         };
@@ -1864,8 +1859,7 @@ impl Ctx<'_, '_> {
     /// `dComIfGp_evmng_cutEnd(staffId)` :1008, :1014
     fn end_staff_cut(&mut self) {
         let list = self.list;
-        self.active
-            .end_staff_cut(list, self.ev_flags, STAFF_NAME);
+        self.active.end_staff_cut(list, self.ev_flags, STAFF_NAME);
     }
 }
 
@@ -1932,7 +1926,7 @@ pub fn control(
             stage: &watch.stage,
             sea_in,
             stick: watch.intent.axis, // <- CPad_GET_STICK_POS_X/Y(0), :604, :643
-            camera: *watch.camera,     // <- dCam_getControledAngleY, :625
+            camera: *watch.camera,    // <- dCam_getControledAngleY, :625
             trig_a: watch.do_intent.0, // <- CPad_CHECK_TRIG_A(0), :774
             trig_r: watch.target_intent.0, // <- CPad_CHECK_TRIG_R(0), :556
             // OMITTED: `talk_command` (:153, :930), `talk_xy`
@@ -1940,7 +1934,7 @@ pub fn control(
             // (eventInfo.checkCommandDemoAccrpt, :985) all read the per-actor event
             // command / talk button, which live in the event-and-attention model this
             // crate does not carry, so all three read false — the same state aryll.rs:2877,
-            // grammarian.rs:2465 and medli.rs:5751 ship in. They stay as Ctx fields so the
+            // ba1.rs:2676 and medli.rs:5751 ship in. They stay as Ctx fields so the
             // branches are transcribed and start working the moment that channel exists.
             talk_command: false,
             talk_xy: false,

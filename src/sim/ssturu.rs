@@ -198,13 +198,7 @@ impl SsTuru {
     }
 
     /// `case 10:`.
-    fn up(
-        &mut self,
-        actor: &Actor,
-        player: &Player,
-        switches: &Switches,
-        events: &mut SimEvents,
-    ) {
+    fn up(&mut self, actor: &Actor, player: &Player, switches: &Switches, events: &mut SimEvents) {
         if self.variant == 1 && (player.pos - actor.pos).length() > self.leave_range() {
             self.at_live = false;
             self.mode = Mode::Sink;

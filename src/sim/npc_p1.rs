@@ -222,13 +222,7 @@ pub const CULL_MIN: [f32; 3] = [-40.0, 0.0, -40.0];
 pub const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0];
 
 pub const MINIGAME_ACTION_NAMES: [&str; 2] = ["4013_msg", "4014_msg"];
-pub const PRIVATE_CUT_NAMES: [&str; 5] = [
-    "4013_msg",
-    "4014_msg",
-    "SETANM",
-    "HEADSWING",
-    "TALKMSG",
-];
+pub const PRIVATE_CUT_NAMES: [&str; 5] = ["4013_msg", "4014_msg", "SETANM", "HEADSWING", "TALKMSG"];
 pub const PRIVATE_ACT_MINIGAME_A: i32 = 0;
 pub const PRIVATE_ACT_MINIGAME_B: i32 = 1;
 pub const PRIVATE_ACT_SETANM: i32 = 2;
@@ -709,10 +703,20 @@ impl HeadAnm {
         let prev = self.phase;
         self.phase = self.phase.wrapping_add(self.rate);
         let temp = (sin_s(self.phase) * self.amplitude) as i16;
-        self.swing[JNT_AXIS_X] =
-            walk::add_calc_angle_s(self.swing[JNT_AXIS_X], temp, HEAD_CHASE_SCALE, HEAD_CHASE_MAX, HEAD_CHASE_MIN);
-        self.swing[JNT_AXIS_Y] =
-            walk::add_calc_angle_s(self.swing[JNT_AXIS_Y], 0, HEAD_CHASE_SCALE, HEAD_CHASE_MAX, HEAD_CHASE_MIN);
+        self.swing[JNT_AXIS_X] = walk::add_calc_angle_s(
+            self.swing[JNT_AXIS_X],
+            temp,
+            HEAD_CHASE_SCALE,
+            HEAD_CHASE_MAX,
+            HEAD_CHASE_MIN,
+        );
+        self.swing[JNT_AXIS_Y] = walk::add_calc_angle_s(
+            self.swing[JNT_AXIS_Y],
+            0,
+            HEAD_CHASE_SCALE,
+            HEAD_CHASE_MAX,
+            HEAD_CHASE_MIN,
+        );
         if prev < 0 && self.phase >= 0 {
             self.count = self.count.wrapping_sub(1);
             if self.count <= 0 {
@@ -725,10 +729,20 @@ impl HeadAnm {
         if self.proc_state == SWING_VERTICAL {
             self.swing_vertical();
         } else {
-            self.swing[JNT_AXIS_X] =
-                walk::add_calc_angle_s(self.swing[JNT_AXIS_X], 0, HEAD_CHASE_SCALE, HEAD_CHASE_MAX, HEAD_CHASE_MIN);
-            self.swing[JNT_AXIS_Y] =
-                walk::add_calc_angle_s(self.swing[JNT_AXIS_Y], 0, HEAD_CHASE_SCALE, HEAD_CHASE_MAX, HEAD_CHASE_MIN);
+            self.swing[JNT_AXIS_X] = walk::add_calc_angle_s(
+                self.swing[JNT_AXIS_X],
+                0,
+                HEAD_CHASE_SCALE,
+                HEAD_CHASE_MAX,
+                HEAD_CHASE_MIN,
+            );
+            self.swing[JNT_AXIS_Y] = walk::add_calc_angle_s(
+                self.swing[JNT_AXIS_Y],
+                0,
+                HEAD_CHASE_SCALE,
+                HEAD_CHASE_MAX,
+                HEAD_CHASE_MIN,
+            );
         }
     }
 }
@@ -1141,9 +1155,7 @@ impl NpcP1 {
     }
 
     fn normal_action(&mut self, ctx: &mut Ctx) -> bool {
-        let dist = ctx
-            .player
-            .map_or(0.0, |link| abs_xz(link - ctx.pos));
+        let dist = ctx.player.map_or(0.0, |link| abs_xz(link - ctx.pos));
         if self.act_status == ACTION_STARTING {
             if self.kind == TYPE_P1A {
                 if self.counter_671 == 1 {
@@ -1429,8 +1441,8 @@ impl NpcP1 {
     fn get_next_msg_no(&mut self, ctx: &mut Ctx, advance: i32) -> u32 {
         let next = match self.curr_mesg {
             MSG_C94 => MSG_C99,
-            MSG_FA1 | MSG_FA2 | MSG_FA5 | MSG_FA6 | MSG_FA7 | MSG_FAA | MSG_FAB
-            | MSG_1015 | MSG_1007 => self.curr_mesg.wrapping_add(1),
+            MSG_FA1 | MSG_FA2 | MSG_FA5 | MSG_FA6 | MSG_FA7 | MSG_FAA | MSG_FAB | MSG_1015
+            | MSG_1007 => self.curr_mesg.wrapping_add(1),
             MSG_1009 => MSG_102E,
             MSG_1016 => MSG_1033,
             MSG_FAE => MSG_FA5,
@@ -1783,8 +1795,7 @@ impl NpcP1 {
                 }
             }
             if self.kaji_id != NO_KAJI {
-                self.set_kaji =
-                    Some((self.anm_num - KAJI_ANM_BIAS, self.morph.get_frame()));
+                self.set_kaji = Some((self.anm_num - KAJI_ANM_BIAS, self.morph.get_frame()));
             }
             return true;
         }
@@ -1866,14 +1877,8 @@ impl NpcP1 {
         let mut src = ctx.pos;
         src.y += LOOK_SRC_LIFT;
         let mut yaw = ctx.angle;
-        self.jnt.look_at_target(
-            &mut yaw,
-            dst,
-            src,
-            ctx.angle,
-            self.max_look_vel,
-            hold_body,
-        );
+        self.jnt
+            .look_at_target(&mut yaw, dst, src, ctx.angle, self.max_look_vel, hold_body);
         ctx.angle = yaw;
         !hold_body
     }
@@ -1929,11 +1934,9 @@ pub fn control(
     mut commands: Commands,
 ) {
     let player = msg.players.iter().next().copied();
-    let player_eye = player.map_or(Vec3::ZERO, |link| Vec3::new(
-        link.pos.x,
-        link.pos.y + PLAYER_EYE_OFFSET_Y,
-        link.pos.z,
-    ));
+    let player_eye = player.map_or(Vec3::ZERO, |link| {
+        Vec3::new(link.pos.x, link.pos.y + PLAYER_EYE_OFFSET_Y, link.pos.z)
+    });
     let clear_count = msg.text_flags.clear_count;
     let event_mode = msg.info.event_run_check();
     let archive = msg.archive.as_deref().map(|held| held as &dyn MsgArchive);

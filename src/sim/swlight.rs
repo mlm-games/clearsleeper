@@ -63,10 +63,7 @@ fn lamp_inside(pos: Vec3, angle: [i16; 3], at: Vec3) -> bool {
     v = xrot(v, angle[0].wrapping_neg());
     v = zrot(v, angle[2].wrapping_neg());
     v *= LAMP_UNSCALE;
-    v.x.abs() <= LAMP_HALF_X
-        && v.y >= LAMP_FLOOR
-        && v.y <= LAMP_TOP
-        && v.z.abs() <= LAMP_HALF_Z
+    v.x.abs() <= LAMP_HALF_X && v.y >= LAMP_FLOOR && v.y <= LAMP_TOP && v.z.abs() <= LAMP_HALF_Z
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]

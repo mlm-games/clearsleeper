@@ -4,7 +4,6 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::bodies::AtMeta;
-use crate::sim::contact_hit::{AT_SPRM_VS_ENEMY, AtObj, TgObj};
 use super::combat::{HitPoints, actor_status};
 use super::contact_run::ContactBodies;
 use super::damage;
@@ -20,6 +19,7 @@ use super::registry::{ActorRegistry, ERROR_PROC_ID};
 use super::shape::Shape;
 use super::ship::Ship;
 use super::walk::to_s16;
+use crate::sim::contact_hit::{AT_SPRM_VS_ENEMY, AtObj, TgObj};
 
 pub const ARROW_ACTOR: &str = "Arrow";
 
@@ -151,7 +151,6 @@ impl Arrow {
         self.visible = self.frames > BLINK_FRAMES || self.frames % 2 == 0;
         self.visible
     }
-
 }
 
 pub fn is_arrow(name: &str) -> bool {
@@ -253,7 +252,8 @@ pub fn control(
                     // `_atHit` ignores any actor without a JntHit, then `procMove` refines
                     // the strike through `searchJntHitPosAngleOffset` to pick the joint.
                     let angle = [to_s16(arrow.pitch), to_s16(arrow.yaw), 0];
-                    let contact = colliders.map(|colliders| colliders.search(angle, actor, arrow.pos));
+                    let contact =
+                        colliders.map(|colliders| colliders.search(angle, actor, arrow.pos));
                     let joint = contact.and_then(|(joint, _)| (joint >= 0).then_some(joint));
                     nearest = distance;
                     struck = Some((

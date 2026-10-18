@@ -44,10 +44,7 @@ pub fn control(
             continue;
         }
         let room = marker.room.max(i32::from(actor.room));
-        let living = room >= 0
-            && foes
-                .iter()
-                .any(|other| i32::from(other.room) == room);
+        let living = room >= 0 && foes.iter().any(|other| i32::from(other.room) == room);
         if living {
             marker.countdown = COUNTDOWN;
             continue;

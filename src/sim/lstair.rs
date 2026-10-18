@@ -2,8 +2,8 @@ use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
-use super::event::{ActiveEvent, EventList, Stage};
 use super::enemy::Enemy;
+use super::event::{ActiveEvent, EventList, Stage};
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 
@@ -465,7 +465,10 @@ impl Lstair {
         let Some(slot) = self.event_slot else {
             return;
         };
-        if matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)) {
+        if matches!(
+            active.stage_of(slot),
+            Some(Stage::Play) | Some(Stage::Close)
+        ) {
             // `if (dComIfGp_evmng_endCheck(mEventIdx)) { dComIfGp_event_reset(); }` (:186-188).
             // `dComIfGp_event_reset()` is `dEvDtBase_c::reset()` (`d_event.h:131`) = `mEventFlag
             // |= 8`, which `dEvt_control_c::check` (`d_event.cpp:546-554`) turns into `endProc` ->

@@ -152,7 +152,8 @@ impl BuoyRace {
     /// attr().m0C * cM_ssin(m2A0)) * attr().mScale;`
     fn create_init(&mut self, actor: &mut Actor, sea: &Sea) {
         self.water_pos(actor.pos, sea);
-        actor.pos.y = self.mean_sea_height + (M08 * -M00 + M0C * walk::from_s16(self.drift).sin()) * MSCALE;
+        actor.pos.y =
+            self.mean_sea_height + (M08 * -M00 + M0C * walk::from_s16(self.drift).sin()) * MSCALE;
         self.entered = true;
     }
 

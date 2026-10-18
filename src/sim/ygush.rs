@@ -1,5 +1,5 @@
-use bevy_ecs::prelude::*;
 use bevy_ecs::entity::Entity;
+use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};

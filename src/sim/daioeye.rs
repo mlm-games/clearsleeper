@@ -296,6 +296,11 @@ pub fn control(
     mut eyes: Query<(&Actor, &mut DaioEye)>,
 ) {
     for (actor, mut eye) in &mut eyes {
-        eye.execute(actor, source_at(&shafts, &chains, &bolts), &blasts, &mut events);
+        eye.execute(
+            actor,
+            source_at(&shafts, &chains, &bolts),
+            &blasts,
+            &mut events,
+        );
     }
 }

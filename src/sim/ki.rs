@@ -213,7 +213,11 @@ impl Ki {
             parameters,
             switch_raw,
             // `if (i_this->m2CF != 0xFF) i_this->m2D4 = i_this->m2CF + 1;` (`:1418-1420`)
-            standby: if switch_raw == PARAM_NONE { 0 } else { switch_raw.wrapping_add(1) },
+            standby: if switch_raw == PARAM_NONE {
+                0
+            } else {
+                switch_raw.wrapping_add(1)
+            },
             reach: MAX_ATTACK_DIST[usize::from(band) % MAX_ATTACK_DIST.len()],
             timers: [0; 4],
             grace: 0,
@@ -389,13 +393,7 @@ impl Ki {
     }
 
     /// `ki_atack_move` (`:491-698`). `m540 = 1` (`:496`); `cVar6` starts at 0 (`:497`).
-    fn attack_move(
-        &mut self,
-        actor: &mut Actor,
-        player: Vec3,
-        fighting: i16,
-        se: &mut Vec<u32>,
-    ) {
+    fn attack_move(&mut self, actor: &mut Actor, player: Vec3, fighting: i16, se: &mut Vec<u32>) {
         self.flying = true;
         // `if (mTimers[3] == 0 && mBehaviorType <= 3) { mTimers[3] = cM_rndF(14.0f) + 15.0f;
         // fopAcM_monsSeStart(a_this, JA_SE_CV_KI_ATTACK, 0); }` (`:499-502`). The re-arm needs the
@@ -609,11 +607,7 @@ impl Ki {
         // mAcch.CrrPos(*dComIfG_Bgsp()); current.pos.y += 30.0f; old.pos.y += 30.0f; }` (`:1078-1089`).
         // Only the ground response of `CrrPos` is transcribed; its wall and roof responses are not.
         if self.flying {
-            let probe = Vec3::new(
-                actor.pos.x,
-                actor.pos.y - GROUND_OFFSET,
-                actor.pos.z,
-            );
+            let probe = Vec3::new(actor.pos.x, actor.pos.y - GROUND_OFFSET, actor.pos.z);
             if let Some(floor) = ground::surface(solid, probe)
                 && actor.pos.y < floor
             {
@@ -660,7 +654,15 @@ pub fn control(
             spent.push(entity);
             continue;
         }
-        if ki.execute(actor, solid, &switches, player.pos, &roster, hit_points.0, &mut se) {
+        if ki.execute(
+            actor,
+            solid,
+            &switches,
+            player.pos,
+            &roster,
+            hit_points.0,
+            &mut se,
+        ) {
             spent.push(entity);
             continue;
         }

@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::bombflower::{Blasts, BLAST_RADIUS};
+use super::bombflower::{BLAST_RADIUS, Blasts};
 use super::carry::Carry;
 use super::collision::Collision;
 use super::combat::Combat;
@@ -277,13 +277,7 @@ pub const EBROCK_SMALL: Attr = Attr {
 /// `data()` (`d_a_stone.h:104`) - `M_data[m670]` in table order, the five entries declared at
 /// `d_a_stone.h:155`. `M_data` is a five-row C array, so a `m670` past the end reads whatever
 /// follows; the wrap below is the same guard `stone.rs` applies to `M_attr`.
-const ATTRS: [Attr; 5] = [
-    ALWAYS_SMALL,
-    ALWAYS_HEAVY,
-    EBROCK,
-    EKAO,
-    EBROCK_SMALL,
-];
+const ATTRS: [Attr; 5] = [ALWAYS_SMALL, ALWAYS_HEAVY, EBROCK, EKAO, EBROCK_SMALL];
 
 /// `m674`'s four values, in `mode_proc[]` order (`:416-421`) - `0` `mode_wait` (`:417`), `1`
 /// `mode_carry` (`:418`), `2` `mode_drop` (`:419`), `3` `mode_sink` (`:420`).
@@ -377,8 +371,7 @@ impl Koisi {
     /// `cPhs_ERROR_e` initialiser (`:194`) in place so the process never runs at all.
     pub fn chk_appear(&mut self, switches: &Switches) -> bool {
         let flagged = self.attr().flags & DATAFLG_8 != 0;
-        self.appears =
-            !flagged || self.switch_no == NO_SWITCH || !switches.test(self.switch_no);
+        self.appears = !flagged || self.switch_no == NO_SWITCH || !switches.test(self.switch_no);
         self.appears
     }
 
@@ -532,9 +525,15 @@ impl Koisi {
     /// that leaves it on - `mode_wait_init` (`:278`), `mode_carry_init` (`:306`) and
     /// `mode_sink_init` (`:381`) all clear it - so in retail only a falling rock can be cut.
     ///
-    /// The vertical half of the `cM3dGCylS` overlap is not modelled: `cM3dGCylS::Height` is consumed
-    /// by the collision engine alone and its axis convention is not resolvable from anything in
-    /// this checkout, the same omission `fallrock.rs` records.
+    /// The vertical half of the `cM3dGCylS` overlap is not modelled. The convention IS readable -
+    /// `cM3d_Cross_CylPnt` (`c_m3d.cpp:1877-1888`) keeps a point strictly inside
+    /// `center.y < y < center.y + Height`, `cM3d_Cross_CylSph` (`:1398-1404`) tests the sphere's
+    /// `y ± R` against the same span, and `cM3d_Cross_CpsCyl` (`:1962-2064`) treats the cylinder
+    /// as the segment `center` to `center + (0, Height, 0)` with `Radius` around it - so `Height`
+    /// runs upward from the centre. What is missing is the geometry pair on the actor side: this
+    /// sim's AT/Tg reduction is `walk::within`, a point against a radius, and its `Collision`
+    /// carries no cylinder or capsule overlap (`cCcD_Obj::ChkAtHit` over `cM3d_Cross_CpsCyl` is
+    /// the `cCcD` registry RULE 3b lists as absent), so the height has no consumer here.
     fn sword_hit(&self, centre: Vec3, tip: Vec3) -> bool {
         self.mode == Mode::Drop && walk::within(tip, centre, self.attr().radius + SWORD_REACH)
     }
@@ -696,11 +695,8 @@ pub fn control(
         // before the actor method runs (`src/sim/actor.rs:86`) while `mAcch.CrrPos` (:438) does not
         // run until inside `mode_proc_call`, so the gate sees the previous step's corrected position.
         let grounded_before = ground::grounded(solid, actor.old.pos);
-        let run = first
-            || rock.mode != Mode::Wait
-            || !grounded_before
-            || rock.cull == 0
-            || rock.move_bg;
+        let run =
+            first || rock.mode != Mode::Wait || !grounded_before || rock.cull == 0 || rock.move_bg;
         if !run {
             continue;
         }

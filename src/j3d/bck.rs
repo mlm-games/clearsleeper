@@ -7,11 +7,15 @@
 //! Key data lives in three arrays: scale and translation as `f32`, rotation as
 //! `s16` angles of 65536 per turn (`TSinCosTable::sinShort`) shifted by
 //! `mDecShift`.
+//!
+//! [`Morph`] takes the same parse the other way: the baked tracks are sampled against a game
+//! model's `JNT1` joint order and composed down its hierarchy, which is the `getAnmMtx` answer a
+//! `mDoExt_McaMorf`-driven actor reads (`m_Do/m_Do_ext.h:324-380`).
 
 use std::collections::HashMap;
 
-use glam::Quat;
-use repame_view3d::{Animation, Interp, NodePose};
+use glam::{Mat4, Quat};
+use repame_view3d::{Animation, Interp, JointPose, NodePose, Skeleton};
 
 const HEADER_LEN: usize = 0x20;
 const BLOCK_LEN: usize = 8;
@@ -87,8 +91,7 @@ fn field(base: usize, delta: i32) -> Result<usize, BckError> {
     if delta < 0 {
         return Err(BckError::Table);
     }
-    base.checked_add(delta as usize)
-        .ok_or(BckError::Table)
+    base.checked_add(delta as usize).ok_or(BckError::Table)
 }
 
 fn find_block(data: &[u8], tag: &[u8; 4]) -> Result<usize, BckError> {
@@ -228,8 +231,7 @@ fn rotation(units: [i32; 3]) -> [f32; 4] {
 pub fn parse(data: &[u8]) -> Result<Animation, BckError> {
     let start = find_block(data, b"ANK1")?;
     let shift = u32::from(read_u8(data, start + 9)?).min(31);
-    let frame_max = usize::try_from(read_i16(data, start + 0x0A)?)
-        .map_err(|_| BckError::Table)?;
+    let frame_max = usize::try_from(read_i16(data, start + 0x0A)?).map_err(|_| BckError::Table)?;
     let joint_count = usize::from(read_u16(data, start + 0x0C)?);
     let counts = [
         usize::from(read_u16(data, start + 0x0E)?),
@@ -294,8 +296,7 @@ pub fn parse(data: &[u8]) -> Result<Animation, BckError> {
                 let frame = frame as f32;
                 let mut units = [0_i32; 3];
                 for (axis, channel) in channels[CHANNEL_ROTATION].iter().enumerate() {
-                    let value =
-                        sample(data, rot_base, counts[1], WIDE_S16, *channel, frame, 0.0)?;
+                    let value = sample(data, rot_base, counts[1], WIDE_S16, *channel, frame, 0.0)?;
                     // `mRotation` is an `SVec`, so the shifted key truncates to 16 bits.
                     units[axis] = ((value as i32) << shift) as i16 as i32;
                 }
@@ -304,7 +305,10 @@ pub fn parse(data: &[u8]) -> Result<Animation, BckError> {
             pose.rotations = rotations;
             pose.rotation_interp = linear.clone();
         }
-        if channels[CHANNEL_TRANSLATION].iter().any(|c| c.max_frame > 0) {
+        if channels[CHANNEL_TRANSLATION]
+            .iter()
+            .any(|c| c.max_frame > 0)
+        {
             pose.translations = sample_axes(
                 data,
                 trans_base,
@@ -326,6 +330,75 @@ pub fn parse(data: &[u8]) -> Result<Animation, BckError> {
         tracks,
         ..Animation::default()
     })
+}
+
+/// A `J3D1bck1` paired with the model hierarchy it drives: the [`Animation`] the loader read and
+/// the joint parents a `JNT1` block carries, sampled into the world matrices a `J3DModel`
+/// answers with (`J3DModel.h:75`).
+///
+/// A track is keyed by joint index, which is `J3DAnmTransformKey::calcTransform`'s `idx`
+/// (`J3DAnimation.cpp:459`), and holds one joint local per disk frame, so a sample at a whole
+/// frame reproduces the reference's key-table read exactly.
+#[derive(Debug, Clone)]
+pub struct Morph {
+    animation: Animation,
+    skeleton: Skeleton,
+    joint_count: usize,
+    frame_max: f32,
+}
+
+impl Morph {
+    /// `J3DAnmKeyLoader_v15::readAnmTransform` (`J3DAnmLoader.cpp:450-465`) over the `ANK1` walk
+    /// above: parse `data`, then pair its joint tracks with the hierarchy `parents` carries - in
+    /// joint order, [`crate::j3d::bdl::RoomMesh::joint_parents`]'s spelling, where a root is a
+    /// value no joint index is. `frame_max` is the block's own `mFrameMax`, the count
+    /// `mDoExt_McaMorf::getEndFrame` reports (`m_Do/m_Do_ext.h:349`).
+    pub fn parse(data: &[u8], parents: &[u16]) -> Result<Self, BckError> {
+        let animation = parse(data)?;
+        let start = find_block(data, b"ANK1")?;
+        let frame_max = f32::from(read_i16(data, start + 0x0A)?);
+        let skeleton = Skeleton {
+            parents: parents
+                .iter()
+                .enumerate()
+                .map(|(joint, parent)| {
+                    let parent = usize::from(*parent);
+                    (joint, (parent < joint).then_some(parent))
+                })
+                .collect(),
+            bind_local: HashMap::new(),
+        };
+        Ok(Self {
+            animation,
+            skeleton,
+            joint_count: parents.len(),
+            frame_max,
+        })
+    }
+
+    /// `mDoExt_McaMorf::getEndFrame` (`m_Do/m_Do_ext.h:349`) over the `ANK1` frame count.
+    pub fn frame_max(&self) -> f32 {
+        self.frame_max
+    }
+
+    /// `mModel->getAnmMtx(no)` (`J3DModel.h:75`) at `frame`, in joint order: sample every track at
+    /// that frame and compose each joint's local down the hierarchy, `J3DMtxCalcAnm::calc`
+    /// (`J3DJoint.cpp:17-27`) over `J3DMtxCalcBasic::calcTransform` (`:57-85`).
+    ///
+    /// A joint the animation carries no track for composes from identity, which is the local the
+    /// reference leaves for a channel its key table does not cover (`J3DAnimation.cpp:459-516`):
+    /// the model's own bind locals are deliberately not a fallback here, because the reference
+    /// replaces the whole joint local rather than the channels the file happens to key.
+    pub fn joint_matrices(&self, frame: f32) -> Vec<Mat4> {
+        let mut locals: HashMap<usize, JointPose> = HashMap::new();
+        for (joint, track) in &self.animation.tracks {
+            locals.insert(*joint, track.sample(frame / FRAME_RATE));
+        }
+        let world = self.skeleton.world_matrices(&locals);
+        (0..self.joint_count)
+            .map(|joint| world.get(&joint).copied().unwrap_or(Mat4::IDENTITY))
+            .collect()
+    }
 }
 
 fn sample_axes(

@@ -371,7 +371,9 @@ fn text_box(reader: &mut Reader<'_>, pane: &mut ScreenPane) {
     pane.font_size_y = reader.u16();
     let len = reader.u16() as usize;
     let text = reader.bytes(len);
-    let text = String::from_utf8_lossy(text).trim_end_matches('\0').to_string();
+    let text = String::from_utf8_lossy(text)
+        .trim_end_matches('\0')
+        .to_string();
     pane.text = match std::str::from_utf8(text.as_bytes()) {
         Ok(_) => text,
         Err(_) => text,

@@ -187,11 +187,7 @@ impl Mat {
 
     fn xrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::X,
-            Vec3::new(0.0, cos, sin),
-            Vec3::new(0.0, -sin, cos),
-        );
+        self.concat(Vec3::X, Vec3::new(0.0, cos, sin), Vec3::new(0.0, -sin, cos));
     }
 
     fn yrot_s(&mut self, angle: i16) {
@@ -204,20 +200,12 @@ impl Mat {
 
     fn yrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::new(cos, 0.0, -sin),
-            Vec3::Y,
-            Vec3::new(sin, 0.0, cos),
-        );
+        self.concat(Vec3::new(cos, 0.0, -sin), Vec3::Y, Vec3::new(sin, 0.0, cos));
     }
 
     fn zrot_m(&mut self, angle: i16) {
         let (sin, cos) = from_s16(angle).sin_cos();
-        self.concat(
-            Vec3::new(cos, sin, 0.0),
-            Vec3::new(-sin, cos, 0.0),
-            Vec3::Z,
-        );
+        self.concat(Vec3::new(cos, sin, 0.0), Vec3::new(-sin, cos, 0.0), Vec3::Z);
     }
 }
 

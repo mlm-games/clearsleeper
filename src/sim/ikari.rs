@@ -47,11 +47,7 @@ impl Ikari {
     pub fn cull(&self) -> ([f32; 3], [f32; 3]) {
         let scale = self.scale_x;
         (
-            [
-                CULL_MIN_X * scale,
-                CULL_MIN_Y * scale,
-                CULL_MIN_Z * scale,
-            ],
+            [CULL_MIN_X * scale, CULL_MIN_Y * scale, CULL_MIN_Z * scale],
             [CULL_MAX_X * scale, CULL_MAX_Y * scale, CULL_MAX_Z * scale],
         )
     }

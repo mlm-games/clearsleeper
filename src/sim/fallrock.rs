@@ -9,10 +9,13 @@
 //! neither `combat::HitPoints` nor `enemy::Hurt` is attached.
 //!
 //! (b) outbound damage: OMITTED. `mCyl`'s `SrcObjAt Type` is `AT_TYPE_UNK8` at `Atp = 1`
-//! (`d_a_fallrock.cpp:22-23`) and the collider is re-registered every tick (`:161-162`), but
-//! `cM3dGCylS`'s `Height` is consumed by the collision engine only and its vertical convention
-//! is not resolvable from anything in this checkout, so the contact test would have to be
-//! invented.
+//! (`d_a_fallrock.cpp:22-23`) and the collider is re-registered every tick (`:161-162`), but the
+//! contact test is the `cCcD` cylinder pair: `cM3dGCylS::Height` runs upward from the centre
+//! (`cM3d_Cross_CylPnt`, `c_m3d.cpp:1877-1888`: `center.y < y < center.y + Height`; likewise
+//! `cM3d_Cross_CylSph` `:1398-1404` and `cM3d_Cross_CpsCyl` `:1962-2064`), and the port's AT/Tg
+//! reduction is a point against a radius with no cylinder geometry behind it - the `cCcD`
+//! registry RULE 3b lists as absent (`stone.rs` and `koisi.rs` record the same gap), so the
+//! contact test would have to be invented.
 //!
 //! The water impact (`field_0x29C.ChkWaterIn()` at `d_a_fallrock.cpp:123`, sounding
 //! `JA_SE_OBJ_FALL_WATER_M` / `_L` at `:125` / `:127`) is OMITTED: `ChkWaterIn` is raised inside
@@ -160,7 +163,8 @@ impl FallRock {
     /// (`:135-142`) and `if (height > current.pos.y + scale.x * 120.0f)` (`:144`).
     fn lava_above(&self, solid: Option<&Collision>, before: Vec3, here: Vec3) -> bool {
         let probe = Vec3::new(before.x, before.y + self.scale * CYL_HEIGHT, before.z);
-        ground::surface(solid, probe).is_some_and(|height| height > here.y + self.scale * CYL_HEIGHT)
+        ground::surface(solid, probe)
+            .is_some_and(|height| height > here.y + self.scale * CYL_HEIGHT)
     }
 }
 
@@ -198,7 +202,9 @@ pub fn control(
             None
         };
         if let Some(impact) = impact {
-            events.list.push(super::events::SimEvent::Se(rock.sound(impact)));
+            events
+                .list
+                .push(super::events::SimEvent::Se(rock.sound(impact)));
             rock.gone = true;
         }
         if rock.gone {

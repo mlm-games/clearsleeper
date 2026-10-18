@@ -4,18 +4,24 @@ use std::collections::HashMap;
 
 use super::actor::Actor;
 use super::chest::ChestOpen;
+use super::demo::{self, DemoCreate, DemoCreates, DemoFile, DemoGap, DemoManager, DemoReaders};
 use super::door::DoorCut;
+use super::events::{SimEvent, SimEvents};
+use super::fade::{Fade, Wipe};
 use super::fire::FireLit;
 use super::flags::{EventFlags, StoryBits};
+use super::jpa::Jpa;
 use super::msg::{
-    MsgBox, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING, MSG_CONTINUES,
-    MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS, MSG_TYPING,
+    MSG_BOX_CLOSED, MSG_BOX_CLOSING, MSG_BOX_OPENING, MSG_CONTINUES, MSG_DESTROYED, MSG_DISPLAYED,
+    MSG_ENDS, MSG_TYPING, MsgBox, MsgTable,
 };
 use super::player::Player;
 use super::sea::Sea;
-use super::ship::{DECK_RISE, GET_OFF_SPEED, LEDGE_OFFSET_X, Ship, SHIP_ACTOR};
+use super::ship::{DECK_RISE, GET_OFF_SPEED, LEDGE_OFFSET_X, SHIP_ACTOR, Ship};
+use super::stage_data::ActorTable;
 use super::talk::Talk;
 use super::transition::{NextStage, Target};
+use super::vibration::Vibration;
 use super::walk::{add_calc, add_calc_angle_s, from_s16, to_s16};
 use super::water;
 use super::zelda::Zelda;
@@ -78,6 +84,9 @@ const SOUND_ACTIONS: &[&str] = &[
     "BGMSTOP",
 ];
 const PACKAGE_ACTIONS: &[&str] = &["WAIT", "PLAY", "PLAY2"];
+/// `dEvDtStaff_c::specialProcCreate`'s action table - `d_event_data.cpp:497-504`. `WAIT` does
+/// nothing at all, not even a timer.
+const CREATE_ACTIONS: &[&str] = &["WAIT", "CREATE"];
 const CAMERA_ACTIONS: &[&str] = &[
     "PAUSE",
     "WAIT",
@@ -169,6 +178,37 @@ pub const LINK_ANIM_STEMS: &[&str] = &[
 ];
 const GET_ENTERED: u8 = 0x01;
 const GET_DONE: u8 = 0x04;
+
+/// `dComIfGp_event_setCullRate(10.0f)` - `d_event_data.cpp:804`, the cull ratio a mounted demo
+/// raises so its own stage props are not culled out from under it. The port's cull pass is the
+/// shell's (`src/lib.rs`'s room/actor views), so the value is carried here and read there.
+pub const DEMO_CULL_RATE: f32 = 10.0;
+
+/// `dEvDtStaff_c::specialProcDirector`'s three `BGM_ID` entries - `d_event_data.cpp:633-637`:
+/// `JA_BGM_I_MAJU`, `JA_BGM_TETRA_MEET`, `JA_BGM_I_LINK_FOREST` (`JAZelAudio_BGM.h:13`, `:24`,
+/// `:29`).
+const DIRECTOR_BGM_TABLE: [u32; 3] = [0x8000_0007, 0x8000_0012, 0x8000_0017];
+/// The same switch's one `SENUM` entry - `d_event_data.cpp:674-676`:
+/// `JA_SE_CM_ZL_FDEMO_JIMEN` (`JAZelAudio_SE.h:1183`).
+const DIRECTOR_SE_TABLE: [u32; 1] = [0x583F];
+/// `JA_SE_CHUYA_SWITCH` (`JAZelAudio_SE.h:224`), the `WIPE` action's `SOUND == 0` case
+/// (`d_event_data.cpp:695-698`).
+const WIPE_SOUND: u32 = 0x08DA;
+/// `JA_SE_READ_RIDDLE_1` (`JAZelAudio_SE.h:18`), the `SOUND` staff's `RIDDLE` action
+/// (`d_event_data.cpp:441-442`).
+const RIDDLE_SE: u32 = 0x0806;
+/// The two streams the `SOUND` staff prepares - `d_event_data.cpp:432-437`:
+/// `JA_STRM_DEMO_MJ_SISTER` and `JA_STRM_DEMO_GO_MAJU` (`JAZelAudio_BGM.h:112-113`).
+const STREAM_MJ_SISTER: u32 = 0xC000_0004;
+const STREAM_GO_MAJU: u32 = 0xC000_0005;
+/// The port's own "stop the music" value on [`SimEvent::Bgm`](super::events::SimEvent), the one
+/// `kalle_demos` already sends; `SimEvent::Bgm` is a channel the shell has no consumer for yet.
+const BGM_STOP: u32 = 0;
+
+/// The `dKy_instant_timechg` argument's scale: `*pHour * 15.0f` (`d_event_data.cpp:222`, `:243`
+/// and `:46` for the pending `dKy_set_nexttime` form) into the `DayNight::time` units a day is
+/// `24 * 15` of.
+const DAYNIGHT_UNITS_PER_HOUR: f32 = 15.0;
 
 const ZL1_MAJYU_POS: Vec3 = Vec3::new(-37927.0, 2200.0, 7852.0); // <- d_a_npc_zl1.cpp:1526
 const ZL1_MAJYU_AIM: Vec3 = Vec3::new(-37978.0, 400.0, 7766.0); // <- field_0x758, :1527
@@ -265,6 +305,11 @@ pub struct DataRecord {
     pub next: i32,
     pub kind: i32,
     pub name: String,
+    /// `dEvDtData_c`'s substance count, the field at `+0x2C` (`d_event_data.h:141-153`, read as
+    /// `mSubstanceSize` by the getters in `d_event_manager.cpp`). The cut handlers above read one
+    /// value through `index`; the array getters - the DIRECTOR staff's `Pattern`, the event
+    /// camera's key lists - need the count.
+    pub size: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -281,6 +326,27 @@ pub struct EventError;
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct ActiveEvent {
     running: Vec<Running>,
+    /// `dEvent_manager_c::mGoal` (`d_event_manager.h:76`): the point
+    /// `dComIfGp_evmng_setGoal` (`d_com_inf_game.h:3739`) last wrote. Retail holds it as a plain
+    /// `cXyz` in the game-info's static storage, so a goal no writer has run for reads as the
+    /// origin there; `None` is the port's mark for that unwritten state, and the only one an
+    /// event's walk cuts see before the actor that ordered it sets the point
+    /// (`daNpc_Ba1_c::eInit_SET_PLYER_GOL_`, `d_a_npc_ba1.cpp:915-923`, is one).
+    goal: Option<Vec3>,
+}
+
+impl ActiveEvent {
+    /// `dEvent_manager_c::setGoal` (`d_event_manager.cpp:637-640`).
+    pub fn set_goal(&mut self, goal: Vec3) {
+        self.goal = Some(goal);
+    }
+
+    /// `dEvent_manager_c::getGoal` (`d_event_manager.cpp:642-645`): what
+    /// `dComIfGp_evmng_getGoal` (`d_com_inf_game.h:3735-3737`) hands the player's demo cut as
+    /// the `pos` it was not given (`d_a_player_main.cpp:10388-10390`).
+    pub fn goal(&self) -> Option<Vec3> {
+        self.goal
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -335,6 +401,11 @@ pub struct ItemPartner {
     pub entity: Option<Entity>,
     pub item: u8,
     pub max_life: u8,
+    /// `daPy_demo_c::mDemoMoveAngle` (`d_a_player.h:141`): the demo walk's heading
+    /// (`walk.rs`'s `demo_walk_tick`, `d_a_player_main.cpp:10453`) and the angle the turn cuts
+    /// face (`link_cut`'s `WAIT_TURN` arm, `:10496-10498`). Writers are the player's own cuts and
+    /// the actors' init cuts - `daNpc_Ba1_c::eInit_SET_PLYER_TRN_ANG_` (`d_a_npc_ba1.cpp:955-963`)
+    /// among them.
     pub move_angle: i16,
     pub demo_stick: Option<f32>,
     pub demo_fall: bool,
@@ -590,6 +661,7 @@ impl EventList {
                     name: reader.text(*at, NAME_LEN)?,
                     kind: reader.i32(*at + 0x24)?,
                     index: reader.i32(*at + 0x28)?,
+                    size: reader.i32(*at + 0x2C)?,
                     next: reader.i32(*at + 0x30)?,
                 })
             })
@@ -728,6 +800,33 @@ impl EventList {
         int_of(self.value(record))
     }
 
+    /// The whole integer array behind a key, the shape `dComIfGp_evmng_getMyIntegerP`'s pointer
+    /// reaches when a caller reads it as bytes - the DIRECTOR staff's `Pattern` is handed straight
+    /// to `StartQuake(const u8*, ...)` (`d_event_data.cpp:654-666`). The bytes of that array are
+    /// the pool's big-endian `i32`s, which is why the pattern's wav in
+    /// [`specialProcSound`](super::event)'s neighbours reads `pattern[0] << 8 | pattern[1]`.
+    pub fn cut_ints(&self, cut: usize, key: &str) -> Option<Vec<i32>> {
+        let cut = self.cuts.get(cut)?;
+        let record = self.record_of(cut.first_data, key)?;
+        if record.kind != TYPE_INT || record.index < 0 {
+            return None;
+        }
+        let size = record.size;
+        let start = record.index as usize;
+        let end = start.checked_add(usize::try_from(size).ok()?)?;
+        self.ints.get(start..end).map(|slice| slice.to_vec())
+    }
+
+    /// The same array as raw bytes, in the byte order the pool stores them.
+    pub fn cut_bytes(&self, cut: usize, key: &str) -> Option<Vec<u8>> {
+        Some(
+            self.cut_ints(cut, key)?
+                .into_iter()
+                .flat_map(i32::to_be_bytes)
+                .collect(),
+        )
+    }
+
     pub fn cut_float(&self, cut: usize, key: &str) -> Option<f32> {
         let cut = self.cuts.get(cut)?;
         let record = self.record_of(cut.first_data, key)?;
@@ -764,6 +863,42 @@ impl EventList {
     }
 }
 
+/// The resources the special staffs reach that the cut handlers above do not, grouped because a
+/// system's parameter list holds sixteen and this one already carries thirteen.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct StageIo<'w> {
+    pub demo: ResMut<'w, DemoManager>,
+    /// `dStage_roomControl_c::mDemoArcName` and the cut models read out of it, which the `PACKAGE`
+    /// staff's mount looks its file up in before the stage archive (`d_event_data.cpp:796-802`).
+    pub room_demo: ResMut<'w, super::demo::RoomDemoArchive>,
+    pub readers: Res<'w, DemoReaders>,
+    pub creates: ResMut<'w, DemoCreates>,
+    pub fade: ResMut<'w, Fade>,
+    pub wipe: ResMut<'w, Wipe>,
+    pub vibration: ResMut<'w, Vibration>,
+    pub events: ResMut<'w, SimEvents>,
+    /// `dPa_control_c::getEmitterManager()`, the manager `JStudio_JParticle::TCreateObject` was
+    /// built around (`d_demo.cpp:688`).
+    pub jpa: ResMut<'w, Jpa>,
+    pub table: Option<Res<'w, ActorTable>>,
+    pub stage: Res<'w, super::area::StageName>,
+    pub stay: Res<'w, super::door::StayRoom>,
+    pub day: ResMut<'w, super::daynight::DayNight>,
+}
+
+/// The queries the cuts above already walk, plus the command buffer the special staffs write
+/// through, sharing one pair of lifetimes so [`Props`] can borrow them together.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct StageActors<'w, 's> {
+    pub actors: Query<'w, 's, (Entity, &'static mut Actor)>,
+    pub talks: Query<'w, 's, &'static mut Talk>,
+    pub players: Query<'w, 's, (Entity, &'static mut Player)>,
+    pub ships: Query<'w, 's, &'static mut Ship>,
+    pub presents: Query<'w, 's, &'static mut PresentItem>,
+    pub zeldas: Query<'w, 's, &'static mut Zelda>,
+    pub commands: Commands<'w, 's>,
+}
+
 pub fn control(
     data: (Res<EventList>, Res<MsgTable>),
     mut active: ResMut<ActiveEvent>,
@@ -774,15 +909,12 @@ pub fn control(
     mut partner: ResMut<ItemPartner>,
     anms: Res<LinkAnms>,
     sea: Option<Res<Sea>>,
-    mut actors: Query<(Entity, &mut Actor)>,
-    mut players: Query<(Entity, &mut Player)>,
-    mut ships: Query<&mut Ship>,
-    mut talks: Query<&mut Talk>,
-    mut presents: Query<&mut PresentItem>,
-    mut zeldas: Query<&mut Zelda>,
-    mut commands: Commands,
+    mut io: StageIo,
+    mut q: StageActors,
 ) {
     let (list, table) = data;
+    let stay = io.stay.0;
+    let goal = active.goal();
     partner.demo_stick = None;
     partner.demo_fall = false;
     partner.demo_backjump = false;
@@ -821,7 +953,34 @@ pub fn control(
             continue;
         }
         for run in running.staffs.iter_mut() {
-            special_proc(run, &list, &mut flags, &mut story, &mut next, &mut msg, &table);
+            let mut props = Props {
+                demo: &mut io.demo,
+                room_demo: &mut io.room_demo,
+                readers: &io.readers,
+                creates: &mut io.creates,
+                fade: &mut io.fade,
+                wipe: &mut io.wipe,
+                vibration: &mut io.vibration,
+                events: &mut io.events,
+                players: &mut q.players,
+                actors: &mut q.actors,
+                commands: &mut q.commands,
+                table: io.table.as_deref(),
+                stage: &io.stage.0,
+                stay,
+            };
+            special_proc(
+                run,
+                &list,
+                &mut flags,
+                &mut story,
+                &mut next,
+                &mut msg,
+                &table,
+                &mut io.jpa,
+                &mut props,
+                &mut io.day,
+            );
         }
     }
     for running in active.running.iter_mut() {
@@ -835,18 +994,19 @@ pub fn control(
                 &list,
                 &mut flags,
                 owner,
-                &mut actors,
-                &mut players,
-                &mut ships,
+                &mut q.actors,
+                &mut q.players,
+                &mut q.ships,
                 sea.as_deref(),
-                &mut talks,
+                &mut q.talks,
                 &mut msg,
                 &table,
                 &mut partner,
                 &anms,
-                &mut presents,
-                &mut zeldas,
-                &mut commands,
+                &mut q.presents,
+                &mut q.zeldas,
+                &mut q.commands,
+                goal,
             );
         }
     }
@@ -869,7 +1029,10 @@ fn staff_cut(
     presents: &mut Query<&mut PresentItem>,
     zeldas: &mut Query<&mut Zelda>,
     commands: &mut Commands,
+    goal: Option<Vec3>,
 ) {
+    // The `goal` parameter is `dComIfGp_evmng_getGoal()` (`d_com_inf_game.h:3735-3737`), the
+    // event manager's `mGoal`, which `link_cut` falls back to when a cut carries no `pos`.
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
     };
@@ -944,7 +1107,12 @@ fn staff_cut(
     } else if people_staff(&staff.name) {
         people_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Ls1" {
-        hold_cut(run, list, flags, &["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"]);
+        hold_cut(
+            run,
+            list,
+            flags,
+            &["LOK_PLYER", "PLYER_MOV", "WAI", "ANM_CHG"],
+        );
     } else if staff.name == "Ba1" {
         hold_cut(run, list, flags, &["ACTION", "START_TALE1"]);
     } else if staff.name == "Hdai1" || staff.name == "Hdai2" || staff.name == "Hdai3" {
@@ -974,7 +1142,7 @@ fn staff_cut(
             ),
             "Link" => link_cut(
                 run, list, flags, actors, ships, msg, table, partner, anms, players, commands,
-                presents,
+                presents, goal,
             ),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
@@ -1017,7 +1185,9 @@ fn warp_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
 }
 
 fn mailbox_msg(owner: Entity, actors: &Query<(Entity, &mut Actor)>) -> u32 {
-    actors.get(owner).map_or(0, |(_, actor)| actor.parameters & 0xFFFF)
+    actors
+        .get(owner)
+        .map_or(0, |(_, actor)| actor.parameters & 0xFFFF)
 }
 
 fn open_msg_cut(
@@ -1044,8 +1214,9 @@ fn open_msg_cut(
                 return;
             };
             if run.advance > 0 {
-                talk.msg_curr =
-                    list.cut_number(run.cut as usize, key).unwrap_or(fallback as i32) as u32;
+                talk.msg_curr = list
+                    .cut_number(run.cut as usize, key)
+                    .unwrap_or(fallback as i32) as u32;
                 talk.msg_end = -1;
                 run.talk_open = true;
             }
@@ -1115,7 +1286,8 @@ fn os_cut(
 fn people_staff(name: &str) -> bool {
     matches!(
         name,
-        "Uo1" | "Uo2"
+        "Uo1"
+            | "Uo2"
             | "Uo3"
             | "Ub1"
             | "Ub2"
@@ -1150,7 +1322,9 @@ fn people_cut(
 ) {
     match list.cuts.get(run.cut as usize).map(|cut| cut.name.as_str()) {
         Some("MES_SET" | "MES_SET_TP" | "MES_SET_PO") => {
-            talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo");
+            talk_cut(
+                run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+            );
         }
         Some(
             "MES_SET2" | "UB1_TALK" | "UB1_TALK_XY" | "UB2_TALK" | "UB_SET_ANM" | "TURN_TO_PLAYER",
@@ -1174,7 +1348,9 @@ fn auction_cut(
         return;
     };
     match cut.name.as_str() {
-        "MES_SET" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
+        "MES_SET" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+        ),
         "MES_END" => {
             let Ok(mut talk) = talks.get_mut(owner) else {
                 cut_end(run, list, flags);
@@ -1221,16 +1397,16 @@ fn tpost_cut(
     }
     let Ok(mut talk) = talks.get_mut(owner) else {
         let room = actors.get(owner).map_or(-1, |(_, actor)| actor.room);
-        commands.entity(owner).insert(super::talk::Talk::new(0, room));
+        commands
+            .entity(owner)
+            .insert(super::talk::Talk::new(0, room));
         return;
     };
     if run.advance > 0 {
         commands.entity(owner).insert(super::flags::LetterMsg);
         run.talk_open = true;
     }
-    if run.talk_open
-        && npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED
-    {
+    if run.talk_open && npc_talk(&mut talk, msg, table) == MSG_BOX_CLOSED {
         run.talk_open = false;
         cut_end(run, list, flags);
     }
@@ -1258,8 +1434,12 @@ fn bs1_cut(
         bs1_init(cut.name.as_str(), run, list);
     }
     match cut.name.as_str() {
-        "TALKMSG" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
-        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, true, "MsgNo"),
+        "TALKMSG" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+        ),
+        "CONTINUE_TALK" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, true, "MsgNo",
+        ),
         "WAIT" => wait_proc(run, list, flags), // <- evn_wait, d_a_npc_bs1.cpp:2000
         _ => cut_end(run, list, flags),        // <- default: end = TRUE, :2003
     }
@@ -1376,7 +1556,7 @@ fn zl1_cut(
     // so it reaches `default: temp = TRUE` (`:1815`) with no init.
     match cut.name.as_str() {
         "OKIRU" | "OKIRU_2" | "JMP_OFF" => {} // <- :1793, :1796, :1805
-        _ => cut_end(run, list, flags),        // <- default: temp = TRUE, :1815
+        _ => cut_end(run, list, flags),       // <- default: temp = TRUE, :1815
     }
 }
 
@@ -1533,7 +1713,9 @@ fn mk_cut(
         return;
     };
     match cut.name.as_str() {
-        "SPEAK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
+        "SPEAK" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+        ),
         "RUN" | "RUN3" | "JUMP" | "JUMP2" | "JITABATA" | "TURN" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1554,7 +1736,9 @@ fn roten_cut(
         return;
     };
     match cut.name.as_str() {
-        "MES_SET" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
+        "MES_SET" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+        ),
         "SET_ITEM" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1656,7 +1840,9 @@ fn statue_cut(
         return;
     };
     match cut.name.as_str() {
-        "INPUT" | "LESSON" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo"),
+        "INPUT" | "LESSON" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "MsgNo",
+        ),
         "BREAK" | "TACT" => {}
         _ => cut_end(run, list, flags),
     }
@@ -1985,8 +2171,12 @@ fn soldier_cut(
         "APPEAR" | "DIVE" | "DISAPPEAR" => offset_cut(run, list, flags, &cut.name),
         "JUMP_MAPOPEN" => mapopen_cut(run, list, flags, owner, actors),
         "TURN" => soldier_turn(run, list, flags, owner, actors),
-        "TALK_MSG" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, false, "msg_num"),
-        "CONTINUE_TALK" => talk_cut(run, list, flags, owner, actors, talks, msg, table, commands, true, "msg_num"),
+        "TALK_MSG" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, false, "msg_num",
+        ),
+        "CONTINUE_TALK" => talk_cut(
+            run, list, flags, owner, actors, talks, msg, table, commands, true, "msg_num",
+        ),
         name if SOLDIER_INSTANT.contains(&name) => cut_end(run, list, flags),
         name if SOLDIER_PENDING.contains(&name) => {}
         _ => cut_end(run, list, flags),
@@ -1994,7 +2184,11 @@ fn soldier_cut(
 }
 
 fn anim_ticks(stem: &str, rate: f32, start: f32, end: f32, anms: &LinkAnms) -> Option<i32> {
-    let target = if end < 0.0 { anms.end_frame(stem)? } else { end };
+    let target = if end < 0.0 {
+        anms.end_frame(stem)?
+    } else {
+        end
+    };
     if rate <= 0.0 {
         return None;
     }
@@ -2141,13 +2335,16 @@ fn link_cut(
     players: &mut Query<(Entity, &mut Player)>,
     commands: &mut Commands,
     presents: &mut Query<&mut PresentItem>,
+    goal: Option<Vec3>,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
     let mode = leading_digits(&cut.name, 3);
     if mode == Some(GET_ITEM_MODE) {
-        get_item_cut(run, list, flags, msg, table, partner, anms, players, commands, presents);
+        get_item_cut(
+            run, list, flags, msg, table, partner, anms, players, commands, presents,
+        );
         return;
     }
     if run.advance > 0 {
@@ -2158,6 +2355,10 @@ fn link_cut(
         .iter()
         .next()
         .map_or(0, |(_, player)| to_s16(player.yaw));
+    // `d_a_player_main.cpp:10388-10390`: the cut's own `pos`, else the event manager's goal.
+    // The goal an actor's own init cut set (`eInit_SET_PLYER_GOL_`, `d_a_npc_ba1.cpp:915-923`)
+    // is the fallback every arm below shares.
+    let pos = list.cut_vec(run.cut as usize, "pos").or(goal);
     if let Some(mode) = mode {
         match mode {
             4 | 44 => {
@@ -2165,7 +2366,7 @@ fn link_cut(
                 partner.move_angle = angle;
                 let mut placed: Option<Vec3> = None;
                 if let Some((_, mut player)) = players.iter_mut().next() {
-                    if let Some(pos) = list.cut_vec(run.cut as usize, "pos") {
+                    if let Some(pos) = pos {
                         player.pos = pos;
                         placed = Some(pos);
                     }
@@ -2176,15 +2377,16 @@ fn link_cut(
                 }
                 if let Some(pos) = placed
                     && ships.iter().any(|ship| ship.riding)
-                    && let Some((_, mut actor)) =
-                        actors.iter_mut().find(|(_, actor)| actor.name == SHIP_ACTOR)
+                    && let Some((_, mut actor)) = actors
+                        .iter_mut()
+                        .find(|(_, actor)| actor.name == SHIP_ACTOR)
                 {
                     actor.pos = pos;
                     actor.angle[1] = angle;
                 }
             }
             43 => {
-                if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
+                if let Some(pos) = pos
                     && let Some((_, mut player)) = players.iter_mut().next()
                 {
                     let heading = target_angle_y(player.pos, pos);
@@ -2194,7 +2396,7 @@ fn link_cut(
             }
             2 | 3 => {
                 partner.demo_stick = Some(0.0);
-                if let Some(pos) = list.cut_vec(run.cut as usize, "pos")
+                if let Some(pos) = pos
                     && let Some((_, mut player)) = players.iter_mut().next()
                 {
                     partner.move_angle = target_angle_y(player.pos, pos);
@@ -2323,11 +2525,7 @@ fn link_cut(
     cut_end(run, list, flags);
 }
 
-fn host_message(
-    owner: Entity,
-    actors: &Query<(Entity, &mut Actor)>,
-    commands: &mut Commands,
-) {
+fn host_message(owner: Entity, actors: &Query<(Entity, &mut Actor)>, commands: &mut Commands) {
     let room = actors.get(owner).map_or(-1, |(_, actor)| actor.room);
     commands
         .entity(owner)
@@ -2441,10 +2639,7 @@ fn get_item_cut(
                         room: -1,
                         ..Default::default()
                     },
-                    PresentItem {
-                        item,
-                        hidden: true,
-                    },
+                    PresentItem { item, hidden: true },
                 ))
                 .id();
             partner.entity = Some(entity);
@@ -2931,9 +3126,10 @@ fn resolve_target(
 ) -> Option<Entity> {
     let set_id = list.cut_number(cut, "SetId").unwrap_or(0);
     if set_id != 0 {
-        if let Some(found) = actors.iter_mut().find_map(|(entity, actor)| {
-            (i32::from(actor.set_id) == set_id).then_some(entity)
-        }) {
+        if let Some(found) = actors
+            .iter_mut()
+            .find_map(|(entity, actor)| (i32::from(actor.set_id) == set_id).then_some(entity))
+        {
             run.target = Some(found);
             return run.target;
         }
@@ -2959,11 +3155,7 @@ fn resolve_target(
     run.target
 }
 
-fn nearest(
-    name: &str,
-    owner: Entity,
-    actors: &mut Query<(Entity, &mut Actor)>,
-) -> Option<Entity> {
+fn nearest(name: &str, owner: Entity, actors: &mut Query<(Entity, &mut Actor)>) -> Option<Entity> {
     let origin = actors.get_mut(owner).ok().map(|(_, actor)| actor.pos);
     let mut best: Option<(Entity, f32)> = None;
     for (entity, actor) in actors.iter_mut() {
@@ -3217,6 +3409,32 @@ fn wait_proc(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     }
 }
 
+/// Everything a special staff reaches that the cut handlers above do not: the demo player and its
+/// reader hook (`specialProcPackage`), the fade and the wipe (`specialProcDirector`), vibration
+/// and the sound channel, and the name table the `CREATER` staff spawns through.
+pub struct Props<'a, 'w, 's> {
+    pub demo: &'a mut DemoManager,
+    /// `dStage_roomControl_c::mDemoArcName` as the room set mounted it, which is the first archive
+    /// `specialProcPackage` reads a cut's `FileName` out of (`d_event_data.cpp:796-799`).
+    pub room_demo: &'a mut super::demo::RoomDemoArchive,
+    pub readers: &'a DemoReaders,
+    pub creates: &'a mut DemoCreates,
+    pub fade: &'a mut Fade,
+    pub wipe: &'a mut Wipe,
+    pub vibration: &'a mut Vibration,
+    pub events: &'a mut SimEvents,
+    pub players: &'a mut Query<'w, 's, (Entity, &'static mut Player)>,
+    pub actors: &'a mut Query<'w, 's, (Entity, &'static mut Actor)>,
+    pub commands: &'a mut Commands<'w, 's>,
+    pub table: Option<&'a ActorTable>,
+    pub stage: &'a str,
+    pub stay: i8,
+}
+
+/// `dEvDtStaff_c::specialProc` - `d_event_data.cpp:139-168`.
+///
+/// `LIGHT` is not in retail's switch as an immediate end: `specialProcLight` runs its own action
+/// and ends the cut itself (`:249`), which [`light`] does.
 fn special_proc(
     run: &mut StaffRun,
     list: &EventList,
@@ -3225,19 +3443,69 @@ fn special_proc(
     next: &mut NextStage,
     msg: &mut MsgBox,
     table: &MsgTable,
+    jpa: &mut super::jpa::Jpa,
+    props: &mut Props<'_, '_, '_>,
+    day: &mut super::daynight::DayNight,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
     };
     match staff.kind {
-        STAFF_ALL | STAFF_CREATE | STAFF_LIGHT => cut_end(run, list, flags),
+        STAFF_ALL => cut_end(run, list, flags), // <- d_event_data.cpp:151-153
+        STAFF_CREATE => {
+            create(run, list, props);
+            cut_end(run, list, flags); // <- d_event_data.cpp:154-157
+        }
+        STAFF_LIGHT => light(run, list, flags, day),
         STAFF_TIMEKEEPER => timekeeper(run, list, flags),
-        STAFF_DIRECTOR => director(run, list, flags, next),
+        STAFF_DIRECTOR => director(run, list, flags, next, props, day),
         STAFF_MESSAGE => message(run, list, flags, msg, table),
-        STAFF_SOUND => sound(run, list, flags),
-        STAFF_PACKAGE => package(run, list, flags, story),
+        STAFF_SOUND => sound(run, list, flags, props),
+        STAFF_PACKAGE => package(run, list, flags, story, next, props, msg, table, jpa, day),
         _ => {}
     }
+}
+
+/// `dEvDtStaff_c::specialProcLight` - `d_event_data.cpp:196-250`.
+///
+/// Both `CHANGE` arms end on `dComIfGp_evmng_cutEnd` whatever happened, so the cell is a one-tick
+/// write. `dKy_instant_timechg` re-derives the whole environment from the new time
+/// (`d_kankyo.cpp`), which `DayNight::set_time` stands in for; `dKy_set_nexttime` (`:221`) is the
+/// same store with a different reader in kankyo.
+///
+/// OMITTED: `dKy_instant_rainchg` (`:229`) - the port's `super::weather` carries a sky and cloud
+/// state with no instant-rain setter, so the request has no destination and is not invented into
+/// one.
+fn light(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    day: &mut super::daynight::DayNight,
+) {
+    const ACTIONS: [&str; 3] = ["WAIT", "CHANGE", "ADD_TIME"];
+    let action = act_index(run, list, &ACTIONS);
+    if run.advance > 0 {
+        match action {
+            1 => {
+                if let Some(hour) = list.cut_float(run.cut as usize, "Hour") {
+                    day.set_time(hour * DAYNIGHT_UNITS_PER_HOUR); // <- :222
+                }
+            }
+            2 => {
+                if let Some(hour) = list.cut_float(run.cut as usize, "Hour") {
+                    // `hour` here is a delta from the current time (`:239-243`).
+                    let now = day.time / DAYNIGHT_UNITS_PER_HOUR;
+                    let mut target = now + hour;
+                    while target >= 24.0 {
+                        target -= 24.0;
+                    }
+                    day.set_time(target * DAYNIGHT_UNITS_PER_HOUR);
+                }
+            }
+            _ => {}
+        }
+    }
+    cut_end(run, list, flags); // <- :249
 }
 
 fn timekeeper(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
@@ -3256,52 +3524,398 @@ fn timekeeper(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
     }
 }
 
-fn cut_target(run: &StaffRun, list: &EventList) -> Option<Target> {
-    let stage = list.cut_text(run.cut as usize, "Stage")?.to_owned();
-    let start = list.cut_number(run.cut as usize, "StartCode")?;
-    let start = u8::try_from(start).ok()?;
-    let room = match list.cut_number(run.cut as usize, "RoomNo") {
-        Some(room) => u8::try_from(room).ok()?,
+/// `dEvDt_Next_Stage` - `d_event_data.cpp:14-53`: `Stage`, `StartCode`, `RoomNo` (default 0),
+/// `Layer` (default -1), `Hour`, `Mode` (default 0) and `Wipe` (default: the caller's).
+///
+/// `Hour` is `dKy_set_nexttime(*pHour * 15.0f)` (`:45-46`), a pending store that the next stage
+/// mount consumes ([`DayNight::apply_stage_init`](super::daynight::DayNight::apply_stage_init)),
+/// and it is applied only inside the guard: a cut with no `Stage` or `StartCode` leaves the
+/// pending value alone, exactly as the reference's `else` does.
+///
+/// OMITTED: `Mode` is `dComIfGp_setNextStage`'s `i_lastMode`, which that function ORs two shield
+/// bits into (`d_com_inf_game.cpp:679-688`) and stores as the save's `mLastMode`
+/// (`:692`) - and `dComIfGp_getLastMode` (`d_com_inf_game.h:1437`) has no caller anywhere in the
+/// checkout, so the write has no reader to model. `Wipe` is the same call's `i_wipe`, which
+/// `dScnPly_Draw` turns into the scene overlap and the fade colour (`d_s_play.cpp:307-341`); the
+/// port's stage swap is immediate and has no overlap channel, so it is not carried. See
+/// [`NextStage::set`](super::transition::NextStage::set).
+///
+/// The return value is `FALSE` when `Stage` or `StartCode` is missing, which is the one branch
+/// `specialProcPackage` tests (`:821`).
+fn next_stage(
+    run: &StaffRun,
+    list: &EventList,
+    next: &mut NextStage,
+    day: &mut super::daynight::DayNight,
+) -> bool {
+    let cut = run.cut as usize;
+    let Some(stage) = list.cut_text(cut, "Stage") else {
+        return false;
+    };
+    let Some(start) = list
+        .cut_number(cut, "StartCode")
+        .and_then(|value| u8::try_from(value).ok())
+    else {
+        return false;
+    };
+    let room = match list.cut_number(cut, "RoomNo") {
+        Some(room) => u8::try_from(room).unwrap_or(0),
         None => 0,
     };
-    Some(Target { stage, room, start })
+    let layer = match list.cut_number(cut, "Layer") {
+        Some(layer) => layer as i8,
+        None => super::transition::LAYER_NONE,
+    };
+    if let Some(hour) = list.cut_float(cut, "Hour") {
+        day.set_next_time(hour * DAYNIGHT_UNITS_PER_HOUR); // <- :46
+    }
+    next.set(stage, room, start, layer);
+    true
 }
 
-fn director(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, next: &mut NextStage) {
+/// `dEvDtStaff_c::specialProcDirector` - `d_event_data.cpp:567-756`.
+///
+/// The action table is `WAIT, NEXT, FADE, BGM_START, VIBRATION, SE_START, WIPE, PLAYER_DRAW,
+/// PLAYER_NODRAW` (`:576-586`).
+///
+/// `FADE` reads a `Rate` and an optional four-byte `Color` (`:610-627`); a positive rate restarts
+/// the fade from transparent (`setFadeRate(0.0f)`, `:614`), a non-positive one starts from opaque,
+/// which is `mDoGph_gInf_c::fadeOut`'s own sign rule (`m_Do_graphic.cpp:158`). Its move arm ends
+/// the cut when the fade is gone or has reached full (`:718-729`).
+///
+/// OMITTED: `dComIfGp_getVibration().StartQuake`'s pattern is the raw bytes of the `Pattern` key
+/// (`:654`, a `const u8*` read off an integer pointer) and `dVibration_c`'s 32-entry spread is
+/// that pattern's own encoding; `super::vibration::start_quake_pattern` takes the bytes, so
+/// [`EventList::cut_bytes`] hands them over unchanged.
+fn director(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    next: &mut NextStage,
+    props: &mut Props<'_, '_, '_>,
+    day: &mut super::daynight::DayNight,
+) {
     let action = act_index(run, list, DIRECTOR_ACTIONS);
+    let cut = run.cut as usize;
     if run.advance > 0 {
         match action {
-            0 | 4 => wait_start(run, list),
+            0 => wait_start(run, list),
             1 => {
-                if let Some(target) = cut_target(run, list) {
-                    next.target = Some(target);
+                next_stage(run, list, next, day); // <- :606
+            }
+            2 => {
+                let rate = list.cut_float(cut, "Rate");
+                if let Some(rate) = rate {
+                    if rate > 0.0 {
+                        props.fade.set_rate(0.0); // <- :614
+                    }
+                    match list.cut_bytes(cut, "Color") {
+                        Some(bytes) if bytes.len() >= 4 => {
+                            props
+                                .fade
+                                .fade_out(rate, [bytes[0], bytes[1], bytes[2], bytes[3]]);
+                        }
+                        _ => props.fade.fade_out(rate, super::fade::CLEAR_COLOR), // <- :625 fadeOut(rate)
+                    }
+                }
+                // A missing `Rate` is the reference's `JUT_ASSERT(0x343, rate)` followed by a
+                // dereference; the port leaves the fade alone and lets the move arm decide.
+            }
+            3 => {
+                let bgm = list
+                    .cut_number(cut, "BGM_ID")
+                    .and_then(|id| usize::try_from(id).ok())
+                    .and_then(|index| DIRECTOR_BGM_TABLE.get(index).copied())
+                    .unwrap_or(DIRECTOR_BGM_TABLE[0]); // <- :639-645, `bgm = 0` default
+                props.events.list.push(SimEvent::Bgm(bgm));
+            }
+            4 => {
+                wait_start(run, list);
+                let at = Vec3::new(0.0, 1.0, 0.0);
+                let bytes = list.cut_bytes(cut, "Pattern").unwrap_or_default();
+                let flags = list.cut_number(cut, "Type").unwrap_or(0);
+                props.vibration.start_quake_pattern(&bytes, 0, flags, at); // <- :666
+            }
+            5 => {
+                if let Some(se) = list
+                    .cut_number(cut, "SENUM")
+                    .and_then(|id| usize::try_from(id).ok())
+                    .and_then(|index| DIRECTOR_SE_TABLE.get(index).copied())
+                {
+                    props.events.list.push(SimEvent::Se(se)); // <- :679
                 }
             }
             6 => {
-                run.wipe = if list
-                    .cut_float(run.cut as usize, "Rate")
-                    .is_some_and(|rate| rate > 0.0)
-                {
-                    0
-                } else {
-                    1
+                let rate = list.cut_float(cut, "Rate").unwrap_or_default();
+                props.wipe.wipe_out_default(rate); // <- :688 dDlst_list_c::wipeOut(*rate)
+                run.wipe = if rate > 0.0 { 0 } else { 1 };
+                if list.cut_number(cut, "SOUND") == Some(0) {
+                    props.events.list.push(SimEvent::Se(WIPE_SOUND)); // <- :697
+                }
+            }
+            7 => player_draw(props, false), // <- :704 offPlayerNoDraw
+            8 => player_draw(props, true),  // <- :707 onPlayerNoDraw
+            _ => {}
+        }
+    }
+    match action {
+        0 => wait_proc(run, list, flags),
+        1 => {} // <- :716-717, NEXT waits for nothing
+        2 => {
+            if !props.fade.is_fade() {
+                cut_end(run, list, flags); // <- :720-721
+            } else if props.fade.rate() >= 1.0
+                && list.cut_float(cut, "Rate").is_some_and(|rate| rate > 0.0)
+            {
+                cut_end(run, list, flags); // <- :722-727
+            }
+        }
+        4 => {
+            if run.timer > 0 {
+                run.timer -= 1;
+                if run.timer == 0 {
+                    props.vibration.stop_quake(-1); // <- :734-735
+                }
+            } else {
+                cut_end(run, list, flags); // <- :737
+            }
+        }
+        6 => {
+            if run.wipe != 0 {
+                if props.wipe.rate() == 0.0 {
+                    cut_end(run, list, flags); // <- :744-745
+                }
+            } else if props.wipe.rate() >= 1.0 {
+                cut_end(run, list, flags); // <- :747-748
+            }
+        }
+        _ => cut_end(run, list, flags),
+    }
+}
+
+/// `player->offPlayerNoDraw()` / `onPlayerNoDraw()` - `d_event_data.cpp:704-708`. The Flag itself
+/// is `daPy_py_c`'s (`d_a_player.h:540-541`), which the port's [`Player::no_draw`] carries.
+fn player_draw(props: &mut Props<'_, '_, '_>, hidden: bool) {
+    if let Some((_, mut player)) = props.players.iter_mut().next() {
+        player.no_draw = hidden;
+    }
+}
+
+/// `dEvDtStaff_c::specialProcSound` - `d_event_data.cpp:394-487`.
+///
+/// The action table is `WAIT, STRM_PLAY, STRM_DEMO_MJ_SISTER, STRM_DEMO_GO_MAJU, NOMSG_WAIT,
+/// RIDDLE, LANDING_DEMO, BGMSTOP` (`:402-421`). The two `NOMSG_WAIT` cells are a plain timer
+/// (`specialProc_WaitStart`), and the move arm holds the cut until the demo's own frame counter has
+/// passed that timer, which is the one place the demo layer's `getFrameNoMsg` is read
+/// (`:479-482`).
+///
+/// OMITTED, all in the same audio system the port has no channel for beyond `SimEvent::Bgm`/`Se`:
+/// `mDoAud_bgmStreamPlay()` (`:430`) starts whatever stream was prepared and carries no id at all;
+/// `mDoAud_prepareLandingDemo`/`startLandingDemo`/`endLandingDemo` (`:453-462`) drive the
+/// landing-demo BGM off `d_a_sea`'s table; and `mDoAud_bgmStop(timer)`'s `Timer` is a frame count
+/// `SimEvent::Bgm`'s single number cannot carry, so the stop goes out as the port's own
+/// `Bgm(0)`.
+fn sound(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    props: &mut Props<'_, '_, '_>,
+) {
+    let action = act_index(run, list, SOUND_ACTIONS);
+    if run.advance > 0 {
+        match action {
+            0 | 4 => wait_start(run, list), // <- :427-428, :439
+            1 => {}
+            2 => props.events.list.push(SimEvent::Bgm(STREAM_MJ_SISTER)), // <- :433
+            3 => props.events.list.push(SimEvent::Bgm(STREAM_GO_MAJU)),   // <- :436
+            5 => props.events.list.push(SimEvent::Se(RIDDLE_SE)),         // <- :442
+            6 => {}
+            7 => props.events.list.push(SimEvent::Bgm(BGM_STOP)), // <- :469
+            _ => {}
+        }
+    }
+    match action {
+        0 => wait_proc(run, list, flags),
+        4 => {
+            if i32::from(run.timer) <= props.demo.frame_no_msg() {
+                cut_end(run, list, flags); // <- :479-482
+            }
+        }
+        1 | 2 | 3 | 5 | 6 | 7 => cut_end(run, list, flags), // <- :483-485 default
+        _ => cut_end(run, list, flags),
+    }
+}
+
+/// `dEvDtStaff_c::specialProcPackage` - `d_event_data.cpp:758-839`.
+///
+/// The action table is `WAIT, PLAY, PLAY2` (`:766-776`). On `PLAY`/`PLAY2`'s advance the cut names
+/// its file with `FileName`, offsets it with `OffsetPos`/`OffsetAngY`, mounts it with
+/// `dComIfGp_demo_create`, raises the cull ratio and sets the cut's `EventFlag` (`:783-808`). The
+/// file itself is looked up twice, room's demo archive first and the stage archive second
+/// (`:796-802`).
+///
+/// The move arm's `PLAY` cell polls `dComIfGp_demo_mode()`: `2` means the timeline ran out, so the
+/// cut hands the stage change to a `Wipe` of 5 or drops the demo when the cut names no `Stage`
+/// (`:819-826`); `0` means the demo is not running at all, so the cut ends (`:828-830`). `PLAY2`
+/// has no cell in either switch, so it holds the cut without polling - the demo itself is what
+/// drives that variant on. `-1` (a cut name outside the table, or none) ends the cut (`:834-837`).
+fn package(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    story: &mut StoryBits,
+    next: &mut NextStage,
+    props: &mut Props<'_, '_, '_>,
+    msg: &mut MsgBox,
+    table: &MsgTable,
+    jpa: &mut super::jpa::Jpa,
+    day: &mut super::daynight::DayNight,
+) {
+    let action = act_index(run, list, PACKAGE_ACTIONS);
+    let cut = run.cut as usize;
+    if run.advance > 0 {
+        match action {
+            0 => wait_start(run, list),
+            1 | 2 => {
+                let file_name = list.cut_text(cut, "FileName").map(str::to_owned);
+                let offset = {
+                    let pos = list.cut_vec(cut, "OffsetPos");
+                    let angle = list.cut_float(cut, "OffsetAngY").unwrap_or(0.0);
+                    pos.map(|pos| (pos, angle))
                 };
+                match file_name {
+                    Some(name) => {
+                        // `demo_data` is the room's demo archive first and the stage archive
+                        // second (`d_event_data.cpp:796-802`), the same two-leg lookup the
+                        // reference makes before it asserts the pointer (`:802`).
+                        let data = props
+                            .room_demo
+                            .data(&name)
+                            .or_else(|| crate::assets::load_demo_data(props.stage, &name));
+                        match data {
+                            Some(bytes) => {
+                                let file = DemoFile { name, bytes };
+                                match props.demo.create(file, offset, props.readers) {
+                                    // `create` runs `mControl->forward(0)` itself (`d_demo.cpp:730`);
+                                    // the reader has no stage while parsing, so the mount site is
+                                    // where the zero step runs here. A lookup the timeline cannot
+                                    // resolve fails that step, which is retail's failed `create`.
+                                    Ok(()) => {
+                                        if let Err(gap) = props.demo.start(
+                                            props.actors,
+                                            props.table,
+                                            props.stay,
+                                            props.creates,
+                                            props.events,
+                                            msg,
+                                            table,
+                                            jpa,
+                                        ) {
+                                            log::warn!("clearsleeper: demo mount failed ({gap})");
+                                        }
+                                    }
+                                    Err(gap) => {
+                                        log::warn!("clearsleeper: demo mount failed ({gap})");
+                                    }
+                                }
+                                // `dComIfGp_event_setCullRate(10.0f)` - `:804` - is carried by
+                                // `DEMO_CULL_RATE` and read by the shell's cull pass; the sim has
+                                // no cull ratio of its own.
+                            }
+                            None => props
+                                .demo
+                                .mount_failed(name.clone(), DemoGap::NoDemoData { name }),
+                        }
+                    }
+                    None => props.demo.mount_failed(String::new(), DemoGap::NoFileName),
+                }
+                // `dComIfGs_onEventBit(*eventFlag)` - `:805-807`.
+                if let Some(bit) = list
+                    .cut_number(cut, "EventFlag")
+                    .and_then(|bit| u16::try_from(bit).ok())
+                {
+                    story.set(bit);
+                }
             }
             _ => {}
         }
     }
     match action {
         0 => wait_proc(run, list, flags),
-        1 => {}
-        2 => cut_end(run, list, flags),
-        4 => wait_proc(run, list, flags),
-        6 => {
+        1 => {
             if run.wipe != 0 {
-                cut_end(run, list, flags);
+                return;
+            }
+            if props.demo.mode() == demo::MODE_END {
+                // `dEvDt_Next_Stage(staffIdx, 5)` - `:821` - or `dComIfGp_demo_remove()` - `:824`.
+                if next_stage(run, list, next, day) {
+                    run.wipe = 1;
+                } else {
+                    props.demo.remove(props.actors);
+                }
+            }
+            if props.demo.mode() == demo::MODE_NONE {
+                cut_end(run, list, flags); // <- :828-830
             }
         }
-        _ => cut_end(run, list, flags),
+        2 => {}
+        _ => cut_end(run, list, flags), // <- :834-837
     }
+}
+
+/// `dEvDtStaff_c::specialProcCreate` - `d_event_data.cpp:490-565`, run by `specialProc`'s
+/// `CREATE_e` arm right before it ends the cut (`:154-157`).
+///
+/// `MAKECAST` names the actor in the stage name table (`dStage_searchName`, `:516`), `ARG` is its
+/// parameter (`:519-525`), `POS` its position with the player's own as the default (`:527-533`),
+/// `ANGLE` its three angles (`:535-550`) and `SCALE` a triple that defaults to one (`:552-558`).
+/// The spawn itself is `fopAcM_create` (`:560`), which needs the port's name-keyed spawn branch
+/// and so goes through [`DemoCreates`].
+fn create(run: &mut StaffRun, list: &EventList, props: &mut Props<'_, '_, '_>) {
+    let action = act_index(run, list, CREATE_ACTIONS);
+    if run.advance <= 0 || action != 1 {
+        return;
+    }
+    let cut = run.cut as usize;
+    let Some(name) = list.cut_text(cut, "MAKECAST") else {
+        return;
+    };
+    let Some(table) = props.table else {
+        return;
+    };
+    let Some(row) = table.record_for_name(name) else {
+        return;
+    };
+    let parameters = match list.cut_number(cut, "ARG") {
+        Some(arg) => arg as u32,
+        None => 0xFFFF_FFFF,
+    };
+    let pos = list
+        .cut_vec(cut, "POS")
+        .or_else(|| {
+            props
+                .players
+                .iter_mut()
+                .next()
+                .map(|(_, player)| player.pos)
+        })
+        .unwrap_or(Vec3::ZERO);
+    let angle = match list.cut_ints(cut, "ANGLE") {
+        Some(values) if values.len() >= 3 => [values[0] as i16, values[1] as i16, values[2] as i16],
+        _ => [0; 3],
+    };
+    let scale = list.cut_vec(cut, "SCALE").unwrap_or(Vec3::ONE);
+    props.creates.list.push(DemoCreate {
+        name: name.to_owned(),
+        parameters,
+        pos,
+        angle,
+        scale,
+        room: props.stay,
+        set_id: u16::MAX,
+        argument: row.argument,
+        demo_actor_id: None,
+    });
 }
 
 fn message(
@@ -3366,46 +3980,11 @@ fn message(
         }
         4 => cut_end(run, list, flags),
         5 => {
-            if run.msg_bound
-                && matches!(msg.status(), MSG_BOX_CLOSING | MSG_BOX_CLOSED)
-            {
+            if run.msg_bound && matches!(msg.status(), MSG_BOX_CLOSING | MSG_BOX_CLOSED) {
                 cut_end(run, list, flags);
             }
         }
         8 => cut_end(run, list, flags),
-        _ => cut_end(run, list, flags),
-    }
-}
-
-fn sound(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
-    let action = act_index(run, list, SOUND_ACTIONS);
-    if run.advance > 0 && (action == 0 || action == 4) {
-        wait_start(run, list);
-    }
-    match action {
-        0 => wait_proc(run, list, flags),
-        4 => {}
-        _ => cut_end(run, list, flags),
-    }
-}
-
-fn package(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags, story: &mut StoryBits) {
-    let action = act_index(run, list, PACKAGE_ACTIONS);
-    if run.advance > 0 {
-        match action {
-            0 => wait_start(run, list),
-            1 | 2 => {
-                if let Some(bit) = list.cut_number(run.cut as usize, "EventFlag") {
-                    story.set(bit as u16);
-                }
-            }
-            _ => {}
-        }
-    }
-    match action {
-        0 => wait_proc(run, list, flags),
-        1 => cut_end(run, list, flags),
-        2 => {}
         _ => cut_end(run, list, flags),
     }
 }

@@ -30,14 +30,14 @@ const SPIN_CHASE: i16 = 100; // <- d_a_fan.cpp:217, :221, :224
 /// `m_cull_max[mType]` by the explicit `fopAcM_setCullSizeBox` at `:113`, so the box is real and
 /// per-type.
 const CULL_MIN: [[f32; 3]; 3] = [
-    [-200.0, -200.0, -50.0],  // <- d_a_fan.cpp:26 (m_cull_min[0])
-    [-200.0, -200.0, -50.0],  // <- d_a_fan.cpp:26 (m_cull_min[1])
-    [-600.0, -600.0, -50.0],  // <- d_a_fan.cpp:26 (m_cull_min[2])
+    [-200.0, -200.0, -50.0], // <- d_a_fan.cpp:26 (m_cull_min[0])
+    [-200.0, -200.0, -50.0], // <- d_a_fan.cpp:26 (m_cull_min[1])
+    [-600.0, -600.0, -50.0], // <- d_a_fan.cpp:26 (m_cull_min[2])
 ]; // <- d_a_fan.cpp:26
 const CULL_MAX: [[f32; 3]; 3] = [
-    [200.0, 200.0, 1600.0],  // <- d_a_fan.cpp:27 (m_cull_max[0])
-    [200.0, 200.0, 1600.0],  // <- d_a_fan.cpp:27 (m_cull_max[1])
-    [600.0, 600.0, 3500.0],  // <- d_a_fan.cpp:27 (m_cull_max[2])
+    [200.0, 200.0, 1600.0], // <- d_a_fan.cpp:27 (m_cull_max[0])
+    [200.0, 200.0, 1600.0], // <- d_a_fan.cpp:27 (m_cull_max[1])
+    [600.0, 600.0, 3500.0], // <- d_a_fan.cpp:27 (m_cull_max[2])
 ]; // <- d_a_fan.cpp:27
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]

@@ -539,10 +539,7 @@ pub fn render(
                 0xFFFF_FFFF,
                 false,
             );
-            print.set_font_size(
-                layout.font_size_x as f32,
-                layout.font_size_y as f32,
-            );
+            print.set_font_size(layout.font_size_x as f32, layout.font_size_y as f32);
             print.locate(0.0, layout.bounds.h);
             let text_layout = print.print_return(
                 fonts,
@@ -570,12 +567,15 @@ pub fn render(
         }
         draw_image(canvas, name, &bounds, pane.alpha);
         if *name == "mak1" || *name == "mak2" {
-            canvas.fill_rect(bounds, [
-                BLACK[0],
-                BLACK[1],
-                BLACK[2],
-                (255.0 * pane.alpha.clamp(0.0, 1.0)) as u8,
-            ]);
+            canvas.fill_rect(
+                bounds,
+                [
+                    BLACK[0],
+                    BLACK[1],
+                    BLACK[2],
+                    (255.0 * pane.alpha.clamp(0.0, 1.0)) as u8,
+                ],
+            );
         }
     }
 }

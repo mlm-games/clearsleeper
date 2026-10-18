@@ -305,12 +305,7 @@ impl Kn {
             }
         }
         if self.mode >= MODE_WANDER && self.mode < MODE_FLEE {
-            stream::add_calc_angle_s2(
-                &mut actor.angle[1],
-                self.goal,
-                TURN_SCALE,
-                self.turn_step,
-            );
+            stream::add_calc_angle_s2(&mut actor.angle[1], self.goal, TURN_SCALE, self.turn_step);
             add_calc2(&mut self.speed_f, self.speed_target, SPEED_SCALE, SPEED_MAX);
         }
     }

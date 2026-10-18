@@ -4,6 +4,7 @@ use crate::j2d::{self, Kind, Screen};
 use crate::sim::flags::{Charts, Collect, StoryBits};
 use crate::sim::health::Health;
 use crate::sim::inventory::Equipped;
+use crate::sim::snap::SnapPacket;
 use crate::text::font::FontBank;
 use crate::text::msgdata::MsgLenState;
 use crate::text::msgget::{ItemMsgGet, MsgArchive};
@@ -4293,8 +4294,8 @@ impl CollectScreen {
                 }
                 let slot = self.icon_slot as usize;
                 self.panes[P_FT0 + slot].pos_center.x = self.note_proc.icon_pos_x[index] as f32;
-                self.panes[P_FT0 + slot].pos_center.y =
-                    half_line * ((unused as f32) + (self.note_proc.icon_pos_y[index as usize] as f32) * 2.0);
+                self.panes[P_FT0 + slot].pos_center.y = half_line
+                    * ((unused as f32) + (self.note_proc.icon_pos_y[index as usize] as f32) * 2.0);
                 self.select_flag = 1;
             } else if icon_no == 0x15 {
                 if self.select_flag == 0 {
@@ -5076,6 +5077,13 @@ impl CollectScreen {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// One picture slot's `card_pictdata` (`d_picture_box.cpp`'s `pict` records): the captured
+/// texture, the judged figure and its detail bits, and the checksum the slot save carries.
+/// `snap_result`/`snap_result_detail` are written from `dSnap_GetResult`/
+/// `dSnap_GetResultDetail` at `d_picture_box.cpp:616-617` - the shell fills
+/// [`AlbumInput::capture_from`] from the snapshot packet for that - and the pair is stored
+/// here by [`AlbumBox::select_mode`] before [`AlbumBox::change_data`] hands the records to the
+/// save.
 pub struct PhotoRecord {
     pub tex_buffer: Vec<u8>,
     pub snap_result: u32,
@@ -5276,6 +5284,16 @@ impl AlbumInput {
     pub fn camera_on_button(&self, button: u8) -> bool {
         button < 3 && self.camera_slot_item == ITEM_SLOT_CAMERA
     }
+
+    /// `pict->snap_result = dSnap_GetResult(); pict->snap_result_detail =
+    /// dSnap_GetResultDetail();` (`d_picture_box.cpp:616-617`): the judged figure the snapshot
+    /// packet holds, which [`AlbumBox::select_mode`] stores in the picture slot
+    /// ([`PhotoRecord::snap_result`]) and `change_data` hands to the save. Retail stores the
+    /// result whatever it is, `0` included, so this does too.
+    pub fn capture_from(&mut self, snap: &SnapPacket) {
+        self.capture_result = u32::try_from(snap.result()).unwrap_or(0);
+        self.capture_result_detail = snap.result_detail();
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5289,6 +5307,9 @@ pub struct AlbumOutput {
     pub capture_step: Option<i32>,
     pub capture_format: Option<u8>,
     pub capture_cansel: bool,
+    /// `dSnap_ReleaseShutter()` (`d_picture_box.cpp:673`): the shell arms
+    /// `sim::snap::SnapPacket` with this when the shutter fires.
+    pub release_shutter: bool,
     pub telescope_pitch: Option<i32>,
     pub picture_status: Option<u8>,
     pub select_picture: Option<u8>,
@@ -5808,6 +5829,10 @@ impl AlbumBox {
                 };
                 out.capture_format = Some(self.capture_format);
                 out.capture_step = Some(1);
+                // `dSnap_ReleaseShutter()` (`d_picture_box.cpp:673`): the one place the
+                // picture box arms the snapshot packet, in the same A-press arm as the
+                // capture step.
+                out.release_shutter = true;
                 out.scope_status = Some(STATUS_STOP);
                 self.shutter_show();
                 out.sound(SE_SHUTTER);

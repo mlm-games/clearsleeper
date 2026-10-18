@@ -4,21 +4,18 @@ use super::{
     CTRL_MAIN_STICK, CTRL_MAIN_STICK_DOWN, CTRL_MAIN_STICK_LEFT, CTRL_MAIN_STICK_LEFT_RIGHT,
     CTRL_MAIN_STICK_RIGHT, CTRL_MAIN_STICK_UP, CTRL_MAIN_STICK_UP_DOWN, CTRL_MUSIC_NOTE,
     CTRL_PLAYER_NAME, CTRL_R_BUTTON, CTRL_SELECT_THREE, CTRL_SELECT_TWO, CTRL_SELECT_YOKO_LEFT,
-    CTRL_SELECT_YOKO_RIGHT, CTRL_STARBURST, CTRL_UNK20, CTRL_UNK21, CTRL_UNK22, CTRL_UNK23,
-    CTRL_UNK24, CTRL_UNK25, CTRL_UNK26, CTRL_UNK28, CTRL_UNK29, CTRL_UNK2B, CTRL_UNK2C, CTRL_UNK2D,
-    CTRL_UNK2E, CTRL_UNK2F, CTRL_UNK30, CTRL_UNK31, CTRL_UNK32, CTRL_UNK33, CTRL_UNK34, CTRL_UNK35,
-    CTRL_UNK36, CTRL_UNK37, CTRL_UNK38, CTRL_UNK3B, CTRL_UNK3C, CTRL_UNK3D, CTRL_UNK3E, CTRL_UNK3F,
-    CTRL_UNK40, CTRL_UNK41, CTRL_UNK42, CTRL_UNK43, CTRL_UNK44, CTRL_UNK45, CTRL_UNK46, CTRL_UNK47,
-    CTRL_UNK48, CTRL_UNK49, CTRL_UNK4A, CTRL_X_BUTTON, CTRL_Y_BUTTON, CTRL_Z_BUTTON, FontSlot,
+    CTRL_SELECT_YOKO_RIGHT, CTRL_STARBURST, CTRL_UNK2B, CTRL_UNK2C, CTRL_UNK2D, CTRL_UNK2E,
+    CTRL_UNK2F, CTRL_UNK3B, CTRL_UNK3C, CTRL_UNK3D, CTRL_UNK3E, CTRL_UNK3F, CTRL_UNK4A, CTRL_UNK20,
+    CTRL_UNK21, CTRL_UNK22, CTRL_UNK23, CTRL_UNK24, CTRL_UNK25, CTRL_UNK26, CTRL_UNK28, CTRL_UNK29,
+    CTRL_UNK30, CTRL_UNK31, CTRL_UNK32, CTRL_UNK33, CTRL_UNK34, CTRL_UNK35, CTRL_UNK36, CTRL_UNK37,
+    CTRL_UNK38, CTRL_UNK40, CTRL_UNK41, CTRL_UNK42, CTRL_UNK43, CTRL_UNK44, CTRL_UNK45, CTRL_UNK46,
+    CTRL_UNK47, CTRL_UNK48, CTRL_UNK49, CTRL_X_BUTTON, CTRL_Y_BUTTON, CTRL_Z_BUTTON, FontSlot,
     ICON_NONE, ICON_SLOTS, MsgData, SPCL_UNK1,
 };
-
 
 const PLAYER_NAME_PLURAL_MSG_NO: [u16; 6] = [0x33B, 0xC8B, 0x1D21, 0x31D7, 0x37DD, 0x37DE];
 
 const ARROW_ANIME_WRAP: i32 = 45;
-
-
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MsgLenState<'a> {
@@ -52,7 +49,8 @@ pub struct MsgStickFlags {
 }
 
 impl MsgStickFlags {
-    pub const WAIT_PARM: (i32, i32, i32, i32, f32, f32, i32, i32) = (5, 2, 3, 2, 0.9, 0.5, 0, 0x2000);
+    pub const WAIT_PARM: (i32, i32, i32, i32, f32, f32, i32, i32) =
+        (5, 2, 3, 2, 0.9, 0.5, 0, 0x2000);
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -161,7 +159,13 @@ impl MsgData {
         self.field_0x296 = 0;
     }
 
-    pub fn char_length<F: FontSlot + ?Sized>(&self, font: &F, scale: i32, code: u16, spaced: bool) -> f32 {
+    pub fn char_length<F: FontSlot + ?Sized>(
+        &self,
+        font: &F,
+        scale: i32,
+        code: u16,
+        spaced: bool,
+    ) -> f32 {
         let char_width = font.char_width(self.font, code) as f32;
         let cell_width = scale as f32 / font.metrics(self.font).cell_width as f32;
         let width = char_width * cell_width;
@@ -219,8 +223,13 @@ impl MsgData {
                         scale = (ratio * self.font_size as f32 + 0.5f32) as i32;
                     }
                     CTRL_PLAYER_NAME if ctrl => {
-                        let mut name: Vec<u8> =
-                            state.player_name.as_bytes().iter().copied().take(19).collect();
+                        let mut name: Vec<u8> = state
+                            .player_name
+                            .as_bytes()
+                            .iter()
+                            .copied()
+                            .take(19)
+                            .collect();
                         if state.pal_language == 1
                             && PLAYER_NAME_PLURAL_MSG_NO.contains(&self.entry.msg_no)
                         {
@@ -703,29 +712,53 @@ impl MsgData {
                         msg_store(&mut sp18, sp14, r.line_width);
                     }
                     CTRL_UNK3E if ctrl => {
-                        let r =
-                            self.tag_len_stock_bokobaba(font, state.buy_item, sp10, sp0c, scale, sp14);
+                        let r = self.tag_len_stock_bokobaba(
+                            font,
+                            state.buy_item,
+                            sp10,
+                            sp0c,
+                            scale,
+                            sp14,
+                        );
                         sp10 = r.len;
                         sp0c = r.width;
                         msg_store(&mut sp18, sp14, r.line_width);
                     }
                     CTRL_UNK3F if ctrl => {
-                        let r =
-                            self.tag_len_stock_dokuro(font, state.buy_item, sp10, sp0c, scale, sp14);
+                        let r = self.tag_len_stock_dokuro(
+                            font,
+                            state.buy_item,
+                            sp10,
+                            sp0c,
+                            scale,
+                            sp14,
+                        );
                         sp10 = r.len;
                         sp0c = r.width;
                         msg_store(&mut sp18, sp14, r.line_width);
                     }
                     CTRL_UNK40 if ctrl => {
-                        let r =
-                            self.tag_len_stock_chuchu(font, state.buy_item, sp10, sp0c, scale, sp14);
+                        let r = self.tag_len_stock_chuchu(
+                            font,
+                            state.buy_item,
+                            sp10,
+                            sp0c,
+                            scale,
+                            sp14,
+                        );
                         sp10 = r.len;
                         sp0c = r.width;
                         msg_store(&mut sp18, sp14, r.line_width);
                     }
                     CTRL_UNK41 if ctrl => {
-                        let r =
-                            self.tag_len_stock_pendant(font, state.buy_item, sp10, sp0c, scale, sp14);
+                        let r = self.tag_len_stock_pendant(
+                            font,
+                            state.buy_item,
+                            sp10,
+                            sp0c,
+                            scale,
+                            sp14,
+                        );
                         sp10 = r.len;
                         sp0c = r.width;
                         msg_store(&mut sp18, sp14, r.line_width);
@@ -738,8 +771,14 @@ impl MsgData {
                         msg_store(&mut sp18, sp14, r.line_width);
                     }
                     CTRL_UNK43 if ctrl => {
-                        let r =
-                            self.tag_len_stock_kenshi(font, state.buy_item, sp10, sp0c, scale, sp14);
+                        let r = self.tag_len_stock_kenshi(
+                            font,
+                            state.buy_item,
+                            sp10,
+                            sp0c,
+                            scale,
+                            sp14,
+                        );
                         sp10 = r.len;
                         sp0c = r.width;
                         msg_store(&mut sp18, sp14, r.line_width);
@@ -862,8 +901,7 @@ impl MsgData {
                     let byte0 = msg_at(&self.bmg, pos);
                     let hi_nibble = byte0 >> 4;
                     let (code, narrow) = if hi_nibble == 8 || hi_nibble == 9 {
-                        let mut code =
-                            ((byte0 as i32) << 8) | (msg_at(&self.bmg, pos + 1) as i32);
+                        let mut code = ((byte0 as i32) << 8) | (msg_at(&self.bmg, pos + 1) as i32);
                         if state.clear_count == 0 && self.entry.textbox_type == 0xC {
                             for entry_pair in super::ZFONT.iter() {
                                 if entry_pair[0] == code as u16 {
@@ -1033,7 +1071,11 @@ impl MsgData {
 
     pub fn arrow_anime(&mut self) {
         let timer = self.field_0x260 as i32 + 1;
-        self.field_0x260 = if timer >= ARROW_ANIME_WRAP { 0 } else { timer as i16 };
+        self.field_0x260 = if timer >= ARROW_ANIME_WRAP {
+            0
+        } else {
+            timer as i16
+        };
     }
 
     pub fn select_check2(
@@ -1213,7 +1255,10 @@ impl MsgData {
             }
         }
 
-        MsgNumInput { index: self.field_0x27d, number: value }
+        MsgNumInput {
+            index: self.field_0x27d,
+            number: value,
+        }
     }
 
     pub fn select_arrow(&mut self, _x: f32, _y: f32, _width: f32, _height: f32) {

@@ -92,7 +92,10 @@ fn read_u64(data: &[u8], at: usize) -> Option<u64> {
 }
 
 fn read_name(bytes: &[u8; NAME_SIZE]) -> &str {
-    let end = bytes.iter().position(|byte| *byte == 0).unwrap_or(NAME_SIZE);
+    let end = bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(NAME_SIZE);
     core::str::from_utf8(&bytes[..end]).unwrap_or("")
 }
 
@@ -128,7 +131,10 @@ fn parse_sector<T>(
         Err(_) => return Vec::new(),
     };
     let start = top as usize;
-    let end = match count.checked_mul(size).and_then(|bytes| start.checked_add(bytes)) {
+    let end = match count
+        .checked_mul(size)
+        .and_then(|bytes| start.checked_add(bytes))
+    {
         Some(value) => value,
         None => return Vec::new(),
     };
@@ -550,10 +556,34 @@ impl EventManager {
         let Some(header) = BinaryHeader::parse(data) else {
             return;
         };
-        self.events = parse_sector(data, header.event_top, header.event_num, EVENT_SIZE, EventRecord::parse);
-        self.staffs = parse_sector(data, header.staff_top, header.staff_num, STAFF_SIZE, StaffRecord::parse);
-        self.cuts = parse_sector(data, header.cut_top, header.cut_num, CUT_SIZE, CutRecord::parse);
-        self.data = parse_sector(data, header.data_top, header.data_num, DATA_SIZE, DataRecord::parse);
+        self.events = parse_sector(
+            data,
+            header.event_top,
+            header.event_num,
+            EVENT_SIZE,
+            EventRecord::parse,
+        );
+        self.staffs = parse_sector(
+            data,
+            header.staff_top,
+            header.staff_num,
+            STAFF_SIZE,
+            StaffRecord::parse,
+        );
+        self.cuts = parse_sector(
+            data,
+            header.cut_top,
+            header.cut_num,
+            CUT_SIZE,
+            CutRecord::parse,
+        );
+        self.data = parse_sector(
+            data,
+            header.data_top,
+            header.data_num,
+            DATA_SIZE,
+            DataRecord::parse,
+        );
         self.floats = parse_floats(data, header.f_data_top, header.f_data_num);
         self.ints = parse_ints(data, header.i_data_top, header.i_data_num);
         self.text = parse_bytes(data, header.s_data_top, header.s_data_num);
@@ -689,7 +719,8 @@ impl EventManager {
     }
 
     pub fn get_event_end_sound(&self, event_idx: i32) -> u8 {
-        self.event_data(event_idx).map_or(0, |event| event.end_sound)
+        self.event_data(event_idx)
+            .map_or(0, |event| event.end_sound)
     }
 
     pub fn close_proc(&mut self, event_idx: i32) {
@@ -953,9 +984,7 @@ impl EventManager {
             }
         }
         for event in self.events.iter() {
-            if event.state != STATE_PLAY
-                && event.state != STATE_CLOSE
-                && event.state != STATE_UNK3
+            if event.state != STATE_PLAY && event.state != STATE_CLOSE && event.state != STATE_UNK3
             {
                 continue;
             }
@@ -966,10 +995,7 @@ impl EventManager {
                 let Some(staff) = self.staff_at(staff_idx as i32) else {
                     continue;
                 };
-                if staff.staff_type != STAFF_ALL
-                    && staff.name() == name
-                    && staff.tag_id == tag_id
-                {
+                if staff.staff_type != STAFF_ALL && staff.name() == name && staff.tag_id == tag_id {
                     return staff_idx as i32;
                 }
             }
@@ -978,7 +1004,8 @@ impl EventManager {
     }
 
     pub fn get_is_advance(&self, staff_idx: i32) -> bool {
-        self.staff_at(staff_idx).is_some_and(|staff| staff.advance != 0)
+        self.staff_at(staff_idx)
+            .is_some_and(|staff| staff.advance != 0)
     }
 
     pub fn get_my_now_cut_name(&self, staff_idx: i32) -> Option<&str> {
@@ -1240,7 +1267,10 @@ impl EventManager {
 }
 
 fn read_bytes(bytes: &[u8]) -> &str {
-    let end = bytes.iter().position(|byte| *byte == 0).unwrap_or(bytes.len());
+    let end = bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(bytes.len());
     core::str::from_utf8(&bytes[..end]).unwrap_or("")
 }
 

@@ -5,7 +5,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
 use super::events::{SimEvent, SimEvents};
-use super::flags::{Collect, EventFlags, StoryBits, SYMBOL_DIN};
+use super::flags::{Collect, EventFlags, SYMBOL_DIN, StoryBits};
 use super::intent::{DoIntent, MoveIntent};
 use super::player::Player;
 use super::stream::{add_calc_angle_s2, cos_s};
@@ -92,9 +92,7 @@ const ANM_PLAY_MODE: [u8; ANM_COUNT] = [
     EMODE_LOOP, EMODE_LOOP, EMODE_LOOP, EMODE_LOOP, EMODE_NONE, EMODE_LOOP, EMODE_LOOP, EMODE_LOOP,
     EMODE_NONE, EMODE_LOOP, EMODE_NONE,
 ];
-const ANM_PLAY_SPEED: [f32; ANM_COUNT] = [
-    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-];
+const ANM_PLAY_SPEED: [f32; ANM_COUNT] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
 const ANM_MORF_FRAME: f32 = 8.0;
 const ANM_FRAME_MAX: [f32; ANM_COUNT] = [
     40.0, 40.0, 40.0, 40.0, 34.0, 45.0, 45.0, 40.0, 74.0, 40.0, 49.0,
@@ -414,7 +412,11 @@ fn target_angle_y(lhs: Vec3, rhs: Vec3) -> i16 {
 
 fn target_angle_x(lhs: Vec3, rhs: Vec3) -> i16 {
     let delta = rhs - lhs;
-    to_s16(delta.y.atan2((delta.x * delta.x + delta.z * delta.z).sqrt()))
+    to_s16(
+        delta
+            .y
+            .atan2((delta.x * delta.x + delta.z * delta.z).sqrt()),
+    )
 }
 
 fn distance_angle_s(x: i16, y: i16) -> i32 {
@@ -925,7 +927,12 @@ impl Mail {
     fn end(&mut self) {
         if self.field_55 == self.field_54 {
             add_calc_angle_s2(&mut self.field_48[1], 0, MAIL_APPEAR_SPEED, MAIL_APPEAR_MAX);
-            add_calc_pos2(&mut self.field_3c, Vec3::ZERO, MAIL_END_SCALE, MAIL_END_STEP);
+            add_calc_pos2(
+                &mut self.field_3c,
+                Vec3::ZERO,
+                MAIL_END_SCALE,
+                MAIL_END_STEP,
+            );
         } else {
             add_calc_angle_s2(
                 &mut self.field_48[1],
@@ -933,7 +940,12 @@ impl Mail {
                 MAIL_APPEAR_SPEED,
                 MAIL_APPEAR_MAX,
             );
-            add_calc_pos2(&mut self.field_3c, Vec3::ZERO, MAIL_END_SCALE, MAIL_END_STEP);
+            add_calc_pos2(
+                &mut self.field_3c,
+                Vec3::ZERO,
+                MAIL_END_SCALE,
+                MAIL_END_STEP,
+            );
             if self.field_24.z < MAIL_FALL_GATE_Z {
                 let target;
                 if self.field_24.y > MAIL_TILT_PIVOT_Y {
@@ -1014,13 +1026,7 @@ impl SwCam {
     pub fn r#move(&mut self) {
         if self.field_1e != 0 {
             let centre = cam_centre(self.field_1d, self.field_1c);
-            add_calc_pos(
-                &mut self.field_00,
-                centre,
-                CAM_SCALE,
-                CAM_STEP,
-                CAM_MIN,
-            );
+            add_calc_pos(&mut self.field_00, centre, CAM_SCALE, CAM_STEP, CAM_MIN);
         }
     }
 }
@@ -1697,8 +1703,7 @@ impl NpcBtsw {
             6 => self.set_anm(ANM_SUGOI_ALT),
             _ => {}
         }
-        if self.check_frame() && (self.field_9c5 == ANM_ONEGAI || self.field_9c5 == ANM_SUGOI_ALT)
-        {
+        if self.check_frame() && (self.field_9c5 == ANM_ONEGAI || self.field_9c5 == ANM_SUGOI_ALT) {
             self.set_anm(ANM_WAIT02);
         }
     }
@@ -1789,7 +1794,8 @@ impl NpcBtsw {
             return NO_STATUS;
         }
         let talk_res = self.talk(ctx);
-        if ctx.mesg_send_button == 1 && (self.curr_msg_no == MSG_1A96 || self.curr_msg_no == MSG_1AA9)
+        if ctx.mesg_send_button == 1
+            && (self.curr_msg_no == MSG_1A96 || self.curr_msg_no == MSG_1AA9)
         {
             self.swcam.active_on();
         }
@@ -2349,10 +2355,7 @@ pub fn control(
         to_s16(axis.x.atan2(axis.y))
     };
     let trig_a = world.do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut btsw) in &mut actors {
         let actor = &mut *actor;
         let btsw = &mut *btsw;

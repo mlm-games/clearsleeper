@@ -71,7 +71,10 @@ pub const ACTION_TEX: [&str; 63] = [
 ];
 
 pub fn action_tex(id: u8) -> &'static str {
-    ACTION_TEX.get(id as usize).copied().unwrap_or(ACTION_TEX[0])
+    ACTION_TEX
+        .get(id as usize)
+        .copied()
+        .unwrap_or(ACTION_TEX[0])
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]

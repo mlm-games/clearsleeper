@@ -135,10 +135,7 @@ impl Vfan {
                 }
             }
             STATE_DEMO => {
-                if self
-                    .event_slot
-                    .is_some_and(|slot| active.start_check(slot))
-                {
+                if self.event_slot.is_some_and(|slot| active.start_check(slot)) {
                     events.list.push(SimEvent::Se(SE_READ_RIDDLE_1));
                     events.list.push(SimEvent::Se(SE_OBJ_GN_SW_DR_LIGHT));
                     self.break_timer = 0;
@@ -153,10 +150,7 @@ impl Vfan {
                     events.list.push(SimEvent::Se(SE_OBJ_GN_SW_DR_BREAK));
                 }
                 self.break_timer += 1;
-                if self
-                    .event_slot
-                    .is_some_and(|slot| active.end_check(slot))
-                {
+                if self.event_slot.is_some_and(|slot| active.end_check(slot)) {
                     switches.set(self.switch_no);
                     ev_flags.set(EVENT_BIT);
                     if let Some(slot) = self.event_slot {

@@ -1,5 +1,5 @@
 use super::msglayout::{fop_msgm_int_to_char, fop_msgm_int_to_char2};
-use super::{FontSlot, MsgData, ICON_INPUT, SELECT_ON};
+use super::{FontSlot, ICON_INPUT, MsgData, SELECT_ON};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MsgTagLen {
@@ -598,11 +598,7 @@ impl MsgData {
         self.msg_tag_measure(font, &buf, scale, len, width)
     }
 
-    pub fn tag_kaisen_game<F: FontSlot + ?Sized>(
-        &mut self,
-        font: &F,
-        event_reg_beff: i32,
-    ) {
+    pub fn tag_kaisen_game<F: FontSlot + ?Sized>(&mut self, font: &F, event_reg_beff: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, event_reg_beff, false);
         self.msg_tag_emit(font, &buf);
@@ -635,11 +631,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_sword_game<F: FontSlot + ?Sized>(
-        &mut self,
-        font: &F,
-        message_count_number: i32,
-    ) {
+    pub fn tag_sword_game<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, message_count_number, false);
         self.msg_tag_emit(font, &buf);
@@ -673,11 +665,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_fish_rupee<F: FontSlot + ?Sized>(
-        &mut self,
-        font: &F,
-        message_count_number: i32,
-    ) {
+    pub fn tag_fish_rupee<F: FontSlot + ?Sized>(&mut self, font: &F, message_count_number: i32) {
         let num = message_count_number * 10;
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, num, false);
@@ -711,11 +699,7 @@ impl MsgData {
         self.msg_tag_advance();
     }
 
-    pub fn tag_forest_timer<F: FontSlot + ?Sized>(
-        &mut self,
-        font: &F,
-        fwater_timer: i32,
-    ) {
+    pub fn tag_forest_timer<F: FontSlot + ?Sized>(&mut self, font: &F, fwater_timer: i32) {
         let minutes = fwater_timer / 1800;
         let mut buf = String::new();
         fop_msgm_int_to_char(&mut buf, minutes, false);

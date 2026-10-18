@@ -85,10 +85,10 @@ pub struct TagEtc {
 
 impl TagEtc {
     /// `daTag_Etc_c::create` (`:101-130`), minus `fopAcM_ct` (`:105`), minus the `mEventIdx` lookup
-    /// (`:107-108`, deferred to the first tick because it needs the stage event list), minus the
-    /// shape-angle zeroing (`:122-123`) - shape angles are not modelled - and minus the attention
-    /// block (`:126-128`), which is the attention/catch request state RULE 3b lists as absent. What
-    /// survives is the parameter decode.
+    /// (`:107-108`, deferred to the first tick because it needs the stage event list), and minus the
+    /// attention block (`:126-128`), which is the attention/catch request state RULE 3b lists as
+    /// absent. What survives is the parameter decode; the shape-angle zeroing of `:122-123` is
+    /// carried by [`TagEtc::create_init`], which runs on the first tick for the same reason.
     pub fn spawn(parameters: u32) -> Self {
         Self {
             // `create` cannot pick the action until `mEventIdx` resolves, so the struct starts in
@@ -226,9 +226,8 @@ impl TagEtc {
             self.action_event(tracked.map(|(_, flying)| flying), list, active, flags);
             return;
         }
-        let held = tracked.is_some_and(|(pos, flying)| {
-            self.range_check(here, pos) && self.other_check(flying)
-        });
+        let held = tracked
+            .is_some_and(|(pos, flying)| self.range_check(here, pos) && self.other_check(flying));
         if !held {
             self.medli = None;
             self.action = ACT_SEARCH;
@@ -248,10 +247,7 @@ impl TagEtc {
         active: &mut ActiveEvent,
         flags: &mut EventFlags,
     ) {
-        if self
-            .event_slot
-            .is_some_and(|slot| active.end_check(slot))
-        {
+        if self.event_slot.is_some_and(|slot| active.end_check(slot)) {
             self.medli = None;
             self.action = ACT_SEARCH;
             if let Some(slot) = self.event_slot {
@@ -276,7 +272,10 @@ impl TagEtc {
 
     fn demo_running(&self, active: &ActiveEvent) -> bool {
         self.event_slot.is_some_and(|slot| {
-            matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+            matches!(
+                active.stage_of(slot),
+                Some(Stage::Play) | Some(Stage::Close)
+            )
         })
     }
 
@@ -293,7 +292,13 @@ impl TagEtc {
         list: &EventList,
     ) {
         // `shape_angle.z = 0; shape_angle.x = 0; current.angle.z = 0; current.angle.x = 0;`
-        // (`:122-125`). `Actor::angle` is `current.angle`; shape angles are not modelled.
+        // (`:122-125`). `Actor::angle` is `current.angle` and `Actor::shape_angle` is
+        // `shape_angle`; both are transcribed. The reference's `shape_angle` starts as the
+        // placement angle (`f_op_actor.cpp:274`) and this port starts it at zero, so on the first
+        // tick the two writes below are idempotent here - they are the marker's own state all the
+        // same, and this module is the only writer for it.
+        actor.shape_angle[2] = 0;
+        actor.shape_angle[0] = 0;
         actor.angle[2] = 0;
         actor.angle[0] = 0;
         let event_no = (parameters >> EVENT_NO_SHIFT) as u8;

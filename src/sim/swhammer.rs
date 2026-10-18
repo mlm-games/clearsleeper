@@ -4,7 +4,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
-use super::hammer::{self, Cut, CUT_HAMMER_FRONTSWING, CUT_HAMMER_SIDESWING};
+use super::hammer::{self, CUT_HAMMER_FRONTSWING, CUT_HAMMER_SIDESWING, Cut};
 use super::player::Player;
 use super::walk;
 
@@ -23,7 +23,6 @@ pub const CYL_HEIGHT_LOW: f32 = 52.5;
 
 pub const CULL_RADIUS: f32 = 30.0;
 pub const CULL_TOP: f32 = 120.0;
-
 
 pub const TOP_DROP: f32 = -60.0;
 pub const V_SPRING: f32 = 0.8;
@@ -187,7 +186,6 @@ impl Swhammer {
     pub fn risen(&self) -> bool {
         self.cur >= 1.0
     }
-
 }
 
 pub fn is_swhammer(name: &str) -> bool {
@@ -197,8 +195,7 @@ pub fn is_swhammer(name: &str) -> bool {
 pub fn contact(hammer: &Swhammer, base: Vec3, player: &Player) -> bool {
     let reach = CYL_RADIUS_TG + hammer::AT_RADIUS;
     let gap = player.pos - base;
-    gap.x * gap.x + gap.z * gap.z <= reach * reach
-        && gap.y.abs() <= hammer.cyl_height() * 0.5
+    gap.x * gap.x + gap.z * gap.z <= reach * reach && gap.y.abs() <= hammer.cyl_height() * 0.5
 }
 
 pub fn control(

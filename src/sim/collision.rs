@@ -490,11 +490,7 @@ fn ladder_ledge(points: [Vec3; 3]) -> (Vec3, f32) {
         ((b, c), a)
     };
     let (first, second) = foot;
-    let mut corner = Vec3::new(
-        0.5 * (first.x + second.x),
-        0.0,
-        0.5 * (first.z + second.z),
-    );
+    let mut corner = Vec3::new(0.5 * (first.x + second.x), 0.0, 0.5 * (first.z + second.z));
     let top = if apex.y > first.y {
         corner.y = first.y;
         apex.y
@@ -695,7 +691,8 @@ impl Collision {
     }
 
     pub fn ground_normal(&self, x: f32, z: f32) -> Option<Vec3> {
-        self.ground_hit(x, z).map(|(_, index)| self.planes[index].normal)
+        self.ground_hit(x, z)
+            .map(|(_, index)| self.planes[index].normal)
     }
 
     pub fn exit_at(&self, x: f32, z: f32) -> Option<u8> {
@@ -914,11 +911,7 @@ impl Collision {
         if Self::wall(self.planes[hit.tri]) {
             let flat = Vec2::new(remaining.x, remaining.z).length();
             return Some(CrawlStop {
-                push: Vec3::new(
-                    -flat * hit.normal.x,
-                    remaining.y,
-                    -flat * hit.normal.z,
-                ),
+                push: Vec3::new(-flat * hit.normal.x, remaining.y, -flat * hit.normal.z),
                 wall: true,
             });
         }
@@ -1055,11 +1048,7 @@ impl Collision {
         let (sin, cos) = (probe.shape_yaw.sin(), probe.shape_yaw.cos());
         let mut wall_hit = None;
         for index in (0..probe.heights.len()).rev() {
-            let start = Vec3::new(
-                probe.pos.x,
-                probe.pos.y + probe.heights[index],
-                probe.pos.z,
-            );
+            let start = Vec3::new(probe.pos.x, probe.pos.y + probe.heights[index], probe.pos.z);
             let reach = WALL_REACH + probe.radius;
             wall_hit = self.line_cross(start, start + Vec3::new(sin * reach, 0.0, cos * reach));
             if wall_hit.is_some() {
@@ -1092,13 +1081,9 @@ impl Collision {
                 let back = 2.0 * out;
                 let mut flat = None;
                 for index in (0..probe.heights.len()).rev() {
-                    let start = Vec3::new(
-                        probe.pos.x,
-                        probe.pos.y + probe.heights[index],
-                        probe.pos.z,
-                    );
-                    let end =
-                        start - Vec3::new(back * face.normal.x, 0.0, back * face.normal.z);
+                    let start =
+                        Vec3::new(probe.pos.x, probe.pos.y + probe.heights[index], probe.pos.z);
+                    let end = start - Vec3::new(back * face.normal.x, 0.0, back * face.normal.z);
                     if let Some(even) = self.line_cross(start, end) {
                         if (face.normal - self.planes[even.tri].normal).length() < PARALLEL_LIMIT {
                             flat = Some(even);
@@ -1117,10 +1102,8 @@ impl Collision {
         if code == Some(WallCode::NoCatch) || probe.pos.y - probe.ledge_h < LEDGE_DROP {
             return wall;
         }
-        let auto_jump = probe.swim_flag
-            && code == Some(WallCode::AutoJump)
-            && !probe.swim
-            && !probe.midair;
+        let auto_jump =
+            probe.swim_flag && code == Some(WallCode::AutoJump) && !probe.swim && !probe.midair;
         wall.auto_jump = auto_jump;
         if auto_jump && probe.pushpull {
             return wall;
@@ -1141,8 +1124,7 @@ impl Collision {
                                 normal: across,
                                 d: -(across.x * ledge.x + across.z * ledge.z),
                             };
-                            if let Some(corner) = intersect3(face, self.planes[ground.tri], slice)
-                            {
+                            if let Some(corner) = intersect3(face, self.planes[ground.tri], slice) {
                                 if corner.y - probe.pos.y <= VINE_PROBE_UP {
                                     return WallTrace {
                                         kind: FrontWall::HandLedge,
@@ -1199,9 +1181,11 @@ impl Collision {
             if !probe.grab_anime && !probe.midair && !probe.swim {
                 let start = Vec3::new(probe.pos.x, probe.pos.y + HIDE_TRACE_UP, probe.pos.z);
                 let wide = 2.0 * probe.radius;
-                let end = start
-                    + Vec3::new(wide * probe.yaw.sin(), 0.0, wide * probe.yaw.cos());
-                if self.hidden_wall(start, end, HideSide::None, probe).is_some() {
+                let end = start + Vec3::new(wide * probe.yaw.sin(), 0.0, wide * probe.yaw.cos());
+                if self
+                    .hidden_wall(start, end, HideSide::None, probe)
+                    .is_some()
+                {
                     return WallTrace {
                         kind: FrontWall::Hidden,
                         ledge: None,
@@ -1225,8 +1209,7 @@ impl Collision {
         if (!probe.swim && ground.height < probe.pos.y) || ground.normal.y < GROUND_NY {
             return wall;
         }
-        let across =
-            Vec3::new(face.normal.z, 0.0, -face.normal.x).normalize_or_zero();
+        let across = Vec3::new(face.normal.z, 0.0, -face.normal.x).normalize_or_zero();
         let slice = Plane {
             normal: across,
             d: -(across.x * ledge.x + across.z * ledge.z),
@@ -1237,11 +1220,12 @@ impl Collision {
         ledge = corner;
         let lift = ledge.y - probe.pos.y;
         let kind = if probe.swim {
-            (lift <= 0.1 + probe.swim_low && lift >= -SWIM_CATCH_DROP).then_some(FrontWall::HandLedge)
+            (lift <= 0.1 + probe.swim_low && lift >= -SWIM_CATCH_DROP)
+                .then_some(FrontWall::HandLedge)
         } else if probe.midair {
             ((ground.height - probe.ground_h) > MIDAIR_CATCH_DROP
                 && (!probe.hookshot_fly || lift < MIDAIR_CATCH_LIFT))
-            .then_some(FrontWall::HandLedge)
+                .then_some(FrontWall::HandLedge)
         } else if lift >= 0.1 + catch_top {
             None
         } else if !probe.grab_anime || lift < 0.1 + probe.catch_low {
@@ -1289,9 +1273,7 @@ impl Collision {
     }
 
     fn wall(surface: Plane) -> bool {
-        surface.normal != Vec3::ZERO
-            && surface.normal.y < GROUND_NY
-            && surface.normal.y >= ROOF_NY
+        surface.normal != Vec3::ZERO && surface.normal.y < GROUND_NY && surface.normal.y >= ROOF_NY
     }
 
     fn blocked(&self, from: Vec3, to: Vec3) -> bool {

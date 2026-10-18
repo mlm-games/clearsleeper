@@ -33,8 +33,8 @@ use repame_view3d::{DEFAULT_KCOLORS, KColors};
 use repame_view3d::{ShadingModel, TevArg, TevBias, TevDest, TevOp, TevScale, TevStage};
 
 use crate::assets::{
-    GX_TF_C4X2, GX_TF_CI4, GX_TF_CI8, gc_texture_bytes, gc_texture_to_rgba, rgb565_to_rgba,
-    rgb5a3_to_rgba,
+    GX_TF_C4X2, GX_TF_CI4, GX_TF_CI8, gc_texture_bytes, gc_texture_to_rgba, rgb5a3_to_rgba,
+    rgb565_to_rgba,
 };
 
 const BP_MEM_LEN: usize = 256;
@@ -170,10 +170,7 @@ pub enum GxDecodeError {
     /// A combiner bias code 3, the r-compare mode `repame_view3d::TevBias`
     /// does not model (`tww/include/dolphin/gf/GFTev.h:13` packs it, but the
     /// engine's arithmetic `code()`/`from_code()` admit only 0..2).
-    Bias {
-        stage: usize,
-        alpha: bool,
-    },
+    Bias { stage: usize, alpha: bool },
 }
 
 impl fmt::Display for GxDecodeError {
@@ -495,7 +492,11 @@ fn bias(code: u32, stage: usize, alpha: bool) -> Result<TevBias, GxDecodeError> 
 /// `tx_slot_reg`,
 /// `gecko/crates/gecko/src/flipper/gx/bp.rs:735`.
 fn slot_reg(base_i0: usize, base_i4: usize, slot: usize) -> usize {
-    if slot < 4 { base_i0 + slot } else { base_i4 + (slot - 4) }
+    if slot < 4 {
+        base_i0 + slot
+    } else {
+        base_i4 + (slot - 4)
+    }
 }
 
 /// Pack a `TX_SETTLUT` word into [`TexDescriptor::palette`]'s
@@ -564,7 +565,17 @@ mod tests {
     }
 
     /// The word `BP_TEV_COLOR` packs, `tww/include/dolphin/gf/GFTev.h:7`.
-    fn color_env(a: u32, b: u32, c: u32, d: u32, bias: u32, op: u32, clamp: u32, scale: u32, dest: u32) -> u32 {
+    fn color_env(
+        a: u32,
+        b: u32,
+        c: u32,
+        d: u32,
+        bias: u32,
+        op: u32,
+        clamp: u32,
+        scale: u32,
+        dest: u32,
+    ) -> u32 {
         (d & 0xF)
             | ((c & 0xF) << 4)
             | ((b & 0xF) << 8)
@@ -578,7 +589,17 @@ mod tests {
 
     /// The word `BP_TEV_ALPHA` packs, `tww/include/dolphin/gf/GFTev.h:21`.
     /// The `ras_sel`/`tex_sel` pair stays zero, so the swap error never trips.
-    fn alpha_env(a: u32, b: u32, c: u32, d: u32, bias: u32, op: u32, clamp: u32, scale: u32, dest: u32) -> u32 {
+    fn alpha_env(
+        a: u32,
+        b: u32,
+        c: u32,
+        d: u32,
+        bias: u32,
+        op: u32,
+        clamp: u32,
+        scale: u32,
+        dest: u32,
+    ) -> u32 {
         (d & 0x7) << 4
             | ((c & 0x7) << 7)
             | ((b & 0x7) << 10)
@@ -651,7 +672,8 @@ mod tests {
 
         let stage = BpState::from_words(&words[..])
             .shading_model()
-            .expect("konst stage decodes").stages[0];
+            .expect("konst stage decodes")
+            .stages[0];
 
         // Color selects a whole register at `0x0C`; alpha starts its register
         // selects at `0x10`, which is the per-component `K0_R`.
@@ -719,7 +741,11 @@ mod tests {
     #[test]
     fn texture_descriptor_and_rgba_decode() {
         let mut words = [0_u32; 256];
-        write(&mut words, 0x88, (7 & 0x3FF) | ((7 & 0x3FF) << 10) | (4 << 20));
+        write(
+            &mut words,
+            0x88,
+            (7 & 0x3FF) | ((7 & 0x3FF) << 10) | (4 << 20),
+        );
         write(&mut words, 0x94, 0x10);
         write(&mut words, 0x80, 0 | (1 << 2));
         write(&mut words, 0x98, 2_u32 << 10);
@@ -812,4 +838,3 @@ mod tests {
         assert_eq!(desc.tmem_entries, 0x10);
     }
 }
-

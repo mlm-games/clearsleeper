@@ -192,7 +192,12 @@ impl Mdoor {
     ///
     /// The type-1 else arm's `dComIfGs_offEventBit(UNK_1140)` (`:141`) MUTATES the save at create
     /// time, so it belongs in the spawn tuple rather than in `spawn`; see the wiring report.
-    pub fn spawn(parameters: u32, list: &EventList, flags: &EventFlags, switches: &Switches) -> Self {
+    pub fn spawn(
+        parameters: u32,
+        list: &EventList,
+        flags: &EventFlags,
+        switches: &Switches,
+    ) -> Self {
         let swbit = ((parameters >> SWBIT_SHIFT) & BYTE_MASK) as u8;
         let kind = ((parameters >> TYPE_SHIFT) & BYTE_MASK) as u8;
         // ```

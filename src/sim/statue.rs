@@ -3,8 +3,8 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
-use super::flags::Switches;
 use super::flags::StoryBits;
+use super::flags::Switches;
 use super::player::Player;
 use super::walk;
 
@@ -116,11 +116,7 @@ impl Statue {
     }
 
     pub fn flag(&self) -> u16 {
-        if self.wind {
-            FLAG_WIND
-        } else {
-            FLAG_EARTH
-        }
+        if self.wind { FLAG_WIND } else { FLAG_EARTH }
     }
 
     pub fn cull(&self) -> (f32, f32) {
@@ -136,11 +132,7 @@ impl Statue {
     }
 
     pub fn awakening(&self) -> u32 {
-        if self.wind {
-            BGM_D_WIND
-        } else {
-            BGM_D_EARTH
-        }
+        if self.wind { BGM_D_WIND } else { BGM_D_EARTH }
     }
 
     pub fn enter(&mut self, step: Step) {
@@ -267,9 +259,7 @@ pub fn control(
         let Some(player) = player else {
             continue;
         };
-        if in_reach(actor.pos, &player)
-            && behind(actor.pos, walk::to_s16(player.face), &player)
-        {
+        if in_reach(actor.pos, &player) && behind(actor.pos, walk::to_s16(player.face), &player) {
             stories.set(statue.flag());
             statue.enter(Step::Talkable);
         }

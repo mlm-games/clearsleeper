@@ -145,17 +145,32 @@ impl Baba {
     /// Link's. `APPEAR_AFTER_DEKU_TREE_e` never reaches here: `mCoSph.ClrCoSet()` (`:241`) clears
     /// the set bit and `Execute` returns at `:129` before `jbo_move` while that type stands.
     fn co_hit(&self, pos: Vec3, player: &Player) -> bool {
-        let radius = if self.entered { CO_RADIUS } else { CO_SPH_RADIUS };
+        let radius = if self.entered {
+            CO_RADIUS
+        } else {
+            CO_SPH_RADIUS
+        };
         walk::within(player.pos, self.collider_centre(pos), radius)
     }
 
     /// The `daJbo_Mode_IDLE_e` arm of `jbo_move` (`:77-87`):
     /// `dComIfGp_checkPlayerStatus0(0, daPyStts0_UNK80_e) && i_this->mCoSph.ChkCoHit()`. The
     /// `mpMorf->setAnm(BCK_IN1)` at `:80` is renderer work; `fopAcM_seStart(JA_SE_OBJ_JFLOWER_IN)`
-    /// (`:81`) is ported; `dComIfGp_setItemMagicCount(4)` (`:82`) has no counterpart in this sim -
-    /// `dComIfG_gameInfo.play.mItemMagicCount` is a `s16` on the game-info record that no module
-    /// here reads or writes - and is omitted.
-    fn mode_idle(&mut self, pos: Vec3, player: &Player, status: &PlayerStatus, events: &mut SimEvents) {
+    /// (`:81`) is ported; `dComIfGp_setItemMagicCount(4)` (`:82`) is omitted.
+    ///
+    /// `dComIfGp_setItemMagicCount` accumulates into `mItemMagicCount` (`d_com_inf_game.h:422`,
+    /// `:2753-2755`), the `s16` the game-info play record carries (`:797`). Its only reader is
+    /// `dMeter2_c::move`'s magic arm, `dComIfGs_getMagic() + dComIfGp_getItemMagicCount()`
+    /// (`d_meter.cpp:4220-4221`), and this port models neither that record slot nor the player's
+    /// own magic pair (`dComIfGs_getMagic` / `getMaxMagic`), so the four units the bud hands over
+    /// have no field to land in.
+    fn mode_idle(
+        &mut self,
+        pos: Vec3,
+        player: &Player,
+        status: &PlayerStatus,
+        events: &mut SimEvents,
+    ) {
         if !status.check0(STTS0_UNK80) || !self.co_hit(pos, player) {
             return;
         }
@@ -168,7 +183,14 @@ impl Baba {
     /// `mAnimationSpeed`/`mAnimRotation` (`:89-90`, `:99-100`) and `mParticlePos` (`:101-104`) are
     /// read only by `jbo_draw_SUB` and the particle system, `mpMorf->setAnm(BCK_OUT1)` (`:97`) is
     /// renderer work, `m2BA = 1` (`:106`) is written but never read anywhere in the decomp, and
-    /// `player->onForceVomitJump()` (`:91-94`) is a player-process call with no counterpart here.
+    /// `player->onForceVomitJump()` (`:91-94`) is omitted: it is
+    /// `onNoResetFlg1(daPyFlg1_FORCE_VOMIT_JUMP)` (`d_a_player.h:555`, bit `0x10` at `:203`), a
+    /// player no-reset flag whose main reader is `daPy_lk_c::checkNextMode`, which enters
+    /// `procVomitJump_init(2)` on it (`d_a_player_main.cpp:4417-4419`), with the process itself in
+    /// `d_a_player_vomit.inc:101-105`. This port carries no `mNoResetFlg1` word - the one player
+    /// latch it does carry is `daPyFlg0_NO_DRAW` ([`Player::no_draw`]) - and its `link_move`
+    /// reducer has no vomit process: the `Proc::Vomit*` entries `link_proc.rs` declares are the
+    /// reference's own table rows, not a running arm.
     /// `mFramesUntilJump == 1` therefore has no reader in this port; the countdown itself is
     /// transcribed by `execute`.
     fn mode_wait_jump(&mut self, status: &PlayerStatus, events: &mut SimEvents) {
@@ -185,13 +207,7 @@ impl Baba {
     fn mode_spawn(&mut self) {}
 
     /// `jbo_move` (`:74-119`).
-    fn step(
-        &mut self,
-        pos: Vec3,
-        player: &Player,
-        status: &PlayerStatus,
-        events: &mut SimEvents,
-    ) {
+    fn step(&mut self, pos: Vec3, player: &Player, status: &PlayerStatus, events: &mut SimEvents) {
         match self.mode {
             Mode::Idle => self.mode_idle(pos, player, status, events),
             Mode::WaitJump => self.mode_wait_jump(status, events),

@@ -28,8 +28,8 @@ use crate::text::{
 };
 
 pub const TAG_MD_CB_ACTORS: [&str; 12] = [
-    "TagMd1", // <- d_stage.cpp:d_stage.cpp:588 (argument 0)
-    "TagCb1", // <- d_stage.cpp:d_stage.cpp:589 (argument 1)
+    "TagMd1",  // <- d_stage.cpp:d_stage.cpp:588 (argument 0)
+    "TagCb1",  // <- d_stage.cpp:d_stage.cpp:589 (argument 1)
     "TagMd11", // <- d_stage.cpp:d_stage.cpp:590 (argument 2)
     "TagMd12", // <- d_stage.cpp:d_stage.cpp:591 (argument 3)
     "TagMd13", // <- d_stage.cpp:d_stage.cpp:592 (argument 4)
@@ -280,16 +280,16 @@ impl TagMdCb {
 
     pub fn argument_of(name: &str) -> i32 {
         match name {
-            "TagMd1" => 0, // <- d_stage.cpp:588
-            "TagCb1" => 1, // <- d_stage.cpp:589
-            "TagMd11" => 2, // <- d_stage.cpp:590
-            "TagMd12" => 3, // <- d_stage.cpp:591
-            "TagMd13" => 4, // <- d_stage.cpp:592
-            "TagMd14" => 5, // <- d_stage.cpp:593
-            "TagMd15" => 6, // <- d_stage.cpp:594
-            "TagMd16" => 7, // <- d_stage.cpp:595
-            "TagCb11" => 8, // <- d_stage.cpp:596
-            "TagCb12" => 9, // <- d_stage.cpp:597
+            "TagMd1" => 0,   // <- d_stage.cpp:588
+            "TagCb1" => 1,   // <- d_stage.cpp:589
+            "TagMd11" => 2,  // <- d_stage.cpp:590
+            "TagMd12" => 3,  // <- d_stage.cpp:591
+            "TagMd13" => 4,  // <- d_stage.cpp:592
+            "TagMd14" => 5,  // <- d_stage.cpp:593
+            "TagMd15" => 6,  // <- d_stage.cpp:594
+            "TagMd16" => 7,  // <- d_stage.cpp:595
+            "TagCb11" => 8,  // <- d_stage.cpp:596
+            "TagCb12" => 9,  // <- d_stage.cpp:597
             "TagCb13" => 10, // <- d_stage.cpp:598
             "TagCb14" => 11, // <- d_stage.cpp:599
             _ => 0,
@@ -345,7 +345,11 @@ impl TagMdCb {
                 let half = usize::try_from((offset - M2BC_OFFSET) / 2).unwrap_or(0);
                 let high = (offset - M2BC_OFFSET) % 2 == 1;
                 let value = self.m2bc.get(half).copied().unwrap_or(0) as u16;
-                Some(if high { (value >> 8) as u8 } else { value as u8 })
+                Some(if high {
+                    (value >> 8) as u8
+                } else {
+                    value as u8
+                })
             }
             0x2CA => Some(self.m2ca as u8),
             0x2CB => Some((self.m2ca >> 8) as u8),
@@ -385,7 +389,10 @@ impl TagMdCb {
 
     pub fn create(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if self.argument <= 1 {
-            let bit = EVENT_BIT_TABLE.get(self.argument as usize).copied().unwrap_or(0);
+            let bit = EVENT_BIT_TABLE
+                .get(self.argument as usize)
+                .copied()
+                .unwrap_or(0);
             if ctx.flags.test(bit) {
                 self.failed = true;
                 return false;
@@ -483,7 +490,10 @@ impl TagMdCb {
         if self.m2b6 == 0 {
             self.m2b6 += 1;
         } else if self.m2b6 != -1 && self.argument <= 1 {
-            let bit = EVENT_BIT_TABLE.get(self.argument as usize).copied().unwrap_or(0);
+            let bit = EVENT_BIT_TABLE
+                .get(self.argument as usize)
+                .copied()
+                .unwrap_or(0);
             ctx.flags.set(bit);
         }
     }
@@ -521,10 +531,7 @@ impl TagMdCb {
     pub fn talk_init(&mut self, ctx: &mut Ctx<'_>) -> bool {
         if ctx.msg.pid == FPC_M_ERROR_PROCESS_ID {
             ctx.msg.pid = message_set_actor(ctx, self.m2a8);
-        } else if ctx
-            .text
-            .alive(ctx.msg.pid)
-        {
+        } else if ctx.text.alive(ctx.msg.pid) {
             return true;
         }
         false
@@ -761,11 +768,9 @@ impl TagMdCb {
         } else if argument == 2 {
             if !ctx.flags.test(EVENT_UNK_3310)
                 && ctx.switches.test(self.m2b0 as u8)
-                && ctx
-                    .link_pos
-                    .map_or(false, |link| {
-                        registry::actor_distance_xz2(player_pos, link) < COND_ARG2_DIST2
-                    })
+                && ctx.link_pos.map_or(false, |link| {
+                    registry::actor_distance_xz2(player_pos, link) < COND_ARG2_DIST2
+                })
             {
                 result = self.check_timer();
             }
@@ -977,12 +982,7 @@ fn message_set_actor(ctx: &mut Ctx<'_>, msg_no: u32) -> u32 {
 
 #[derive(SystemParam)]
 pub struct World<'w, 's> {
-    pub tags: Query<
-        'w,
-        's,
-        (Entity, &'static mut Actor, &'static mut TagMdCb),
-        Without<Player>,
-    >,
+    pub tags: Query<'w, 's, (Entity, &'static mut Actor, &'static mut TagMdCb), Without<Player>>,
     pub players: Query<'w, 's, (Entity, &'static Actor, &'static Player), Without<TagMdCb>>,
     pub npcs: Query<'w, 's, (Entity, Option<&'static Medli>, Option<&'static Makar>)>,
     pub list: Res<'w, EventList>,
@@ -1032,7 +1032,9 @@ pub fn control(mut world: World<'_, '_>, mut commands: Commands<'_, '_>) {
             continue;
         }
         let (player_entity, player_pos, player_room) = match world.players.iter().next() {
-            Some((id, player_actor, _)) => (Some(id), Some(player_actor.pos), Some(player_actor.room)),
+            Some((id, player_actor, _)) => {
+                (Some(id), Some(player_actor.pos), Some(player_actor.room))
+            }
             None => (None, None, None),
         };
         let link_pos = player_pos;

@@ -7,18 +7,8 @@ use super::collision::Collision;
 use super::ground::grounded;
 
 pub const TSUBO_ACTORS: [&str; 12] = [
-    "Odokuro",
-    "Ktaru",
-    "Ostool",
-    "Ptubo",
-    "kotubo",
-    "ootubo1",
-    "Kmtub",
-    "Kmi00",
-    "Kmi02",
-    "KkibaB",
-    "Okioke",
-    "Hbox2S",
+    "Odokuro", "Ktaru", "Ostool", "Ptubo", "kotubo", "ootubo1", "Kmtub", "Kmi00", "Kmi02",
+    "KkibaB", "Okioke", "Hbox2S",
 ];
 
 pub const POT: u8 = 0;

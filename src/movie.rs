@@ -97,7 +97,11 @@ impl Movie {
     }
 
     pub fn rate(&self) -> f32 {
-        if self.rate > 0.0 { self.rate } else { DEFAULT_RATE }
+        if self.rate > 0.0 {
+            self.rate
+        } else {
+            DEFAULT_RATE
+        }
     }
 
     pub fn interval(&self) -> f32 {
@@ -280,9 +284,10 @@ fn restuff(frame: &[u8]) -> Vec<u8> {
         if marker == 0xD8 || marker == 0xD9 || (0xD0..=0xD7).contains(&marker) {
             continue;
         }
-        let Some(length) = frame.get(at..at + 2).map(|head| {
-            usize::from(u16::from_be_bytes([head[0], head[1]]))
-        }) else {
+        let Some(length) = frame
+            .get(at..at + 2)
+            .map(|head| usize::from(u16::from_be_bytes([head[0], head[1]])))
+        else {
             break;
         };
         let Some(segment) = frame.get(at..at + length) else {
@@ -317,13 +322,20 @@ fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) 
     }
 }
 
-fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<Vec<Frame>, MovieError> {
+fn index(
+    file: &mut File,
+    first: usize,
+    last: usize,
+    declared: usize,
+) -> Result<Vec<Frame>, MovieError> {
     let mut marks = Vec::with_capacity(declared.min(8192));
     let mut at = first as u64;
     let end = (last as u64).max(at);
     let mut window = vec![0_u8; 1 << 16];
     while marks.len() < declared && at < end {
-        let want = usize::try_from(end - at).unwrap_or(window.len()).min(window.len());
+        let want = usize::try_from(end - at)
+            .unwrap_or(window.len())
+            .min(window.len());
         file.seek(SeekFrom::Start(at)).map_err(|_| MovieError)?;
         let read = file.read(&mut window[..want]).map_err(|_| MovieError)?;
         if read < SOI.len() {
@@ -366,9 +378,17 @@ fn index(file: &mut File, first: usize, last: usize, declared: usize) -> Result<
     Ok(frames)
 }
 
-
-pub fn title_path() -> PathBuf {
-    crate::assets::asset_root().join("files/thpdemo/title_loop.thp")
+/// The title movie's path under an extracted `CS_ASSETS` tree.
+///
+/// `Movie::open` streams from a file handle, so an in-memory disc image has no path to hand it:
+/// a web session plays without the title loop, the way it did before the image could be dropped.
+pub fn title_path() -> Option<PathBuf> {
+    Some(
+        crate::assets::AssetRoot::from_env()
+            .ok()?
+            .fs_root()?
+            .join("files/thpdemo/title_loop.thp"),
+    )
 }
 
 fn wave(samples: &[i16]) -> Vec<u8> {

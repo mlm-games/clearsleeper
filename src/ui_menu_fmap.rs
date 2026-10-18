@@ -360,9 +360,7 @@ pub const SECRET_TABLE: [&str; 8] = [
 
 pub const AREA_TEXT_TABLE: [&str; 3] = ["txt1", "txt3", "txt2"];
 
-pub const GHOST_SHIP_TABLE: [&str; 7] = [
-    "gs07", "gs01", "gs02", "gs03", "gs04", "gs05", "gs06",
-];
+pub const GHOST_SHIP_TABLE: [&str; 7] = ["gs07", "gs01", "gs02", "gs03", "gs04", "gs05", "gs06"];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CursorSlot {
@@ -525,8 +523,12 @@ impl Default for Tuning {
             warp_cursor_blink_frame: 12,
             warp_cursor_alpha_min: 70,
             warp_cursor_alpha_max: 140,
-            warp_spot_pos_x: [-193.0, -82.0, 30.0, -193.0, -26.0, 30.0, -193.0, -137.0, -83.0],
-            warp_spot_pos_y: [-137.0, -137.0, -137.0, -25.0, -25.0, 86.0, 145.0, -80.0, 86.0],
+            warp_spot_pos_x: [
+                -193.0, -82.0, 30.0, -193.0, -26.0, 30.0, -193.0, -137.0, -83.0,
+            ],
+            warp_spot_pos_y: [
+                -137.0, -137.0, -137.0, -25.0, -25.0, 86.0, 145.0, -80.0, 86.0,
+            ],
             warp_spot_scale_sel: 1.6,
             warp_spot_scale: 0.75,
             field_0xa0: 30.0,
@@ -973,13 +975,7 @@ pub fn salvage_item_texture(map_type: i8) -> Option<&'static str> {
     SALVAGE_ITEM_TEX.get(map_type as usize).copied()
 }
 
-pub fn child_pane_move_sp(
-    pane: &mut MapPane,
-    parent: &MapPane,
-    scale: f32,
-    x: f32,
-    y: f32,
-) {
+pub fn child_pane_move_sp(pane: &mut MapPane, parent: &MapPane, scale: f32, x: f32, y: f32) {
     let x_size = parent.size.x / 2.0;
     let y_size = parent.size.y / 2.0;
     pane.pos_center.x = x_size + scale * (pane.pos_center_orig.x - parent.size_orig.x / 2.0);
@@ -995,7 +991,8 @@ pub fn set_island_pos(base: &MapPane, pane: &mut MapPane, x: f32, y: f32) {
 }
 
 pub fn zoom_map_alpha_set(grid_x: i8, grid_y: i8, pane: &mut MapPane, alpha: u8) {
-    if (i32::from(grid_x) + 3) + (i32::from(grid_y) + 3) * GRID_WIDTH == ISLE_IDX_TOWER_OF_THE_GODS {
+    if (i32::from(grid_x) + 3) + (i32::from(grid_y) + 3) * GRID_WIDTH == ISLE_IDX_TOWER_OF_THE_GODS
+    {
         pane.init_alpha = alpha;
     } else {
         pane.init_alpha = 0xFF;
@@ -1731,54 +1728,14 @@ impl MapPanes {
     pub fn all_mut(&mut self) -> Vec<&mut MapPane> {
         let mut list: Vec<&mut MapPane> = Vec::new();
         push_mut!(
-            self,
-            list,
-            fddm,
-            cl,
-            area,
-            ci22,
-            ci21,
-            ci32,
-            ci31,
-            kkdm,
-            smsk,
-            lnk1,
-            spi1,
-            lnk2,
-            spi2,
-            lnk3,
-            spi3,
-            tsw1,
-            r01b,
-            r01g,
-            stm1,
-            stl1,
-            mr01,
-            ktx1,
-            ktx2,
-            clb,
-            clb2,
-            clg,
-            wnd1,
-            wnd2,
-            bt00,
-            bt01,
-            bt02,
-            wts1,
-            cc01,
-            ys01,
-            ys00,
-            ysk0,
-            yes,
-            no01,
-            no00,
-            nok0,
-            no,
-            cur1,
-            wt0,
+            self, list, fddm, cl, area, ci22, ci21, ci32, ci31, kkdm, smsk, lnk1, spi1, lnk2, spi2,
+            lnk3, spi3, tsw1, r01b, r01g, stm1, stl1, mr01, ktx1, ktx2, clb, clb2, clg, wnd1, wnd2,
+            bt00, bt01, bt02, wts1, cc01, ys01, ys00, ysk0, yes, no01, no00, nok0, no, cur1, wt0,
             wt1,
         );
-        extend_mut!(self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
+        extend_mut!(
+            self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x
+        );
         extend_mut!(self, list, area_txt, gs);
         list
     }
@@ -1786,54 +1743,14 @@ impl MapPanes {
     pub fn all(&self) -> Vec<&MapPane> {
         let mut list: Vec<&MapPane> = Vec::new();
         push_ref!(
-            self,
-            list,
-            fddm,
-            cl,
-            area,
-            ci22,
-            ci21,
-            ci32,
-            ci31,
-            kkdm,
-            smsk,
-            lnk1,
-            spi1,
-            lnk2,
-            spi2,
-            lnk3,
-            spi3,
-            tsw1,
-            r01b,
-            r01g,
-            stm1,
-            stl1,
-            mr01,
-            ktx1,
-            ktx2,
-            clb,
-            clb2,
-            clg,
-            wnd1,
-            wnd2,
-            bt00,
-            bt01,
-            bt02,
-            wts1,
-            cc01,
-            ys01,
-            ys00,
-            ysk0,
-            yes,
-            no01,
-            no00,
-            nok0,
-            no,
-            cur1,
-            wt0,
+            self, list, fddm, cl, area, ci22, ci21, ci32, ci31, kkdm, smsk, lnk1, spi1, lnk2, spi2,
+            lnk3, spi3, tsw1, r01b, r01g, stm1, stl1, mr01, ktx1, ktx2, clb, clb2, clg, wnd1, wnd2,
+            bt00, bt01, bt02, wts1, cc01, ys01, ys00, ysk0, yes, no01, no00, nok0, no, cur1, wt0,
             wt1,
         );
-        extend_ref!(self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x);
+        extend_ref!(
+            self, list, gti, kk1, kk3, sc1, sc2, fmx, fmn, stx, ck1, ck2, ck3, kr0, r0x
+        );
         extend_ref!(self, list, area_txt, gs);
         list
     }
@@ -2490,7 +2407,8 @@ impl SeaMapScreen {
         self.panes.ktx1.set_string(&blank);
         self.panes.ktx2.set_string(&blank);
 
-        self.out_font2.set_pane_ex(self.fonts[0], "ktx1", None, None, None);
+        self.out_font2
+            .set_pane_ex(self.fonts[0], "ktx1", None, None, None);
         self.out_font2.set_ruby_ex(self.fonts[1], "ktx2");
         self.out_font2.message_set(MSG_UNKNOWN_NAME);
         let x = self.panes.ktx1.pos_top_left.x;
@@ -2532,12 +2450,14 @@ impl SeaMapScreen {
         self.input_disabled = false;
         self.player_pos.x = ctx.env.player_x;
         self.player_pos.y = ctx.env.player_y;
-        self.player_pos.z = f32::from(ctx.env.player_angle_y.wrapping_add(i16::MIN)) * 180.0 / 32768.0;
+        self.player_pos.z =
+            f32::from(ctx.env.player_angle_y.wrapping_add(i16::MIN)) * 180.0 / 32768.0;
 
         if ctx.env.has_ship {
             self.ship_pos.x = ctx.env.ship_x;
             self.ship_pos.y = ctx.env.ship_y;
-            self.ship_pos.z = f32::from(ctx.env.ship_angle_y.wrapping_add(i16::MIN)) * 180.0 / 32768.0;
+            self.ship_pos.z =
+                f32::from(ctx.env.ship_angle_y.wrapping_add(i16::MIN)) * 180.0 / 32768.0;
         } else {
             self.ship_pos.x = 0.0;
             self.ship_pos.y = 0.0;
@@ -2674,9 +2594,10 @@ impl SeaMapScreen {
         self.disp_end_salvage_mark(ctx);
         let size_x = self.panes.area.size_orig.x;
         let size_y = self.panes.area.size_orig.y;
-        self.panes
-            .area
-            .pane_trans(f32::from(self.grid_x) * size_x, f32::from(self.grid_y) * size_y);
+        self.panes.area.pane_trans(
+            f32::from(self.grid_x) * size_x,
+            f32::from(self.grid_y) * size_y,
+        );
         self.set_dsp_normal_map_link(ctx);
         self.set_dsp_large_map_link(ctx);
         self.sel_cursor_init();
@@ -2729,7 +2650,10 @@ impl SeaMapScreen {
                 self.panes.stx[index].hide();
                 continue;
             };
-            if !ctx.flags.is_complete_collect_map(i32::from(pnt.collect_map_no)) {
+            if !ctx
+                .flags
+                .is_complete_collect_map(i32::from(pnt.collect_map_no))
+            {
                 self.panes.stx[index].hide();
             } else {
                 let base_x = self.area_panes[index].pos_center_orig.x;
@@ -2807,8 +2731,7 @@ impl SeaMapScreen {
             for index in 0..8usize {
                 let bit = index & 7;
                 let stat = ctx.flags.is_event_bit(EVENT_UNKNOWN_0102)
-                    || ((u32::from(ctx.flags.event_reg(EVENT_UNKNOWN_9EFF as u16)) & 0xFF)
-                        >> bit
+                    || ((u32::from(ctx.flags.event_reg(EVENT_UNKNOWN_9EFF as u16)) & 0xFF) >> bit
                         & 1)
                         != 0;
                 if stat {
@@ -2937,13 +2860,12 @@ impl SeaMapScreen {
             self.txt_name[index].clear();
             self.txt_name_msg[index] = None;
         } else {
-            let msg_no = if grid == ISLE_IDX_PRIVATE_OASIS
-                && ctx.flags.is_event_bit(EVENT_UNKNOWN_2D80)
-            {
-                MSG_PRIVATE_ISLAND
-            } else {
-                grid as u32 + MSG_GRID_NAME_BASE
-            };
+            let msg_no =
+                if grid == ISLE_IDX_PRIVATE_OASIS && ctx.flags.is_event_bit(EVENT_UNKNOWN_2D80) {
+                    MSG_PRIVATE_ISLAND
+                } else {
+                    grid as u32 + MSG_GRID_NAME_BASE
+                };
             let color = if is_main_island(grid) {
                 self.tuning.area_text_color_main
             } else {
@@ -3032,7 +2954,10 @@ impl SeaMapScreen {
             self.panes.gti[index].set_alpha();
             return;
         };
-        if ctx.flags.is_complete_collect_map(i32::from(pnt.collect_map_no)) {
+        if ctx
+            .flags
+            .is_complete_collect_map(i32::from(pnt.collect_map_no))
+        {
             self.full_map_mode = true;
             if let Some(texture) = salvage_item_texture(pnt.map_type) {
                 self.panes.gti[index].change_texture(texture);
@@ -3119,7 +3044,8 @@ impl SeaMapScreen {
         let adj = atan2s_deg(ctx.env.wind_x, ctx.env.wind_y).wrapping_add(i16::MIN);
         let angle = f32::from(adj) * 180.0 / 32768.0 % 360.0;
 
-        let x = (self.panes.wnd1.size_orig.x + f32::from(self.tuning.wind_arrow_pivot_x)) as i32 as f32;
+        let x =
+            (self.panes.wnd1.size_orig.x + f32::from(self.tuning.wind_arrow_pivot_x)) as i32 as f32;
         let y = (self.panes.wnd1.size_orig.y * 0.5 + f32::from(self.tuning.wind_arrow_pivot_y))
             as i32 as f32;
         self.panes.wnd1.rotate(x, y, angle);
@@ -3155,11 +3081,7 @@ impl SeaMapScreen {
             mix_color(
                 self.tuning.wind_arrow_color2,
                 self.tuning.wind_arrow_color1,
-                value_increase(
-                    i32::from(period),
-                    i32::from(hold_a + period * 2 - val),
-                    0,
-                ),
+                value_increase(i32::from(period), i32::from(hold_a + period * 2 - val), 0),
             )
         } else {
             self.tuning.wind_arrow_color2
@@ -3291,8 +3213,10 @@ impl SeaMapScreen {
         } else {
             let area_x = self.panes.area.pos_center_orig.x;
             let area_y = self.panes.area.pos_center_orig.y;
-            self.panes.lnk1.pos_center_orig.x = area_x + (self.player_pos.x * GRID_STEP) / WORLD_UNIT;
-            self.panes.lnk1.pos_center_orig.y = area_y + (self.player_pos.y * GRID_STEP) / WORLD_UNIT;
+            self.panes.lnk1.pos_center_orig.x =
+                area_x + (self.player_pos.x * GRID_STEP) / WORLD_UNIT;
+            self.panes.lnk1.pos_center_orig.y =
+                area_y + (self.player_pos.y * GRID_STEP) / WORLD_UNIT;
             self.panes.lnk1.pos_center.x = self.panes.lnk1.pos_center_orig.x;
             self.panes.lnk1.pos_center.y = self.panes.lnk1.pos_center_orig.y;
             self.panes.lnk1.cpos_move();
@@ -3389,7 +3313,10 @@ impl SeaMapScreen {
             return;
         };
 
-        if !ctx.flags.is_complete_collect_map(i32::from(pnt.collect_map_no)) {
+        if !ctx
+            .flags
+            .is_complete_collect_map(i32::from(pnt.collect_map_no))
+        {
             self.panes.stm1.hide();
         } else {
             let salvage = pnt.salvage_pnt[self.salvage_pnt_idx as usize % 4];
@@ -3407,8 +3334,11 @@ impl SeaMapScreen {
     }
 
     pub fn set_dsp_huge_map_link(&mut self, ctx: &mut MapContext<'_>) {
-        let index =
-            check_point_use_grid(ctx.marks, self.save.get_zoom_grid_x(), self.save.get_zoom_grid_y());
+        let index = check_point_use_grid(
+            ctx.marks,
+            self.save.get_zoom_grid_x(),
+            self.save.get_zoom_grid_y(),
+        );
         if index == -1 {
             return;
         }
@@ -3433,8 +3363,10 @@ impl SeaMapScreen {
 
             let base_x = self.panes.r01g.pos_top_left_orig.x + self.panes.r01g.size_orig.x / 2.0;
             let base_y = self.panes.r01g.pos_top_left_orig.y + self.panes.r01g.size_orig.y / 2.0;
-            self.panes.lnk3.pos_center_orig.x = base_x + dx * (self.panes.r01g.size_orig.x / 20000.0);
-            self.panes.lnk3.pos_center_orig.y = base_y + dy * (self.panes.r01g.size_orig.y / 20000.0);
+            self.panes.lnk3.pos_center_orig.x =
+                base_x + dx * (self.panes.r01g.size_orig.x / 20000.0);
+            self.panes.lnk3.pos_center_orig.y =
+                base_y + dy * (self.panes.r01g.size_orig.y / 20000.0);
             self.panes.lnk3.pos_center.x = self.panes.lnk3.pos_center_orig.x;
             self.panes.lnk3.pos_center.y = self.panes.lnk3.pos_center_orig.y;
             self.panes.lnk3.cpos_move();
@@ -3476,7 +3408,10 @@ impl SeaMapScreen {
             return;
         };
 
-        if !ctx.flags.is_complete_collect_map(i32::from(pnt.collect_map_no)) {
+        if !ctx
+            .flags
+            .is_complete_collect_map(i32::from(pnt.collect_map_no))
+        {
             self.panes.stl1.hide();
         } else {
             let salvage = pnt.salvage_pnt[self.salvage_pnt_idx as usize % 4];
@@ -3546,7 +3481,8 @@ impl SeaMapScreen {
             true
         } else {
             let result = self.pane_trans_base(
-                self.frame_timer.wrapping_sub(i16::from(self.tuning.open_delay)),
+                self.frame_timer
+                    .wrapping_sub(i16::from(self.tuning.open_delay)),
                 self.tuning.base_anim_frame,
                 self.tuning.open_pos_y,
                 0.0,
@@ -3809,7 +3745,8 @@ impl SeaMapScreen {
             (x, y, scale)
         };
         let zoom_map = self.pane_trance_zoom_map(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.zoom_anim_frame,
             tx,
             ty,
@@ -3822,7 +3759,8 @@ impl SeaMapScreen {
         );
         let zoom_cursor = pane_alpha_fmap_cursor(
             &mut self.panes.kk3,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.zoom_anim_frame,
             0,
             0,
@@ -3902,13 +3840,15 @@ impl SeaMapScreen {
 
     pub fn zoom_grid_lv1_out(&mut self) {
         let sel_grid_mask = self.sel_grid_mask_alpha_ctrl(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
             self.tuning.zoom_anim_frame,
             0,
             1,
         );
         let fmap_mask = self.fmap_mask_alpha_ctrl(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
             self.tuning.zoom_anim_frame,
             0,
             1,
@@ -3920,7 +3860,8 @@ impl SeaMapScreen {
             (x, y, scale)
         };
         let zoom_map = self.pane_trance_zoom_map(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.zoom_anim_frame,
             0.0,
             0.0,
@@ -3933,14 +3874,16 @@ impl SeaMapScreen {
         );
         let zoom_cursor = pane_alpha_fmap_cursor(
             &mut self.panes.kk3,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.zoom_anim_frame,
             0,
             1,
         );
         let sel_cursor = pane_alpha_fmap_cursor(
             &mut self.panes.kk1,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
             self.tuning.select_cursor_alpha_frame,
             0,
             0,
@@ -4450,8 +4393,8 @@ impl SeaMapScreen {
             let range =
                 f32::from(self.tuning.moon_alpha_max) - f32::from(self.tuning.moon_alpha_min);
             let index = self.moon_type as usize % 7;
-            self.panes.gs[index].now_alpha = (f32::from(self.tuning.moon_alpha_min)
-                + (range * alpha) as u32 as f32) as u8;
+            self.panes.gs[index].now_alpha =
+                (f32::from(self.tuning.moon_alpha_min) + (range * alpha) as u32 as f32) as u8;
             self.panes.gs[index].set_alpha();
             if self.moon_alpha_timer == 0 {
                 self.moon_alpha_timer = self.tuning.moon_alpha_frame;
@@ -4584,10 +4527,18 @@ impl SeaMapScreen {
             self.panes.cur1.show();
             self.warp_sub_state = WARP_SEL_YES;
 
-            self.panes.no01.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-            self.panes.no00.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-            self.panes.ys01.set_black_white(self.ys01_color1, self.ys01_color2);
-            self.panes.ys00.set_black_white(self.ys01_color1, self.ys01_color2);
+            self.panes
+                .no01
+                .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+            self.panes
+                .no00
+                .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+            self.panes
+                .ys01
+                .set_black_white(self.ys01_color1, self.ys01_color2);
+            self.panes
+                .ys00
+                .set_black_white(self.ys01_color1, self.ys01_color2);
             self.warp_sel_cursor_move();
             self.warp_sel_cursor_anime_init();
 
@@ -4686,7 +4637,8 @@ impl SeaMapScreen {
         );
         let msg = pane_trance_warp_msg(
             &mut self.panes.cc01,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.warp_msg_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.warp_msg_delay)),
             self.tuning.warp_msg_anim_frame,
             self.tuning.warp_msg_pos_y,
             40.0,
@@ -4720,7 +4672,8 @@ impl SeaMapScreen {
         );
         let no_move = pane_trance_warp_msg(
             &mut self.panes.nok0,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.warp_no_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.warp_no_delay)),
             self.tuning.warp_yes_no_anim_frame,
             self.tuning.warp_yes_no_pos_y,
             0.0,
@@ -4754,20 +4707,36 @@ impl SeaMapScreen {
                 self.warp_sub_state = WARP_SEL_NO;
                 ctx.out.sound(SE_TALK_CURSOR);
                 self.warp_sel_cursor_move();
-                self.panes.ys01.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-                self.panes.ys00.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-                self.panes.no01.set_black_white(self.ys01_color1, self.ys01_color2);
-                self.panes.no00.set_black_white(self.ys01_color1, self.ys01_color2);
+                self.panes
+                    .ys01
+                    .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+                self.panes
+                    .ys00
+                    .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+                self.panes
+                    .no01
+                    .set_black_white(self.ys01_color1, self.ys01_color2);
+                self.panes
+                    .no00
+                    .set_black_white(self.ys01_color1, self.ys01_color2);
             }
         } else if self.stick.check_left_trigger() {
             if self.warp_sub_state != WARP_SEL_YES {
                 ctx.out.sound(SE_TALK_CURSOR);
                 self.warp_sub_state = WARP_SEL_YES;
                 self.warp_sel_cursor_move();
-                self.panes.no01.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-                self.panes.no00.set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
-                self.panes.ys01.set_black_white(self.ys01_color1, self.ys01_color2);
-                self.panes.ys00.set_black_white(self.ys01_color1, self.ys01_color2);
+                self.panes
+                    .no01
+                    .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+                self.panes
+                    .no00
+                    .set_black_white(WARP_NO_SHADOW, WARP_NO_BODY);
+                self.panes
+                    .ys01
+                    .set_black_white(self.ys01_color1, self.ys01_color2);
+                self.panes
+                    .ys00
+                    .set_black_white(self.ys01_color1, self.ys01_color2);
             }
         }
         self.warp_sel_cursor_anime();
@@ -4783,7 +4752,8 @@ impl SeaMapScreen {
         );
         let msg = pane_trance_warp_msg(
             &mut self.panes.cc01,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.warp_msg_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.warp_msg_delay)),
             self.tuning.warp_msg_anim_frame,
             0.0,
             40.0,
@@ -4817,7 +4787,8 @@ impl SeaMapScreen {
         );
         let no_move = pane_trance_warp_msg(
             &mut self.panes.nok0,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.warp_no_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.warp_no_delay)),
             self.tuning.warp_yes_no_anim_frame,
             0.0,
             self.tuning.warp_yes_no_pos_y,
@@ -4846,7 +4817,8 @@ impl SeaMapScreen {
         );
         let nok_warp = pane_trance_warp_msg(
             &mut self.panes.nok0,
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.warp_no_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.warp_no_delay)),
             self.tuning.warp_yes_no_anim_frame,
             0.0,
             self.tuning.warp_yes_no_pos_y,
@@ -4931,10 +4903,10 @@ impl SeaMapScreen {
         if self.warp_blink_toggle != 0 {
             alpha = 1.0 - alpha;
         }
-        let range =
-            f32::from(self.tuning.warp_cursor_alpha_max) - f32::from(self.tuning.warp_cursor_alpha_min);
-        self.panes.cur1.now_alpha = (f32::from(self.tuning.warp_cursor_alpha_min)
-            + (range * alpha) as u32 as f32) as u8;
+        let range = f32::from(self.tuning.warp_cursor_alpha_max)
+            - f32::from(self.tuning.warp_cursor_alpha_min);
+        self.panes.cur1.now_alpha =
+            (f32::from(self.tuning.warp_cursor_alpha_min) + (range * alpha) as u32 as f32) as u8;
         self.panes.cur1.set_alpha();
 
         if self.panes.cur1.user_area == 0 {
@@ -5064,10 +5036,26 @@ impl SeaMapScreen {
         let color1 = self.tuning.warp_back_color1;
         let color2 = self.tuning.warp_back_color2;
         let rgb: [[u8; 3]; 4] = [
-            [(color1 >> 24) as u8, (color1 >> 16) as u8, (color1 >> 8) as u8],
-            [(color2 >> 24) as u8, (color2 >> 16) as u8, (color2 >> 8) as u8],
-            [(color2 >> 24) as u8, (color2 >> 16) as u8, (color2 >> 8) as u8],
-            [(color2 >> 24) as u8, (color2 >> 16) as u8, (color2 >> 8) as u8],
+            [
+                (color1 >> 24) as u8,
+                (color1 >> 16) as u8,
+                (color1 >> 8) as u8,
+            ],
+            [
+                (color2 >> 24) as u8,
+                (color2 >> 16) as u8,
+                (color2 >> 8) as u8,
+            ],
+            [
+                (color2 >> 24) as u8,
+                (color2 >> 16) as u8,
+                (color2 >> 8) as u8,
+            ],
+            [
+                (color2 >> 24) as u8,
+                (color2 >> 16) as u8,
+                (color2 >> 8) as u8,
+            ],
         ];
 
         let phase = ratio % 4.0;
@@ -5080,8 +5068,7 @@ impl SeaMapScreen {
             let r = line_inter(rgb[index][0], rgb[next][0], alpha);
             let g = line_inter(rgb[index][1], rgb[next][1], alpha);
             let b = line_inter(rgb[index][2], rgb[next][2], alpha);
-            color[index] =
-                (u32::from(r) << 24) | (u32::from(g) << 16) | (u32::from(b) << 8) | 255;
+            color[index] = (u32::from(r) << 24) | (u32::from(g) << 16) | (u32::from(b) << 8) | 255;
         }
 
         let idx0 = idx.rem_euclid(4) as usize;
@@ -5244,12 +5231,8 @@ impl SeaMapScreen {
     }
 
     pub fn fm_zoom_grid_lv1_in(&mut self, ctx: &mut MapContext<'_>) {
-        let sel_grid_mask = self.sel_grid_mask_alpha_ctrl(
-            self.frame_timer,
-            self.tuning.fishman_zoom1_frame,
-            0,
-            0,
-        );
+        let sel_grid_mask =
+            self.sel_grid_mask_alpha_ctrl(self.frame_timer, self.tuning.fishman_zoom1_frame, 0, 0);
         let fmap_mask =
             self.fmap_mask_alpha_ctrl(self.frame_timer, self.tuning.fishman_zoom1_frame, 0, 0);
         let (tx, ty, ts) = {
@@ -5259,7 +5242,8 @@ impl SeaMapScreen {
             (x, y, scale)
         };
         let zoom_map = self.pane_trance_zoom_map(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.fishman_zoom1_frame,
             tx,
             ty,
@@ -5438,13 +5422,15 @@ impl SeaMapScreen {
 
     pub fn fm_zoom_grid_lv1_out(&mut self) {
         let sel_grid_mask = self.sel_grid_mask_alpha_ctrl(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
             self.tuning.zoom_anim_frame,
             0,
             1,
         );
         let fmap_mask = self.fmap_mask_alpha_ctrl(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_out_delay)),
             self.tuning.zoom_anim_frame,
             0,
             1,
@@ -5456,7 +5442,8 @@ impl SeaMapScreen {
             (x, y, scale)
         };
         let zoom_map = self.pane_trance_zoom_map(
-            self.frame_timer.wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
+            self.frame_timer
+                .wrapping_sub(i16::from(self.tuning.zoom_map_delay)),
             self.tuning.fishman_zoom1_out_frame,
             0.0,
             0.0,

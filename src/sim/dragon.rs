@@ -194,7 +194,12 @@ impl Dragon {
     /// `i_this->scale.x = scale.y = scale.z = l_HIO.mScale` (`:198`) with
     /// `mScale = 1.0f` (`:21`) is retail scale 1.0 (RULE 2); `daDr_setMtx` (`:200`) and the tongue
     /// joint's `eyePos` (`:202-205`) are renderer and joint-matrix work.
-    fn execute(&mut self, mem: &MemBits, vibe: &super::vibration::Vibration, events: &mut SimEvents) {
+    fn execute(
+        &mut self,
+        mem: &MemBits,
+        vibe: &super::vibration::Vibration,
+        events: &mut SimEvents,
+    ) {
         for timer in &mut self.timers {
             if *timer != 0 {
                 *timer -= 1;

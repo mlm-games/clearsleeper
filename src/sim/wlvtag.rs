@@ -33,7 +33,11 @@ pub struct WlvTag {
 }
 
 fn level_for(sch: u8, schbit: u8) -> f32 {
-    if sch & schbit != 0 { LEVEL_HIGH } else { LEVEL_LOW }
+    if sch & schbit != 0 {
+        LEVEL_HIGH
+    } else {
+        LEVEL_LOW
+    }
 }
 
 impl WlvTag {

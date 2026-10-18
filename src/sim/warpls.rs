@@ -24,7 +24,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::area::StageName;
-use super::event::{ActiveEvent, EventList, StageEvents};
+use super::event::{ActiveEvent, EventList, Stage, StageEvents};
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 use super::player::Player;
@@ -92,12 +92,6 @@ const SE_WARP_EFF_APPEAR: u32 = 0x6967;
 /// `fopAcM_seStart(this, JA_SE_LK_WAPR_EFF_WARP, 0)` (`d_a_warpls.cpp:209`).
 const SE_WAPR_EFF_WARP: u32 = 0x285D;
 
-/// `eventInfo.checkCommandDemoAccrpt()` (`d_a_warpls.cpp:195`) has no counterpart here: the demo
-/// actor registry that `dDemo_setDemoData` feeds does not exist in this sim. The gate is
-/// transcribed and fed `false`, which selects the non-demo path - the same treatment
-/// `andsw0.rs` gives its identical `DEMO_ACCEPT: bool = false`.
-pub const DEMO_ACCEPT: bool = false;
-
 /// `daWarpls_prm::getType` = `(fopAcM_GetParam(this) >> 0x1C) & 0xFF` (`d_a_warpls.h:50`),
 /// stored in `mWarpType` by `_create` (`:153`).
 fn get_type(parameters: u32) -> u8 {
@@ -114,6 +108,11 @@ fn get_switch_no(parameters: u32) -> u8 {
 fn get_ev_id(parameters: u32) -> u8 {
     ((parameters >> 0x10) & 0xFF) as u8
 }
+
+/// `daWarpls_prm::getSceneNo` = `(fopAcM_GetParam(this) >> 8) & 0xFF` (`d_a_warpls.h:58-60`),
+/// stored in `mSceneNo` by `CreateInit` (`d_a_warpls.cpp:95`).
+const SCENE_NO_SHIFT: u32 = 8;
+const SCENE_NO_MASK: u32 = 0xFF;
 
 /// `mActivationEvtIdx = dComIfGp_evmng_getEventIdx(NULL, daWarpls_prm::getEvId(this))`
 /// (`d_a_warpls.cpp:137`). A `NULL` name makes retail resolve the id through the stage
@@ -175,6 +174,9 @@ pub struct Warpls {
     player_started_in_warp: bool,
     /// `mStartupDelayTimer` (`d_a_warpls.cpp:126`, `:133`), decremented at `:176-178`.
     startup_delay: u8,
+    /// `mSceneNo` (`d_a_warpls.cpp:95`, inside `CreateInit`), `daWarpls_prm::getSceneNo(this)`;
+    /// read only by `dLib_setNextStageBySclsNum(mSceneNo, fopAcM_GetRoomNo(this))` (`:208`).
+    scene_no: u8,
     /// `mActivationEvtIdx` (`d_a_warpls.cpp:137`), tested against `-1` at `:240` and `:263`.
     activation_idx: Option<usize>,
     /// `mWarpingEvtIdx = dComIfGp_evmng_getEventIdx(eventNames[mEvtType], 0xFF)` (`:138`).
@@ -186,14 +188,17 @@ pub struct Warpls {
 impl Warpls {
     /// `_create` (`:150-163`) then the parameter-independent half of `CreateInit`. The profile's
     /// `Parameters` field is `0` (`d_a_warpls.cpp:395`) and every read of the parameter is a
-    /// `daWarpls_prm` accessor, so the whole u32 is decoded here. `mSceneNo` is deliberately not
-    /// stored: `daWarpls_prm::getSceneNo` (`d_a_warpls.h:44` region) feeds only
-    /// `dLib_setNextStageBySclsNum(mSceneNo, fopAcM_GetRoomNo(this))` at `:208`, which has no
-    /// resource here - per RULE 7 an unread field is dead code.
+    /// `daWarpls_prm` accessor, so the whole u32 is decoded here. `mSceneNo` is
+    /// `daWarpls_prm::getSceneNo`, `(param >> 8) & 0xFF` (`d_a_warpls.h:58-60`), and it feeds the
+    /// one call `dLib_setNextStageBySclsNum(mSceneNo, fopAcM_GetRoomNo(this))` (`:208`) makes when
+    /// the warping event ends: a scene number into the room's own `SCLS` table, published through
+    /// [`NextStage::set_by_scls`](super::transition::NextStage::set_by_scls) and resolved by the
+    /// shell, which owns the loaded tables.
     pub fn spawn(parameters: u32) -> Self {
         Self {
             warp_type: get_type(parameters),
             switch_no: get_switch_no(parameters),
+            scene_no: ((parameters >> SCENE_NO_SHIFT) & SCENE_NO_MASK) as u8,
             evt_type: EVT_TYPE_DUNGEON,
             evt_state: EVT_STATE_NONE,
             warp_active: false,
@@ -286,6 +291,20 @@ impl Warpls {
         !self.player_started_in_warp && self.warp_active && self.within(actor, player)
     }
 
+    /// `eventInfo.checkCommandDemoAccrpt()` (`d_a_warpls.cpp:195`) is `mCommand ==
+    /// dEvtCmd_INDEMO_e` (`f_op_actor.h:177`), the per-actor latch `dEvt_control_c::demoCheck`
+    /// sets on every actor that ordered the event when it starts (`d_event.cpp:314-316`) and
+    /// `demoEnd` clears (`:331-337`). `ActiveEvent` marks that same window as `Stage::Play` or
+    /// `Stage::Close` on the slot the actor ordered, which is how `iceisland.rs` reads the
+    /// identical call; this actor orders the activation and the warping event and never both at
+    /// once, so either slot holding that window is the accept.
+    fn demo_accepted(&self, active: &ActiveEvent) -> bool {
+        [self.activation_idx, self.warping_idx]
+            .into_iter()
+            .flatten()
+            .any(|slot| matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)))
+    }
+
     /// `warp_eff_start()` (`:319-334`).
     fn warp_eff_start(&mut self, events: &mut SimEvents) {
         if self.warp_active {
@@ -309,10 +328,10 @@ impl Warpls {
         player: &Player,
         active: &mut ActiveEvent,
         events: &mut SimEvents,
+        next: &mut super::transition::NextStage,
         switch_on: bool,
-        demo_accepted: bool,
     ) {
-        if !demo_accepted {
+        if !self.demo_accepted(active) {
             self.demo(actor, player, switch_on);
             return;
         }
@@ -338,6 +357,10 @@ impl Warpls {
         if let Some(slot) = self.warping_idx
             && active.end_check(slot)
         {
+            // `dLib_setNextStageBySclsNum(mSceneNo, fopAcM_GetRoomNo(this))` (`:208`): the
+            // scene number is `mSceneNo`, the room the actor's own, and the shell resolves the
+            // pair against the room's `SCLS` table it loaded.
+            next.set_by_scls(self.scene_no, actor.room);
             events.list.push(SimEvent::Se(SE_WAPR_EFF_WARP));
         }
     }
@@ -400,7 +423,13 @@ impl Warpls {
     /// `fopAcM_orderOtherEventId(...)` (`:221`, `:232`, `:235`). Bug class 5: re-ordering every tick
     /// resets `Stage::Order` and livelocks the demo, so the order is only issued when the slot is
     /// idle.
-    fn order(&self, list: &EventList, active: &mut ActiveEvent, slot: Option<usize>, entity: Entity) {
+    fn order(
+        &self,
+        list: &EventList,
+        active: &mut ActiveEvent,
+        slot: Option<usize>,
+        entity: Entity,
+    ) {
         let Some(slot) = slot else {
             return;
         };
@@ -422,6 +451,7 @@ pub fn control(
     stage_events: Option<Res<StageEvents>>,
     mut active: ResMut<ActiveEvent>,
     mut events: ResMut<SimEvents>,
+    mut next: ResMut<super::transition::NextStage>,
     mut lights: Query<(Entity, &mut Actor, &mut Warpls)>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -433,13 +463,7 @@ pub fn control(
             light.entered = true;
             let parameters = actor.parameters;
             light.create_init(
-                &mut actor,
-                &stage.0,
-                &switches,
-                &list,
-                stage_ref,
-                player,
-                parameters,
+                &mut actor, &stage.0, &switches, &list, stage_ref, player, parameters,
             );
         }
         let switch_on = light.switch_on(&switches);
@@ -453,8 +477,8 @@ pub fn control(
             player,
             &mut active,
             &mut events,
+            &mut next,
             switch_on,
-            DEMO_ACCEPT,
         );
         light.event_order(
             &actor,

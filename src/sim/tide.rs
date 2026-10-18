@@ -58,12 +58,12 @@ const CULL_MIN: [[i16; 3]; ATTR_COUNT] = [
     [3800, -1650, 400],    // <- :174-176 (0xED8, 0xF98E, 0x190)
 ];
 const CULL_MAX: [[i16; 3]; ATTR_COUNT] = [
-    [8800, -1600, 4600], // <- :42-44 (0x2260, 0xF9C0, 0x11F8)
+    [8800, -1600, 4600],  // <- :42-44 (0x2260, 0xF9C0, 0x11F8)
     [7300, -1550, -1544], // <- :69-71 (0x1C84, 0xF9F2, 0xF8F8)
-    [7800, -1550, 4800], // <- :96-98 (0x1E78, 0xF9F2, 0x12C0)
-    [1800, 150, 1800],   // <- :123-125 (0x708, 0x96, 0x708)
+    [7800, -1550, 4800],  // <- :96-98 (0x1E78, 0xF9F2, 0x12C0)
+    [1800, 150, 1800],    // <- :123-125 (0x708, 0x96, 0x708)
     [-3900, -1550, 1700], // <- :150-152 (0xF0C4, 0xF9F2, 0x6A4)
-    [6000, -1550, 1500], // <- :177-179 (0x1770, 0xF9F2, 0x5DC)
+    [6000, -1550, 1500],  // <- :177-179 (0x1770, 0xF9F2, 0x5DC)
 ];
 
 /// `daObjTide::Act_c`, the tide/sea-surface actor. Five stage strings share it; type 3 is the
@@ -105,9 +105,8 @@ impl Tide {
         } else {
             MODE_NORM
         };
-        let initial_y = slot(kind).and_then(|slot| {
-            SCH_FLAG[slot].then(|| home.y + (1.0 - level.now) * M20[slot])
-        });
+        let initial_y = slot(kind)
+            .and_then(|slot| SCH_FLAG[slot].then(|| home.y + (1.0 - level.now) * M20[slot]));
         Self {
             kind,
             switch_no: ((parameters >> SWSAVE_SHIFT) & SWSAVE_MASK) as u8,
@@ -126,10 +125,7 @@ impl Tide {
         let Some(slot) = slot(self.kind) else {
             return ([0.0; 3], [0.0; 3]);
         };
-        (
-            CULL_MIN[slot].map(f32::from),
-            CULL_MAX[slot].map(f32::from),
-        )
+        (CULL_MIN[slot].map(f32::from), CULL_MAX[slot].map(f32::from))
     }
 
     /// `mode_norm` (`d_a_obj_tide.cpp:418-456`). `current.pos.y` (`:428`) is the only line whose

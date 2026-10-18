@@ -524,10 +524,7 @@ impl ObjEff {
             id: set.particle_id,
             pos,
             angle: None,
-            scale: set
-                .scale
-                .or(set.scale_2d)
-                .map(Vec3::from_array),
+            scale: set.scale.or(set.scale_2d).map(Vec3::from_array),
         }
     }
 

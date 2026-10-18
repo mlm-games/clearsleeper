@@ -162,7 +162,7 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
                     entry.pos_center.y - entry.pos_center_orig.y,
                 ]
             });
-            
+
             // The parent's global origin already carries the parent's own shift,
             // so the child adds only its own translation on top of the offset.
             // Accumulating the parent's shift here would apply it twice.
@@ -178,17 +178,30 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
             if trace && (own_shift[0].abs() > 0.5 || own_shift[1].abs() > 0.5) {
                 eprintln!(
                     "  RESIDUAL {:>10} shift=({:.1},{:.1}) drawn_at=({:.0},{:.0}) shown={} a={:.2}",
-                    node.name, own_shift[0], own_shift[1],
-                    origin[index][0], origin[index][1], shown[index], alpha[index]
+                    node.name,
+                    own_shift[0],
+                    own_shift[1],
+                    origin[index][0],
+                    origin[index][1],
+                    shown[index],
+                    alpha[index]
                 );
             }
             if trace_slots {
                 eprintln!(
                     "  PANE[{index:3}] {:>8} par={:?} at=({:.0},{:.0}) bounds=({:.0},{:.0} {:.0}x{:.0}) shown={} a={:.2} tex={:?} live={}",
-                    node.name, node.parent, origin[index][0], origin[index][1],
-                    node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
-                    shown[index], alpha[index],
-                    node.texture, pane.is_some()
+                    node.name,
+                    node.parent,
+                    origin[index][0],
+                    origin[index][1],
+                    node.bounds.x,
+                    node.bounds.y,
+                    node.bounds.w,
+                    node.bounds.h,
+                    shown[index],
+                    alpha[index],
+                    node.texture,
+                    pane.is_some()
                 );
             }
             if shown[index] && alpha[index] > 0.0 {
@@ -341,17 +354,49 @@ fn tex_coord(binding: u8, mirror: u8, rect: [f32; 4], image: &Image) -> [f32; 4]
     let mirror_y = mirror & 1 != 0;
     let (bind_left, bind_right, bind_top, bind_bottom) = if !tumble {
         (
-            if mirror_x { binding & BIND_RIGHT != 0 } else { binding & BIND_LEFT != 0 },
-            if mirror_x { binding & BIND_LEFT != 0 } else { binding & BIND_RIGHT != 0 },
-            if mirror_y { binding & BIND_BOTTOM != 0 } else { binding & BIND_TOP != 0 },
-            if mirror_y { binding & BIND_TOP != 0 } else { binding & BIND_BOTTOM != 0 },
+            if mirror_x {
+                binding & BIND_RIGHT != 0
+            } else {
+                binding & BIND_LEFT != 0
+            },
+            if mirror_x {
+                binding & BIND_LEFT != 0
+            } else {
+                binding & BIND_RIGHT != 0
+            },
+            if mirror_y {
+                binding & BIND_BOTTOM != 0
+            } else {
+                binding & BIND_TOP != 0
+            },
+            if mirror_y {
+                binding & BIND_TOP != 0
+            } else {
+                binding & BIND_BOTTOM != 0
+            },
         )
     } else {
         (
-            if mirror_x { binding & BIND_BOTTOM != 0 } else { binding & BIND_TOP != 0 },
-            if mirror_x { binding & BIND_TOP != 0 } else { binding & BIND_BOTTOM != 0 },
-            if mirror_y { binding & BIND_LEFT != 0 } else { binding & BIND_RIGHT != 0 },
-            if mirror_y { binding & BIND_RIGHT != 0 } else { binding & BIND_LEFT != 0 },
+            if mirror_x {
+                binding & BIND_BOTTOM != 0
+            } else {
+                binding & BIND_TOP != 0
+            },
+            if mirror_x {
+                binding & BIND_TOP != 0
+            } else {
+                binding & BIND_BOTTOM != 0
+            },
+            if mirror_y {
+                binding & BIND_LEFT != 0
+            } else {
+                binding & BIND_RIGHT != 0
+            },
+            if mirror_y {
+                binding & BIND_RIGHT != 0
+            } else {
+                binding & BIND_LEFT != 0
+            },
         )
     };
     let (rect_w, rect_h) = if tumble {

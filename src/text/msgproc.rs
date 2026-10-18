@@ -2,8 +2,8 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::msgdata::MsgLenState;
-use super::msglayout::MsgLayoutState;
 use super::msgget::{ItemMsgGet, MsgArchive, MsgGet};
+use super::msglayout::MsgLayoutState;
 use super::{
     FontSlot, ICON_ARROW_DOWN, ICON_ARROW_LEFT, ICON_ARROW_RIGHT, ICON_ARROW_UP,
     ICON_FLASHING_A_BUTTON, ICON_FLASHING_A_BUTTON_2, ICON_HEART, ICON_HEART_2, ICON_MAIN_STICK,
@@ -100,8 +100,6 @@ const BUTTON_W: [[u8; 4]; 24] = [
     [0xFF, 0xFF, 0xFF, 0xFF],
     [0xFF, 0xFF, 0xFF, 0xFF],
 ];
-
-
 
 pub const J2D_MIRROR_Y: u8 = 1 << 0;
 pub const J2D_MIRROR_X: u8 = 1 << 1;
@@ -1285,14 +1283,14 @@ fn anime_piece_blend(hio: &MeterMsgHio, param_3: i16, param_4: i16) -> Option<[f
     if param_3 < p.temp2 {
         Some(BLEND_FULL)
     } else if param_3 < p.temp3 {
-        let t =
-            fop_msgm_value_increase(p.temp as i32, param_3 as i32 - p.temp2 as i32, 0).unwrap_or_default();
+        let t = fop_msgm_value_increase(p.temp as i32, param_3 as i32 - p.temp2 as i32, 0)
+            .unwrap_or_default();
         Some([t, 1.0 - t, 1.0, 1.0])
     } else if param_3 < p.temp4 {
         Some([1.0, 0.0, 1.0, 1.0])
     } else if param_3 < p.temp5 {
-        let t =
-            fop_msgm_value_increase(p.temp as i32, param_3 as i32 - p.temp4 as i32, 0).unwrap_or_default();
+        let t = fop_msgm_value_increase(p.temp as i32, param_3 as i32 - p.temp4 as i32, 0)
+            .unwrap_or_default();
         Some([1.0 - t, t, 1.0, 1.0])
     } else {
         None
@@ -1745,7 +1743,12 @@ pub fn fop_msgm_out_font_draw(
         param_5 as f32,
         param_5 as f32,
     );
-    i_icon_pic.draw(param_3 as f32, icon_y as f32, param_5 as f32, param_5 as f32);
+    i_icon_pic.draw(
+        param_3 as f32,
+        icon_y as f32,
+        param_5 as f32,
+        param_5 as f32,
+    );
 
     i_icon_pic.set_alpha(i_alpha);
     i_sdw_pic.set_alpha(i_alpha);

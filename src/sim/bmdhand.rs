@@ -231,26 +231,9 @@ const JNT_HANAD7: i32 = 55;
 const JOINT_SLOTS: usize = 5;
 
 const BOSS_JOINT_D: [i32; HANDS] = [
-    JNT_HANAA7,
-    JNT_HANAA7,
-    JNT_HANAA7,
-    JNT_HANAA7,
-    JNT_HANAB7,
-    JNT_HANAB7,
-    JNT_HANAB7,
-    JNT_HANAB7,
-    JNT_HANAC7,
-    JNT_HANAC7,
-    JNT_HANAC7,
-    JNT_HANAC7,
-    JNT_HANAE7,
-    JNT_HANAE7,
-    JNT_HANAE7,
-    JNT_HANAE7,
-    JNT_HANAD7,
-    JNT_HANAD7,
-    JNT_HANAD7,
-    JNT_HANAD7,
+    JNT_HANAA7, JNT_HANAA7, JNT_HANAA7, JNT_HANAA7, JNT_HANAB7, JNT_HANAB7, JNT_HANAB7, JNT_HANAB7,
+    JNT_HANAC7, JNT_HANAC7, JNT_HANAC7, JNT_HANAC7, JNT_HANAE7, JNT_HANAE7, JNT_HANAE7, JNT_HANAE7,
+    JNT_HANAD7, JNT_HANAD7, JNT_HANAD7, JNT_HANAD7,
 ];
 
 const BOSS_JOINT_XAD: [f32; 4] = [60.0, 20.0, -20.0, -60.0];
@@ -617,15 +600,13 @@ impl Bmdhand {
             let local_c4 = Vec3::new(
                 dvar9
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S5 + 0x44c)
-                            + i as i32 * (REG0_S6 + 4000),
+                        i32::from(self.m2b8) * (REG0_S5 + 0x44c) + i as i32 * (REG0_S6 + 4000)
                     ))
                     .sin(),
                 0.0,
                 dvar9
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S7 + 800)
-                            + i as i32 * (REG0_S8 + 4000),
+                        i32::from(self.m2b8) * (REG0_S7 + 800) + i as i32 * (REG0_S8 + 4000)
                     ))
                     .cos(),
             );
@@ -697,20 +678,17 @@ impl Bmdhand {
             let local_124 = Vec3::new(
                 self.m31c
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S4 + 0xdac)
-                            + i as i32 * (REG0_S5 + 4000),
+                        i32::from(self.m2b8) * (REG0_S4 + 0xdac) + i as i32 * (REG0_S5 + 4000)
                     ))
                     .sin(),
                 self.m31c
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S6 + 4000)
-                            + i as i32 * (REG0_S7 + 4000),
+                        i32::from(self.m2b8) * (REG0_S6 + 4000) + i as i32 * (REG0_S7 + 4000)
                     ))
                     .cos(),
                 self.m31c
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S8 + 0xed8)
-                            + i as i32 * (REG0_S9 + 4000),
+                        i32::from(self.m2b8) * (REG0_S8 + 0xed8) + i as i32 * (REG0_S9 + 4000)
                     ))
                     .cos(),
             );
@@ -756,20 +734,17 @@ impl Bmdhand {
             let local_c4 = Vec3::new(
                 dvar9
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S5 + 0x640)
-                            + i as i32 * (REG0_S6 + 3000),
+                        i32::from(self.m2b8) * (REG0_S5 + 0x640) + i as i32 * (REG0_S6 + 3000)
                     ))
                     .sin(),
                 dvar9
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S5 + 0x6a4)
-                            + i as i32 * (REG0_S6 + 4000),
+                        i32::from(self.m2b8) * (REG0_S5 + 0x6a4) + i as i32 * (REG0_S6 + 4000)
                     ))
                     .sin(),
                 dvar9
                     * walk::from_s16(sni(
-                        i32::from(self.m2b8) * (REG0_S7 + 0x578)
-                            + i as i32 * (REG0_S8 + 0xdac),
+                        i32::from(self.m2b8) * (REG0_S7 + 0x578) + i as i32 * (REG0_S8 + 0xdac)
                     ))
                     .cos(),
             );
@@ -803,7 +778,9 @@ impl Bmdhand {
     fn ceiling(&mut self, solid: Option<&Collision>, hio: &BmdhandHio) {
         let from = self.m2d8;
         let to = self.m2d8 + Vec3::new(0.0, LINE_HEIGHT, 0.0);
-        let cross = solid.map(|solid| solid.slide(from, to)).filter(|at| *at != to);
+        let cross = solid
+            .map(|solid| solid.slide(from, to))
+            .filter(|at| *at != to);
         if let Some(cross) = cross {
             self.m2cc = cross;
             self.m2cc.y += hio.m08;
@@ -918,9 +895,7 @@ impl Bmdhand {
         player: Vec3,
         sink: &mut Sink<'_>,
     ) {
-        let r3 = sni(
-            REG8_S4 + (param & PARAM_BRANCH) as i32 * PARAM_YAW_STEP + PARAM_YAW_BASE,
-        );
+        let r3 = sni(REG8_S4 + (param & PARAM_BRANCH) as i32 * PARAM_YAW_STEP + PARAM_YAW_BASE);
         actor.angle[1] = r3.wrapping_add(boss.shape_angle[1]);
         let joint = boss_joint_matrix(boss, joint_slot(param));
         let local_40 = Vec3::new(
@@ -1268,12 +1243,7 @@ pub struct Watch<'w, 's> {
     combat: Res<'w, Combat>,
     hammer: Res<'w, hammer::Cut>,
     blasts: Res<'w, super::bombflower::Blasts>,
-    players: Query<
-        'w,
-        's,
-        &'static Actor,
-        (With<Player>, Without<Bmdhand>, Without<KalleDemos>),
-    >,
+    players: Query<'w, 's, &'static Actor, (With<Player>, Without<Bmdhand>, Without<KalleDemos>)>,
     shafts: Query<'w, 's, &'static arrow::Arrow, Without<Bmdhand>>,
     bolts: Query<'w, 's, &'static boomerang::Boomerang, Without<Bmdhand>>,
 }

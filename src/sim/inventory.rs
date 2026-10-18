@@ -98,7 +98,11 @@ impl Default for Got {
 
 impl Got {
     pub fn has(&self, field: usize, bit: u8) -> bool {
-        bit < 8 && self.flags.get(field).is_some_and(|flags| flags & (1 << bit) != 0)
+        bit < 8
+            && self
+                .flags
+                .get(field)
+                .is_some_and(|flags| flags & (1 << bit) != 0)
     }
 
     pub fn gain(&mut self, field: usize, bit: u8) {
@@ -149,11 +153,7 @@ pub const ITEM_SONG_OF_PASSING: u8 = 0x72;
 pub const SWORD_COLLECT_BYTE: u8 = 0;
 pub const SWORD_COLLECT_LEVEL: u8 = 0;
 
-pub fn check_get_item(
-    equipped: &Equipped,
-    collect: &super::flags::Collect,
-    item: u8,
-) -> bool {
+pub fn check_get_item(equipped: &Equipped, collect: &super::flags::Collect, item: u8) -> bool {
     let tact = |no: u8| item == ITEM_WINDS_REQUIEM + no;
     if tact(0) {
         return collect.is_tact(0);

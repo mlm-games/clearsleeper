@@ -1,5 +1,9 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
+use super::actor::Actor;
+use super::damage_fx::DamageFxQueue;
+use super::damage_resolve::DamageFx;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
 
@@ -53,6 +57,15 @@ const SE_W_OUT: u32 = 0x704B; // <- JAZelAudio_SE.h:2157 (JA_SE_OBJ_RDUN_MAE_W_O
 const SE_GEYSER: u32 = 0x704C; // <- JAZelAudio_SE.h:2158 (JA_SE_OBJ_RDUN_MAE_GEYSER)
 const SE_W_UP: u32 = 0x704D; // <- JAZelAudio_SE.h:2159 (JA_SE_OBJ_RDUN_MAE_W_UP)
 
+/// The four `dComIfGp_particle_set` ids `particle_set` (`d_a_obj_gryw00.cpp:122-127`) creates at
+/// `home.pos`: `dPa_name::ID_AK_SN_RYUDANMAESPLASH00`, `ID_AK_SN_RYUDANMAESTEAM00`,
+/// `ID_AK_SN_RYUDANMAESPLASH01` and `ID_AK_SN_RYUDANMAEHAMON00`. The last two are the ones the
+/// class keeps in `mpEmitters[0]` / `mpEmitters[1]`; the first two are fire-and-forget.
+const ID_RYUDANMAESPLASH00: u16 = 0x8295; // <- d/d_particle_name.h:783
+const ID_RYUDANMAESPLASH01: u16 = 0x8296; // <- d/d_particle_name.h:784
+const ID_RYUDANMAESTEAM00: u16 = 0x8297; // <- d/d_particle_name.h:785
+const ID_RYUDANMAEHAMON00: u16 = 0x8298; // <- d/d_particle_name.h:786
+
 const SWSAVE_SHIFT: u32 = 0x00; // <- d_a_obj_gryw00.h:16 (PRM_SWSAVE_S = 0x00)
 const SWSAVE_WIDTH: u32 = 0x08; // <- d_a_obj_gryw00.h:15 (PRM_SWSAVE_W = 0x08)
 const SWSAVE_MASK: u32 = (1 << SWSAVE_WIDTH) - 1;
@@ -78,7 +91,6 @@ pub struct Gryw {
     btk_state: u8,
 }
 
-
 impl Gryw {
     pub fn water_lv(&self) -> f32 {
         self.water_lv
@@ -100,8 +112,16 @@ impl Gryw {
         Self {
             switch_no,
             mode: if solved { PHASE_HIGH_WATER } else { PHASE_WAIT },
-            water_lv: if solved { HIGH_WATER_LEVEL } else { LOW_WATER_LEVEL },
-            water_max: if solved { HIGH_WATER_LEVEL } else { LOW_WATER_LEVEL },
+            water_lv: if solved {
+                HIGH_WATER_LEVEL
+            } else {
+                LOW_WATER_LEVEL
+            },
+            water_max: if solved {
+                HIGH_WATER_LEVEL
+            } else {
+                LOW_WATER_LEVEL
+            },
             water_inc: 0.0,
             wave: if solved { WAVE_AMPLITUDE } else { WAVE_START },
             wave_max: if solved { WAVE_AMPLITUDE } else { WAVE_START },
@@ -109,7 +129,11 @@ impl Gryw {
             should_play_se: false,
             geyser_se: 0,
             btk_end: BTK_END_FRAME,
-            btk_rate: if solved { BTK_PLAY_RATE } else { BTK_START_RATE },
+            btk_rate: if solved {
+                BTK_PLAY_RATE
+            } else {
+                BTK_START_RATE
+            },
             btk_frame: 0.0,
             btk_state: 0,
         }
@@ -169,9 +193,16 @@ impl Gryw {
         events.list.push(SimEvent::Se(SE_W_UP));
     }
 
-    /// `switch_wait_act_proc` (`:224-243`). The BCK half (`:232`) and the four emitters
-    /// (`:238`) are not modelled - the particle system and `J3DAnmTransform` archives are absent.
-    fn switch_wait_act_proc(&mut self, switches: &Switches) {
+    /// `switch_wait_act_proc` (`:224-243`). The BCK write (`:232`) is renderer-only: `mBck` drives
+    /// the model's joint animation and nothing in the translation unit reads a frame or a rate
+    /// back off it, so the port's `j3d` BCK reader has no consumer here. The four emitters
+    /// (`:238`) go through [`particle_set`](Self::particle_set).
+    fn switch_wait_act_proc(
+        &mut self,
+        pos: Vec3,
+        switches: &Switches,
+        fx: &mut DamageFxQueue,
+    ) {
         if self.switch_no == SWITCH_NONE {
             return;
         }
@@ -183,9 +214,38 @@ impl Gryw {
         self.wave_max = WAVE_AMPLITUDE;
         self.water_inc = WATER_WAVE_GROWTH_SPEED;
         self.water_max = SPREAD_WATER_LEVEL;
+        self.particle_set(pos, fx); // <- :238
         self.geyser_se = GEYSER_SOUND_LEN;
         self.should_play_se = true;
         self.mode = PHASE_SPREAD;
+    }
+
+    /// `particle_set` (`:122-127`): four `dComIfGp_particle_set(id, &homePos, NULL, NULL, 0xff,
+    /// NULL, -1, NULL, &mColorK0, NULL)` calls, all at `this->home.pos`, with the third and fourth
+    /// ids kept in `mpEmitters[0]` / `mpEmitters[1]`. The port's actor-facing particle channel is
+    /// [`DamageFxQueue`](super::damage_fx::DamageFxQueue) - the one `fgmahou.rs` and `shand.rs`
+    /// push their own `dComIfGp_particle_set` calls through, and the one `App::pump_damage_fx`
+    /// drains into the renderer's emitter pool - so the four requests are queued at the position
+    /// the reference creates them.
+    ///
+    /// `particle_move` (`:129-138`) then follows the two held emitters - `setGlobalTranslation` at
+    /// `home.pos + (0, mWaterLv, 0)` - and `particle_delete` (`:140-150`) retires them. The queue
+    /// carries one-shot requests and no emitter handle, so neither call has a destination: the two
+    /// held effects are placed once, where retail creates them.
+    fn particle_set(&self, pos: Vec3, fx: &mut DamageFxQueue) {
+        for id in [
+            ID_RYUDANMAESPLASH00,
+            ID_RYUDANMAESTEAM00,
+            ID_RYUDANMAESPLASH01,
+            ID_RYUDANMAEHAMON00,
+        ] {
+            fx.push(DamageFx::Particle {
+                id,
+                pos,
+                angle: None,
+                scale: None,
+            });
+        }
     }
 
     /// `spread_water_face_act_proc` (`:246-250`).
@@ -195,7 +255,10 @@ impl Gryw {
         }
     }
 
-    /// `water_level_move_wait_act_proc` (`:253-261`). The BCK hold (`:258-259`) is not modelled.
+    /// `water_level_move_wait_act_proc` (`:253-261`). The BCK hold (`:258-259`,
+    /// `mBck.setPlaySpeed(0); mBck.setFrame(RISE_PHASE_ANIM_LEN);`) is renderer-only, as the BCK
+    /// write in [`switch_wait_act_proc`](Self::switch_wait_act_proc) is: only the model draw reads
+    /// a BCK frame back.
     fn water_level_move_wait_act_proc(&mut self) {
         if self.btk_check_frame(RISE_PHASE_ANIM_LEN) {
             self.water_inc = WATER_RISE_SPEED;
@@ -214,9 +277,9 @@ impl Gryw {
     /// `high_water_level_act_proc` (`:272-273`) is empty.
     fn high_water_level_act_proc(&mut self) {}
 
-    fn act_proc(&mut self, switches: &Switches) {
+    fn act_proc(&mut self, pos: Vec3, switches: &Switches, fx: &mut DamageFxQueue) {
         match self.mode {
-            PHASE_WAIT => self.switch_wait_act_proc(switches),
+            PHASE_WAIT => self.switch_wait_act_proc(pos, switches, fx),
             PHASE_SPREAD => self.spread_water_face_act_proc(),
             PHASE_RISE => self.water_level_move_wait_act_proc(),
             PHASE_LOOP_WAIT => self.anime_loop_start_wait_act_proc(),
@@ -225,9 +288,16 @@ impl Gryw {
         }
     }
 
-    /// `Execute` (`:276-304`), minus the renderer-only matrix writes (`:288-295`), the emitter
-    /// moves (`:297`) and the BCK play (`:300`). Retail order is water, `set_se`, BTK, mode.
-    fn execute(&mut self, switches: &Switches, events: &mut SimEvents) {
+    /// `Execute` (`:276-304`), minus the renderer-only matrix writes (`:288-295`) and the BCK play
+    /// (`:300`). `particle_move` (`:297`) is `particle_set`'s note. Retail order is water,
+    /// `set_se`, BTK, mode.
+    fn execute(
+        &mut self,
+        pos: Vec3,
+        switches: &Switches,
+        events: &mut SimEvents,
+        fx: &mut DamageFxQueue,
+    ) {
         self.wave += self.wave_inc;
         if self.wave < self.wave_max {
             self.wave = self.wave_max;
@@ -240,7 +310,7 @@ impl Gryw {
         }
         self.set_se(events);
         self.btk_play();
-        self.act_proc(switches);
+        self.act_proc(pos, switches, fx);
     }
 }
 
@@ -251,9 +321,10 @@ pub fn is_gryw(name: &str) -> bool {
 pub fn control(
     switches: Res<Switches>,
     mut events: ResMut<SimEvents>,
-    mut pools: Query<&mut Gryw>,
+    mut fx: ResMut<DamageFxQueue>,
+    mut pools: Query<(&Actor, &mut Gryw)>,
 ) {
-    for mut pool in &mut pools {
-        pool.execute(&switches, &mut events);
+    for (actor, mut pool) in &mut pools {
+        pool.execute(actor.pos, &switches, &mut events, &mut fx);
     }
 }

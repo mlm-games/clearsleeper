@@ -23,25 +23,9 @@ use super::walk;
 // d_stage.cpp:483-501 -- the 19 takara*/tkr* names mapped to fpcNm_TBOX_e.
 // d_stage.cpp:502 maps tkrSlv to fpcNm_SBOX_e, which this actor does NOT own.
 pub const TBOX_ACTORS: [&str; 19] = [
-    "takara",
-    "takara2",
-    "takara3",
-    "takara4",
-    "takara5",
-    "takara6",
-    "takara7",
-    "takara8",
-    "takaraK",
-    "takaraI",
-    "takaraM",
-    "tkrASw",
-    "tkrAGc",
-    "tkrAKd",
-    "tkrAIk",
-    "tkrBMs",
-    "tkrCTf",
-    "tkrAOc",
-    "tkrAOs",
+    "takara", "takara2", "takara3", "takara4", "takara5", "takara6", "takara7", "takara8",
+    "takaraK", "takaraI", "takaraM", "tkrASw", "tkrAGc", "tkrAKd", "tkrAIk", "tkrBMs", "tkrCTf",
+    "tkrAOc", "tkrAOs",
 ];
 
 const FUNC_TYPE_SWITCH: u8 = 1; // <- d_a_tbox.cpp:24
@@ -226,7 +210,9 @@ impl Tbox {
         let chest_sight = to_player.wrapping_sub(actor.angle[1]).unsigned_abs();
         // fopAcM_seenActorAngleY(player, this)
         let to_chest = walk::to_s16(-diff.x.atan2(-diff.z));
-        let player_sight = to_chest.wrapping_sub(walk::to_s16(player.face)).unsigned_abs();
+        let player_sight = to_chest
+            .wrapping_sub(walk::to_s16(player.face))
+            .unsigned_abs();
         chest_sight < SEEN_LIMIT && player_sight < SEEN_LIMIT
     }
 
@@ -250,7 +236,8 @@ impl Tbox {
         if self.func != FUNC_GRAVITY {
             return;
         }
-        let (next, _) = stream::calc_speed(0.0, actor.angle[1], self.speed.y, self.gravity, MAX_FALL);
+        let (next, _) =
+            stream::calc_speed(0.0, actor.angle[1], self.speed.y, self.gravity, MAX_FALL);
         self.speed = next;
         let from = actor.pos;
         actor.pos += self.speed;

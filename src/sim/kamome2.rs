@@ -428,7 +428,8 @@ impl Kamome2 {
 
     fn bgcheck(&mut self, actor: &mut Actor, ctx: &Ctx<'_, '_>) {
         let probe = actor.pos - Vec3::Y * BGCHECK_DROP;
-        self.ground_hit = ground::surface(ctx.collision, probe).is_some_and(|height| probe.y <= height);
+        self.ground_hit =
+            ground::surface(ctx.collision, probe).is_some_and(|height| probe.y <= height);
         actor.pos.y += BGCHECK_DROP;
     }
 

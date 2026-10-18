@@ -162,7 +162,6 @@ impl WindTag {
     pub fn visible(&self) -> bool {
         !self.hidden && self.cur >= DRAW_MIN
     }
-
 }
 
 pub fn is_wind_tag(name: &str) -> bool {

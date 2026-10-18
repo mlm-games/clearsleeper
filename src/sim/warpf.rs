@@ -178,7 +178,7 @@ impl Warpf {
     /// `demo_proc` (`:375-402`). `dComIfGp_evmng_getMyStaffId` is `ActiveEvent::staff_cut` under
     /// the same name and `getMyActIdx` is `EventList::cut_name` matched against `action_table`.
     /// `!eventInfo.checkCommandTalk()` (`:377`) is the event manager's TALK command, which this
-    /// sim leaves false - the same proven default `warpfo.rs:120-122` and `grammarian.rs:1168-1170`
+    /// sim leaves false - the same proven default `warpfo.rs:120-122` and `ba1.rs:1290-1292`
     /// use - so the staff lookup alone carries the arm.
     ///
     /// `true` is `dComIfGp_evmng_cutEnd(mStaffID)`, which retail calls from the `actIdx == -1`

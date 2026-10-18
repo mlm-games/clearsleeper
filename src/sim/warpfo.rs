@@ -119,7 +119,7 @@ impl Warpfo {
     /// `ActiveEvent::staff_cut` under the same name, `getMyActIdx` is `cut_name` matched against
     /// `action_table`, `getIsAddvance` is the returned advance flag, and `actIdx == -1` is the
     /// unmatched cut. `eventInfo.checkCommandTalk()` is the event manager's TALK command, which
-    /// this sim leaves false, the same proven default `grammarian.rs:1168-1170` uses.
+    /// this sim leaves false, the same proven default `ba1.rs:1290-1292` uses.
     fn demo_proc(
         &mut self,
         list: &EventList,

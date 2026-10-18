@@ -5,7 +5,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::daynight::{DayNight, TIME_DAY};
 use super::event::{ActiveEvent, EventList};
-use super::flags::{Collect, StoryBits, SYMBOL_DIN};
+use super::flags::{Collect, SYMBOL_DIN, StoryBits};
 use super::intent::DoIntent;
 use super::player::Player;
 use super::stream::add_calc_angle_s2;
@@ -19,9 +19,7 @@ use crate::text::msgproc::{
     FPC_M_ERROR_PROCESS_ID, FPC_NM_MSG, FPC_NM_MSG2, MsgGameInfo, MsgProcs,
     fop_msgm_message_set_actor,
 };
-use crate::text::{
-    STATUS_BOX_CLOSED, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS,
-};
+use crate::text::{STATUS_BOX_CLOSED, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS};
 
 pub const NPC_BTSW2_ACTORS: [&str; 1] = ["Btsw2"];
 
@@ -703,10 +701,7 @@ pub fn control(
     let day_night = world.daynight.daynight();
     let demo_accept = msg.info.event_run_check();
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (entity, mut actor, mut btsw2) in &mut actors {
         let mut refused = false;
         if !btsw2.entered {

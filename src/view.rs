@@ -93,6 +93,7 @@ pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
             layer_size: LAYER_SIZE,
             layers: room.textures.len().max(1) as u32,
             filter: SceneFilter::Linear,
+            mips: 1,
         },
         None => BatchDesc::default(),
     }
@@ -120,6 +121,11 @@ pub fn build_frame_with_actor(
         cam,
         background: Some(snapshot.sky),
         desc: batch_desc(room),
+        // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
+        // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
+        // both cull groups this port never asked it to and append a depth pass + readback
+        // whose pyramid nobody reads.
+        occlusion_feed: None,
         ..Frame3d::default()
     };
     let eye = frame.cam.eye();
@@ -165,10 +171,9 @@ pub fn build_frame_with_actor(
 }
 
 pub fn skinned_draw(actor: &RoomMesh, snapshot: &SceneSnapshot) -> Option<SkinnedDraw> {
-    let group = actor
-        .groups
-        .iter()
-        .find(|group| group.joint_indices.len() == group.positions.len() && !group.joint_indices.is_empty())?;
+    let group = actor.groups.iter().find(|group| {
+        group.joint_indices.len() == group.positions.len() && !group.joint_indices.is_empty()
+    })?;
     if actor.joint_matrices.len() != actor.joints.len() {
         return None;
     }
@@ -208,7 +213,11 @@ pub fn skinned_draw(actor: &RoomMesh, snapshot: &SceneSnapshot) -> Option<Skinne
 /// unreduced on the right of every joint and displace the actor by the negated
 /// bind translations.
 fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot) -> Vec<Mat4> {
-    let origin = Vec3::new(snapshot.player_pos.x, snapshot.ground_y, snapshot.player_pos.z);
+    let origin = Vec3::new(
+        snapshot.player_pos.x,
+        snapshot.ground_y,
+        snapshot.player_pos.z,
+    );
     let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
     pose.into_iter().map(|joint| to_world * joint).collect()
 }

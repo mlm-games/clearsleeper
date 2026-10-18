@@ -87,9 +87,14 @@ pub fn control(players: Query<&Player>, mut cursors: Query<&mut Actor, With<Agb>
         // `if (getFollowTarget() == 0) { if (fopAcM_GetName(player) == fpcNm_NPC_KAM_e) {
         // onFree(); } else { current.pos = player->current.pos; home.pos = player->current.pos;
         // } }` (`d_a_agb.cpp:1589-1595`). `getFollowTarget()` is false from `resetCursor`'s
-        // `setFollowTarget(false)` (`:742`) and nothing in the un-linked arms sets it again, and
-        // `home.pos` has no counterpart in this sim's `Actor`, so the surviving half is the
-        // position copy. `fpcNm_NPC_KAM_e` is `d_a_npc_kamome` (`c_dylink.cpp:196`), the bird that
+        // `setFollowTarget(false)` (`:742`) and nothing in the un-linked arms sets it again, so
+        // the surviving half is the position copy. `home` is the actor base's own stage-placed
+        // transform (`fopAc_ac_c::home`, `f_op_actor.h:287`) and has no counterpart in this sim's
+        // `Actor`; the missing subsystem is the engine services that read a home point (culling by
+        // home room, the room reset, `fopAcM_GetHomePos` readers). This TU never reads the field
+        // back: every `home` use in `d_a_agb.cpp` is a write (`:754`, `:757`, and `:1300-1331`
+        // inside the `CursorMove` tail the module already drops), so the omitted half has no
+        // reader here either. `fpcNm_NPC_KAM_e` is `d_a_npc_kamome` (`c_dylink.cpp:196`), the bird that
         // carries Link in the cutscene; the player of a normal stage is never it, so the `onFree()`
         // arm is not the live one.
         actor.pos = player.pos;

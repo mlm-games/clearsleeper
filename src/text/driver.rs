@@ -4,12 +4,12 @@ use glam::Vec3;
 use super::font::{FontBank, ResFont};
 use super::fontdata;
 use super::msgbox::{Msg2Box, Msg2Ctx, Msg2Env, Msg2Hio, Msg2Screen, Msg2Stick};
-use super::msgdata::MsgStickFlags;
 use super::msgbox1::{Msg1Box, Msg1Ctx, Msg1Env, Msg1Hio, Msg1Screen, Msg1Stick};
 use super::msgdata::MsgLenState;
-use super::msgproc::{MeterMsgHio, MsgGameInfo, MsgProcs, FPC_NM_MSG2};
+use super::msgdata::MsgStickFlags;
 use super::msgget::MsgArchive;
 use super::msglayout::MsgLayoutState;
+use super::msgproc::{FPC_NM_MSG2, MeterMsgHio, MsgGameInfo, MsgProcs};
 
 pub const COLOR_TABLE: &str = "color.bmc";
 
@@ -249,7 +249,6 @@ impl TextDriver {
             slot.copy_from_slice(name.as_bytes().get(..take).unwrap_or(&[]));
         }
     }
-
 }
 
 pub fn load_fonts(fonts: &mut FontBank) {

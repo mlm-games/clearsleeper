@@ -21,7 +21,10 @@ use crate::text::msgbox::Msg2Box;
 use crate::text::msgbox1::Msg1Box;
 use crate::text::msgget::MsgArchive;
 use crate::text::msgproc::{FPC_M_ERROR_PROCESS_ID, MsgGameInfo, MsgProcs};
-use crate::text::{STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED, STATUS_MSG_ENDS};
+use crate::text::{
+    STATUS_BOX_CLOSED, STATUS_MSG_CONTINUES, STATUS_MSG_DESTROYED, STATUS_MSG_DISPLAYED,
+    STATUS_MSG_ENDS,
+};
 
 pub const TAG_HINT_ACTORS: [&str; 2] = ["TagHt", "TagHt2"];
 
@@ -74,11 +77,7 @@ pub const EVENT_DEFAULT_HINT: &str = "DEFAULT_HINT"; // <- d_a_tag_hint.cpp:330
 
 pub const ACTION_TABLE: [&str; 5] = [
     // <- d_a_tag_hint.cpp:533-539
-    "WAIT",
-    "MESSAGE",
-    "MESSAGE2",
-    "SURPRIS",
-    "MESSAGE3",
+    "WAIT", "MESSAGE", "MESSAGE2", "SURPRIS", "MESSAGE3",
 ];
 pub const ACT_WAIT: i32 = 0; // <- d_a_tag_hint.cpp:534
 pub const ACT_MESSAGE: i32 = 1; // <- d_a_tag_hint.cpp:535
@@ -134,9 +133,12 @@ pub const LIGHT_FLUCTUATION: f32 = 93.8; // <- d_a_tag_hint.cpp:341
 pub const LIGHT_COLOR_P: [u16; 3] = [0x5C, 0xAE, 0xFF]; // <- d_a_tag_hint.cpp:337-339
 pub const LIGHT_COLOR_E: [u16; 3] = [0xBA, 0xFF, 0xFF]; // <- d_a_tag_hint.cpp:342-344
 
-pub const SEARCH_ANGLE_TABLE: [i16; 8] = [0x00, 0x2000, -0x2000, 0x4000, -0x4000, 0x6000, -0x6000, 0x7FFF]; // <- d_a_tag_hint.cpp:399
-pub const SEARCH_ANGLE_TABLE_GRAB: [i16; 8] =
-    [0x4000, -0x4000, 0x6000, -0x6000, 0x7FFF, -0x2000, 0x2000, 0x00]; // <- d_a_tag_hint.cpp:400
+pub const SEARCH_ANGLE_TABLE: [i16; 8] = [
+    0x00, 0x2000, -0x2000, 0x4000, -0x4000, 0x6000, -0x6000, 0x7FFF,
+]; // <- d_a_tag_hint.cpp:399
+pub const SEARCH_ANGLE_TABLE_GRAB: [i16; 8] = [
+    0x4000, -0x4000, 0x6000, -0x6000, 0x7FFF, -0x2000, 0x2000, 0x00,
+]; // <- d_a_tag_hint.cpp:400
 pub const SEARCH_ANGLE_COUNT: usize = 8; // <- d_a_tag_hint.cpp:407
 
 pub const CULL_MIN: [f32; 3] = [-150.0, 0.0, -150.0]; // <- f_op_actor_mng.cpp:563

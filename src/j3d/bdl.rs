@@ -38,11 +38,23 @@ const TLUT_IA8: u8 = 0;
 const TLUT_RGB565: u8 = 1;
 const MATERIAL_INIT_STRIDE: usize = 0x14C;
 const MATERIAL_TEX_NO: usize = 0x084;
+/// `J3DTevBlock::mTexNo[8]`'s slot count (`J3DMatBlock.h:304`).
+pub const TEX_UNITS: usize = 8;
+/// `J3DTexGenBlock::mTexCoord[8]` - one texture coordinate per texgen (`J3DMatBlock.h`), each
+/// holding the `GX_TEXMTX*` it reads (`J3DMaterialFactory::newTexCoord`, `:482-488`).
+pub const TEX_COORDS: usize = 8;
+/// `J3DTexGenBlock::mTexMtx[8]` - the texture matrices a `btk` animates
+/// (`J3DMaterialFactory::newTexMtx`, `:490-497`).
+pub const TEX_MTX_SLOTS: usize = 8;
+/// `J3DTevBlock::mTevColor[4]` and `mTevKColor[4]` (`J3DMatBlock.h:308-309`).
+const TEV_COLOR_MAX: usize = 4;
+const TEV_K_COLOR_MAX: usize = 4;
 const MATERIAL_COLOR_CHAN_NUM: usize = 0x002;
 const MATERIAL_COLOR_CHAN_IDX: usize = 0x00C;
 const COLOR_CHAN_STRIDE: usize = 8;
 const COLOR_CHAN_MAX: usize = 4;
-const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
+/// `J3DMaterialInitData::mTexNoIdx[i]`'s "no texture" value (`J3DMaterialFactory.cpp:509-515`).
+pub const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
 const MATERIAL_TEX_GEN_NUM: usize = 0x003;
 const MATERIAL_TEV_STAGE_NUM: usize = 0x004;
 const MATERIAL_TEX_COORD_IDX: usize = 0x028;
@@ -77,6 +89,12 @@ const SHAPE_MATRIX_DIRECT: u8 = 0;
 const SHAPE_MATRIX_MULTI: u8 = 3;
 const MATRIX_INDEX_DIVISOR: u32 = 3;
 const MATRIX_UNSET: u16 = 0xFFFF;
+/// `J3DJointBlock::mpNameTable` (`J3DJointFactory.h:33`): the `ResNTAB` the loader turns into
+/// `J3DModelData::getJointName()` (`J3DModelLoader.cpp:370-383`).
+const JOINT_NAME_TABLE: usize = 0x14;
+/// `ResNTAB::Entry` (`JUTNameTab.h:9-12`): the key code and the string offset of one name.
+const NAME_ENTRY_STRIDE: usize = 4;
+const NAME_ENTRY_OFFSET: usize = 2;
 const SHAPE_INDEX_TABLE: usize = 0x1C;
 const SHAPE_INIT_MATRIX_SLOTS: usize = 0x02;
 const SHAPE_INIT_MATRIX_FIRST: usize = 0x04;
@@ -140,12 +158,21 @@ pub struct RoomMesh {
     pub textures: Vec<RoomTexture>,
     pub uv_placements: Vec<[f32; 4]>,
     pub animations: Vec<crate::j3d::btk::TextureAnimation>,
+    /// `J3DModelData`'s material table (`J3DMaterialAttach`): one [`MaterialSlot`] per `MAT3`
+    /// material, in material order, which is the order `JUTNameTab::getIndex` and every animation
+    /// name lookup answer in.
+    pub materials: Vec<MaterialSlot>,
     pub joints: Vec<[f32; 3]>,
     /// Bind-pose world matrix per joint, each the product of its ancestors'
     /// locals. [`RoomMesh::joint_locals`] recovers the per-joint factor these
     /// were composed from, which is what an animation delta multiplies against.
     pub joint_matrices: Vec<Mat4>,
     pub joint_parents: Vec<u16>,
+    /// `J3DModelData::getJointName()` (`J3DModelData.h:59`), the `JNT1` block's `ResNTAB`
+    /// (`J3DJointFactory.h:33`, `JUTNameTab.h:6-17`) in joint order: entry `i` is joint `i`'s
+    /// name, which is the index `JUTNameTab::getIndex` answers with (`JUTNameTab.cpp:368-378`).
+    /// Empty for a model whose block carries no name table (`J3DModelLoader.cpp:373-379`).
+    pub joint_names: Vec<String>,
 }
 
 impl RoomMesh {
@@ -169,6 +196,26 @@ impl RoomMesh {
                 }
             })
             .collect()
+    }
+
+    /// `JUTNameTab::getIndex(name)` - `JUTNameTab.cpp:368-378`, the answer behind
+    /// `dDemo_actor_c::JSGFindNodeID` (`d_demo.h:84-87`). The reference searches the name table
+    /// with `calcKeyCode` as a fast-path filter and `strcmp` for the verdict, so the verdict is
+    /// the byte equality below; retail's `-1` for a miss is [`Option::None`].
+    pub fn find_node_id(&self, name: &[u8]) -> Option<u32> {
+        let index = self
+            .joint_names
+            .iter()
+            .position(|joint| joint.as_bytes() == name)?;
+        u32::try_from(index).ok()
+    }
+
+    /// The matrix half of `dDemo_actor_c::JSGGetNodeTransformation` (`d_demo.h:88-92`), which
+    /// reads `mModel->getAnmMtx(no)` (`J3DModel.h:75`). The port's `JNT1` walk answers with the
+    /// node transforms that block carries; a node past the joint array is the reference's
+    /// out-of-range read, so it answers nothing.
+    pub fn node_transform(&self, node: u32) -> Option<Mat4> {
+        self.joint_matrices.get(usize::try_from(node).ok()?).copied()
     }
 }
 
@@ -205,13 +252,20 @@ impl RoomMesh {
                 binding.set += animation_base;
             }
         }
+        for material in &mut part.materials {
+            for unit in material.tex_nos.iter_mut().flatten() {
+                *unit += page_base as u16;
+            }
+        }
         self.uv_placements.append(&mut part.uv_placements);
         self.animations.append(&mut part.animations);
         self.groups.append(&mut part.groups);
+        self.materials.append(&mut part.materials);
         self.textures.append(&mut part.textures);
         self.joints.append(&mut part.joints);
         self.joint_matrices.append(&mut part.joint_matrices);
         self.joint_parents.append(&mut part.joint_parents);
+        self.joint_names.append(&mut part.joint_names);
     }
 }
 
@@ -222,7 +276,8 @@ pub fn parse(
     animation: Option<&crate::j3d::btk::TextureAnimation>,
 ) -> Result<RoomMesh, BdlError> {
     let blocks = Blocks::parse(data)?;
-    let (worlds, matrices, parents, material_nodes) = read_joints(data, &blocks)?;
+    let joints = read_joints(data, &blocks)?;
+    let worlds = joints.worlds;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
     let envelopes = read_envelopes(data, &blocks, worlds.len())?;
     let vertices = read_vertex_arrays(data, &blocks)?;
@@ -237,10 +292,13 @@ pub fn parse(
         cos,
         animation,
     };
+    let material_nodes = joints.material_nodes;
     let mut mesh = RoomMesh::default();
     mesh.joints = worlds.clone();
-    mesh.joint_matrices = matrices;
-    mesh.joint_parents = parents;
+    mesh.joint_matrices = joints.matrices;
+    mesh.joint_parents = joints.parents;
+    mesh.joint_names = joints.names;
+    mesh.materials = materials.iter().map(MaterialBinding::slot).collect();
     if let Some(animation) = animation {
         mesh.animations.push(animation.clone());
     }
@@ -303,11 +361,7 @@ fn trig_cos(value: i16) -> f32 {
     trig_entry(trig_index(value) + TRIG_QUARTER)
 }
 
-fn joint_matrix(
-    scale: [f32; 3],
-    rotation: [i16; 3],
-    translation: [f32; 3],
-) -> Mat4 {
+fn joint_matrix(scale: [f32; 3], rotation: [i16; 3], translation: [f32; 3]) -> Mat4 {
     let sx = trig_sin(rotation[0]);
     let cx = trig_cos(rotation[0]);
     let sy = trig_sin(rotation[1]);
@@ -388,14 +442,69 @@ impl Blocks {
     }
 }
 
-fn read_joints(
+/// What one `JNT1` walk yields: the joint locals composed into bind-pose world matrices, the
+/// per-joint parent link, the `ResNTAB` name table in joint order, and the `SHP1` material
+/// attachment the `INF1` hierarchy carries.
+struct Joints {
+    worlds: Vec<[f32; 3]>,
+    matrices: Vec<Mat4>,
+    parents: Vec<u16>,
+    names: Vec<String>,
+    material_nodes: Vec<(u16, Option<u16>)>,
+}
+
+/// `J3DModelLoader::readJoint`'s name half - `J3DModelLoader.cpp:370-383`: the `JNT1` block's
+/// `mpNameTable` is a `ResNTAB` (`JUTNameTab.h:6-17`) whose `mEntryNum` entries are the joint
+/// names in joint order. A block with no name table leaves the model's `mJointName` NULL
+/// (`:373-379`), which is an empty name list here. Each entry's `mOffs` is relative to the table
+/// itself (`ResNTAB::getName`, `JUTNameTab.h:14-16`).
+fn read_joint_names(
     data: &[u8],
-    blocks: &Blocks,
-) -> Result<(Vec<[f32; 3]>, Vec<Mat4>, Vec<u16>, Vec<(u16, Option<u16>)>), BdlError> {
-    let (joint_start, _) = blocks.find(b"JNT1")?;
+    joint_start: usize,
+    joint_end: usize,
+) -> Result<Vec<String>, BdlError> {
+    let table = read_u32(data, at(joint_start, JOINT_NAME_TABLE)?)?;
+    if table == 0 {
+        return Ok(Vec::new());
+    }
+    let base = at(joint_start, table as usize)?;
+    let count = usize::from(read_u16(data, base)?);
+    if at(base, 4 + count * NAME_ENTRY_STRIDE)? > joint_end {
+        return Err(BdlError::Block);
+    }
+    let mut names = Vec::with_capacity(count);
+    for entry in 0..count {
+        let offset = usize::from(read_u16(
+            data,
+            at(base, 4 + entry * NAME_ENTRY_STRIDE + NAME_ENTRY_OFFSET)?,
+        )?);
+        let string = at(base, offset)?;
+        if string >= joint_end {
+            return Err(BdlError::Block);
+        }
+        let bytes = data.get(string..joint_end).ok_or(BdlError::Truncated)?;
+        let length = bytes
+            .iter()
+            .position(|&byte| byte == 0)
+            .ok_or(BdlError::Block)?;
+        let name = std::str::from_utf8(&bytes[..length]).map_err(|_| BdlError::Block)?;
+        names.push(name.to_owned());
+    }
+    Ok(names)
+}
+
+fn read_joints(data: &[u8], blocks: &Blocks) -> Result<Joints, BdlError> {
+    let (joint_start, joint_end) = blocks.find(b"JNT1")?;
+    let names = read_joint_names(data, joint_start, joint_end)?;
     let joint_count = usize::from(read_u16(data, joint_start + 8)?);
-    let init_start = at(joint_start, read_u32(data, at(joint_start, 0x0C)?)? as usize)?;
-    let index_start = at(joint_start, read_u32(data, at(joint_start, 0x10)?)? as usize)?;
+    let init_start = at(
+        joint_start,
+        read_u32(data, at(joint_start, 0x0C)?)? as usize,
+    )?;
+    let index_start = at(
+        joint_start,
+        read_u32(data, at(joint_start, 0x10)?)? as usize,
+    )?;
     let init_len = index_start.checked_sub(init_start).ok_or(BdlError::Block)?;
     if init_len != joint_count * JOINT_INIT_STRIDE {
         return Err(BdlError::Block);
@@ -521,7 +630,13 @@ fn read_joints(
             }
         })
         .collect();
-    Ok((worlds, matrices, joint_parents, material_nodes))
+    Ok(Joints {
+        worlds,
+        matrices,
+        parents: joint_parents,
+        names,
+        material_nodes,
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -569,9 +684,18 @@ fn read_envelopes(
         return Ok(Vec::new());
     };
     let count = usize::from(read_u16(data, at(start, ENVELOPE_TABLE_COUNT)?)?);
-    let mixes_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_MIXES)?)? as usize)?;
-    let index_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_INDEX)?)? as usize)?;
-    let weight_at = at(start, read_u32(data, at(start, ENVELOPE_TABLE_WEIGHT)?)? as usize)?;
+    let mixes_at = at(
+        start,
+        read_u32(data, at(start, ENVELOPE_TABLE_MIXES)?)? as usize,
+    )?;
+    let index_at = at(
+        start,
+        read_u32(data, at(start, ENVELOPE_TABLE_INDEX)?)? as usize,
+    )?;
+    let weight_at = at(
+        start,
+        read_u32(data, at(start, ENVELOPE_TABLE_WEIGHT)?)? as usize,
+    )?;
     let mut bindings = Vec::with_capacity(count);
     let mut mix = 0_usize;
     for envelope in 0..count {
@@ -619,7 +743,9 @@ fn skin_binding(
         binding.weights[0] = 1.0;
         return Ok(binding);
     }
-    Ok(*envelopes.get(usize::from(entry.target)).ok_or(BdlError::Range)?)
+    Ok(*envelopes
+        .get(usize::from(entry.target))
+        .ok_or(BdlError::Range)?)
 }
 
 struct VertexArrays {
@@ -700,7 +826,9 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
             None => end,
         };
         let texcoord_at = at(start, texcoord_rel as usize)?;
-        let texcoord_bytes = texcoord_end.checked_sub(texcoord_at).ok_or(BdlError::Block)?;
+        let texcoord_bytes = texcoord_end
+            .checked_sub(texcoord_at)
+            .ok_or(BdlError::Block)?;
         (texcoord_at, texcoord_bytes / TEXCOORD_STRIDE)
     };
 
@@ -780,13 +908,90 @@ fn read_vertex_arrays(data: &[u8], blocks: &Blocks) -> Result<VertexArrays, BdlE
 
 #[derive(Debug, Clone)]
 struct MaterialBinding {
-    texture: Option<u16>,
+    tex_nos: [Option<u16>; TEX_UNITS],
     lit: bool,
     name: Option<String>,
     coord: Option<u8>,
-    init_matrix: Option<u8>,
+    tex_gen: [Option<u8>; TEX_COORDS],
 }
 
+impl MaterialBinding {
+    /// The page a room group samples: the material's first texture unit, the one
+    /// `J3DMaterialFactory::newTexNo(idx, 0)` answers with (`J3DMaterialFactory.cpp:509-515`). The
+    /// other seven units belong to a multi-texture TEV chain this port's room draw does not build.
+    fn page(&self) -> Option<u16> {
+        self.tex_nos[0]
+    }
+
+    /// The material as the model's material table holds it (`J3DMaterialTable`), the shape the
+    /// btp, btk and brk passes write their slots in.
+    fn slot(&self) -> MaterialSlot {
+        MaterialSlot {
+            name: self.name.clone(),
+            tex_nos: self.tex_nos,
+            coord: self.coord,
+            tex_gen: self.tex_gen,
+            ..MaterialSlot::default()
+        }
+    }
+
+    /// The `GX_TEXMTX*` slot the named coord reads (`J3DTexCoord::getTexGenMtx`), `None` for a
+    /// coord the material does not carry or one parked on `GX_IDENTITY`.
+    fn coord_matrix(&self) -> Option<u8> {
+        let coord = self.coord?;
+        self.tex_gen.get(usize::from(coord)).copied().flatten()
+    }
+
+    /// `J3DMaterialTable::setTexMtxAnimator`'s entry-to-material answer for this material
+    /// (`J3DMaterialAttach.cpp:284-304`): the track of `animation` the room draw follows. The
+    /// reference writes the animation's own `texMtxID` into the material's matching tex-coord slot
+    /// (`:289`, `:294`); a room group carries one uv set, so this port follows the coord its first
+    /// textured TEV stage reads, and the matrix that coord starts on when the animation does not
+    /// key it.
+    fn animation_track(&self, animation: &crate::j3d::btk::TextureAnimation) -> Option<u32> {
+        let name = self.name.as_deref()?;
+        let coord = self.coord?;
+        let slot = if animation.has_track(name, coord) {
+            coord
+        } else {
+            self.coord_matrix()?
+        };
+        animation.track(name, slot)
+    }
+}
+
+/// One `J3DMaterial`: the lookups the animation passes key on and the three slots they write.
+///
+/// `J3DMaterialAnm` is the reference's per-material half (`J3DMaterialAnm.h:168-175`), an array of
+/// animator pointers per slot, and `J3DMaterialAnm::calc` (`J3DMaterialAnm.cpp:51-76`) is where
+/// they land: the texture units on the `TevBlock` (`:60`), the texture matrix SRT (`:71-75`), and
+/// the TEV colour registers (`:63-70`). This holds the landing sites, so a pass leaves the same
+/// values behind as the reference's `calc` and the draw reads the animated material.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MaterialSlot {
+    /// `J3DModelData::getMaterialName()` entry (`JUTNameTab::getIndex`, `J3DMaterialAttach.cpp:265`).
+    pub name: Option<String>,
+    /// `J3DTevBlock::getTexNo(i)` over the eight units (`J3DMatBlock.h:304`, the `mTexNoIdx[8]`
+    /// table at `0x084`; `newTexNo`, `J3DMaterialFactory.cpp:509-515`), each the TEX1 index the
+    /// unit samples. `None` is the `0xFFFF` hole.
+    pub tex_nos: [Option<u16>; TEX_UNITS],
+    /// The tex coord slot the material's first textured TEV stage reads, which is the uv set the
+    /// room draw samples.
+    pub coord: Option<u8>,
+    /// `J3DTexCoord::getTexGenMtx()` per coord (`J3DMaterialFactory::newTexCoord`, `:482-488`):
+    /// the texture-matrix slot each coord starts on. `setTexMtxAnimator` re-points coord
+    /// `texMtxID` at slot `texMtxID` (`GX_TEXMTX0 + texMtxID * 3`, `J3DMaterialAttach.cpp:294`).
+    pub tex_gen: [Option<u8>; TEX_COORDS],
+    /// `J3DTexMtxInfo::mSRT` (`J3DMaterialAnm.cpp:71-75`): the texture matrix a btk animates, per
+    /// matrix slot. `setTexMtxAnimator` registers its animators by the animation's own
+    /// `texMtxID` (`J3DMaterialAttach.cpp:289`), which is the slot index here.
+    pub tex_mtxs: [Option<crate::j3d::btk::UvMatrix>; TEX_MTX_SLOTS],
+    /// The TEV colour registers C0..C3 (`J3DTevBlock::getTevColor(i)`, `J3DMatBlock.h:308`) as a
+    /// brk leaves them. `J3DMaterialAnm::calc` only applies the first three (`J3DMaterialAnm.cpp:63`).
+    pub tev_colors: [Option<[i16; 4]>; TEV_COLOR_MAX],
+    /// The TEV konst registers K0..K3 (`J3DTevBlock::getTevKColor(i)`, `J3DMatBlock.h:309`).
+    pub tev_k_colors: [Option<[u8; 4]>; TEV_K_COLOR_MAX],
+}
 fn material_lit(
     data: &[u8],
     start: usize,
@@ -814,8 +1019,10 @@ fn material_lit(
         return Err(BdlError::Descriptor);
     }
     for channel in 0..channel_count {
-        let info_index =
-            usize::from(read_u16(data, at(init, MATERIAL_COLOR_CHAN_IDX + channel * 2)?)?);
+        let info_index = usize::from(read_u16(
+            data,
+            at(init, MATERIAL_COLOR_CHAN_IDX + channel * 2)?,
+        )?);
         let info = at(info_table, info_index * COLOR_CHAN_STRIDE)?;
         if at(info, COLOR_CHAN_STRIDE)? > end {
             return Err(BdlError::Block);
@@ -879,44 +1086,44 @@ fn material_coord(
     tex_coord_table: u32,
     tev_order_table: u32,
     tev_stage_table: u32,
-) -> Result<(Option<u8>, Option<u8>), BdlError> {
+) -> Result<(Option<u8>, [Option<u8>; TEX_COORDS]), BdlError> {
     if tex_gen_num_table == 0
         || tex_coord_table == 0
         || tev_order_table == 0
         || tev_stage_table == 0
     {
-        return Ok((None, None));
+        return Ok((None, [None; TEX_COORDS]));
     }
-    let tex_gen_num_index = usize::from(block_byte(
-        data,
-        init,
-        MATERIAL_TEX_GEN_NUM,
-        end,
-    )?);
+    let tex_gen_num_index = usize::from(block_byte(data, init, MATERIAL_TEX_GEN_NUM, end)?);
     let tex_gen_num_table_at = at(start, tex_gen_num_table as usize)?;
     let tex_gen_num = block_byte(data, tex_gen_num_table_at, tex_gen_num_index, end)?;
     if tex_gen_num > TEX_GEN_MAX {
         return Err(BdlError::Descriptor);
     }
-    let stage_num_index = usize::from(block_byte(
-        data,
-        init,
-        MATERIAL_TEV_STAGE_NUM,
-        end,
-    )?);
+    let stage_num_index = usize::from(block_byte(data, init, MATERIAL_TEV_STAGE_NUM, end)?);
     let stage_num_table_at = at(start, tev_stage_table as usize)?;
     let stage_num = block_byte(data, stage_num_table_at, stage_num_index, end)?;
     if stage_num > TEV_STAGE_MAX {
         return Err(BdlError::Descriptor);
     }
+    let tex_gen = material_tex_gen(
+        data,
+        start,
+        end,
+        init,
+        tex_gen_num,
+        tex_coord_table,
+    )?;
     let tev_order_table_at = at(start, tev_order_table as usize)?;
     let mut coord = None;
     for stage in 0..usize::from(stage_num) {
         if at(init, MATERIAL_TEV_ORDER_IDX + stage * 2 + 2)? > end {
             return Err(BdlError::Block);
         }
-        let order_index =
-            usize::from(read_u16(data, at(init, MATERIAL_TEV_ORDER_IDX + stage * 2)?)?);
+        let order_index = usize::from(read_u16(
+            data,
+            at(init, MATERIAL_TEV_ORDER_IDX + stage * 2)?,
+        )?);
         let order = at(tev_order_table_at, order_index * TEV_ORDER_STRIDE)?;
         if at(order, TEV_ORDER_STRIDE)? > end {
             return Err(BdlError::Block);
@@ -931,45 +1138,53 @@ fn material_coord(
         coord = Some(slot);
         break;
     }
-    let init_matrix = match coord {
-        None => None,
-        Some(slot) => {
-            if at(init, MATERIAL_TEX_COORD_IDX + usize::from(slot) * 2 + 2)? > end {
-                return Err(BdlError::Block);
-            }
-            let info_index = usize::from(read_u16(
-                data,
-                at(init, MATERIAL_TEX_COORD_IDX + usize::from(slot) * 2)?,
-            )?);
-            let info_table_at = at(start, tex_coord_table as usize)?;
-            let info = at(info_table_at, info_index * TEX_COORD_STRIDE)?;
-            if at(info, TEX_COORD_STRIDE)? > end {
-                return Err(BdlError::Block);
-            }
-            let matrix = block_byte(data, info, 2, end)?;
-            match matrix.checked_sub(GX_TEXMTX0) {
-                Some(offset) if matrix < GX_IDENTITY && offset % 3 == 0 => {
-                    Some((offset / 3) as u8)
-                }
-                _ => None,
-            }
+    Ok((coord, tex_gen))
+}
+
+/// `J3DMaterialFactory::newTexCoord` for the material's own texgen count (`:482-488`,
+/// `countTexGens` `:80-85`): each coord's `mTexCoordIdx` entry indexes the material's texture
+/// coordinate table, whose matrix byte is the `GX_TEXMTX*` the coord reads. A coord the material
+/// does not carry, an `0xFFFF` entry and a matrix that is not a `GX_TEXMTX*` (the `GX_IDENTITY`
+/// park) all answer `None`.
+fn material_tex_gen(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    tex_gen_num: u8,
+    tex_coord_table: u32,
+) -> Result<[Option<u8>; TEX_COORDS], BdlError> {
+    let mut tex_gen = [None; TEX_COORDS];
+    let info_table_at = at(start, tex_coord_table as usize)?;
+    for coord in 0..usize::from(tex_gen_num).min(TEX_COORDS) {
+        if at(init, MATERIAL_TEX_COORD_IDX + coord * 2 + 2)? > end {
+            return Err(BdlError::Block);
         }
-    };
-    Ok((coord, init_matrix))
+        let info_index = usize::from(read_u16(
+            data,
+            at(init, MATERIAL_TEX_COORD_IDX + coord * 2)?,
+        )?);
+        if info_index == usize::from(u16::MAX) {
+            continue;
+        }
+        let info = at(info_table_at, info_index * TEX_COORD_STRIDE)?;
+        if at(info, TEX_COORD_STRIDE)? > end {
+            return Err(BdlError::Block);
+        }
+        let matrix = block_byte(data, info, 2, end)?;
+        tex_gen[coord] = match matrix.checked_sub(GX_TEXMTX0) {
+            Some(offset) if matrix < GX_IDENTITY && offset % 3 == 0 => Some((offset / 3) as u8),
+            _ => None,
+        };
+    }
+    Ok(tex_gen)
 }
 
 fn material_anim(
     animation: &crate::j3d::btk::TextureAnimation,
     binding: &MaterialBinding,
 ) -> Option<AnimBinding> {
-    let name = binding.name.as_deref()?;
-    let coord = binding.coord?;
-    let slot = if animation.has_track(name, coord) {
-        coord
-    } else {
-        binding.init_matrix?
-    };
-    let track = animation.track(name, slot)?;
+    let track = binding.animation_track(animation)?;
     Some(AnimBinding { set: 0, track })
 }
 
@@ -997,28 +1212,23 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     for material in 0..count {
         let slot = usize::from(read_u16(data, at(index_table, material * 2)?)?);
         let init = at(init_table, slot * MATERIAL_INIT_STRIDE)?;
-        if at(init, MATERIAL_TEX_NO + 2)? > end {
+        if at(init, MATERIAL_TEX_NO + TEX_UNITS * 2)? > end {
             return Err(BdlError::Block);
         }
-        let texno = read_u16(data, at(init, MATERIAL_TEX_NO)?)?;
-        let texture = if texno == MATERIAL_UNTEXTURED {
-            None
-        } else {
+        let mut tex_nos = [None; TEX_UNITS];
+        for (unit, target) in tex_nos.iter_mut().enumerate() {
+            let texno = read_u16(data, at(init, MATERIAL_TEX_NO + unit * 2)?)?;
+            if texno == MATERIAL_UNTEXTURED {
+                continue;
+            }
             let binding = at(texno_table, usize::from(texno) * 2)?;
             if at(binding, 2)? > end {
                 return Err(BdlError::Block);
             }
-            Some(read_u16(data, binding)?)
-        };
-        let lit = material_lit(
-            data,
-            start,
-            end,
-            init,
-            color_chan_num,
-            color_chan_info,
-        )?;
-        let (coord, init_matrix) = material_coord(
+            *target = Some(read_u16(data, binding)?);
+        }
+        let lit = material_lit(data, start, end, init, color_chan_num, color_chan_info)?;
+        let (coord, tex_gen) = material_coord(
             data,
             start,
             end,
@@ -1029,11 +1239,11 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             tev_stage_table,
         )?;
         materials.push(MaterialBinding {
-            texture,
+            tex_nos,
             lit,
             name: names.get(material).cloned(),
             coord,
-            init_matrix,
+            tex_gen,
         });
     }
     Ok(materials)
@@ -1071,7 +1281,9 @@ fn texture_size(format: u8, width: usize, height: usize) -> Result<usize, BdlErr
 }
 
 fn texture_palette(data: &[u8], entry: usize) -> Result<Vec<[u8; 4]>, BdlError> {
-    let tlut_format = *data.get(entry + TLUT_FORMAT_OFFSET).ok_or(BdlError::Truncated)?;
+    let tlut_format = *data
+        .get(entry + TLUT_FORMAT_OFFSET)
+        .ok_or(BdlError::Truncated)?;
     let count = usize::from(read_u16(data, at(entry, TLUT_COUNT_OFFSET)?)?);
     let offset = read_u32(data, at(entry, TLUT_PALETTE_OFFSET)?)? as usize;
     if count == 0 || offset == 0 {
@@ -1116,7 +1328,14 @@ fn read_textures(data: &[u8], blocks: &Blocks) -> Result<Vec<NativeTexture>, Bdl
         let wrap_t = read_wrap(*data.get(at(entry, 7)?).ok_or(BdlError::Truncated)?)?;
         let image = read_u32(data, at(entry, TEXTURE_IMAGE_OFFSET)?)?;
         let size = texture_size(format, width, height)?;
-        let image_at = at(entry, if image == 0 { TEXTURE_STRIDE } else { image as usize })?;
+        let image_at = at(
+            entry,
+            if image == 0 {
+                TEXTURE_STRIDE
+            } else {
+                image as usize
+            },
+        )?;
         let image_end = at(image_at, size)?;
         if image_end > data.len() {
             return Err(BdlError::Truncated);
@@ -1167,7 +1386,11 @@ fn axis_samples(lo: f32, hi: f32, footprint: f32, dim: usize, wrap: Wrap) -> Vec
     let dim_i = dim as i64;
     if footprint <= 1.0 {
         let center = (lo + hi) * 0.5;
-        return vec![wrap_index((center * dim as f32).floor() as i64, dim_i, wrap)];
+        return vec![wrap_index(
+            (center * dim as f32).floor() as i64,
+            dim_i,
+            wrap,
+        )];
     }
     let start = (lo * dim as f32).floor() as i64;
     let stop = (hi * dim as f32).ceil() as i64;
@@ -1354,9 +1577,7 @@ impl PrimitiveLayout {
         let start = self.widths[..field].iter().sum::<usize>();
         match self.widths[field] {
             0 => Ok(0),
-            1 => Ok(usize::from(
-                *record.get(start).ok_or(BdlError::Truncated)?,
-            )),
+            1 => Ok(usize::from(*record.get(start).ok_or(BdlError::Truncated)?)),
             _ => Ok(usize::from(read_u16(record, start)?)),
         }
     }
@@ -1376,13 +1597,34 @@ fn read_shapes(
     let (shape_start, _) = blocks.find(b"SHP1")?;
     let data = context.data;
     let shape_count = usize::from(read_u16(data, shape_start + 8)?);
-    let init_table = at(shape_start, read_u32(data, at(shape_start, 0x0C)?)? as usize)?;
-    let index_table = at(shape_start, read_u32(data, at(shape_start, 0x10)?)? as usize)?;
-    let descriptor_table = at(shape_start, read_u32(data, at(shape_start, 0x18)?)? as usize)?;
-    let mtx_table = at(shape_start, read_u32(data, at(shape_start, SHAPE_INDEX_TABLE)?)? as usize)?;
-    let display_table = at(shape_start, read_u32(data, at(shape_start, 0x20)?)? as usize)?;
-    let matrix_table = at(shape_start, read_u32(data, at(shape_start, 0x24)?)? as usize)?;
-    let draw_table = at(shape_start, read_u32(data, at(shape_start, 0x28)?)? as usize)?;
+    let init_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x0C)?)? as usize,
+    )?;
+    let index_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x10)?)? as usize,
+    )?;
+    let descriptor_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x18)?)? as usize,
+    )?;
+    let mtx_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, SHAPE_INDEX_TABLE)?)? as usize,
+    )?;
+    let display_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x20)?)? as usize,
+    )?;
+    let matrix_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x24)?)? as usize,
+    )?;
+    let draw_table = at(
+        shape_start,
+        read_u32(data, at(shape_start, 0x28)?)? as usize,
+    )?;
     let mut shape_materials = vec![None; shape_count];
     for &(shape, material) in material_nodes {
         let slot = usize::from(shape);
@@ -1409,7 +1651,10 @@ fn read_shapes(
         let texcoord_field = layout.texcoord_field;
         let lit = match shape_materials[shape] {
             Some(index) if !materials.is_empty() => {
-                materials.get(usize::from(index)).ok_or(BdlError::Range)?.lit
+                materials
+                    .get(usize::from(index))
+                    .ok_or(BdlError::Range)?
+                    .lit
             }
             _ => false,
         };
@@ -1419,7 +1664,7 @@ fn read_shapes(
             match shape_materials[shape] {
                 Some(index) => {
                     let binding = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
-                    match binding.texture {
+                    match binding.page() {
                         Some(texture) => {
                             if usize::from(texture) >= texture_count {
                                 return Err(BdlError::Range);
@@ -1458,11 +1703,9 @@ fn read_shapes(
             let (world, bindings) = match layout.matrix_field {
                 Some(_) => {
                     let count = usize::from(read_u16(data, at(matrix, SHAPE_INIT_MATRIX_SLOTS)?)?);
-                    let first = usize::try_from(read_u32(
-                        data,
-                        at(matrix, SHAPE_INIT_MATRIX_FIRST)?,
-                    )?)
-                    .map_err(|_| BdlError::Range)?;
+                    let first =
+                        usize::try_from(read_u32(data, at(matrix, SHAPE_INIT_MATRIX_FIRST)?)?)
+                            .map_err(|_| BdlError::Range)?;
                     if slots.len() < count {
                         slots.resize(count, None);
                     }
@@ -1472,12 +1715,8 @@ fn read_shapes(
                         let binding = if entry == MATRIX_UNSET {
                             slots[slot].ok_or(BdlError::Shape)?
                         } else {
-                            let binding = skin_binding(
-                                entry,
-                                draw_joints,
-                                envelopes,
-                                worlds.len(),
-                            )?;
+                            let binding =
+                                skin_binding(entry, draw_joints, envelopes, worlds.len())?;
                             slots[slot] = Some(binding);
                             binding
                         };
@@ -1507,13 +1746,7 @@ fn read_shapes(
                 .get(display_start..display_end)
                 .ok_or(BdlError::Truncated)?;
             decode_display_list(
-                context,
-                display,
-                &layout,
-                &bindings,
-                textured,
-                world,
-                &mut group,
+                context, display, &layout, &bindings, textured, world, &mut group,
             )?;
         }
         mesh.groups.push(group);
@@ -1528,8 +1761,7 @@ fn emit(group: &mut RoomGroup, base: u32, a: usize, b: usize, c: usize) {
 }
 
 fn normalize(vector: [f32; 3]) -> [f32; 3] {
-    let length_squared =
-        vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2];
+    let length_squared = vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2];
     if length_squared <= 0.0 {
         return vector;
     }
@@ -1560,13 +1792,8 @@ fn decode_display_list(
             continue;
         }
         let count = match command {
-            COMMAND_QUADS
-            | COMMAND_TRIANGLES
-            | COMMAND_STRIP
-            | COMMAND_FAN
-            | COMMAND_LINES
-            | COMMAND_LINE_STRIP
-            | COMMAND_POINTS => {
+            COMMAND_QUADS | COMMAND_TRIANGLES | COMMAND_STRIP | COMMAND_FAN | COMMAND_LINES
+            | COMMAND_LINE_STRIP | COMMAND_POINTS => {
                 let bytes = display
                     .get(cursor + 1..cursor + 3)
                     .ok_or(BdlError::Truncated)?;
@@ -1581,8 +1808,7 @@ fn decode_display_list(
         if command == COMMAND_TRIANGLES && count % 3 != 0 {
             return Err(BdlError::Command);
         }
-        let indexed =
-            !matches!(command, COMMAND_LINES | COMMAND_LINE_STRIP | COMMAND_POINTS);
+        let indexed = !matches!(command, COMMAND_LINES | COMMAND_LINE_STRIP | COMMAND_POINTS);
         let base = group.positions.len() as u32;
         for _ in 0..count {
             let bytes = display
@@ -1682,8 +1908,7 @@ fn decode_display_list(
                 if index >= context.vertices.normal_count {
                     return Err(BdlError::Range);
                 }
-                let normal_at =
-                    context.vertices.normal_at + index * context.vertices.normal_stride;
+                let normal_at = context.vertices.normal_at + index * context.vertices.normal_stride;
                 let normal = if context.vertices.normal_stride == NORMAL_STRIDE_F32 {
                     [
                         read_f32(data, normal_at)?,

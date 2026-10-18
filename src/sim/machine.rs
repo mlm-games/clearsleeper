@@ -110,13 +110,7 @@ fn set_speed(actor: &mut Actor, mill: Option<&Windmill>) {
     // `cLib_addCalc(&old_speedF, ...)` mutates a local that is copied back afterwards (`:247-249`),
     // so the read of `speedF` happens once, before the chase.
     let mut speed_f = actor.speed_f;
-    add_calc(
-        &mut speed_f,
-        target,
-        SPEED_ADD,
-        SPEED_MAX,
-        SPEED_MIN,
-    );
+    add_calc(&mut speed_f, target, SPEED_ADD, SPEED_MAX, SPEED_MIN);
     actor.speed_f = speed_f;
 }
 

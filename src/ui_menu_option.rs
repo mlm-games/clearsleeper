@@ -53,12 +53,12 @@ pub const ICON_OUT_TEXTURE: &str = "font_07_02.bti";
 pub const ICON_BLEND_TEXTURE: &str = "font_00.bti";
 
 pub const TEXT_ROW: [&str; LABEL_COUNT] = [
-    "ft00", "ft01", "ft02", "ft03", "ft04", "ft05", "ft06", "ft07", "ft08", "ft09", "ft10",
-    "ft11", "ft12", "ft13", "ft14",
+    "ft00", "ft01", "ft02", "ft03", "ft04", "ft05", "ft06", "ft07", "ft08", "ft09", "ft10", "ft11",
+    "ft12", "ft13", "ft14",
 ];
 pub const TEXT_SHADOW: [&str; LABEL_COUNT] = [
-    "fd00", "fd01", "fd02", "fd03", "fd04", "fd05", "fd06", "fd07", "fd08", "fd09", "fd10",
-    "fd11", "fd12", "fd13", "fd14",
+    "fd00", "fd01", "fd02", "fd03", "fd04", "fd05", "fd06", "fd07", "fd08", "fd09", "fd10", "fd11",
+    "fd12", "fd13", "fd14",
 ];
 
 pub use crate::j2d::{STICK_HALF_DEAD, STICK_MAX_VALUE, STICK_MIN_VALUE};
@@ -559,10 +559,7 @@ impl Default for OptionPanes {
             note_flag: Pane::new("sk01"),
             icon: std::array::from_fn(|i| Pane::new(TEXT_ROW[i])),
             icon_shadow: std::array::from_fn(|i| Pane::new(TEXT_SHADOW[i])),
-            note_text: [
-                Pane::new("st00"),
-                Pane::new("str0"),
-            ],
+            note_text: [Pane::new("st00"), Pane::new("str0")],
             note_title: Pane::new("no11"),
             note_anchor: Pane::new("nt00"),
             no_key: Pane::new("nk00"),
@@ -574,11 +571,7 @@ impl Default for OptionPanes {
                 Pane::new("tsou"),
             ],
             attention: [Pane::new("thld"), Pane::new("tsic")],
-            sound: [
-                Pane::new("tmon"),
-                Pane::new("tste"),
-                Pane::new("tsur"),
-            ],
+            sound: [Pane::new("tmon"), Pane::new("tste"), Pane::new("tsur")],
             vibration: [Pane::new("tnas"), Pane::new("tari")],
             cursor: [
                 Pane::new("cr32"),
@@ -838,11 +831,7 @@ impl OptionMenu {
             msgs.message(MSG_SOUND_1),
             msgs.message(MSG_SOUND_2),
         ];
-        let sound_slots = [
-            LabelSlot::Sound0,
-            LabelSlot::Sound1,
-            LabelSlot::Sound2,
-        ];
+        let sound_slots = [LabelSlot::Sound0, LabelSlot::Sound1, LabelSlot::Sound2];
         for index in 0..SOUND_PARTS {
             self.panes.sound[index].set_string(&sound[index]);
             self.change_scale_center(sound_slots[index], &sound[index], font);
@@ -1022,7 +1011,9 @@ impl OptionMenu {
             0,
         );
         let f30 = (1.0 - alpha) * -12.0;
-        self.panes.note_title.pane_trans(0.0, (1.0 - alpha) * NOTE_DY);
+        self.panes
+            .note_title
+            .pane_trans(0.0, (1.0 - alpha) * NOTE_DY);
 
         self.panes.note_title.rotate(
             self.panes.note_title.size.x / 2.0,
@@ -1269,8 +1260,7 @@ impl OptionMenu {
                                     RUMBLE_LOOP_ONCE,
                                     RUMBLE_STRENGTH,
                                 );
-                                vibration.motor_shock.pattern_idx =
-                                    rumbles.pattern[0] as i32;
+                                vibration.motor_shock.pattern_idx = rumbles.pattern[0] as i32;
                                 vibration.motor_shock.length = i32::from(rumbles.length);
                             }
                             self.panes.note_bar[1].user_area = 6;
@@ -1322,8 +1312,7 @@ impl OptionMenu {
                                     RUMBLE_LOOP_ONCE,
                                     RUMBLE_STRENGTH,
                                 );
-                                vibration.motor_shock.pattern_idx =
-                                    rumbles.pattern[0] as i32;
+                                vibration.motor_shock.pattern_idx = rumbles.pattern[0] as i32;
                                 vibration.motor_shock.length = i32::from(rumbles.length);
                             }
                             self.panes.note_bar[1].user_area = -6;
@@ -1543,9 +1532,7 @@ impl OptionMenu {
         vibration: &mut Vibration,
         msgs: &dyn MsgSource,
     ) {
-        let check_trigger = self
-            .stick
-            .check_trigger(pad.stick_value, pad.stick_angle);
+        let check_trigger = self.stick.check_trigger(pad.stick_value, pad.stick_angle);
 
         if self.vibration != 0 && !rumbles.supported {
             self.vibration = 0;

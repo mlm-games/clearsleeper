@@ -13,7 +13,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 
-layers=(src/archive.rs src/j3d)
+layers=(src/archive.rs src/disc.rs src/j3d)
 forbidden='crate::(sim|ui|ui_[a-z_]+|assets|save|view|lib)::'
 status=0
 

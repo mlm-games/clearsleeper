@@ -68,8 +68,6 @@ impl Tingle {
         self.speed = Vec3::ZERO;
     }
 
-
-
     pub fn strike(&mut self) {
         self.action = ACTION_FIGHT;
         self.mode = MODE_IDLE;

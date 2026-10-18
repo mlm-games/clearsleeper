@@ -77,7 +77,9 @@ impl Volume {
             ShapeKind::Cylinder => Shape::cylinder(pos, self.radius, self.height),
             ShapeKind::Capsule => Shape::capsule(pos, self.radius, self.height),
             ShapeKind::Box => Shape::capsule(pos, self.radius, self.height),
-            ShapeKind::Triangle => Shape::triangle(self.corners[0], self.corners[1], self.corners[2]),
+            ShapeKind::Triangle => {
+                Shape::triangle(self.corners[0], self.corners[1], self.corners[2])
+            }
         }
     }
 
@@ -160,12 +162,7 @@ const fn cps(
     }
 }
 
-pub fn tri(
-    corners: [Vec3; 3],
-    set: ObjSet,
-    gobj: GObjInf,
-    atk: Option<AtMeta>,
-) -> Volume {
+pub fn tri(corners: [Vec3; 3], set: ObjSet, gobj: GObjInf, atk: Option<AtMeta>) -> Volume {
     Volume {
         kind: ShapeKind::Triangle,
         center: [0.0, 0.0, 0.0],
@@ -302,16 +299,14 @@ pub const CITATIONS: &[(&str, &str)] = &[
 const TABLE: &[(&str, &[Volume])] = &[
     (
         "Ah",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                150.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            150.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ajav",
@@ -370,16 +365,14 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "Ba1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                50.0,
-                110.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            50.0,
+            110.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Bb",
@@ -389,7 +382,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 62.5,
                 set(0x05, 0x800, 1, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 5, at_spl: 0, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 5,
+                    at_spl: 0,
+                    at_atp: 1,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -422,7 +420,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 70.0,
                 set(0x0F, 0x800, 2, 0x00, 0x00, 0x75),
                 gobj(0x01, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 5, at_spl: 9, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 5,
+                    at_spl: 9,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -450,14 +453,24 @@ const TABLE: &[(&str, &[Volume])] = &[
                 50.0,
                 set(0x0F, 0x800, 2, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x00, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 300.0,
                 set(0x0F, 0x200000, 10, 0x00, 0x00, 0x00),
                 gobj(0x03, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200000), at_se: 0, at_spl: 1, at_atp: 10 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x200000),
+                    at_se: 0,
+                    at_spl: 1,
+                    at_atp: 10,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -503,7 +516,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 50.0,
                 set(0x05, 0x08, 4, 0x03, 0xFF1DFEBF, 0x15),
                 gobj(0x01, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 9, at_atp: 4 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 9,
+                    at_atp: 4,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -522,7 +540,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 50.0,
                 set(0x0F, 0x08, 4, 0x03, 0xFF1DFEBF, 0x15),
                 gobj(0x01, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 10, at_atp: 4 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 10,
+                    at_atp: 4,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -541,7 +564,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 50.0,
                 set(0x0F, 0x08, 2, 0x03, 0xFF1DFEBF, 0x15),
                 gobj(0x01, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 9, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 9,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -554,16 +582,14 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "Bita",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                50.0,
-                20.0,
-                set(0x00, 0x00, 0, 0x09, 0x200, 0x00),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            50.0,
+            20.0,
+            set(0x00, 0x00, 0, 0x09, 0x200, 0x00),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Bk",
@@ -596,7 +622,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 100.0,
                 set(0x0F, 0x800, 2, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -609,41 +640,40 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "Bm1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                50.0,
-                160.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            50.0,
+            160.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Bmdhand",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                100.0,
-                set(0x05, 0x00, 0, 0x03, 0xFF1DFEFF, 0x75),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x00), at_se: 0, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            100.0,
+            set(0x05, 0x00, 0, 0x03, 0xFF1DFEFF, 0x75),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x00),
+                at_se: 0,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "Bmsw",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Boko",
@@ -661,22 +691,25 @@ const TABLE: &[(&str, &[Volume])] = &[
                 0.0,
                 set(0x0B, 0x80, 1, 0x00, 0x00, 0x00),
                 gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x80), at_se: 0, at_spl: 1, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x80),
+                    at_se: 0,
+                    at_spl: 1,
+                    at_atp: 1,
+                }),
             ),
         ],
     ),
     (
         "Bs1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Bst",
@@ -687,7 +720,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 400.0,
                 set(0x05, 0x800, 1, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x00, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 1,
+                }),
             ),
             cyl(
                 [0.0, 0.0, 0.0],
@@ -702,7 +740,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 30.0,
                 set(0x05, 0x800, 1, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x01, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 1,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -716,7 +759,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 60.0,
                 set(0x05, 0x200, 2, 0x00, 0x00, 0x00),
                 gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200), at_se: 0, at_spl: 10, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x200),
+                    at_se: 0,
+                    at_spl: 10,
+                    at_atp: 2,
+                }),
             ),
         ],
     ),
@@ -728,56 +776,72 @@ const TABLE: &[(&str, &[Volume])] = &[
                 200.0,
                 set(0x0F, 0x1000, 1, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x00, 0x01, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x1000), at_se: 0, at_spl: 9, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x1000),
+                    at_se: 0,
+                    at_spl: 9,
+                    at_atp: 1,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 50.0,
                 set(0x05, 0x00, 0, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x00, 0x01, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x00), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x00),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 100.0,
                 set(0x0F, 0x200, 2, 0x03, 0x00, 0x00),
                 gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200), at_se: 0, at_spl: 10, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x200),
+                    at_se: 0,
+                    at_spl: 10,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 40.0,
                 set(0x05, 0x200, 1, 0x03, 0x00, 0x00),
                 gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200), at_se: 0, at_spl: 2, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x200),
+                    at_se: 0,
+                    at_spl: 2,
+                    at_atp: 1,
+                }),
             ),
         ],
     ),
     (
         "Btsw",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Btsw2",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Bwd",
@@ -787,7 +851,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 15.0,
                 set(0x05, 0x800, 8, 0x03, 0xFF1DFEFF, 0x75),
                 gobj(0x01, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 9, at_atp: 8 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 9,
+                    at_atp: 8,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -813,7 +882,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 15.0,
                 set(0x05, 0x800, 2, 0x03, 0xFF1D7EFF, 0x75),
                 gobj(0x00, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 2,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -848,7 +922,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 500.0,
                 set(0x0B, 0x20, 0, 0x00, 0x00, 0x00),
                 gobj(0x00, 0x04, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x20), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x20),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
         ],
     ),
@@ -875,41 +954,35 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "Doguu",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                200.0,
-                200.0,
-                set(0x00, 0x00, 0, 0x00, 0x00, 0x19),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            200.0,
+            200.0,
+            set(0x00, 0x00, 0, 0x00, 0x00, 0x19),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ds1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ebomzo",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                10.0,
-                set(0x00, 0x00, 0, 0x09, 0x20, 0x00),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            10.0,
+            set(0x00, 0x00, 0, 0x09, 0x20, 0x00),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ep",
@@ -975,7 +1048,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 200.0,
                 set(0x0F, 0x08, 0, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 7, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 7,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -989,7 +1067,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 30.0,
                 set(0x0F, 0x800, 2, 0x00, 0x00, 0x00),
                 gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 10, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 10,
+                    at_atp: 2,
+                }),
             ),
         ],
     ),
@@ -1008,22 +1091,25 @@ const TABLE: &[(&str, &[Volume])] = &[
                 30.0,
                 set(0x0F, 0x800, 8, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 10, at_atp: 8 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 10,
+                    at_atp: 8,
+                }),
             ),
         ],
     ),
     (
         "Figure",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                150.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x79),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            150.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x79),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Fire",
@@ -1034,7 +1120,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 150.0,
                 set(0x05, 0x200, 1, 0x09, 0x200100, 0x00),
                 gobj(0x00, 0x04, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200), at_se: 0, at_spl: 1, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x200),
+                    at_se: 0,
+                    at_spl: 1,
+                    at_atp: 1,
+                }),
             ),
             cyl(
                 [0.0, 0.0, 0.0],
@@ -1050,301 +1141,270 @@ const TABLE: &[(&str, &[Volume])] = &[
                 150.0,
                 set(0x09, 0x20000, 0, 0x09, 0x00, 0x00),
                 gobj(0x00, 0x04, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x20000), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x20000),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
         ],
     ),
     (
         "Gtaki",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                70.0,
-                1000.0,
-                set(0x00, 0x00, 0, 0x00, 0x00, 0x119),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            70.0,
+            1000.0,
+            set(0x00, 0x00, 0, 0x00, 0x00, 0x119),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Hfuck1",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                35.0,
-                set(0x00, 0x00, 0, 0x09, 0x8000, 0x00),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            35.0,
+            set(0x00, 0x00, 0, 0x09, 0x8000, 0x00),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Hi1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                110.0,
-                260.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            110.0,
+            260.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Hmlif",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                35.0,
-                set(0x00, 0x00, 0, 0x09, 0x1C4000, 0x00),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            35.0,
+            set(0x00, 0x00, 0, 0x09, 0x1C4000, 0x00),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ho",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                40.0,
-                140.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            40.0,
+            140.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Hr",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                45.0,
-                100.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            45.0,
+            100.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Hys",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                30.0,
-                set(0x00, 0x00, 0, 0x09, 0x1C4000, 0x00),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            30.0,
+            set(0x00, 0x00, 0, 0x09, 0x1C4000, 0x00),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Kantera",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                40.0,
-                set(0x05, 0x200, 1, 0x00, 0x00, 0x75),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x200), at_se: 0, at_spl: 8, at_atp: 1 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            40.0,
+            set(0x05, 0x200, 1, 0x00, 0x00, 0x75),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x200),
+                at_se: 0,
+                at_spl: 8,
+                at_atp: 1,
+            }),
+        )],
     ),
     (
         "Kita",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                400.0,
-                set(0x05, 0x00, 0, 0x03, 0x200000, 0x00),
-                gobj(0x00, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x00), at_se: 0, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            400.0,
+            set(0x05, 0x00, 0, 0x03, 0x200000, 0x00),
+            gobj(0x00, 0x02, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x00),
+                at_se: 0,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "Km1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                150.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            150.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Lamp",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                30.0,
-                set(0x00, 0x00, 0, 0x09, 0x660200, 0x00),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            30.0,
+            set(0x00, 0x00, 0, 0x09, 0x660200, 0x00),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ls1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                40.0,
-                100.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            40.0,
+            100.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Mflft",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                10.0,
-                1000.0,
-                set(0x00, 0x00, 0, 0x03, 0xFF1DFEBF, 0x75),
-                gobj(0x00, 0x01, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            10.0,
+            1000.0,
+            set(0x00, 0x00, 0, 0x03, 0xFF1DFEBF, 0x75),
+            gobj(0x00, 0x01, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Mk",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                40.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            40.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "MkieK",
-        &[
-            sph(
-                [0.0, 150.0, 0.0],
-                100.0,
-                set(0x00, 0x00, 0, 0x03, 0x800000, 0x00),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 150.0, 0.0],
+            100.0,
+            set(0x00, 0x00, 0, 0x03, 0x800000, 0x00),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Mn",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                40.0,
-                160.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x15),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            40.0,
+            160.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x15),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Mt",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                150.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            150.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Nh",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                10.0,
-                20.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            10.0,
+            20.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x75),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Os",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                120.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            120.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Plant",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                200.0,
-                set(0x00, 0x00, 0, 0x09, 0x20, 0x19),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            200.0,
+            set(0x00, 0x00, 0, 0x09, 0x20, 0x19),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Player",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                125.0,
-                set(0x00, 0x00, 0, 0x05, 0xFF1DFEFF, 0x73),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            125.0,
+            set(0x00, 0x00, 0, 0x05, 0xFF1DFEFF, 0x73),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Rflw",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                30.0,
-                200.0,
-                set(0x00, 0x00, 0, 0x09, 0x20, 0x19),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            30.0,
+            200.0,
+            set(0x00, 0x00, 0, 0x09, 0x20, 0x19),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Rsh1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                80.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            80.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Ship",
@@ -1374,7 +1434,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 20.0,
                 set(0x05, 0x800, 0, 0x03, 0xFF1DFEBF, 0x75),
                 gobj(0x00, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -1393,54 +1458,58 @@ const TABLE: &[(&str, &[Volume])] = &[
                 20.0,
                 set(0x05, 0x00, 0, 0x03, 0xFF1DFEBF, 0x75),
                 gobj(0x00, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x00), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x00),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 80.0,
                 set(0x05, 0x00, 0, 0x03, 0x200040, 0x00),
                 gobj(0x00, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x00), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x00),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
         ],
     ),
     (
         "Tama",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                30.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x55),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            30.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFFF, 0x55),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Tbox",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                40.0,
-                110.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            40.0,
+            110.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Tc",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                60.0,
-                150.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            60.0,
+            150.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Tn",
@@ -1473,14 +1542,24 @@ const TABLE: &[(&str, &[Volume])] = &[
                 100.0,
                 set(0x0F, 0x10008, 0, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x10008), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x10008),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 62.5,
                 set(0x0F, 0x10008, 0, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x10008), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x10008),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -1493,42 +1572,36 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "Tt",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                48.0,
-                140.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            48.0,
+            140.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Vfan",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                100.0,
-                300.0,
-                set(0x00, 0x00, 0, 0x09, 0x20000000, 0x00),
-                gobj(0x00, 0x00, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            100.0,
+            300.0,
+            set(0x00, 0x00, 0, 0x09, 0x20000000, 0x00),
+            gobj(0x00, 0x00, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "Zl1",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                50.0,
-                140.0,
-                set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
-                gobj(0x00, 0x04, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            50.0,
+            140.0,
+            set(0x00, 0x00, 0, 0x03, 0xFFFFFFBF, 0x75),
+            gobj(0x00, 0x04, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "amos",
@@ -1559,7 +1632,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 15.0,
                 set(0x0F, 0x1000, 2, 0x00, 0x00, 0x75),
                 gobj(0x00, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x1000), at_se: 0, at_spl: 6, at_atp: 2 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x1000),
+                    at_se: 0,
+                    at_spl: 6,
+                    at_atp: 2,
+                }),
             ),
         ],
     ),
@@ -1592,82 +1670,100 @@ const TABLE: &[(&str, &[Volume])] = &[
                 15.0,
                 set(0x05, 0x1000, 1, 0x00, 0x00, 0x61),
                 gobj(0x00, 0x03, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x1000), at_se: 0, at_spl: 6, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x1000),
+                    at_se: 0,
+                    at_spl: 6,
+                    at_atp: 1,
+                }),
             ),
         ],
     ),
     (
         "bridge",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                5.0,
-                1000.0,
-                set(0x00, 0x00, 0, 0x03, 0xFF1DFEBF, 0x75),
-                gobj(0x00, 0x01, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            5.0,
+            1000.0,
+            set(0x00, 0x00, 0, 0x03, 0xFF1DFEBF, 0x75),
+            gobj(0x00, 0x01, 0x00, 0x00),
+            None,
+        )],
     ),
     (
         "c_black",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x2000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x2000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "c_blue",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x2000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x2000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "c_green",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x2000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x2000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "c_kiiro",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x2000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x2000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "c_red",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x2000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x05, 0x2000, 0, 0x0B, 0xFFBDFEFF, 0x75),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x2000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "keeth",
@@ -1677,7 +1773,12 @@ const TABLE: &[(&str, &[Volume])] = &[
                 30.0,
                 set(0x05, 0x800, 1, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x00, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x800), at_se: 0, at_spl: 0, at_atp: 1 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x800),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 1,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -1697,15 +1798,18 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "kuro_s",
-        &[
-            sph(
-                [0.0, 0.0, 0.0],
-                15.0,
-                set(0x15, 0x1000000, 0, 0x03, 0xFF3DFEFF, 0x65),
-                gobj(0x00, 0x06, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x1000000), at_se: 6, at_spl: 0, at_atp: 0 }),
-            ),
-        ],
+        &[sph(
+            [0.0, 0.0, 0.0],
+            15.0,
+            set(0x15, 0x1000000, 0, 0x03, 0xFF3DFEFF, 0x65),
+            gobj(0x00, 0x06, 0x00, 0x00),
+            Some(AtMeta {
+                at_type: AtkType(0x1000000),
+                at_se: 6,
+                at_spl: 0,
+                at_atp: 0,
+            }),
+        )],
     ),
     (
         "mo2",
@@ -1738,14 +1842,24 @@ const TABLE: &[(&str, &[Volume])] = &[
                 100.0,
                 set(0x0F, 0x08, 0, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
                 62.5,
                 set(0x0F, 0x08, 0, 0x00, 0x00, 0x00),
                 gobj(0x01, 0x02, 0x00, 0x00),
-                Some(AtMeta { at_type: AtkType(0x08), at_se: 0, at_spl: 0, at_atp: 0 }),
+                Some(AtMeta {
+                    at_type: AtkType(0x08),
+                    at_se: 0,
+                    at_spl: 0,
+                    at_atp: 0,
+                }),
             ),
             sph(
                 [0.0, 0.0, 0.0],
@@ -1758,16 +1872,14 @@ const TABLE: &[(&str, &[Volume])] = &[
     ),
     (
         "zouK",
-        &[
-            cyl(
-                [0.0, 0.0, 0.0],
-                100.0,
-                200.0,
-                set(0x00, 0x00, 0, 0x0F, 0xFF1DFEFF, 0x79),
-                gobj(0x00, 0x03, 0x00, 0x00),
-                None,
-            ),
-        ],
+        &[cyl(
+            [0.0, 0.0, 0.0],
+            100.0,
+            200.0,
+            set(0x00, 0x00, 0, 0x0F, 0xFF1DFEFF, 0x79),
+            gobj(0x00, 0x03, 0x00, 0x00),
+            None,
+        )],
     ),
 ];
 

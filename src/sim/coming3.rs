@@ -450,10 +450,7 @@ pub fn is_coming3(name: &str) -> bool {
     COMING3_ACTORS.contains(&name)
 }
 
-pub fn control(
-    mut buoys: Query<(&Actor, &mut Coming3), With<Coming3>>,
-    players: Query<&Player>,
-) {
+pub fn control(mut buoys: Query<(&Actor, &mut Coming3), With<Coming3>>, players: Query<&Player>) {
     // RULE 9 / RULE 12(d): the access set is `&Actor` (read, `With<Coming3>`), `&mut Coming3`
     // (write, `With<Coming3>`) and `&Player` (read). No param writes a component another reads, and
     // nothing here writes `Actor`, so there is no intra-system ambiguity to guard.

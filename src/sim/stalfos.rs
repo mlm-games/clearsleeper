@@ -372,8 +372,8 @@ pub enum Clip {
 }
 
 const CLIP_FRAMES: [i16; 42] = [
-    40, 40, 70, 70, 40, 89, 139, 59, 39, 14, 19, 71, 39, 14, 19, 71, 8, 10, 14, 19, 8, 10, 14, 19, 13,
-    13, 50, 19, 29, 40, 24, 54, 30, 59, 49, 10, 28, 8, 7, 20, 20, 20,
+    40, 40, 70, 70, 40, 89, 139, 59, 39, 14, 19, 71, 39, 14, 19, 71, 8, 10, 14, 19, 8, 10, 14, 19,
+    13, 13, 50, 19, 29, 40, 24, 54, 30, 59, 49, 10, 28, 8, 7, 20, 20, 20,
 ];
 
 impl Clip {
@@ -505,7 +505,9 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     for lane in 0..3 {
         seed[lane] = (seed[lane] * RND_MUL[lane]) % RND_MOD[lane];
     }
-    let sum = seed[0] as f32 / RND_SCALE[0] + seed[1] as f32 / RND_SCALE[1] + seed[2] as f32 / RND_SCALE[2];
+    let sum = seed[0] as f32 / RND_SCALE[0]
+        + seed[1] as f32 / RND_SCALE[1]
+        + seed[2] as f32 / RND_SCALE[2];
     (sum % 1.0).abs()
 }
 
@@ -611,13 +613,33 @@ fn seek(part: &mut Part, actor: &Actor) {
         link * yaw_cos * tilt_cos,
     );
     part.pos += part.vel;
-    add_calc2(&mut part.stretch, PART_STRETCH_TOP, PART_STRETCH_SCALE, PART_STRETCH_STEP);
+    add_calc2(
+        &mut part.stretch,
+        PART_STRETCH_TOP,
+        PART_STRETCH_SCALE,
+        PART_STRETCH_STEP,
+    );
 }
 
 fn snap(part: &mut Part, actor: &Actor) -> bool {
-    add_calc2(&mut part.pos.x, actor.pos.x, PART_SNAP_SCALE, part.vel.x.abs() + PART_CLOSED);
-    add_calc2(&mut part.pos.y, actor.pos.y, PART_SNAP_SCALE, part.vel.y.abs() + PART_CLOSED);
-    add_calc2(&mut part.pos.z, actor.pos.z, PART_SNAP_SCALE, part.vel.z.abs() + PART_CLOSED);
+    add_calc2(
+        &mut part.pos.x,
+        actor.pos.x,
+        PART_SNAP_SCALE,
+        part.vel.x.abs() + PART_CLOSED,
+    );
+    add_calc2(
+        &mut part.pos.y,
+        actor.pos.y,
+        PART_SNAP_SCALE,
+        part.vel.y.abs() + PART_CLOSED,
+    );
+    add_calc2(
+        &mut part.pos.z,
+        actor.pos.z,
+        PART_SNAP_SCALE,
+        part.vel.z.abs() + PART_CLOSED,
+    );
     if (actor.pos - part.pos).length() > PART_CLOSED {
         return false;
     }
@@ -685,7 +707,11 @@ impl Stalfos {
             at_weapon: AT_OFF,
             flinch: 0,
             grab_lock: 0,
-            body: if upper { UPPER_BODY_HEALTH } else { BODY_HEALTH },
+            body: if upper {
+                UPPER_BODY_HEALTH
+            } else {
+                BODY_HEALTH
+            },
             head_hp: HEAD_HEALTH as i16,
             countdown: 0,
             weapon_state: if upper { WEAPON_GONE } else { WEAPON_LOOSE },
@@ -820,7 +846,12 @@ impl Stalfos {
 
     fn speed_pos_calc(&mut self, actor: &mut Actor, solid: Option<&Collision>, player: Vec3) {
         if ground::grounded(solid, actor.pos) && self.turn != 0 {
-            add_calc_angle_s2(&mut self.aim, bearing(actor.pos, player), TURN_DIV, self.turn);
+            add_calc_angle_s2(
+                &mut self.aim,
+                bearing(actor.pos, player),
+                TURN_DIV,
+                self.turn,
+            );
             self.turn = 0;
         }
         let (sin, cos) = from_s16(self.aim.wrapping_add(self.sway)).sin_cos();
@@ -1144,7 +1175,9 @@ impl Stalfos {
             _ => {}
         }
         add_calc2(&mut self.swing, spin, ONE, spin_step);
-        self.wobble = self.wobble.wrapping_add((SWING_BODY_RATE * self.swing) as i16);
+        self.wobble = self
+            .wobble
+            .wrapping_add((SWING_BODY_RATE * self.swing) as i16);
         if self.swing.abs() > SWING_THRESHOLD {
             let before = self.swing_count;
             self.swing_count = before.wrapping_add((SWING_BODY_RATE * self.swing.abs()) as i16);
@@ -1192,7 +1225,8 @@ impl Stalfos {
                 self.nunchaku = NUNCHAKU_WHIR;
                 self.set_anm(Clip::HoneAttack, true, HONE_SPEED);
                 self.sub = F2_NUNCHAKU_SWING;
-                self.timers[0] = (self.rnd_f(NUNCHAKU_SPREAD) as i32 * i32::from(NUNCHAKU_PERIOD)) as i16;
+                self.timers[0] =
+                    (self.rnd_f(NUNCHAKU_SPREAD) as i32 * i32::from(NUNCHAKU_PERIOD)) as i16;
                 self.se(events, SE_CV_NUNCHAKU_L);
             }
             F2_NUNCHAKU_SWING => {
@@ -1686,17 +1720,27 @@ impl Stalfos {
         match self.head.state {
             PART_HEAD_POP => {
                 let seed = &mut self.seed;
-                if let Some(hit) =
-                    part_land(&mut self.head, seed, self.home_y, actor, solid, PART_POP_GATE)
-                {
+                if let Some(hit) = part_land(
+                    &mut self.head,
+                    seed,
+                    self.home_y,
+                    actor,
+                    solid,
+                    PART_POP_GATE,
+                ) {
                     events.list.push(SimEvent::Se(hit));
                 }
             }
             PART_HEAD_HURT => {
                 let seed = &mut self.seed;
-                if let Some(hit) =
-                    part_land(&mut self.head, seed, self.home_y, actor, solid, PART_HURT_GATE)
-                {
+                if let Some(hit) = part_land(
+                    &mut self.head,
+                    seed,
+                    self.home_y,
+                    actor,
+                    solid,
+                    PART_HURT_GATE,
+                ) {
                     events.list.push(SimEvent::Se(hit));
                 }
                 if self.head.wait == 0 {
@@ -1969,14 +2013,7 @@ pub fn control(
         let taken = (HEAD_HEALTH - hp.0).clamp(0, HEAD_HEALTH);
         hp.0 = HEAD_HEALTH;
         st.st_move(actor, &player, &mut events, &switches, &mut commands, solid);
-        st.damage_check(
-            actor,
-            &player,
-            taken,
-            finisher,
-            &mut events,
-            &mut commands,
-        );
+        st.damage_check(actor, &player, taken, finisher, &mut events, &mut commands);
         st.shape_settle(actor);
         st.step_anm();
         st.cc_set(actor);

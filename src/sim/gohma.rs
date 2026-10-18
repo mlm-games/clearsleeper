@@ -42,10 +42,10 @@ const HIO_M50: f32 = 1.0;
 const HIO_M54: u8 = 0;
 
 pub const JOINT_CHECK: [i8; 73] = [
-    -1, 0x05, -1, -1, 0x11, -1, -1, -1, -1, -1, 0x12, -1, -1, -1, 0x06, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0x04, -1, -1, 0x0D, -1, -1, 0x0F, -1,
-    -1, 0x0E, -1, -1, 0x11, 0x03, -1, -1, 0x0B, -1, -1, 0x0C, -1, -1, -1, 0x02, -1, -1, -1, 0x64,
-    -1, 0x00, 0x01, 0x65, 0x66, -1, -1, 0x07, 0x08, -1, -1, 0x09, 0x0A,
+    -1, 0x05, -1, -1, 0x11, -1, -1, -1, -1, -1, 0x12, -1, -1, -1, 0x06, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0x04, -1, -1, 0x0D, -1, -1, 0x0F, -1, -1, 0x0E, -1, -1,
+    0x11, 0x03, -1, -1, 0x0B, -1, -1, 0x0C, -1, -1, -1, 0x02, -1, -1, -1, 0x64, -1, 0x00, 0x01,
+    0x65, 0x66, -1, -1, 0x07, 0x08, -1, -1, 0x09, 0x0A,
 ];
 
 const SE_BTD_MAGMA_MOVE: u32 = 0x583E;
@@ -232,14 +232,7 @@ const FRAME_YOKO_KAEN3: i16 = 100;
 const FRAME_YOKO_WAIT: i16 = 50;
 
 const JAB_BCK: [i32; 8] = [
-    BCK_RJAB1,
-    BCK_RJAB2,
-    BCK_RJAB3,
-    0,
-    0,
-    BCK_LJAB1,
-    BCK_LJAB2,
-    BCK_LJAB3,
+    BCK_RJAB1, BCK_RJAB2, BCK_RJAB3, 0, 0, BCK_LJAB1, BCK_LJAB2, BCK_LJAB3,
 ];
 
 const PUNCH_BCK: [i32; 10] = [
@@ -256,8 +249,8 @@ const PUNCH_BCK: [i32; 10] = [
 ];
 
 const AT_SIZE: [f32; 19] = [
-    100.0, 100.0, 250.0, 300.0, 300.0, 300.0, 300.0, 100.0, 250.0, 100.0, 250.0, 150.0, 150.0, 150.0, 150.0, 150.0,
-    150.0, 150.0, 150.0,
+    100.0, 100.0, 250.0, 300.0, 300.0, 300.0, 300.0, 100.0, 250.0, 100.0, 250.0, 150.0, 150.0,
+    150.0, 150.0, 150.0, 150.0, 150.0, 150.0,
 ];
 
 const AT_SPH_SRC_RADIUS: f32 = 200.0;
@@ -617,11 +610,7 @@ impl At {
             At::Bomb | At::Boomerang => 2,
             At::Hookshot => 0,
             At::Idle => 0xC,
-            At::Arrow
-            | At::FireArrow
-            | At::IceArrow
-            | At::LightArrow
-            | At::Hammer => 5,
+            At::Arrow | At::FireArrow | At::IceArrow | At::LightArrow | At::Hammer => 5,
         }
     }
 
@@ -777,8 +766,6 @@ pub struct Watch<'w, 's> {
     bolts: Query<'w, 's, &'static super::boomerang::Boomerang>,
     chains: Query<'w, 's, &'static super::hookshot::Hookshot>,
 }
-
-
 
 pub struct Sink<'a> {
     pub events: &'a mut SimEvents,
@@ -1010,7 +997,11 @@ pub fn control(
                 {
                     found = At::Hammer;
                 }
-                if found == At::Idle && watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6 {
+                if found == At::Idle
+                    && watch.combat.active
+                    && watch.combat.frame >= 1
+                    && watch.combat.frame < 6
+                {
                     found = At::Sword;
                 }
                 if found == At::Idle && !watch.blasts.list.is_empty() {
@@ -1192,14 +1183,9 @@ impl Gohma {
         }
         for i in 0..HAND_CYL_COUNT {
             if self.m5e7c != 0
-                && ((self.m5e7c == 1 || (self.m5e7c == 2 && i <= 2))
-                    || (self.m5e7c == 3 && i >= 3))
+                && ((self.m5e7c == 1 || (self.m5e7c == 2 && i <= 2)) || (self.m5e7c == 3 && i >= 3))
             {
-                let local = [
-                    HAND_CO_POS_X[i],
-                    HAND_CO_POS_Y[i],
-                    scale * HAND_CO_POS_Z[i],
-                ];
+                let local = [HAND_CO_POS_X[i], HAND_CO_POS_Y[i], scale * HAND_CO_POS_Z[i]];
                 self.m5e98[i + 19] = mtx_position_y(actor.angle[ANGLE_Y].wrapping_add(turn), local);
                 self.m5e98[i + 19][0] += actor.pos.x;
                 self.m5e98[i + 19][1] += actor.pos.y;
@@ -1317,10 +1303,7 @@ impl Gohma {
                 }
                 let diff = env.player_eye - self.eye3();
                 let pitch = super::walk::to_s16(diff.x.atan2(diff.z));
-                target = wrapping_div(
-                    pitch.wrapping_sub(actor.angle[ANGLE_Y]),
-                    2,
-                );
+                target = wrapping_div(pitch.wrapping_sub(actor.angle[ANGLE_Y]), 2);
                 if target > 0x2000 {
                     target = 0x2000;
                 } else if target < -0x2000 {
@@ -1502,24 +1485,14 @@ impl Gohma {
             if self.sibuki[idx].m00 <= 2 {
                 let mut landed = false;
                 if idx == 0 && HIO_M54 != 0 {
-                    add_calc2(
-                        &mut self.sibuki[idx].m04[0],
-                        env.player_pos.x,
-                        1.0,
-                        30.0,
-                    );
+                    add_calc2(&mut self.sibuki[idx].m04[0], env.player_pos.x, 1.0, 30.0);
                     add_calc2(
                         &mut self.sibuki[idx].m04[1],
                         env.player_pos.y + 70.0,
                         1.0,
                         30.0,
                     );
-                    add_calc2(
-                        &mut self.sibuki[idx].m04[2],
-                        env.player_pos.z,
-                        1.0,
-                        30.0,
-                    );
+                    add_calc2(&mut self.sibuki[idx].m04[2], env.player_pos.z, 1.0, 30.0);
                     self.sibuki[idx].m10[1] = -10.0;
                 } else {
                     self.sibuki[idx].m10[1] -= HIO_M50;
@@ -2290,8 +2263,6 @@ impl Gohma {
         state != 0
     }
 
-    
-
     fn damage_step(&mut self, out: &mut Sink<'_>, fall: &mut bool) {
         match self.gohma_state {
             0 => {
@@ -2478,7 +2449,11 @@ impl Gohma {
     fn spawn_hahen(&mut self) {
         for idx in 0..self.hahen.len() {
             if self.hahen[idx].m04 == 0 {
-                let joint = if idx < 5 { 2 } else { self.rnd_f(18.999) as usize };
+                let joint = if idx < 5 {
+                    2
+                } else {
+                    self.rnd_f(18.999) as usize
+                };
                 self.hahen[idx].m04 = 1;
                 let src = self.m02fc.get(joint).copied().unwrap_or(ZERO_XYZ);
                 self.hahen[idx].m08 = [
@@ -2858,12 +2833,7 @@ impl Gohma {
 
     fn end_drop(&mut self, out: &mut Sink<'_>) {
         self.m6e88 = 0;
-        add_calc2(
-            &mut self.m6e50[0],
-            self.m6e5c[0],
-            1.0,
-            self.m6e68[0].abs(),
-        );
+        add_calc2(&mut self.m6e50[0], self.m6e5c[0], 1.0, self.m6e68[0].abs());
         self.m6e50[1] += self.m6e68[1];
         self.m6e68[1] -= REG0_F3 + 5.0;
         if self.m6e50[1] <= self.m6e5c[1] {
@@ -2877,12 +2847,7 @@ impl Gohma {
                 self.m6038 = 0;
             }
         }
-        add_calc2(
-            &mut self.m6e50[2],
-            self.m6e5c[2],
-            1.0,
-            self.m6e68[2].abs(),
-        );
+        add_calc2(&mut self.m6e50[2], self.m6e5c[2], 1.0, self.m6e68[2].abs());
         self.eye_pos = self.m6e50;
         self.end_flight_common();
     }
@@ -2916,7 +2881,11 @@ impl Gohma {
             if self.sibuki[lane].m00 == 0 {
                 self.sibuki[lane].m00 = 1;
                 let yaw = self.rnd_fx(32768.0) as i16;
-                let local = [0.0, self.rnd_f(50.0), REG0_F13 + (self.rnd_fx(200.0) + 300.0)];
+                let local = [
+                    0.0,
+                    self.rnd_f(50.0),
+                    REG0_F13 + (self.rnd_fx(200.0) + 300.0),
+                ];
                 self.sibuki[lane].m04 = mtx_position_y(yaw, local);
                 let scatter = [
                     0.0,

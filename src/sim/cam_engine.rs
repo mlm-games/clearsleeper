@@ -3,12 +3,12 @@ use glam::{Vec2, Vec3};
 use super::cam_event::{self, SplinePaths};
 use super::cam_follow::{self, FollowInput, SAngle, SGlobe, ViewCache};
 use super::cam_lockon;
-use super::cam_room::{CamRoom, CAM_FIELD_UNSET};
-use super::cam_style::{self, flag, param, CamEngine};
-use super::event_manager::EventManager;
+use super::cam_room::{CAM_FIELD_UNSET, CamRoom};
+use super::cam_style::{self, CamEngine, flag, param};
 use super::cam_tp_engines;
 use super::camera::Camera;
 use super::collision::Collision;
+use super::event_manager::EventManager;
 use super::player::Player;
 use super::player_status;
 
@@ -588,12 +588,7 @@ pub fn engine(
         Some(CamEngine::Ride) => cam_tp_engines::ride(camera, player, input),
         Some(CamEngine::Manual) => cam_tp_engines::manual(camera, player, input),
         Some(CamEngine::Hookshot) => cam_tp_engines::hookshot(camera, player, input),
-        Some(
-            CamEngine::Hung
-            | CamEngine::Tornado
-            | CamEngine::Vomit
-            | CamEngine::Shield,
-        ) => false,
+        Some(CamEngine::Hung | CamEngine::Tornado | CamEngine::Vomit | CamEngine::Shield) => false,
         None => false,
     };
     camera.work.event.age = camera.work.event.age.wrapping_add(1);
@@ -703,7 +698,8 @@ fn crawl(
 
     cache.center += (anchor - cache.center) * Vec3::new(lerp_x, lerp_y, lerp_x);
 
-    let blocked = collision.is_some_and(|solid| solid.line_cross(cache.center, work.arrow).is_some());
+    let blocked =
+        collision.is_some_and(|solid| solid.line_cross(cache.center, work.arrow).is_some());
     if work.aiming && !blocked {
         cache.eye = work.arrow;
         cache.direction = SGlobe::from_xyz(cache.eye - cache.center);
@@ -848,10 +844,14 @@ fn fixed_position(camera: &mut Camera, player: &Player, room: Option<&CamRoom>) 
                 Some(row) if row.field_0x12 != CAM_FIELD_UNSET => f32::from(row.field_0x12),
                 _ => style_fovy,
             };
-            let named = row
-                .and_then(|row| (row.field_0x13 != CAM_FIELD_UNSET).then_some(row.field_0x13));
+            let named =
+                row.and_then(|row| (row.field_0x13 != CAM_FIELD_UNSET).then_some(row.field_0x13));
             work.timed = named.is_some();
-            (arrow.position, fovy_target, named.map(i32::from).unwrap_or(-1))
+            (
+                arrow.position,
+                fovy_target,
+                named.map(i32::from).unwrap_or(-1),
+            )
         }
         None => (camera.bump.eye, style_fovy, -1),
     };
@@ -889,7 +889,13 @@ fn fixed_position(camera: &mut Camera, player: &Player, room: Option<&CamRoom>) 
         work.center += (anchor - work.center) * work.share;
         let center = camera.view_cache.center;
         camera.view_cache.center = center + (work.center - center) * lerp;
-        walk_towards(&mut camera.view_cache, position, radius_near, radius_far, work.share);
+        walk_towards(
+            &mut camera.view_cache,
+            position,
+            radius_near,
+            radius_far,
+            work.share,
+        );
         let fovy = camera.view_cache.fovy;
         camera.view_cache.fovy = fovy + work.share * (fovy_target - fovy);
         if camera.setup_age >= (work.frames - 1) as u32 {
@@ -898,7 +904,13 @@ fn fixed_position(camera: &mut Camera, player: &Player, room: Option<&CamRoom>) 
     } else {
         let center = camera.view_cache.center;
         camera.view_cache.center = center + (anchor - center) * lerp;
-        walk_towards(&mut camera.view_cache, position, radius_near, radius_far, rate);
+        walk_towards(
+            &mut camera.view_cache,
+            position,
+            radius_near,
+            radius_far,
+            rate,
+        );
         let fovy = camera.view_cache.fovy;
         camera.view_cache.fovy = fovy + rate * (fovy_target - fovy);
     }
@@ -1080,9 +1092,8 @@ fn subject_settled(
         cam_follow::relational_pos(player, facing, rotated)
     };
 
-    let want = SGlobe::from_xyz(
-        cache.center - Vec3::new(lockon.x, lockon.y - SUBJECT_DROP, lockon.z),
-    );
+    let want =
+        SGlobe::from_xyz(cache.center - Vec3::new(lockon.x, lockon.y - SUBJECT_DROP, lockon.z));
     let current = cache.direction.radius();
     cache
         .direction
@@ -1234,13 +1245,8 @@ impl Camera {
     /// before the collision pass. The four offsets stay on [`Camera::shake`] for the renderer.
     pub fn shake_pass(&mut self) {
         let anchor = if self.shake.flags & 0x10 == 0 && self.shake.flags & 0x20 != 0 {
-            self.project(self.view_cache.eye).map(|proj| {
-                Vec3::new(
-                    proj.x / self.port.width,
-                    proj.y / self.port.height,
-                    0.0,
-                )
-            })
+            self.project(self.view_cache.eye)
+                .map(|proj| Vec3::new(proj.x / self.port.width, proj.y / self.port.height, 0.0))
         } else {
             None
         };

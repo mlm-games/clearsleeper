@@ -18,7 +18,7 @@ use super::collision::Collision;
 use super::flags::Switches;
 use super::inventory::{Got, ITEM_BOOMERANG};
 use super::player::Player;
-use super::player_status::{STTS0_SHIP_RIDE, STTS0_SWIM, STTS0_UNK1000000, PlayerStatus};
+use super::player_status::{PlayerStatus, STTS0_SHIP_RIDE, STTS0_SWIM, STTS0_UNK1000000};
 use super::ship::Ship;
 use crate::text::msgproc::MsgGameInfo;
 
@@ -93,7 +93,9 @@ const SPAWN_DEPTH: f32 = -1000.0; // <- d_a_gy_ctrl.cpp:343
 /// `REG8_*` registers to zero.
 const HIDE_TICK: i32 = 30; // <- d_a_gy_ctrl.cpp:380, :407
 /// `m4AC = true;` (`:115`) - the "every spawned gull is calm" latch, whose inner test
-/// `pfVar2->m2B0 != 0` (`:119`) has no counterpart. See [`GyCtrl::set_target`].
+/// `pfVar2->m2B0 != 0` (`:119`) has no counterpart: `daGy_c::m2B0` is the gull's mode index
+/// (`d_a_gy.h:92`, the `mode_proc[m2B0]` selector at `d_a_gy.cpp:1236`), and `daGy_c` has no
+/// behaviour in this port. See [`GyCtrl::set_target`].
 const CALM_DEFAULT: bool = true; // <- d_a_gy_ctrl.cpp:115
 
 /// The four `mode_tbl` entries of `modeProc` (`d_a_gy_ctrl.cpp:276-297`). `modeProc(PROC_INIT_e, n)`
@@ -189,8 +191,10 @@ pub struct GyCtrl {
     pub refused: bool,
     /// `m4AC` (`d_a_gy_ctrl.h:71`) - "every spawned gull is calm", initialised `CALM_DEFAULT` by the
     /// `VERSION > VERSION_DEMO` block at `:115`. Its only writer besides that seed is
-    /// `pfVar2->m2B0 != 0` (`:119-121`), which has no counterpart, so it never clears. Stored so the
-    /// fold is visible rather than silently absent.
+    /// `pfVar2->m2B0 != 0` (`:119-121`), the mode index `daGy_c` carries in `d_a_gy.h:92`
+    /// (`d_a_gy.cpp:1236` dispatches `mode_proc[m2B0]`), which has no counterpart: the gull this
+    /// module spawns is the marker [`Gull`], because `d_a_gy.cpp` is a RULE 1-STUB. It therefore
+    /// never clears. Stored so the fold is visible rather than silently absent.
     pub calm: bool,
 }
 
@@ -306,7 +310,11 @@ impl GyCtrl {
             return;
         }
         // `m328 == 0 && checkGyCtrlExist()` (:536)
-        if self.use_area == 0 && peers.iter().any(|&(area, no_area)| area == 0 && no_area == 1) {
+        if self.use_area == 0
+            && peers
+                .iter()
+                .any(|&(area, no_area)| area == 0 && no_area == 1)
+        {
             self.refused = true;
         }
     }
@@ -497,7 +505,10 @@ impl GyCtrl {
             // `cXyz sp08 = m3EC[i]; sp08.y += l_HIO.m24;` (:213-214)
             let raised = Vec3::new(dest.x, dest.y + HIO_M24, dest.z);
             // `if (lineCheck(&sp08, &m3EC[i])) { return false; }` (:220-222)
-            if solid.and_then(|solid| solid.line_cross(raised, dest)).is_some() {
+            if solid
+                .and_then(|solid| solid.line_cross(raised, dest))
+                .is_some()
+            {
                 return false;
             }
         }
@@ -772,7 +783,9 @@ fn rotate(origin: Vec3, angle: i16, lateral: f32, forward: f32) -> Vec3 {
 /// `fpcNm_DAIOCTA_e`, `fpcNm_OBJ_IKADA_e` and `fpcNm_NPC_SO_e` (`:77`), spelled with their stage
 /// strings so the comparison can be a `&str` test.
 fn near_names() -> &'static [&'static str] {
-    &["Daiocta", "Ikada", "ikada_h", "ikadaS", "ikada_u", "Svsp", "So"]
+    &[
+        "Daiocta", "Ikada", "ikada_h", "ikadaS", "ikada_u", "Svsp", "So",
+    ]
 }
 
 pub fn is_gy_ctrl(name: &str) -> bool {
@@ -820,6 +833,7 @@ pub fn control(
     let entities: Vec<Entity> = rows.iter().collect();
     let peers: Vec<(u8, u8)> = tags
         .iter_many(&entities)
+        .filter_map(|row| row.ok())
         .filter(|(_, actor, _)| actor.name == GY_CTRL_NAME)
         .map(|(_, _, tag)| (tag.use_area, tag.no_area))
         .collect();

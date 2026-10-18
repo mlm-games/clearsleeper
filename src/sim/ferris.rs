@@ -57,11 +57,11 @@ const GONDOLA_OFFSETS: [[f32; 3]; 6] = [
 /// (`d_a_obj_ferris.cpp:455-461`) - the RIDE-SURFACE anchors, a DIFFERENT table from
 /// [`GONDOLA_OFFSETS``: these feed `mRideWaveAngle` (`:470`), not `set_mtx`.
 const RIDE_OFFSETS: [[f32; 3]; 5] = [
-    [-993.54, -325.78, 37.63],   // <- d_a_obj_ferris.cpp:456
-    [-616.86, 844.24, 37.63],    // <- d_a_obj_ferris.cpp:457
-    [612.3, 847.55, 37.63],      // <- d_a_obj_ferris.cpp:458
-    [995.28, -320.43, 37.63],    // <- d_a_obj_ferris.cpp:459
-    [2.82, -1045.59, 37.63],     // <- d_a_obj_ferris.cpp:460
+    [-993.54, -325.78, 37.63], // <- d_a_obj_ferris.cpp:456
+    [-616.86, 844.24, 37.63],  // <- d_a_obj_ferris.cpp:457
+    [612.3, 847.55, 37.63],    // <- d_a_obj_ferris.cpp:458
+    [995.28, -320.43, 37.63],  // <- d_a_obj_ferris.cpp:459
+    [2.82, -1045.59, 37.63],   // <- d_a_obj_ferris.cpp:460
 ];
 /// `mRotAngle = 0x1800;` (`:194`, `:335`) - the wheel's rest pitch, 45 degrees in 0x10000 units.
 const REST_ANGLE: i16 = 0x1800; // <- d_a_obj_ferris.cpp:194
@@ -622,7 +622,7 @@ impl Ferris {
                 let temp2 = -delta.z;
                 let h = (-(temp2 * pt0.x + delta.x * pt0.z)
                     + (temp2 * self.ride_pos.x + delta.x * self.ride_pos.z))
-                .abs();
+                    .abs();
                 // `f32 temp = delta.x * delta2.z - delta.z * delta2.x;` (:505)
                 let temp = delta.x * delta2.z - delta.z * delta2.x;
                 // `f32 h2 = h / 162.0f;` (:506)
@@ -643,12 +643,8 @@ impl Ferris {
             };
             self.ride_target[index] = target;
             // `cLib_addCalcAngleS2(&mRideWaveAngle[i], mRideWaveTarget[i], 4, 0x1000);` (:516)
-            self.ride_angle[index] = chase_angle_s2(
-                self.ride_angle[index],
-                target,
-                LEAN_SCALE,
-                LEAN_MAX,
-            );
+            self.ride_angle[index] =
+                chase_angle_s2(self.ride_angle[index], target, LEAN_SCALE, LEAN_MAX);
             // `mRideState[i] = 0;` (:517) - the ride callback is a one-tick pulse.
             self.ridden[index] = false;
             // `sin_a` / `cos_a` are consumed by `rotate`; keeping the bindings named here documents
@@ -816,7 +812,10 @@ fn chase_angle_s2(value: i16, target: i16, scale: i16, max_step: i16) -> i16 {
 /// `dEvent_manager_c::getMyStaffId` scans (`d_event_manager.cpp:412`). The `hbrf1.rs:258` /
 /// `hole.rs:293` house reduction.
 fn demo_running(active: &ActiveEvent, slot: usize) -> bool {
-    matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close))
+    matches!(
+        active.stage_of(slot),
+        Some(Stage::Play) | Some(Stage::Close)
+    )
 }
 
 pub fn is_ferris(name: &str) -> bool {
@@ -845,6 +844,13 @@ pub fn control(
         // `mDoMtx_stack_c::YrotM(shape_angle.y)` (`:261`) reads `shape_angle`, which for a
         // stage-placed actor equals `current.angle` - RULE 2, since `dStage_actorInit` never writes
         // a separate shape angle and `fopAc_Init` seeds both from the placement.
-        wheel.execute(&mut active, &mut flags, entity, &list, actor.pos, actor.angle[1]);
+        wheel.execute(
+            &mut active,
+            &mut flags,
+            entity,
+            &list,
+            actor.pos,
+            actor.angle[1],
+        );
     }
 }

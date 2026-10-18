@@ -23,6 +23,17 @@ pub enum SimEvent {
     CreditsDone,
     Se(u32),
     Bgm(u32),
+    /// A JAISoundID started at a point - the `JSND` sound adaptor's `mPosition`, which
+    /// `JAIBasic::startSoundVec` turns into a 3D sound (`JStudio_JAudio/object-sound.cpp:129`).
+    /// The id is the retail one, and the point is the demo's own, transformed by the mount's
+    /// origin when one is set.
+    SeAt(u32, glam::Vec3),
+    /// `JAISound::stop(fade)` - the two places a JStudio demo sound stops an id it started:
+    /// the fade-out output `TVVOOn_END_FADE_OUT_` and the re-prepare stop
+    /// (`JStudio_JAudio/object-sound.cpp:78`, `:137-142`). The id is the same JAISoundID the
+    /// `Se`/`Bgm` that started it carried, so a layer that owns the sound objects can match
+    /// them up; the port's own one-shot cue bank cannot, and its shell drops the event.
+    SeStop(u32),
     /// A steal-item create the sim worked out but cannot run itself: the point, the life-ball
     /// table, the room and the item bit number, for whichever layer owns item spawns.
     StealItem(StealItemCreate),

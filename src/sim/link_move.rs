@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::{Vec2, Vec3};
 
-use super::anim_clock::{FrameCtrl, FrameClocks, Mode, Under};
+use super::anim_clock::{FrameClocks, FrameCtrl, Mode, Under};
 use super::collision::{Collision, MoveFrom, WallProbe, WallTrace};
 use super::combat::{Combat, CutKind};
 use super::ground::grounded;
@@ -300,34 +300,174 @@ pub struct MoveSite {
 /// through the crouch state, and the wall and vine selection last, because the reference runs it
 /// after the action dispatch has had its turn.
 pub const SITES: &[MoveSite] = &[
-    MoveSite { proc: Proc::Crouch, entry: "main.cpp:4287", exit: "main.cpp:6529", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrouchDefense, entry: "main.cpp:4294", exit: "main.cpp:6412", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrouchDefenseSlip, entry: "main.cpp:5258", exit: "main.cpp:6496", gap: MoveGap::DamageVector },
-    MoveSite { proc: Proc::CrawlStart, entry: "main.cpp:6530", exit: "crawl.inc:296", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrawlMove, entry: "crawl.inc:301", exit: "crawl.inc:400", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrawlAutoMove, entry: "crawl.inc:473", exit: "crawl.inc:657", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::CrawlEnd, entry: "crawl.inc:296", exit: "crawl.inc:712", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::PushPullWait, entry: "main.cpp:4138", exit: "pushpull.inc:104", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::PushMove, entry: "pushpull.inc:101", exit: "pushpull.inc:137", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::PullMove, entry: "pushpull.inc:110", exit: "pushpull.inc:184", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SlideFront, entry: "main.cpp:4901", exit: "main.cpp:6712", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SlideBack, entry: "main.cpp:4903", exit: "main.cpp:6746", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SlideFrontLand, entry: "main.cpp:6712", exit: "main.cpp:6764", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SlideBackLand, entry: "main.cpp:6746", exit: "main.cpp:6789", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::WaitTurn, entry: "main.cpp:4482", exit: "main.cpp:6586", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::MoveTurn, entry: "main.cpp:4494", exit: "main.cpp:6621", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::SideRoll, entry: "main.cpp:4952", exit: "main.cpp:6964", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangStart, entry: "main.cpp:4783", exit: "hang.inc:259", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangFallStart, entry: "main.cpp:5350", exit: "hang.inc:375", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangUp, entry: "hang.inc:374", exit: "hang.inc:410", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangWait, entry: "hang.inc:263", exit: "hang.inc:443", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangMove, entry: "hang.inc:446", exit: "hang.inc:487", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangClimb, entry: "hang.inc:259", exit: "hang.inc:576", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::HangWallCatch, entry: "main.cpp:4875", exit: "hang.inc:620", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::ClimbUpStart, entry: "main.cpp:4835", exit: "climb.inc:270", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::ClimbDownStart, entry: "main.cpp:5346", exit: "climb.inc:315", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::ClimbMoveUpDown, entry: "main.cpp:4789", exit: "climb.inc:381", gap: MoveGap::Ready },
-    MoveSite { proc: Proc::ClimbMoveSide, entry: "climb.inc:91", exit: "climb.inc:447", gap: MoveGap::Ready },
+    MoveSite {
+        proc: Proc::Crouch,
+        entry: "main.cpp:4287",
+        exit: "main.cpp:6529",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::CrouchDefense,
+        entry: "main.cpp:4294",
+        exit: "main.cpp:6412",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::CrouchDefenseSlip,
+        entry: "main.cpp:5258",
+        exit: "main.cpp:6496",
+        gap: MoveGap::DamageVector,
+    },
+    MoveSite {
+        proc: Proc::CrawlStart,
+        entry: "main.cpp:6530",
+        exit: "crawl.inc:296",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::CrawlMove,
+        entry: "crawl.inc:301",
+        exit: "crawl.inc:400",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::CrawlAutoMove,
+        entry: "crawl.inc:473",
+        exit: "crawl.inc:657",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::CrawlEnd,
+        entry: "crawl.inc:296",
+        exit: "crawl.inc:712",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::PushPullWait,
+        entry: "main.cpp:4138",
+        exit: "pushpull.inc:104",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::PushMove,
+        entry: "pushpull.inc:101",
+        exit: "pushpull.inc:137",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::PullMove,
+        entry: "pushpull.inc:110",
+        exit: "pushpull.inc:184",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SlideFront,
+        entry: "main.cpp:4901",
+        exit: "main.cpp:6712",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SlideBack,
+        entry: "main.cpp:4903",
+        exit: "main.cpp:6746",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SlideFrontLand,
+        entry: "main.cpp:6712",
+        exit: "main.cpp:6764",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SlideBackLand,
+        entry: "main.cpp:6746",
+        exit: "main.cpp:6789",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::WaitTurn,
+        entry: "main.cpp:4482",
+        exit: "main.cpp:6586",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::MoveTurn,
+        entry: "main.cpp:4494",
+        exit: "main.cpp:6621",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SideRoll,
+        entry: "main.cpp:4952",
+        exit: "main.cpp:6964",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangStart,
+        entry: "main.cpp:4783",
+        exit: "hang.inc:259",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangFallStart,
+        entry: "main.cpp:5350",
+        exit: "hang.inc:375",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangUp,
+        entry: "hang.inc:374",
+        exit: "hang.inc:410",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangWait,
+        entry: "hang.inc:263",
+        exit: "hang.inc:443",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangMove,
+        entry: "hang.inc:446",
+        exit: "hang.inc:487",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangClimb,
+        entry: "hang.inc:259",
+        exit: "hang.inc:576",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::HangWallCatch,
+        entry: "main.cpp:4875",
+        exit: "hang.inc:620",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::ClimbUpStart,
+        entry: "main.cpp:4835",
+        exit: "climb.inc:270",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::ClimbDownStart,
+        entry: "main.cpp:5346",
+        exit: "climb.inc:315",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::ClimbMoveUpDown,
+        entry: "main.cpp:4789",
+        exit: "climb.inc:381",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::ClimbMoveSide,
+        entry: "climb.inc:91",
+        exit: "climb.inc:447",
+        gap: MoveGap::Ready,
+    },
 ];
 
 /// The corner `procCrawlAutoMove` walks: which faces it found round it, the point it is walking to,
@@ -514,7 +654,8 @@ impl Probe<'_> {
     /// `setFrontWallType`, `main.cpp:4544`: the ten words the wall, hang, climb and jump selectors
     /// are chosen by.
     fn front_wall(&self) -> Option<WallTrace> {
-        self.collision.map(|collision| collision.front_wall(&self.wall))
+        self.collision
+            .map(|collision| collision.front_wall(&self.wall))
     }
 
     /// `checkNotCrawlStand`, `crawl.inc:309`: whether a point has the room a crawl needs over it.
@@ -651,11 +792,12 @@ fn set_push_pull_keep_data(
 /// grab point by the actor's own turn since the last label.
 fn turned_about(around: Vec3, angle: i16, offset: Vec3) -> Vec3 {
     let (sin, cos) = from_s16(angle).sin_cos();
-    around + Vec3::new(
-        offset.x * cos + offset.z * sin,
-        offset.y,
-        -offset.x * sin + offset.z * cos,
-    )
+    around
+        + Vec3::new(
+            offset.x * cos + offset.z * sin,
+            offset.y,
+            -offset.x * sin + offset.z * cos,
+        )
 }
 
 /// `setFrontWallType` at `main.cpp:4544` opens by reading the player, and every word it reads has a
@@ -770,11 +912,12 @@ fn facing(yaw: f32) -> Vec3 {
 /// states measure is the base transform with the root at zero — `m3700 = cXyz::Zero` at
 /// `crawl.inc:267` — so it is the player's own position turned by the model's own yaw.
 fn joint(player: &Player, offset: Vec3) -> Vec3 {
-    player.pos + Vec3::new(
-        offset.x * player.face.cos() + offset.z * player.face.sin(),
-        offset.y,
-        -offset.x * player.face.sin() + offset.z * player.face.cos(),
-    )
+    player.pos
+        + Vec3::new(
+            offset.x * player.face.cos() + offset.z * player.face.sin(),
+            offset.y,
+            -offset.x * player.face.sin() + offset.z * player.face.cos(),
+        )
 }
 
 /// `checkCrawlSideWall`, `crawl.inc:209-232`: the first trace finds the face, the second a face a
@@ -824,8 +967,12 @@ fn change_crawl_auto_move(player: &Player, collision: &Collision) -> Option<Craw
         }
     }
 
-    let left =
-        start + Vec3::new(CRAWL_CORNER_SIDE * shape.z, 0.0, -CRAWL_CORNER_SIDE * shape.x);
+    let left = start
+        + Vec3::new(
+            CRAWL_CORNER_SIDE * shape.z,
+            0.0,
+            -CRAWL_CORNER_SIDE * shape.x,
+        );
     let across = start * 2.0 - left;
     let mut walls = 0;
     let found;
@@ -865,7 +1012,10 @@ fn change_crawl_auto_move(player: &Player, collision: &Collision) -> Option<Craw
 fn crawl_bg_check(player: &mut Player, collision: &Collision) {
     let front = joint(player, CRAWL_FRONT_OFFSET);
     let top = joint(player, CRAWL_TOP_OFFSET);
-    match (collision.crawl_stop(top, front), collision.crawl_stop(top, top)) {
+    match (
+        collision.crawl_stop(top, front),
+        collision.crawl_stop(top, top),
+    ) {
         (Some(one), Some(two)) => {
             player.pos -= if one.push.length_squared() > two.push.length() {
                 one.push
@@ -890,9 +1040,7 @@ fn crawl_slope_blocked(player: &Player, collision: &Collision) -> bool {
     };
     let back = player.pos - stop.push;
     let lifted = Vec3::new(back.x, back.y + CRAWL_SLOPE_UP, back.z);
-    let floor = collision
-        .ground_at(lifted.x, lifted.z)
-        .unwrap_or(lifted.y);
+    let floor = collision.ground_at(lifted.x, lifted.z).unwrap_or(lifted.y);
     let flat = player.pos - Vec3::new(back.x, floor, back.z);
     let slope = to_s16((-flat.y).atan2((flat.x * flat.x + flat.z * flat.z).sqrt()));
     turn_between(slope, to_s16(player.yaw)) > CRAWL_SLOPE_LIMIT
@@ -1032,7 +1180,9 @@ fn want_push_pull(_player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
         return None;
     }
     match probe.crouch_button() {
-        Some(true) => probe.pushable().map(|_| (Proc::PushPullWait, MoveGap::Ready)),
+        Some(true) => probe
+            .pushable()
+            .map(|_| (Proc::PushPullWait, MoveGap::Ready)),
         Some(false) | None => None,
     }
 }
@@ -1123,10 +1273,16 @@ fn want_side_roll(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     if probe.stick() <= LAND_STICK || probe.drop < ROLL_DROP {
         return None;
     }
-    if matches!(direction(probe.wanted(), to_s16(player.yaw)), Direction::Back) {
+    if matches!(
+        direction(probe.wanted(), to_s16(player.yaw)),
+        Direction::Back
+    ) {
         return None;
     }
-    if matches!(direction(probe.wanted(), to_s16(player.face)), Direction::Back) {
+    if matches!(
+        direction(probe.wanted(), to_s16(player.face)),
+        Direction::Back
+    ) {
         return None;
     }
     Some((Proc::SideRoll, MoveGap::Ready))
@@ -1585,9 +1741,16 @@ fn push_pull_wait_tick(
         Direction::Back => Proc::PullMove,
         Direction::Left | Direction::Right => return None,
     };
-    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_NONE)
-        .is_some()
-        .then_some((want, MoveGap::Ready))
+    set_push_pull_keep_data(
+        player,
+        state,
+        probe.pushpull,
+        reach,
+        pushable.poly,
+        PPLABEL_NONE,
+    )
+    .is_some()
+    .then_some((want, MoveGap::Ready))
 }
 
 /// `procPushMove`, `pushpull.inc:137-163`: the stick is read against the model's own facing on the
@@ -1621,7 +1784,14 @@ fn push_tick(
         };
     }
     state.armed = false;
-    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_PUSH);
+    set_push_pull_keep_data(
+        player,
+        state,
+        probe.pushpull,
+        reach,
+        pushable.poly,
+        PPLABEL_PUSH,
+    );
     None
 }
 
@@ -1636,9 +1806,16 @@ fn enter_move(
     want: Proc,
 ) -> Option<(Proc, MoveGap)> {
     let pushable = probe.pushable()?;
-    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_NONE)
-        .is_some()
-        .then_some((want, MoveGap::Ready))
+    set_push_pull_keep_data(
+        player,
+        state,
+        probe.pushpull,
+        reach,
+        pushable.poly,
+        PPLABEL_NONE,
+    )
+    .is_some()
+    .then_some((want, MoveGap::Ready))
 }
 
 /// `procPullMove`, `pushpull.inc:180-232`: the two wall traces behind the player and the ground
@@ -1674,7 +1851,14 @@ fn pull_tick(
         };
     }
     state.armed = false;
-    set_push_pull_keep_data(player, state, probe.pushpull, reach, pushable.poly, PPLABEL_PULL);
+    set_push_pull_keep_data(
+        player,
+        state,
+        probe.pushpull,
+        reach,
+        pushable.poly,
+        PPLABEL_PULL,
+    );
     None
 }
 
@@ -1686,7 +1870,10 @@ fn pull_clear(player: &Player, probe: &Probe) -> bool {
         let shape = facing(player.face);
         for up in PULL_PROBE_UP {
             let from = player.pos + Vec3::new(0.0, up, 0.0);
-            if collision.line_cross(from, from - shape * PULL_REACH).is_some() {
+            if collision
+                .line_cross(from, from - shape * PULL_REACH)
+                .is_some()
+            {
                 return false;
             }
         }
@@ -1706,7 +1893,11 @@ fn back_to_crawl() -> Option<(Proc, MoveGap)> {
 /// animation has already stopped at `crawl.inc:710` leaves at once. A ceiling the player no longer
 /// fits under is the one condition the reference tests here that the port can answer, and it ends
 /// the crawl outright.
-fn crawl_end_tick(player: &mut Player, probe: &Probe, clock: &FrameCtrl) -> Option<(Proc, MoveGap)> {
+fn crawl_end_tick(
+    player: &mut Player,
+    probe: &Probe,
+    clock: &FrameCtrl,
+) -> Option<(Proc, MoveGap)> {
     if !probe.crawl_clear(player.pos, player.pos.y) {
         return Some((Proc::Wait, MoveGap::Ready));
     }
@@ -1740,10 +1931,10 @@ fn climb_move_tick(player: &mut Player, probe: &Probe, previous: Proc) -> Option
         return None;
     }
     match direction(probe.wanted(), to_s16(player.face)) {
-        Direction::Forward | Direction::Back => (Proc::ClimbMoveUpDown != previous)
-            .then_some((Proc::ClimbMoveUpDown, MoveGap::Ready)),
-        _ => (Proc::ClimbMoveSide != previous)
-            .then_some((Proc::ClimbMoveSide, MoveGap::Ready)),
+        Direction::Forward | Direction::Back => {
+            (Proc::ClimbMoveUpDown != previous).then_some((Proc::ClimbMoveUpDown, MoveGap::Ready))
+        }
+        _ => (Proc::ClimbMoveSide != previous).then_some((Proc::ClimbMoveSide, MoveGap::Ready)),
     }
 }
 
@@ -1819,11 +2010,7 @@ fn tick(
 fn asks_dispatcher(proc: Proc) -> bool {
     matches!(
         proc,
-        Proc::Crouch
-            | Proc::CrouchDefense
-            | Proc::WaitTurn
-            | Proc::MoveTurn
-            | Proc::SideRoll
+        Proc::Crouch | Proc::CrouchDefense | Proc::WaitTurn | Proc::MoveTurn | Proc::SideRoll
     )
 }
 
@@ -2072,7 +2259,9 @@ pub fn control(
     proc.mark_takeoff(launch);
     probe.drop = proc.takeoff_y - player.pos.y;
     proc.advance();
-    if !probe.dead && !probe.riding && !probe.busy()
+    if !probe.dead
+        && !probe.riding
+        && !probe.busy()
         && let Some(trace) = probe.front_wall()
     {
         state.latch_wall(&trace);

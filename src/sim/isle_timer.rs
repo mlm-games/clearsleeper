@@ -84,11 +84,7 @@ pub const VOLCANO_SE: [(i32, u32); 13] = [
 ];
 
 fn digit(value: i32) -> i32 {
-    if value < 0 || value >= 10 {
-        0
-    } else {
-        value
-    }
+    if value < 0 || value >= 10 { 0 } else { value }
 }
 
 fn rest_time_ms(limit: i64, time: i64, start: i64, pause: i64) -> i64 {
@@ -130,16 +126,9 @@ impl TimerParams {
         if data.len() < PARAM_SIZE {
             return None;
         }
-        let mode = i32::from_le_bytes(
-            data[PARAM_MODE_AT..PARAM_MODE_AT + 4]
-                .try_into()
-                .ok()?,
-        );
-        let limit_time = u16::from_le_bytes(
-            data[PARAM_LIMIT_AT..PARAM_LIMIT_AT + 2]
-                .try_into()
-                .ok()?,
-        );
+        let mode = i32::from_le_bytes(data[PARAM_MODE_AT..PARAM_MODE_AT + 4].try_into().ok()?);
+        let limit_time =
+            u16::from_le_bytes(data[PARAM_LIMIT_AT..PARAM_LIMIT_AT + 2].try_into().ok()?);
         let timer_pos = [
             f32::from_le_bytes(
                 data[PARAM_TIMER_POS_AT..PARAM_TIMER_POS_AT + 4]
@@ -290,12 +279,7 @@ impl IsleTimer {
     }
 
     pub fn get_rest_time_ms(&self) -> i32 {
-        rest_time_ms(
-            self.limit_time,
-            self.time,
-            self.start_time,
-            self.pause_time,
-        ) as i32
+        rest_time_ms(self.limit_time, self.time, self.start_time, self.pause_time) as i32
     }
 
     pub fn rest_time_check(&self, time: i32) -> bool {
@@ -424,14 +408,7 @@ impl IsleTimer {
             return false;
         }
         self.create(&TimerParams::new(
-            mode,
-            limit_time,
-            show_type,
-            icon_type,
-            timer_x,
-            timer_y,
-            rupee_x,
-            rupee_y,
+            mode, limit_time, show_type, icon_type, timer_x, timer_y, rupee_x, rupee_y,
         ));
         true
     }
@@ -441,14 +418,7 @@ impl IsleTimer {
             return false;
         }
         self.create(&TimerParams::new(
-            MODE_STOCK,
-            0,
-            3,
-            0,
-            221.0,
-            439.0,
-            32.0,
-            419.0,
+            MODE_STOCK, 0, 3, 0, 221.0, 439.0, 32.0, 419.0,
         ));
         true
     }
@@ -564,11 +534,7 @@ impl IsleTimer {
     }
 
     pub fn timer_stop(&mut self, tag: u8) -> bool {
-        if self.exists {
-            self.stop(tag)
-        } else {
-            false
-        }
+        if self.exists { self.stop(tag) } else { false }
     }
 
     pub fn timer_delete_request(&mut self, mode: i32) -> i32 {

@@ -75,12 +75,7 @@ impl Qdghd {
 
     /// `daObjDragonhead_c::_execute` (`d_a_obj_dragonhead.cpp:144-188`) minus the `dBgW`
     /// `Release` (`:161`) and `set_mtx` (`:186`).
-    fn step(
-        &mut self,
-        arrows: &Query<&Arrow>,
-        switches: &mut Switches,
-        events: &mut SimEvents,
-    ) {
+    fn step(&mut self, arrows: &Query<&Arrow>, switches: &mut Switches, events: &mut SimEvents) {
         if !self.switch_on {
             events.list.push(SimEvent::Se(SE_ICEBERG_BREATH));
             if self.fire_arrow_hit(arrows) {

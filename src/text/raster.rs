@@ -49,7 +49,13 @@ impl Canvas {
         self.pixels[at + 3] = (dst + (255.0 - dst) * alpha).round() as u8;
     }
 
-    pub fn draw_layout(&mut self, layout: &TextLayout, font: &ResFont, origin: [f32; 2], alpha: u8) {
+    pub fn draw_layout(
+        &mut self,
+        layout: &TextLayout,
+        font: &ResFont,
+        origin: [f32; 2],
+        alpha: u8,
+    ) {
         let glyph = &font.glyph;
         let cells = u32::from(glyph.texture_width) * u32::from(glyph.texture_height);
         if cells == 0 || font.tex_page().len() * 2 != cells as usize {
@@ -145,7 +151,8 @@ fn mix(colors: [u32; 4], fx: f32, fy: f32) -> [u8; 3] {
     let mut out = [0_u8; 3];
     for index in 0..3 {
         let top = f32::from(top_left[index]) * (1.0 - fx) + f32::from(top_right[index]) * fx;
-        let bottom = f32::from(bottom_left[index]) * (1.0 - fx) + f32::from(bottom_right[index]) * fx;
+        let bottom =
+            f32::from(bottom_left[index]) * (1.0 - fx) + f32::from(bottom_right[index]) * fx;
         out[index] = (top * (1.0 - fy) + bottom * fy).round() as u8;
     }
     out

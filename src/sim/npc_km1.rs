@@ -543,7 +543,8 @@ impl NpcKm1 {
         }
         let turn = self.head_turn_vel;
         let follow = self.head_only_follow;
-        self.jnt.look_at_target(&mut actor.angle[1], dst, src, target_y, turn, follow);
+        self.jnt
+            .look_at_target(&mut actor.angle[1], dst, src, target_y, turn, follow);
     }
 
     /// `daNpc_Km1_c::setAttention` (`:417-427`).
@@ -712,10 +713,7 @@ pub fn control(
     let clear_count = world.text_flags.clear_count;
     let event_run = msg.info.event_run_check();
     let do_now = do_intent.0;
-    let archive = world
-        .archive
-        .as_deref()
-        .map(|held| held as &dyn MsgArchive);
+    let archive = world.archive.as_deref().map(|held| held as &dyn MsgArchive);
     for (mut actor, mut km1) in &mut actors {
         let tap = do_now && !km1.prev_do;
         km1.prev_do = do_now;

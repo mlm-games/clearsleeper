@@ -224,10 +224,15 @@ impl Kui {
     /// `daKui_Execute` (`:203-391`), reduced to the three value updates that leave the sim.
     ///
     /// The type-3 arm's `target_x_angle` computation (`:233-274`) is DROPPED with the health fold -
-    /// it needs `player->getLeftHandPos()`, which has no counterpart, and it is behind
-    /// `actor->health == 3` anyway. `cLib_addCalcAngleS2(&actor->current.angle.x, target_x_angle, 4,
-    /// REG0_S(1) + 0x200)` (`:279`) is the one surviving line of that arm, and with
-    /// `target_x_angle = 0` from `:276` it relaxes the bell's pitch toward level.
+    /// it needs `player->getLeftHandPos()`, i.e. `daPy_lk_c::mLeftHandPos` (`d_a_player.h:512`),
+    /// which the player writes from its left-hand joint's world matrix every tick
+    /// (`mDoMtx_multVecZero(mpCLModel->getAnmMtx(CL_JNT_CL_LHANDA_e), &mLeftHandPos)`,
+    /// `d_a_player_main.cpp:11594`). This port has no player model and keeps no hand-joint
+    /// position, so the arm has no first point - and it is behind `actor->health == 3` anyway,
+    /// which the port's `kui` fold also drops.
+    /// `cLib_addCalcAngleS2(&actor->current.angle.x, target_x_angle, 4, REG0_S(1) + 0x200)` (`:279`)
+    /// is the one surviving line of that arm, and with `target_x_angle = 0` from `:276` it relaxes
+    /// the bell's pitch toward level.
     ///
     /// DROPPED from the type-3 arm: `cLib_addCalcAngleS2(&field_0x2E2, ...)` and its two siblings
     /// (`:309-311`) are KEPT (they are live matrix state, see the constants above); `setBaseTRMtx`,
@@ -269,7 +274,12 @@ impl Kui {
             }
             // `cLib_addCalcAngleS2(&i_this->field_0x2E2, i_this->field_0x2E4, 4, i_this->field_0x2E6);`
             // (:309)
-            let swing = chase_angle_s2(self.swing, self.ring_angle, RING_CHASE_SCALE, self.ring_step);
+            let swing = chase_angle_s2(
+                self.swing,
+                self.ring_angle,
+                RING_CHASE_SCALE,
+                self.ring_step,
+            );
             self.swing = swing;
             // `cLib_addCalcAngleS2(&i_this->field_0x2E4, 0, 1, REG17_S(6) + 0x80);` (:310)
             let angle = chase_angle_s2(self.ring_angle, 0, 1, RING_DECAY_MAX);
@@ -394,10 +404,8 @@ impl Kui {
                     // `super::vibration::Vibration` but the brief lists rumble as a confirmed-absent
                     // input, so nothing is pushed.
                     // `cLib_addCalc2(&i_this->field_0x30C, -70.0f, 1.0f, 10.0f);` (:161)
-                    let step = ((DROP_REST - self.drop) * DROP_SCALE).clamp(
-                        -DROP_MAX_STEP,
-                        DROP_MAX_STEP,
-                    );
+                    let step =
+                        ((DROP_REST - self.drop) * DROP_SCALE).clamp(-DROP_MAX_STEP, DROP_MAX_STEP);
                     self.drop += step;
                 } else if frame < DROP_SETTLE_END {
                     // `f32 sin_result = cM_ssin(uVar3 * 0x3A00);

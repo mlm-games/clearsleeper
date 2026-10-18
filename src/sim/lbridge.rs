@@ -362,7 +362,12 @@ impl Lbridge {
         [bridge.appear_slot, bridge.disappear_slot]
             .into_iter()
             .flatten()
-            .any(|slot| matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)))
+            .any(|slot| {
+                matches!(
+                    active.stage_of(slot),
+                    Some(Stage::Play) | Some(Stage::Close)
+                )
+            })
     }
 }
 
@@ -376,7 +381,11 @@ fn chase_alpha(alpha: &mut u8, target: u8, step: u8) -> bool {
     }
     let wide = i16::from(*alpha);
     let wide_target = i16::from(target);
-    let wide_step = if wide > wide_target { -i16::from(step) } else { i16::from(step) };
+    let wide_step = if wide > wide_target {
+        -i16::from(step)
+    } else {
+        i16::from(step)
+    };
     let next = wide + wide_step;
     if wide_step * (next - wide_target) >= 0 {
         *alpha = target;

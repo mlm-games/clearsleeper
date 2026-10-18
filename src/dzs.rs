@@ -21,6 +21,7 @@ const CAMERA_LEN: usize = 0x14;
 const ARROW_LEN: usize = 0x14;
 const CAM_TYPE_LEN: usize = 16;
 const EVENT_LEN: usize = 0x18;
+const FILI_LEN: usize = 0x08;
 const EVENT_NAME_LEN: usize = 15;
 const ACTOR_NAME_LEN: usize = 8;
 const SEA_ACTOR: &str = "sea";
@@ -131,6 +132,20 @@ pub struct StageHeader {
     /// `stage_stag_info_class::mCameraMapToolID`, `d_stage.h:69`, the `CAMR` row the camera
     /// starts on, `d_camera.cpp:203-213`.
     pub camera_map_tool_id: u8,
+    /// `stage_stag_info_class::mParticleSceneNo`, `d_stage.h:76`: the packed particle token whose
+    /// low three bits are `dStage_stagInfo_GetUpButton` and whose next eight are
+    /// [`StageHeader::particle_no`].
+    pub particle_scene_no: u16,
+}
+
+impl StageHeader {
+    /// `dStage_stagInfo_GetParticleNo` - `d_stage.h:1047-1049`: `(mParticleSceneNo >> 3) & 0xFF`,
+    /// the number `d_s_play.cpp:1378-1379` hands `dPa_control_c::readScene`
+    /// (`d_particle.cpp:757-770`), which reads `/res/Particle/Pscene%03d.jpc`. `0xFF` is that
+    /// reader's own "no archive" (`:758-760`).
+    pub fn particle_no(&self) -> u8 {
+        ((self.particle_scene_no >> 3) & 0xFF) as u8
+    }
 }
 
 #[derive(Debug)]
@@ -202,7 +217,100 @@ fn scene_chunk(layer: u8) -> Option<u8> {
 /// those pointers null, which the camera reads as no camera at all.
 pub fn room_cameras(data: &[u8]) -> Result<StageCameras, DzsError> {
     let nodes = chunk_nodes(data)?;
-    parse_camera_tables(data, |tag: &[u8; 4]| chunk_locate(&nodes, tag), b"RCAM", b"RARO")
+    parse_camera_tables(
+        data,
+        |tag: &[u8; 4]| chunk_locate(&nodes, tag),
+        b"RCAM",
+        b"RARO",
+    )
+}
+
+/// `dStage_dt_c_roomLoader`'s `SCLS` row, `d_stage.cpp:2166`/`:2189`: the same
+/// `stage_scls_info_dummy_class` loader the stage's own `SCLS` goes through
+/// (`dStage_sclsInfoInit`, `:1683-1686`), installed on the room's `dStage_roomDt_c`, which is the
+/// table `dComIfG_roomControl_getStatusRoomDt(room)->getSclsInfo()` answers (`d_lib.cpp:245-246`).
+/// A room file without the chunk answers an empty table, which `dLib_setNextStageBySclsNum` reads
+/// as no destination at all (`:248-250`).
+pub fn room_exits(data: &[u8]) -> Result<Vec<StageExit>, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    let Some((count, offset)) = chunk_locate(&nodes, b"SCLS") else {
+        return Ok(Vec::new());
+    };
+    parse_exits(data, count, offset)
+}
+
+/// `dStage_Lbnk_c` (`d_stage.h:310-313`): the room file's `LBNK` chunk - one bank number per
+/// layer - which `d_s_room.cpp:220-231` reads a room's demo archive name out of.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StageLbnk {
+    entries: Vec<u8>,
+}
+
+impl StageLbnk {
+    /// `lbnk->m_entries[dComIfG_play_c::getLayerNo(roomNo)]` - `d_s_room.cpp:224-226`. `0xFF` is
+    /// the table's own "no bank" and answers `None`, which is the `bank != 0xFF` test the
+    /// reference makes (`:226`); a layer the table does not carry is the reference's
+    /// out-of-bounds read and answers `None` too.
+    pub fn bank(&self, layer: u8) -> Option<u8> {
+        match self.entries.get(usize::from(layer)) {
+            Some(&0xFF) | None => None,
+            Some(&bank) => Some(bank),
+        }
+    }
+}
+
+/// The room file's `LBNK` chunk, which `dStage_dt_c_roomLoader` installs through
+/// `dStage_lbnkInfoInit` (`d_stage.cpp:2194`, `:1967-1972`): the node's count bytes at the node's
+/// offset. A room file without the chunk answers the empty table, which is what the reference's
+/// null `getLbnk()` reads as.
+pub fn room_lbnk(data: &[u8]) -> Result<StageLbnk, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    match chunk_locate(&nodes, b"LBNK") {
+        Some((count, offset)) => Ok(StageLbnk {
+            entries: parse_records(data, count, offset, 1, read_u8)?,
+        }),
+        None => Ok(StageLbnk::default()),
+    }
+}
+
+/// `dStage_FileList_dt_c` (`d_stage.h:291-294`): the one record a room file's `FILI` chunk
+/// carries. Every inline `dStage_FileList_dt_*` reads a bitfield of `mParam`; only the particle
+/// number is read by the room flow this port follows.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct StageFileList {
+    pub param: u32,
+    pub sea_level: f32,
+}
+
+impl StageFileList {
+    /// `dStage_FileList_dt_GetParticleNo` - `d_stage.h:1118-1120`: `(mParam & 0x1FE00000) >> 21`,
+    /// the number `d_s_room.cpp:240` hands `dPa_control_c::readScene` (`d_particle.cpp:757-770`).
+    /// `0xFF` is that reader's own "no archive" (`:758-760`).
+    pub fn particle_no(&self) -> u8 {
+        ((self.param & 0x1FE00000) >> 21) as u8
+    }
+}
+
+/// The room file's `FILI` chunk, which `dStage_dt_c_roomLoader` installs through
+/// `dStage_filiInfoInit` (`d_stage.cpp:2192`, `:1630-1638`): the single record at the node's
+/// offset. A room file whose `FILI` node is absent or empty answers `None`, which is the null
+/// `setFileListInfo(NULL)` the same function makes when its count is zero (`:1631-1632`).
+pub fn room_file_list(data: &[u8]) -> Result<Option<StageFileList>, DzsError> {
+    let nodes = chunk_nodes(data)?;
+    let Some((count, offset)) = chunk_locate(&nodes, b"FILI") else {
+        return Ok(None);
+    };
+    if count == 0 {
+        return Ok(None);
+    }
+    let at = offset as usize;
+    if table_end(at, 1, FILI_LEN)? > data.len() {
+        return Err(DzsError::BadTable);
+    }
+    Ok(Some(StageFileList {
+        param: read_u32(data, at)?,
+        sea_level: read_f32(data, at + 4)?,
+    }))
 }
 
 pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, DzsError> {
@@ -223,9 +331,12 @@ pub fn room_actors(data: &[u8], room: i8, layer: u8) -> Result<Vec<StageActor>, 
             actors.extend(parse_actors(data, count, offset, room, false)?);
         }
     }
-    for tag in [Some([b'S', b'C', b'O', b'B']), scene_chunk(layer).map(|digit| [b'S', b'C', b'O', digit])]
-        .into_iter()
-        .flatten()
+    for tag in [
+        Some([b'S', b'C', b'O', b'B']),
+        scene_chunk(layer).map(|digit| [b'S', b'C', b'O', digit]),
+    ]
+    .into_iter()
+    .flatten()
     {
         if let Some((count, offset)) = chunk_locate(&nodes, &tag) {
             actors.extend(parse_actors(data, count, offset, room, true)?);
@@ -424,6 +535,7 @@ fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
         schbit_enable: (enable_and_far >> 16) as u8,
         far_plane: (enable_and_far & 0xFFFF) as u16 as f32,
         camera_map_tool_id: read_u8(data, at + 0x08)?,
+        particle_scene_no: read_u16(data, at + 0x0A)?,
     })
 }
 
@@ -648,11 +760,9 @@ impl StageTables {
     }
 
     pub fn boot_sky(&self) -> Option<[f32; 4]> {
-        let entry = self.boot_palette().and_then(|palette| {
-            self.skies
-                .get(usize::from(palette.virt_idx))
-                .copied()
-        })?;
+        let entry = self
+            .boot_palette()
+            .and_then(|palette| self.skies.get(usize::from(palette.virt_idx)).copied())?;
         Some([
             entry[0] as f32 / 255.0,
             entry[1] as f32 / 255.0,
@@ -670,12 +780,13 @@ impl StageTables {
     }
 
     fn boot_palette(&self) -> Option<&PaletteEntry> {
-        let schedule = SCHEDULE.iter().find(|(begin, end, _)| {
-            self.boot_time() >= *begin && self.boot_time() <= *end
-        })?;
+        let schedule = SCHEDULE
+            .iter()
+            .find(|(begin, end, _)| self.boot_time() >= *begin && self.boot_time() <= *end)?;
         let envr = self.envr.first()?;
         let colo = self.colo.get(usize::from(envr[0]))?;
-        self.palettes.get(usize::from(colo[usize::from(schedule.2)]))
+        self.palettes
+            .get(usize::from(colo[usize::from(schedule.2)]))
     }
 }
 

@@ -464,7 +464,10 @@ pub fn control(
             {
                 found = At::Hammer;
             }
-            if found == At::Idle && watch.combat.active && watch.combat.frame >= 1 && watch.combat.frame < 6
+            if found == At::Idle
+                && watch.combat.active
+                && watch.combat.frame >= 1
+                && watch.combat.frame < 6
             {
                 found = At::Sword;
             }
@@ -742,7 +745,10 @@ impl Bwds {
     }
 
     fn search_player_angle_y(&self, env: &Env) -> i16 {
-        atan2s(env.player_eye.x - self.eye_pos.x, env.player_eye.z - self.eye_pos.z)
+        atan2s(
+            env.player_eye.x - self.eye_pos.x,
+            env.player_eye.z - self.eye_pos.z,
+        )
     }
 
     fn execute(
@@ -829,13 +835,7 @@ impl Bwds {
         }
     }
 
-    fn tick(
-        &mut self,
-        actor: &mut Actor,
-        env: &Env,
-        spawns: &mut Vec<Spawn>,
-        sink: &mut Sink<'_>,
-    ) {
+    fn tick(&mut self, actor: &mut Actor, env: &Env, spawns: &mut Vec<Spawn>, sink: &mut Sink<'_>) {
         self.old_pos = [actor.pos.x, actor.pos.y, actor.pos.z];
         self.m02f4 = self.m02f4.wrapping_add(1);
         for i in 0..5 {
@@ -858,7 +858,10 @@ impl Bwds {
             self.m1810[0] = actor.pos.x;
             self.m1810[2] = actor.pos.z;
             let probe = actor.pos + Vec3::new(0.0, REG0_F13 + FAR_GROUND_PROBE, 0.0);
-            if let Some(cross) = env.solid.as_ref().and_then(|s| s.ground_at(probe.x, probe.z))
+            if let Some(cross) = env
+                .solid
+                .as_ref()
+                .and_then(|s| s.ground_at(probe.x, probe.z))
                 && cross < FAR_GROUND
                 && cross != -GROUND_INF
             {
@@ -1217,10 +1220,7 @@ impl Bwds {
         match self.m02f8 {
             0 => {
                 let angle = self.search_player_angle_y(env);
-                let local = rot_y(
-                    [0.0, REG0_F19 + FAIL_RISE_Y, REG0_F20 + FAIL_RISE_Z],
-                    angle,
-                );
+                let local = rot_y([0.0, REG0_F19 + FAIL_RISE_Y, REG0_F20 + FAIL_RISE_Z], angle);
                 self.speed = Vec3::new(local[0], local[1], local[2]);
                 self.m02f8 += 1;
                 self.m0314[0] = REG0_S4 + 10;
@@ -1361,13 +1361,11 @@ impl Bwds {
                     f_var3 = d_var8;
                 }
             }
-            let diff_x = self.m043c[i][0]
-                + (self.m032c[i][0] - self.m032c[i - 1][0])
-                + seg_z * f_var2;
+            let diff_x =
+                self.m043c[i][0] + (self.m032c[i][0] - self.m032c[i - 1][0]) + seg_z * f_var2;
             let diff_y = f_var3 - self.m032c[i - 1][1];
-            let diff_z = self.m043c[i][2]
-                + (self.m032c[i][2] - self.m032c[i - 1][2])
-                + seg_z * f_var2;
+            let diff_z =
+                self.m043c[i][2] + (self.m032c[i][2] - self.m032c[i - 1][2]) + seg_z * f_var2;
 
             let s_var2 = atan2s(diff_x, diff_z);
             let s_var1 = -atan2s(diff_y, spread(diff_x, diff_z));

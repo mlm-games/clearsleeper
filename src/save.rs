@@ -136,6 +136,7 @@ impl From<SavedPlayer> for Player {
             speed: saved.speed,
             speed_y: saved.speed_y,
             drift: Vec3::ZERO,
+            no_draw: false,
         }
     }
 }
@@ -200,7 +201,10 @@ impl App {
             .iter(world)
             .next()
             .map_or(0, |stall| stall.roten_reserve);
-        let clock = world.get_resource::<crate::sim::daynight::DayNight>().copied().unwrap_or_default();
+        let clock = world
+            .get_resource::<crate::sim::daynight::DayNight>()
+            .copied()
+            .unwrap_or_default();
         let stage = self
             .stage
             .as_ref()
@@ -273,16 +277,16 @@ impl App {
                     save.rooms.clone(),
                     save.area.spawn.into(),
                     save.area.yaw,
+                    crate::sim::transition::LAYER_NONE,
                 );
             }
         } else {
             let rooms = save.rooms.clone();
             if !rooms.is_empty() {
                 let stories = *self.sim.world.resource::<StoryBits>();
-                let set = self
-                    .stage
-                    .as_ref()
-                    .and_then(|tables| crate::load_rooms(tables, &rooms, stories));
+                let set = self.stage.as_ref().and_then(|tables| {
+                    crate::load_rooms(tables, &rooms, stories, self.start_layer)
+                });
                 match set {
                     Some(set) => {
                         let frame = self.sim.world.resource::<CurrentFrame>().0;

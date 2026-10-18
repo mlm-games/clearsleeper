@@ -59,12 +59,7 @@ pub fn craw(normal: Vec3, vector: Vec3) -> Vec3 {
     vector + normal * vector.dot(normal).abs()
 }
 
-fn pull(
-    resist: Vec3,
-    speed: Vec3,
-    gravity: f32,
-    grade: &Grade,
-) -> Vec3 {
+fn pull(resist: Vec3, speed: Vec3, gravity: f32, grade: &Grade) -> Vec3 {
     let Some(normal) = grade.normal else {
         return Vec3::ZERO;
     };
@@ -96,7 +91,11 @@ pub fn grade(
 ) -> (Vec3, f32, i16) {
     let resist = resist(speed, stream, damp, drag);
     let held = pull(resist, speed, gravity, surface);
-    let forward = Vec3::new(walk::from_s16(heading).sin(), 0.0, walk::from_s16(heading).cos());
+    let forward = Vec3::new(
+        walk::from_s16(heading).sin(),
+        0.0,
+        walk::from_s16(heading).cos(),
+    );
     let mut next = Vec3::new(
         held.x + resist.x + speed_f * forward.x,
         held.y + resist.y + speed.y + gravity,
@@ -165,4 +164,3 @@ pub fn calc_speed(
     }
     (next, speed_f)
 }
-

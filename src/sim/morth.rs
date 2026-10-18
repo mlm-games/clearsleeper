@@ -3,11 +3,11 @@ use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::arrow;
 use super::area::StageName;
-use super::boomerang;
+use super::arrow;
 use super::bomb;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::{Combat, CutKind};
 use super::events::{SimEvent, SimEvents};
@@ -74,8 +74,8 @@ const TIMER_COUNT: usize = 4;
 const SWING_COUNT: usize = 5;
 
 const JOINT_TABLE: [i16; JOINT_COUNT] = [
-    0x20, 0x21, 0x25, 0x26, 0x02, 0x03, 0x04, 0x1E, 0x29, 0x1F, 0x24, 0x08, 0x06, 0x07, 0x05,
-    0x0C, 0x0A, 0x0B, 0x09, 0x0E,
+    0x20, 0x21, 0x25, 0x26, 0x02, 0x03, 0x04, 0x1E, 0x29, 0x1F, 0x24, 0x08, 0x06, 0x07, 0x05, 0x0C,
+    0x0A, 0x0B, 0x09, 0x0E,
 ];
 
 const ACTION_DOU: u8 = 0;
@@ -1001,9 +1001,8 @@ impl Morth {
             FORM_GRAB | FORM_GRAB_GORON => {
                 self.gm_link = true;
                 if self.form == FORM_GRAB_GORON {
-                    self.angle[1] = self
-                        .angle[1]
-                        .wrapping_add((self.rnd_fx(GORON_ANGLE)) as i32 as i16);
+                    self.angle[1] =
+                        self.angle[1].wrapping_add((self.rnd_fx(GORON_ANGLE)) as i32 as i16);
                     self.speed_f = GORON_FAST + self.rnd_f(GORON_SPEED);
                     self.speed.y = GORON_RISE + self.rnd_f(GORON_UP);
                 }
@@ -1080,8 +1079,7 @@ impl Morth {
             self.gravity = 0.0;
             self.speed.y = 0.0;
         } else if self.water_in != 0
-            && (ground::grounded(solid, self.pos)
-                || self.pos.y > self.water_surface + WATER_ESCAPE)
+            && (ground::grounded(solid, self.pos) || self.pos.y > self.water_surface + WATER_ESCAPE)
         {
             self.water_in = 0;
         }
@@ -1197,7 +1195,13 @@ impl Morth {
         self.shock_damage_check(env)
     }
 
-    fn action_dousa_move(&mut self, statics: &Statics, env: &Env<'_>, blow: &Blow, sink: &mut Sink<'_>) {
+    fn action_dousa_move(
+        &mut self,
+        statics: &Statics,
+        env: &Env<'_>,
+        blow: &Blow,
+        sink: &mut Sink<'_>,
+    ) {
         match self.mode {
             MODE_DOU_INIT => {
                 self.sway = 0.0;
@@ -1279,7 +1283,13 @@ impl Morth {
         }
     }
 
-    fn action_kougeki_move(&mut self, statics: &Statics, env: &Env<'_>, blow: &Blow, sink: &mut Sink<'_>) {
+    fn action_kougeki_move(
+        &mut self,
+        statics: &Statics,
+        env: &Env<'_>,
+        blow: &Blow,
+        sink: &mut Sink<'_>,
+    ) {
         self.radius = RADIUS;
         if env.head_top.y > self.pos.y {
             self.radius = RADIUS_POKE_HIGH;
@@ -1387,7 +1397,12 @@ impl Morth {
 
     fn kaze_rise(&mut self) {
         add_calc(&mut self.speed.y, self.climb, WIND_RISE_STEP, self.rise);
-        add_calc(&mut self.rise, WIND_RATE_TARGET, WIND_RATE_STEP, WIND_RATE_MAX);
+        add_calc(
+            &mut self.rise,
+            WIND_RATE_TARGET,
+            WIND_RATE_STEP,
+            WIND_RATE_MAX,
+        );
         if self.base_y + WIND_RISE_TARGET < self.pos.y || self.timers[1] == 0 {
             self.mode += 1;
         }
@@ -1472,7 +1487,13 @@ impl Morth {
         }
     }
 
-    fn action_omoi(&mut self, statics: &mut Statics, env: &Env<'_>, blow: &Blow, sink: &mut Sink<'_>) {
+    fn action_omoi(
+        &mut self,
+        statics: &mut Statics,
+        env: &Env<'_>,
+        blow: &Blow,
+        sink: &mut Sink<'_>,
+    ) {
         match self.mode {
             MODE_CLING_ENTER => self.cling_enter(statics, env),
             MODE_CLING_HOLD => self.cling_hold(statics, env),
@@ -1482,9 +1503,7 @@ impl Morth {
                     self.joint_live = false;
                 }
                 self.angle[1] = env.facing(self.pos).wrapping_add(-32768);
-                self.angle[1] = self
-                    .angle[1]
-                    .wrapping_add((self.rnd_fx(16384.0)) as i32 as i16);
+                self.angle[1] = self.angle[1].wrapping_add((self.rnd_fx(16384.0)) as i32 as i16);
                 self.speed_f = CLING_LEAP;
                 self.gravity = GRAVITY;
                 self.speed.y = CLING_CLAW;
@@ -1494,8 +1513,7 @@ impl Morth {
             MODE_CLING_WAIT => self.cling_wait(),
             _ => {}
         }
-        if self.mode == MODE_CLING_WAIT && self.body_atari_check(env, blow) && self.cling != 0
-        {
+        if self.mode == MODE_CLING_WAIT && self.body_atari_check(env, blow) && self.cling != 0 {
             sink.se(SE_LK_LAST_HIT);
             self.cling = 0;
         }
@@ -1765,7 +1783,11 @@ impl Morth {
             }
             self.light.timer = self.light.timer.wrapping_add(1);
             if self.light.timer < LIGHT_SHRINK_END {
-                add_calc0(&mut self.light.scale_xz, LIGHT_SHRINK_STEP, LIGHT_SHRINK_MAX);
+                add_calc0(
+                    &mut self.light.scale_xz,
+                    LIGHT_SHRINK_STEP,
+                    LIGHT_SHRINK_MAX,
+                );
                 add_calc0(&mut self.light.scale_y, LIGHT_SHRINK_STEP, LIGHT_SHRINK_MAX);
             } else {
                 if self.light.timer == LIGHT_SHRINK_END {

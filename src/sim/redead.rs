@@ -229,20 +229,10 @@ impl ReDead {
     }
 
     fn wake(&self, actor: &Actor, player: &Player) -> bool {
-        if !in_circle(
-            self.spawn_pos,
-            actor.pos,
-            self.area_radius,
-            RETURN_HEIGHT,
-        ) {
+        if !in_circle(self.spawn_pos, actor.pos, self.area_radius, RETURN_HEIGHT) {
             return false;
         }
-        if !in_circle(
-            self.spawn_pos,
-            player.pos,
-            self.area_radius,
-            WAKE_HEIGHT,
-        ) {
+        if !in_circle(self.spawn_pos, player.pos, self.area_radius, WAKE_HEIGHT) {
             return false;
         }
         player.speed > WAKE_SPEED
@@ -271,12 +261,8 @@ impl ReDead {
             if angle_distance(actor.angle[1], self.spawn_angle) <= HOME_TOLERANCE {
                 actor.angle[1] = self.spawn_angle;
             }
-        } else if !in_circle(
-            self.spawn_pos,
-            actor.pos,
-            self.area_radius,
-            RETURN_HEIGHT,
-        ) || !in_circle(self.spawn_pos, player.pos, self.area_radius, WAKE_HEIGHT)
+        } else if !in_circle(self.spawn_pos, actor.pos, self.area_radius, RETURN_HEIGHT)
+            || !in_circle(self.spawn_pos, player.pos, self.area_radius, WAKE_HEIGHT)
         {
             return MODE_RETURN;
         }
@@ -495,6 +481,14 @@ pub fn control(
         {
             actor.pos.y = floor;
         }
-        state.mode_exec(actor, &player, stunned, &switches, axis, &mut health, &mut events);
+        state.mode_exec(
+            actor,
+            &player,
+            stunned,
+            &switches,
+            axis,
+            &mut health,
+            &mut events,
+        );
     }
 }

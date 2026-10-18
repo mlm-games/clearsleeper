@@ -281,9 +281,7 @@ impl Himo3Sph {
     }
 
     pub fn is_target(&self, point: Vec3) -> bool {
-        self.registered
-            && self.tg_set
-            && walk::within(self.centre, point, self.radius)
+        self.registered && self.tg_set && walk::within(self.centre, point, self.radius)
     }
 }
 
@@ -530,10 +528,7 @@ impl Himo3 {
             min = min.min(p);
             max = max.max(p);
         }
-        (
-            [min.x, min.y, min.z],
-            [max.x, max.y, max.z],
-        )
+        ([min.x, min.y, min.z], [max.x, max.y, max.z])
     }
 
     pub fn drawn(&self) -> bool {
@@ -579,11 +574,8 @@ impl Himo3 {
         if self.sph.blocks(point) {
             return true;
         }
-        (0..self.sphere_count).any(|index| {
-            self.sphs
-                .get(index)
-                .is_some_and(|sph| sph.blocks(point))
-        })
+        (0..self.sphere_count)
+            .any(|index| self.sphs.get(index).is_some_and(|sph| sph.blocks(point)))
     }
 
     pub fn is_target(&self, point: Vec3) -> bool {
@@ -593,11 +585,8 @@ impl Himo3 {
         if self.sph.is_target(point) {
             return true;
         }
-        (0..self.sphere_count).any(|index| {
-            self.sphs
-                .get(index)
-                .is_some_and(|sph| sph.is_target(point))
-        })
+        (0..self.sphere_count)
+            .any(|index| self.sphs.get(index).is_some_and(|sph| sph.is_target(point)))
     }
 
     pub fn damages_player(&self) -> bool {
@@ -827,28 +816,18 @@ impl Himo3 {
                     }
                 }
                 if self.m02b4[0] == 0 {
-                    self.m02b4[0] = (rnd_f(
-                        &mut self.seed,
-                        REG0_F2 + TORCH_TIMER0_SPAN,
-                    ) + TORCH_TIMER0_MIN
+                    self.m02b4[0] = (rnd_f(&mut self.seed, REG0_F2 + TORCH_TIMER0_SPAN)
+                        + TORCH_TIMER0_MIN
                         + REG0_F3) as i16;
-                    self.m187c = rnd_f(
-                        &mut self.seed,
-                        REG0_F6 + TORCH_ALPHA_SPAN,
-                    ) + TORCH_ALPHA_MIN
+                    self.m187c = rnd_f(&mut self.seed, REG0_F6 + TORCH_ALPHA_SPAN)
+                        + TORCH_ALPHA_MIN
                         + REG0_F7;
                 }
                 if self.m02b4[1] == 0 {
                     self.m02b4[1] =
-                        (rnd_f(&mut self.seed, TORCH_TIMER1_SPAN) + TORCH_TIMER1_MIN)
-                            as i16;
+                        (rnd_f(&mut self.seed, TORCH_TIMER1_SPAN) + TORCH_TIMER1_MIN) as i16;
                 }
-                add_calc2(
-                    &mut self.m1878,
-                    self.m187c,
-                    1.0,
-                    REG0_F4 + TORCH_ALPHA_STEP,
-                );
+                add_calc2(&mut self.m1878, self.m187c, 1.0, REG0_F4 + TORCH_ALPHA_STEP);
                 if !self.fire_lit {
                     self.fire_lit = true;
                     self.m1620 = 1.0;
@@ -1048,12 +1027,7 @@ impl Himo3 {
                     index += 1;
                 }
             }
-            add_calc_angle_s2(
-                &mut actor.angle[1],
-                target,
-                HANG_ANGLE_STEP,
-                HANG_ANGLE_MAX,
-            );
+            add_calc_angle_s2(&mut actor.angle[1], target, HANG_ANGLE_STEP, HANG_ANGLE_MAX);
             let turned = yrot(anchor - self.m15c4, target.wrapping_neg());
             let tilt = HANG_TILT + REG0_F5;
             let limit = HANG_TILT_STEP + REG0_F6;
@@ -1075,19 +1049,11 @@ impl Himo3 {
             self.m15d0 += self.m15d4;
             let decay = self.m15d0 * (SWAY_DAMP + REG0_F7);
             self.m15d4 += decay;
-            add_calc0(
-                &mut self.m15d0,
-                SWAY_DAMP_SCALE,
-                SWAY_DAMP_MAX + REG0_F9,
-            );
+            add_calc0(&mut self.m15d0, SWAY_DAMP_SCALE, SWAY_DAMP_MAX + REG0_F9);
             self.m15d8 += self.m15dc;
             let decay = self.m15d8 * (SWAY_DAMP + REG0_F7);
             self.m15dc += decay;
-            add_calc0(
-                &mut self.m15d8,
-                SWAY_DAMP_SCALE,
-                SWAY_DAMP_MAX + REG0_F9,
-            );
+            add_calc0(&mut self.m15d8, SWAY_DAMP_SCALE, SWAY_DAMP_MAX + REG0_F9);
             if actor.parameters == PARAM_HANG_PLAYER {
                 self.m02be = 1;
                 self.m15e0 = 1.0;
@@ -1127,9 +1093,7 @@ impl Himo3 {
         add_calc0(&mut self.m15f4, 1.0, SWAY_DECAY + REG0_F3);
 
         let gust_phase = (i32::from(self.m15fa) * (SWAY_FREQ + REG0_S5)) as i16;
-        let gust = sin_s(gust_phase)
-            * (SWAY_AMPLITUDE + REG0_F4)
-            * self.m15f0;
+        let gust = sin_s(gust_phase) * (SWAY_AMPLITUDE + REG0_F4) * self.m15f0;
         let gust_vec = yrot(Vec3::new(0.0, 0.0, gust), self.m15f8);
 
         let wind_yaw = atan2s(env.wind.x, env.wind.z);

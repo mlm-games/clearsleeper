@@ -19,7 +19,6 @@ pub fn is_obj_hha(name: &str) -> bool {
     OBJ_HHA_ACTORS.contains(&name)
 }
 
-
 pub const EVENT_HHA_CLOSE: &str = "hha_close";
 pub const EVENT_INFO_NONE: u8 = 0xFF;
 pub const EVENT_IDX_NONE: i32 = -1;
@@ -111,10 +110,7 @@ pub const SE_READ_RIDDLE_1: u32 = 0x0806;
 
 pub const PARTICLE_SIRENSUIRYU00: u32 = 0x810D;
 pub const PARTICLE_SIRENSUIRYU01: u32 = 0x810E;
-pub const SPLASH_PARTICLE_TABLE: [u32; 2] = [
-    PARTICLE_SIRENSUIRYU00,
-    PARTICLE_SIRENSUIRYU01,
-];
+pub const SPLASH_PARTICLE_TABLE: [u32; 2] = [PARTICLE_SIRENSUIRYU00, PARTICLE_SIRENSUIRYU01];
 pub const PARTICLE_LIFE: u8 = 255;
 
 pub const CULL_MIN: [f32; 3] = [-700.0, -1600.0, -400.0];
@@ -188,7 +184,6 @@ impl BgwSets {
             None => false,
         }
     }
-
 }
 
 #[derive(Resource, Debug, Default)]
@@ -594,7 +589,13 @@ impl HhaPart {
         self.exe_normal(entity, bgws, at, shape_angle);
     }
 
-    pub fn bgw_step(&mut self, entity: Entity, bgws: &mut BgwSets, at: Vec3, shape_angle: [i16; 3]) {
+    pub fn bgw_step(
+        &mut self,
+        entity: Entity,
+        bgws: &mut BgwSets,
+        at: Vec3,
+        shape_angle: [i16; 3],
+    ) {
         if !self.has_bgw || !self.has_mdl {
             return;
         }
@@ -781,7 +782,11 @@ pub fn rotate_zxy(local: Vec3, shape_angle: [i16; 3]) -> Vec3 {
     let ay = shape_angle[1];
     let az = shape_angle[2];
     let (sin_x, cos_x) = super::stream::sin_cos(ax);
-    point = Vec3::new(point.x, point.y * cos_x + point.z * sin_x, -point.y * sin_x + point.z * cos_x);
+    point = Vec3::new(
+        point.x,
+        point.y * cos_x + point.z * sin_x,
+        -point.y * sin_x + point.z * cos_x,
+    );
     let (sin_y, cos_y) = super::stream::sin_cos(ay);
     point = Vec3::new(
         point.x * cos_y + point.z * sin_y,
@@ -927,15 +932,25 @@ impl ObjHha {
         }
     }
 
-    pub fn get_water_h(&self, pos: Vec3, angle: [i16; 3], sea: Option<&Sea>, water: Option<&Water>) -> f32 {
+    pub fn get_water_h(
+        &self,
+        pos: Vec3,
+        angle: [i16; 3],
+        sea: Option<&Sea>,
+        water: Option<&Water>,
+    ) -> f32 {
         let mut ret = pos.y;
         let mut chk_pos = pos;
         let off_vec = base_z_rotated(angle[1]) * WTR_CHK_FORWARD;
         chk_pos += off_vec;
         if WTR_CHK_SCALE != 0.0 {
             let surface = match sea {
-                Some(sea) if sea.draw_contains(chk_pos.x, chk_pos.z) => Some(sea.height_at(chk_pos.x, chk_pos.z)),
-                _ => water.filter(|water| water.in_area).map(|water| water.surface),
+                Some(sea) if sea.draw_contains(chk_pos.x, chk_pos.z) => {
+                    Some(sea.height_at(chk_pos.x, chk_pos.z))
+                }
+                _ => water
+                    .filter(|water| water.in_area)
+                    .map(|water| water.surface),
             };
             if let Some(height) = surface {
                 ret = height;
@@ -1008,12 +1023,7 @@ impl ObjHha {
         self.wtr_scale = WTR_SCALE_INIT;
     }
 
-    pub fn init_data_middle(
-        &mut self,
-        scale: Vec3,
-        entity: Entity,
-        sets: &mut SplashSets,
-    ) {
+    pub fn init_data_middle(&mut self, scale: Vec3, entity: Entity, sets: &mut SplashSets) {
         if self.middle == 0 {
             self.set_tex(OPEN_TEX_FRAME, OPEN_TEX_SPEED, 1);
             self.hitbox_active = true;
@@ -1208,8 +1218,7 @@ pub fn control(
                 let slot = index;
                 statue.parts[slot].has_mdl = true;
                 statue.parts[slot].has_bgw = true;
-                let world_pos = statue.parts[slot]
-                    .model_translation(actor.pos, actor.shape_angle);
+                let world_pos = statue.parts[slot].model_translation(actor.pos, actor.shape_angle);
                 bgws.regist(entity, slot, world_pos);
             }
             for index in 0..SPLASH_COUNT {
@@ -1221,7 +1230,14 @@ pub fn control(
                 let y = SPLASH_Y_TABLE.get(slot).copied().unwrap_or(0.0);
                 let z = SPLASH_Z_TABLE.get(slot).copied().unwrap_or(0.0);
                 statue.splashes[slot].create_s(
-                    entity, slot, particle, actor.pos, y, z, actor.angle, &mut splashes,
+                    entity,
+                    slot,
+                    particle,
+                    actor.pos,
+                    y,
+                    z,
+                    actor.angle,
+                    &mut splashes,
                 );
             }
             statue.init_data_middle(actor.scale, entity, &mut splashes);

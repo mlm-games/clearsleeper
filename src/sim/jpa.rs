@@ -1,8 +1,9 @@
 use bevy_ecs::prelude::*;
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat3, Mat4, Vec3, Vec4};
 
 use super::camera::{Camera, View};
-use super::weather::{pntwind_get_info, Weather};
+use super::jpa_bank::{JpaBank, JpaBankError, JpaResourceRef};
+use super::weather::{Weather, pntwind_get_info};
 
 /// `DEG2RAD_CONSTANT` (`SSystem/SComponent/c_angle.h:7`).
 pub const DEG2RAD: f32 = core::f32::consts::PI / 180.0;
@@ -54,11 +55,45 @@ pub const FADE_ALPHA_TARGET: i16 = 1;
 pub const FADE_ALPHA_STEP: i16 = 4;
 
 /// `ID_AK_ST_O_BKMSATTACKSMOKE00` (`d_particle_name.h:259`), one of the two ids
-/// `dPa_simpleEcallBack::create` arms the smoke draw on (`d_particle.cpp:531`).
+/// `dPa_simpleEcallBack::create` arms the smoke draw on (`d_particle.cpp:600`).
 pub const ID_AK_ST_O_BKMSATTACKSMOKE00: u16 = 0xA06A;
 /// `ID_AK_ST_O_KGTT2JUMPHANDSMOKE00` (`d_particle_name.h:1108`), the second such id
-/// (`d_particle.cpp:533`).
+/// (`d_particle.cpp:602`).
 pub const ID_AK_ST_O_KGTT2JUMPHANDSMOKE00: u16 = 0xA410;
+
+/// The behaviour table: the two effect ids whose *reaction* this module models, namely the smoke
+/// particle callback `dPa_simpleEcallBack::create` arms (`d_particle.cpp:598-611`). Every other id
+/// the bank carries is created as an identity-only emitter.
+///
+/// The bank and this table never stand in for each other. The bank decides whether a resource
+/// exists and which ids it holds: [`create_emitter_id`] refuses an id no loaded archive carries,
+/// exactly as `getByUserIndex` answering NULL does (`JPAEmitterManager.cpp:61-66`), even when the
+/// id is named here. This table only decides what an emitter that exists does; an id absent from
+/// it gets no smoke callback rather than a guessed one.
+pub const PORTED_SMOKE_IDS: [u16; 2] = [
+    ID_AK_ST_O_BKMSATTACKSMOKE00,
+    ID_AK_ST_O_KGTT2JUMPHANDSMOKE00,
+];
+
+/// Whether `res_id` is one of [`PORTED_SMOKE_IDS`].
+pub fn is_ported_smoke_id(res_id: u16) -> bool {
+    PORTED_SMOKE_IDS.contains(&res_id)
+}
+
+/// The resource-manager slot `dPa_control_c::createCommon` mounts `common.jpc` into
+/// (`d_particle.cpp:713-735`, the constructor at `:715`): the manager the emitter manager was
+/// handed at construction (`JPAEmitterManager.cpp:21`), reached for every effect id whose bit 15
+/// is clear (`d_particle.cpp:620`, `:698-701`).
+pub const COMMON_RM_ID: u8 = 0;
+/// `dPa_control_c::createRoomScene`'s slot: `mEmitterMng->pResMgrArray[1] = mSceneResMng`
+/// (`d_particle.cpp:744`), the stage's `Pscene###.jpc`.
+pub const SCENE_RM_ID: u8 = 1;
+/// The archive `d_s_logo.cpp:931` reads into `createCommon`; `dPa_control_c::readScene` names the
+/// per-stage one `Pscene%03d.jpc` (`d_particle.cpp:757-770`).
+pub const COMMON_ARCHIVE: &str = "common.jpc";
+/// `dPa_control_c::readScene`'s own "no archive" token (`d_particle.cpp:758-760`): the particle
+/// number a stage whose `mParticleSceneNo` carries `0xFF` mounts nothing for.
+pub const NO_SCENE: u8 = 0xFF;
 
 /// `dPtclGroup_Normal_e` through `dPtclGroup_2DmenuBack_e` (`d/d_particle.h:399-411`): the eleven
 /// group ids the manager's per-group `calc` walks and the follow and simple draws branch on.
@@ -752,6 +787,104 @@ pub enum EmitterCallback {
     Simple(usize),
 }
 
+/// A resolution the emitter-creation path could not make. Retail warns and returns no emitter
+/// (`JPAEmitterManager.cpp:52-78`); the port records the ids here for the shell instead of
+/// creating a stand-in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JpaGap {
+    /// `createSimpleEmitterID`'s `pResMgrArray[rmID]` is NULL: no archive is mounted in the slot
+    /// the effect id selects (`JPAEmitterManager.cpp:55` asserts it is not). A scene id has no
+    /// manager until the stage's `Pscene###.jpc` is mounted (`d_particle.cpp:744`).
+    ManagerNotMounted {
+        group_id: u8,
+        rm_id: u8,
+        user_id: u16,
+    },
+    /// The manager is mounted and `getByUserIndex(user_id)` answered NULL
+    /// (`JPAEmitterManager.cpp:61-66`): the archive does not carry the id.
+    UnknownResource {
+        group_id: u8,
+        rm_id: u8,
+        user_id: u16,
+    },
+}
+
+impl std::fmt::Display for JpaGap {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ManagerNotMounted {
+                group_id,
+                rm_id,
+                user_id,
+            } => write!(
+                formatter,
+                "particle resource {user_id:#06x} needs resource manager {rm_id}, which is not mounted (group {group_id})"
+            ),
+            Self::UnknownResource {
+                group_id,
+                rm_id,
+                user_id,
+            } => write!(
+                formatter,
+                "particle resource {user_id:#06x} is not in resource manager {rm_id} (group {group_id})"
+            ),
+        }
+    }
+}
+
+/// `JPAEmitterManager::createSimpleEmitterID` (`JPAEmitterManager.cpp:52-78`) up to the callback
+/// installation: resolve `user_id` in the bank slot `rm_id` names, claim a free pool slot, make
+/// the emitter from the resolved resource and place it at `pos` in `group_id`.
+///
+/// A miss creates nothing and records a [`JpaGap`], which is retail's warn-and-return-NULL arm
+/// (`:63-66`). The bank is the only source of resources: the [`PORTED_SMOKE_IDS`] table chooses
+/// what an emitter that exists does, never whether it exists.
+///
+/// The slot is rebuilt from [`Emitter::default`] before its ids are written. Retail's pool
+/// objects are constructed once and `create` re-initialises the fields the resource drives; the
+/// port's pool recycles values, so the construction the type default stands in for is what makes
+/// a reclaimed slot match a fresh one.
+pub fn create_emitter_id(
+    emitters: &mut [Emitter],
+    bank: &JpaBank,
+    gaps: &mut Vec<JpaGap>,
+    pos: Vec3,
+    user_id: u16,
+    group_id: u8,
+    rm_id: u8,
+) -> Option<usize> {
+    let Some(manager) = bank.manager(rm_id) else {
+        gaps.push(JpaGap::ManagerNotMounted {
+            group_id,
+            rm_id,
+            user_id,
+        });
+        return None;
+    };
+    let Some((resource_index, resource)) = manager.find_by_user_index(user_id) else {
+        gaps.push(JpaGap::UnknownResource {
+            group_id,
+            rm_id,
+            user_id,
+        });
+        return None;
+    };
+    let index = (0..emitters.len()).find(|index| !emitters[*index].active)?;
+    let emitter = &mut emitters[index];
+    *emitter = Emitter::default();
+    emitter.active = true;
+    emitter.res_id = resource.user_index;
+    emitter.res_mgr_id = rm_id;
+    emitter.group_id = group_id;
+    emitter.resource = Some(JpaResourceRef {
+        rm_id,
+        index: resource_index,
+        user_index: resource.user_index,
+    });
+    emitter.global_translation = pos;
+    Some(index)
+}
+
 /// `JPABaseEmitter` (`JPAEmitter.h:163-350`) narrowed to the fields the ported callbacks read and
 /// write, plus the active particle list they walk. The emission, key, field and draw integration
 /// the base class performs over the rest is not ported.
@@ -760,10 +893,15 @@ pub struct Emitter {
     /// `mGroupID`, read by the follow and simple draws and set by the emitter factory.
     pub group_id: u8,
     /// `mResID` and `mResMgrID`: the effect id the emitter was created from, which is also the key
-    /// `dPa_control_c::getSimple` searches on (`:939-947`), and the resource-manager selector its
-    /// top bit picks (`:630-632`).
+    /// `dPa_control_c::getSimple` searches on (`:1008-1014`), and the resource-manager selector
+    /// its top bit picks (`:699-701`).
     pub res_id: u16,
     pub res_mgr_id: u8,
+    /// `mpDataLinkInfo` (`JPAEmitter.h:410`), the link info `create` was handed
+    /// (`JPAEmitter.cpp:134`), reduced to where the resource came from in the bank: the manager
+    /// slot, the registration index and the user index. `None` for an emitter no bank resource
+    /// created; this port never manufactures one as a substitute.
+    pub resource: Option<JpaResourceRef>,
     /// `mFlags` (`JPAEmitter.h:196-199`), the [`EMITTER_*`] bits.
     pub flags: u32,
     /// `mMaxFrame` (`JPAEmitter.h:254`), the frame count `becomeInvalidEmitter` and
@@ -782,6 +920,10 @@ pub struct Emitter {
     /// `JPAGetXYZRotateMtx` into a rotation matrix. Nothing in this module reads it back, so the
     /// triple is what is carried and the conversion is not reproduced.
     pub global_rotation: [i16; 3],
+    /// `mGlobalRotation` (`JPAEmitter.h:414`) as `setGlobalSRTMatrix` writes it: the rotation
+    /// half of the decomposed matrix (`JPAMath.cpp:115-137`). The two writers above and below
+    /// store different spellings of the one retail field, and nothing reads either back.
+    pub global_rotation_matrix: Option<Mat3>,
     /// `mGlobalDynamicsScale` (`JPAEmitter.h:242`).
     pub global_dynamics_scale: Vec3,
     /// `mGlobalParticleScale` (`JPAEmitter.h:234`), the scale the model draw multiplies a particle's
@@ -825,6 +967,7 @@ impl Default for Emitter {
             group_id: GROUP_NORMAL,
             res_id: 0,
             res_mgr_id: 0,
+            resource: None,
             flags: 0,
             max_frame: 0,
             rate: 0.0,
@@ -832,6 +975,7 @@ impl Default for Emitter {
             directional_speed: 0.0,
             global_translation: Vec3::ZERO,
             global_rotation: [0; 3],
+            global_rotation_matrix: None,
             global_dynamics_scale: Vec3::ONE,
             global_particle_scale: Vec3::ONE,
             global_prm_color: Color::new(0xff, 0xff, 0xff, 0xff),
@@ -930,12 +1074,24 @@ impl Emitter {
         self.global_prm_color.a = alpha as u8;
     }
 
+    /// `setGlobalSRTMatrix` (`JPAEmitter.h:218-220`): `JPASetRMtxSTVecfromMtx`
+    /// (`JPAMath.cpp:115-137`) stores the 3x3 column norms as the dynamics scale, the normalised
+    /// columns as the rotation matrix and the last column as the translation - exactly what
+    /// [`Mat4::to_scale_rotation_translation`] answers. It does not touch the particle scale,
+    /// which only the `setGlobalScale` spelling writes (`JPAEmitter.h:229-233`).
+    pub fn set_global_srt_matrix(&mut self, matrix: Mat4) {
+        let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
+        self.global_dynamics_scale = scale;
+        self.global_rotation_matrix = Some(Mat3::from_quat(rotation));
+        self.global_translation = translation;
+    }
+
     /// `getGlobalAlpha` (`JPAEmitter.h:213`), widened from the byte the field actually is.
     pub fn global_alpha(&self) -> i16 {
         i16::from(self.global_prm_color.a)
     }
 
-    /// `dPa_control_c::getRM_ID` (`d_particle.cpp:630-632`): the resource-manager selector the
+    /// `dPa_control_c::getRM_ID` (`d_particle.cpp:699-701`): the resource-manager selector the
     /// effect id's top bit names.
     pub fn resource_manager_id(res_id: u16) -> u8 {
         ((res_id >> 15) & 0x01) as u8
@@ -1010,8 +1166,8 @@ pub struct SimpleData {
 /// `0x010`.
 ///
 /// The constructor writes `mpBaseEmitter` and `mCount` only (`d_particle.cpp:474-477`).
-/// `mResID`, `mGrpID` and `mbIsSmoke` have no writer until `create` (`:525-546`), and `create`
-/// leaves `mbIsSmoke` alone when the emitter it wanted could not be made (`:529`), so it is an
+/// `mResID`, `mGrpID` and `mbIsSmoke` have no writer until `create` (`:594-616`), and `create`
+/// leaves `mbIsSmoke` alone when the emitter it wanted could not be made (`:598-611`), so it is an
 /// [`Option`] here rather than a flag assumed false.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Simple {
@@ -1059,48 +1215,57 @@ pub fn simple_set(
     true
 }
 
-/// `dPa_simpleEcallBack::createEmitter` (`d_particle.cpp:549-561`): make the emitter at the origin
-/// with the resource manager the effect id's top bit selects, install this callback, keep it
-/// emitting for as long as the host says, and stop its own emission until the drain runs.
+/// `dPa_simpleEcallBack::createEmitter` (`d_particle.cpp:618-630`): make the emitter at the
+/// origin with the resource manager the effect id's top bit selects, install this callback, keep
+/// it emitting for as long as the host says, and stop its own emission until the drain runs.
 ///
-/// `available` stands in for `JPAEmitterManager::createSimpleEmitterID` (`:552`), which reads the
-/// packed emitter through the resource manager this port has no reader for. Passing `false` leaves
-/// the callback exactly as the reference does on a null return: no emitter, no callback, no frame
-/// limit and no stop.
+/// The manager call is [`create_emitter_id`]'s bank lookup. An id the loaded bank cannot resolve
+/// leaves the callback exactly as the reference does on a null return - no emitter, no callback,
+/// no frame limit and no stop - and records a [`JpaGap`].
 pub fn simple_create_emitter(
     callback: &mut Simple,
     emitters: &mut [Emitter],
+    bank: &JpaBank,
+    gaps: &mut Vec<JpaGap>,
     slot: usize,
-    available: bool,
 ) -> Option<usize> {
-    if callback.base_emitter.is_none() && available {
-        let index = (0..emitters.len()).find(|index| !emitters[*index].active)?;
-        emitters[index].active = true;
-        emitters[index].res_id = callback.res_id;
-        emitters[index].res_mgr_id = Emitter::resource_manager_id(callback.res_id);
-        emitters[index].group_id = callback.group_id;
-        emitters[index].callback = Some(EmitterCallback::Simple(slot));
-        emitters[index].max_frame = 0;
-        emitters[index].stop_create_particle();
-        callback.base_emitter = Some(index);
+    if callback.base_emitter.is_some() {
+        return callback.base_emitter;
     }
+    let index = create_emitter_id(
+        emitters,
+        bank,
+        gaps,
+        Vec3::ZERO,
+        callback.res_id,
+        callback.group_id,
+        Emitter::resource_manager_id(callback.res_id),
+    )?;
+    let emitter = &mut emitters[index];
+    emitter.callback = Some(EmitterCallback::Simple(slot));
+    emitter.max_frame = 0;
+    emitter.stop_create_particle();
+    callback.base_emitter = Some(index);
     callback.base_emitter
 }
 
-/// `dPa_simpleEcallBack::create` (`d_particle.cpp:525-546`): clear the emitter pointer, adopt the
-/// group and the effect id, create the emitter, then arm the smoke draw for the two effect ids that
-/// name it and install the shared smoke particle callback.
+/// `dPa_simpleEcallBack::create` (`d_particle.cpp:594-616`): clear the emitter pointer, adopt the
+/// group and the effect id, create the emitter, then arm the smoke draw for the two effect ids in
+/// [`PORTED_SMOKE_IDS`] and install the shared smoke particle callback.
+///
+/// A resource the bank cannot resolve refuses the whole entry: the callback keeps no emitter, and
+/// `dPa_control_c::newSimple` does not spend a registry slot on it (`d_particle.cpp:984-996`
+/// increments `mNumSimple` only after `create` answers non-NULL).
 pub fn simple_create(
     callback: &mut Simple,
     emitters: &mut [Emitter],
+    bank: &JpaBank,
+    gaps: &mut Vec<JpaGap>,
     slot: usize,
-    available: bool,
 ) -> Option<usize> {
     callback.base_emitter = None;
-    let emitter = simple_create_emitter(callback, emitters, slot, available)?;
-    if callback.res_id == ID_AK_ST_O_BKMSATTACKSMOKE00
-        || callback.res_id == ID_AK_ST_O_KGTT2JUMPHANDSMOKE00
-    {
+    let emitter = simple_create_emitter(callback, emitters, bank, gaps, slot)?;
+    if is_ported_smoke_id(callback.res_id) {
         callback.is_smoke = Some(true);
         emitters[emitter].particle_callback = Some(ParticleCallback::Smoke);
     } else {
@@ -1239,6 +1404,49 @@ impl Clip {
             .iter()
             .any(|plane| plane.x.mul_add(p.x, plane.y.mul_add(p.y, plane.z * p.z)) > radius)
     }
+
+    /// `J3DUClipper::clip(const Mtx, Vec*, Vec*)` (`J3DUClipper.cpp:73-148`): the eight corners of
+    /// `min`/`max` in the order retail builds them, each mapped through the model matrix onto the
+    /// view, rejected when every corner is outside one plane. A corner inside all six planes ends
+    /// the test with `false` first, which is retail's `if (!any) return FALSE;`. The model matrix
+    /// is the caller's `fopAcM_GetMtx` (`f_op_actor_mng.cpp:594-599` concatenates it onto the
+    /// view before the walk).
+    pub fn clip_box(&self, model: Mat4, min: Vec3, max: Vec3) -> bool {
+        let m = self.view * model;
+        let corners = [
+            Vec3::new(max.x, max.y, min.z),
+            Vec3::new(max.x, max.y, max.z),
+            Vec3::new(min.x, max.y, max.z),
+            Vec3::new(min.x, max.y, min.z),
+            Vec3::new(max.x, min.y, min.z),
+            Vec3::new(max.x, min.y, max.z),
+            Vec3::new(min.x, min.y, max.z),
+            Vec3::new(min.x, min.y, min.z),
+        ];
+        let mut clip = [0_u32; 6];
+        for corner in corners {
+            let p = m.transform_point3(corner);
+            let mut any = false;
+            if -p.z < self.near {
+                clip[4] += 1;
+                any = true;
+            }
+            if -p.z > self.far {
+                clip[5] += 1;
+                any = true;
+            }
+            for (slot, plane) in self.planes.iter().enumerate() {
+                if plane.x.mul_add(p.x, plane.y.mul_add(p.y, plane.z * p.z)) > 0.0 {
+                    clip[slot] += 1;
+                    any = true;
+                }
+            }
+            if !any {
+                return false;
+            }
+        }
+        clip.iter().any(|count| *count == 8)
+    }
 }
 
 /// The particle pool the emitter manager allocates once and recycles for the whole game
@@ -1274,6 +1482,16 @@ impl Particles {
         emitter.particles.remove(slot);
         self.free.push(index);
         Some(self.items[index])
+    }
+
+    /// `JPABaseEmitter::deleteAllParticle` (`JPAEmitter.cpp:403-410`): every active particle goes
+    /// back onto the vacant list. The child-particle list the reference sweeps next (`:412-421`)
+    /// has no counterpart here - the port's emitter holds one list - and the field data it clears
+    /// per particle is not modelled.
+    pub fn delete_all(&mut self, emitter: &mut Emitter) {
+        for slot in emitter.particles.drain(..) {
+            self.free.push(slot);
+        }
     }
 }
 
@@ -1652,6 +1870,13 @@ pub struct Jpa {
     pub particles: Particles,
     /// The emitter list, [`EMITTER_POOL`] slots. An unused slot is one with `active` clear.
     pub emitters: Vec<Emitter>,
+    /// `JPAEmitterManager::pResMgrArray` (`JPAEmitterManager.h:46`): the loaded JPA archives, one
+    /// per resource-manager slot. `dPa_control_c::createCommon` mounts `common.jpc` into slot 0
+    /// (`d_particle.cpp:713-735`, read at `d_s_logo.cpp:931`) and `createRoomScene` the stage's
+    /// `Pscene###.jpc` into slot 1 (`:736-756`, `:744`, read by `readScene` at `:757-770`).
+    pub bank: JpaBank,
+    /// The [`JpaGap`]s [`create_emitter_id`] recorded since the shell last read them.
+    pub gaps: Vec<JpaGap>,
     pub model_control: ModelControl,
     /// `mSimpleCallbacks[25]` (`d/d_particle.h:563`), the registry `getSimple` searches.
     pub simple: Vec<Simple>,
@@ -1672,6 +1897,8 @@ impl Default for Jpa {
         Jpa {
             particles: Particles::default(),
             emitters: vec![Emitter::default(); EMITTER_POOL],
+            bank: JpaBank::default(),
+            gaps: Vec::new(),
             model_control: ModelControl::default(),
             simple: vec![simple_new(); SIMPLE_SLOTS],
             smoke_callback: smoke_new_shared(0, 1, 1, 1),
@@ -1682,35 +1909,117 @@ impl Default for Jpa {
 }
 
 impl Jpa {
-    /// `JPAEmitterManager`'s emitter pool: the first free slot, claimed.
-    pub fn alloc_emitter(&mut self) -> Option<usize> {
-        let index = (0..self.emitters.len()).find(|index| !self.emitters[*index].active)?;
-        self.emitters[index].active = true;
-        Some(index)
+    /// `JPAEmitterManager::createSimpleEmitterID` (`JPAEmitterManager.cpp:52-78`), the resolution
+    /// the demo particle adaptor is one caller of: `TAdaptor_particle` decodes its packed id
+    /// first - low half user index, bits 24-31 group, bits 16-23 resource manager
+    /// (`JStudio_JParticle/object-particle.cpp:141-162`). The resolved resource becomes the new
+    /// emitter's [`Emitter::resource`]; a miss records a [`JpaGap`] and creates nothing.
+    pub fn create_simple_emitter_id(
+        &mut self,
+        pos: Vec3,
+        user_id: u16,
+        group_id: u8,
+        rm_id: u8,
+    ) -> Option<usize> {
+        create_emitter_id(
+            &mut self.emitters,
+            &self.bank,
+            &mut self.gaps,
+            pos,
+            user_id,
+            group_id,
+            rm_id,
+        )
     }
 
-    /// `dPa_control_c::newSimple` (`d_particle.cpp:916-927`): take the next registry entry in order
-    /// and make its emitter. Refused past [`SIMPLE_SLOTS`], which is the count the reference reports
-    /// as an over-registration before it returns false.
-    pub fn new_simple(&mut self, effect_id: u16, group_id: u8, available: bool) -> Option<usize> {
+    /// [`Jpa::create_simple_emitter_id`] for the packed `PARTICLE` id whole, which is how the
+    /// demo adaptor carries it (`JStudio_JParticle/object-particle.cpp:86-87`, `:144-155`).
+    pub fn create_simple_emitter_packed_id(&mut self, pos: Vec3, id: u32) -> Option<usize> {
+        create_emitter_id(
+            &mut self.emitters,
+            &self.bank,
+            &mut self.gaps,
+            pos,
+            (id & 0xFFFF) as u16,
+            (id >> 24) as u8,
+            ((id >> 16) & 0xFF) as u8,
+        )
+    }
+
+    /// The [`JpaGap`]s [`create_emitter_id`] recorded since the shell last read them.
+    pub fn take_gaps(&mut self) -> Vec<JpaGap> {
+        core::mem::take(&mut self.gaps)
+    }
+
+    /// Mount one archive into a bank slot: `JPAResourceManager`'s constructor over
+    /// `JPAEmitterArchiveLoaderDataBase::load` (`JPAResourceManager.cpp:79-82`), the call
+    /// `dPa_control_c::createCommon` and `createRoomScene` make (`d_particle.cpp:715`, `:741`).
+    /// An unreadable archive is a [`JpaBankError`] and leaves the slot as it was.
+    pub fn load_manager(&mut self, rm_id: u8, data: &[u8]) -> Result<(), JpaBankError> {
+        self.bank.register(rm_id, data)
+    }
+
+    /// `JPAEmitterManager::clearResourceManager` (`JPAEmitterManager.cpp:139-151`): every emitter
+    /// whose `mResMgrID` is `rmID` is force-deleted - `forceDeleteEmitter`'s `deleteAllParticle`
+    /// (`JPAEmitter.cpp:403-418`) then `deleteEmitter` (`JPAEmitterManager.cpp:114-119`), which
+    /// hands the slot back to the pool - and the resource-manager slot is nulled last.
+    ///
+    /// This is the sweep `dPa_control_c::removeRoomScene` runs when the last holder of a stage's
+    /// `Pscene###.jpc` goes away (`d_particle.cpp:784`), which is why the port's stage mount calls
+    /// it: without it an emitter the previous stage created out of the vanished slot keeps
+    /// ticking. The deletion is [`Emitter::is_enable_delete_emitter`]'s unconditional form; the
+    /// reference walks its sixteen group lists, which the pool's `active` flag stands in for.
+    ///
+    /// A [`Simple`] callback keeps its own `base_emitter` handle through all of this - retail's
+    /// `dPa_simpleEcallBack::removeEmitter` is a `removeScene` step, not a `clearResourceManager`
+    /// one (`d_particle.cpp:799-800`) - so nothing here rewrites one.
+    pub fn clear_resource_manager(&mut self, rm_id: u8) {
+        let Self {
+            emitters,
+            particles,
+            bank,
+            ..
+        } = self;
+        for emitter in emitters.iter_mut() {
+            if !emitter.active || emitter.res_mgr_id != rm_id {
+                continue;
+            }
+            particles.delete_all(emitter);
+            *emitter = Emitter::default();
+        }
+        bank.clear(rm_id);
+    }
+
+    /// `dPa_control_c::newSimple` (`d_particle.cpp:984-996`): take the next registry entry in
+    /// order and make its emitter. Refused past [`SIMPLE_SLOTS`], which is the count the reference
+    /// reports as an over-registration before it returns false, and refused when the effect id's
+    /// resource cannot be resolved, in which case the entry is not consumed either
+    /// (`:990-994` increments `mNumSimple` only after `create` answers non-NULL).
+    pub fn new_simple(&mut self, effect_id: u16, group_id: u8) -> Option<usize> {
         if self.num_simple >= SIMPLE_SLOTS {
             return None;
         }
         let slot = self.num_simple;
         self.simple[slot].res_id = effect_id;
         self.simple[slot].group_id = group_id;
-        simple_create(&mut self.simple[slot], &mut self.emitters, slot, available)?;
+        simple_create(
+            &mut self.simple[slot],
+            &mut self.emitters,
+            &self.bank,
+            &mut self.gaps,
+            slot,
+        )?;
         self.num_simple += 1;
         Some(slot)
     }
 
-    /// `dPa_control_c::getSimple` (`d_particle.cpp:939-947`): the first registry entry whose effect
-    /// id matches.
+    /// `dPa_control_c::getSimple` (`d_particle.cpp:1008-1014`): the first registry entry whose
+    /// effect id matches.
     pub fn get_simple(&self, id: u16) -> Option<usize> {
         (0..self.num_simple).find(|slot| self.simple[*slot].res_id == id)
     }
 
-    /// `dPa_control_c::setSimple` (`d_particle.cpp:930-936`): find the entry and queue on it.
+    /// `dPa_control_c::setSimple` (`d_particle.cpp:998-1005`): find the entry and queue on it.
     pub fn set_simple(
         &mut self,
         id: u16,
@@ -1721,9 +2030,14 @@ impl Jpa {
         affected_by_wind: i32,
     ) -> bool {
         match self.get_simple(id) {
-            Some(slot) => {
-                simple_set(&mut self.simple[slot], pos, alpha, prm, env, affected_by_wind)
-            }
+            Some(slot) => simple_set(
+                &mut self.simple[slot],
+                pos,
+                alpha,
+                prm,
+                env,
+                affected_by_wind,
+            ),
             None => false,
         }
     }
@@ -1814,6 +2128,55 @@ pub fn draw_model_particles(mut jpa: ResMut<Jpa>) {
     jpa.draw_models();
 }
 
+/// `dPa_control_c::readScene` (`d_particle.cpp:757-770`) with `createScene`'s mount (`:773-780`
+/// over `createRoomScene`, `:736-756`): the stage's `/res/Particle/Pscene%03d.jpc` into slot
+/// [`SCENE_RM_ID`]. `particle_no` is `dStage_stagInfo_GetParticleNo`'s answer
+/// (`d_stage.h:1047-1049`, read at `d_s_play.cpp:1378-1379`); `room_particle_no` is a room's own
+/// `FILI` number (`d_s_room.cpp:237-241`), which `readScene` reaches only as the fallback: a
+/// stage number that is not [`NO_SCENE`] consumes the reader's single read (`mCount++`),
+/// `:761-765`, and the room's read then does nothing. A stage that named [`NO_SCENE`] returns
+/// false before the counter moves (`:758-760`), so the first room whose record names a number is
+/// the read that mounts.
+///
+/// A stage whose token is [`NO_SCENE`] and whose rooms named no number mounts nothing - the
+/// reader's own `if (i_no == 0xff) return false` (`:758-760`) - and an archive the dump does not
+/// carry mounts nothing either, so a scene particle id keeps resolving to
+/// [`JpaGap::ManagerNotMounted`]. Either way the slot is first swept by
+/// [`Jpa::clear_resource_manager`], the `clearResourceManager(1)` of `removeRoomScene`
+/// (`:781-792`), so the previous stage's emitters do not survive the mount.
+pub fn mount_scene_archive(jpa: &mut Jpa, particle_no: u8, room_particle_no: Option<u8>) {
+    jpa.clear_resource_manager(SCENE_RM_ID);
+    let number = if particle_no == NO_SCENE {
+        room_particle_no
+    } else {
+        Some(particle_no)
+    };
+    let Some(number) = number else {
+        return;
+    };
+    let name = format!("Pscene{number:03}.jpc");
+    let Some(data) = crate::assets::load_particle_archive(&name) else {
+        return;
+    };
+    match jpa.load_manager(SCENE_RM_ID, &data) {
+        Ok(()) => {}
+        Err(error) => log::warn!("clearsleeper: scene JPA archive {name} unreadable ({error})"),
+    }
+}
+
+/// The particle layer's construction: `dPa_control_c`'s constructor and the common-archive mount
+/// that precedes every stage. `d_s_logo.cpp:931` reads `/res/Particle/common.jpc` into
+/// `dPa_control_c::createCommon` (`d_particle.cpp:713-735`), which is slot 0's mount. The stage's
+/// own `Pscene###.jpc` - or, when the stage named none, the one a room's `FILI` record names
+/// (`d_s_room.cpp:237-241`) - goes into slot 1 through [`mount_scene_archive`] at the stage load
+/// that names one.
 pub fn init(world: &mut World) {
-    world.init_resource::<Jpa>();
+    let mut jpa = Jpa::default();
+    if let Some(data) = crate::assets::load_particle_archive(COMMON_ARCHIVE) {
+        match jpa.load_manager(COMMON_RM_ID, &data) {
+            Ok(()) => {}
+            Err(error) => log::warn!("clearsleeper: common JPA archive unreadable ({error})"),
+        }
+    }
+    world.insert_resource(jpa);
 }

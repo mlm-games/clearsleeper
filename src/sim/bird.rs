@@ -128,4 +128,3 @@ pub fn control(
         bird.altitude = bird.altitude.clamp(0.0, MAX_ALTITUDE);
     }
 }
-

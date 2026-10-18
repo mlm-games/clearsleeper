@@ -28,7 +28,8 @@ pub mod flag {
     /// `chkFlag(0x80080)` at `d_camera.cpp:3412`: the player must be inside the window. Both
     /// bits are the collision pass's own, `setFlag(0x80)` at `:2235` and `setFlag(0x80000)` at
     /// `:2225`, so this mask is composed from [`cam_bump::evflag`](super::cam_bump::evflag).
-    pub const SIGHT: u32 = crate::sim::cam_bump::evflag::CORNER | crate::sim::cam_bump::evflag::PULL_IN;
+    pub const SIGHT: u32 =
+        crate::sim::cam_bump::evflag::CORNER | crate::sim::cam_bump::evflag::PULL_IN;
 }
 
 /// `dCamera_c::mWork.lockon`, `d_camera.h:308-324`, narrowed to the members the engine reads
@@ -239,13 +240,10 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
 
     let release = if input.lockon.truth { RELEASE } else { 0.0 };
     let mut range = 10000.0;
-    let (globe, ratio) = if status.check0(
-        player_status::STTS0_UNK40 | player_status::STTS0_UNK20 | player_status::STTS0_UNK1,
-    ) {
-        (
-            SGlobe::new(PARALLEL_DIST, SAngle::ZERO, facing.inv()),
-            1.0,
-        )
+    let (globe, ratio) = if status
+        .check0(player_status::STTS0_UNK40 | player_status::STTS0_UNK20 | player_status::STTS0_UNK1)
+    {
+        (SGlobe::new(PARALLEL_DIST, SAngle::ZERO, facing.inv()), 1.0)
     } else if let Some(at) = target {
         range = cam_follow::horizontal_distance(at, attention) as f32;
         let globe = SGlobe::from_xyz(at - attention);
@@ -322,7 +320,11 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     let stretch = if target.is_some() {
         let here = turn.cos();
         let there = (globe.latitude() * 1.3).cos();
-        let pick = if here.abs() < there.abs() { here } else { there };
+        let pick = if here.abs() < there.abs() {
+            here
+        } else {
+            there
+        };
         (f64::from(globe.radius()) - inset * 2.0) * f64::from((pick * -0.5 + 0.5).abs())
     } else {
         f64::from(globe.radius() * (turn.cos() * -0.5 + 0.5).abs())
@@ -332,8 +334,8 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     work.latitude_gain += (camera.val(param::UNK3) - work.latitude_gain) * GAIN_CUSHION;
     work.radius_gain += (camera.val(param::UNK4) - work.radius_gain) * GAIN_CUSHION;
     let want_longitude = globe.longitude();
-    let longitude = work.eye.longitude()
-        + (want_longitude - work.eye.longitude()) * work.latitude_gain;
+    let longitude =
+        work.eye.longitude() + (want_longitude - work.eye.longitude()) * work.latitude_gain;
     let radius = work.eye.radius();
     let latitude = work.eye.latitude();
     let (radius, latitude) = if blocked {

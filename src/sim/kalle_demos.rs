@@ -6,8 +6,8 @@ use super::actor::Actor;
 use super::area::StageName;
 use super::arrow;
 use super::bmdhand;
-use super::boomerang;
 use super::bombflower;
+use super::boomerang;
 use super::collision::Collision;
 use super::combat::Combat;
 use super::damage;
@@ -450,7 +450,14 @@ fn touches(centre: Vec3, radius: f32, at: Vec3, reach: f32) -> bool {
     (at - centre).length() <= radius + reach
 }
 
-fn cyls_touch(a: Vec3, a_radius: f32, a_height: f32, b: Vec3, b_radius: f32, b_height: f32) -> bool {
+fn cyls_touch(
+    a: Vec3,
+    a_radius: f32,
+    a_height: f32,
+    b: Vec3,
+    b_radius: f32,
+    b_height: f32,
+) -> bool {
     let sum = a_radius + b_radius;
     let dx = a.x - b.x;
     let dz = a.z - b.z;
@@ -776,7 +783,11 @@ impl Sph {
         at_vs_player: false,
         at_hit: false,
         tg_set: true,
-        tg_type: AT_TYPE_ALL & !AT_TYPE_BOOMERANG & !AT_TYPE_WATER & !AT_TYPE_UNK20000 & !AT_TYPE_WIND
+        tg_type: AT_TYPE_ALL
+            & !AT_TYPE_BOOMERANG
+            & !AT_TYPE_WATER
+            & !AT_TYPE_UNK20000
+            & !AT_TYPE_WIND
             & !AT_TYPE_UNK400000
             & !AT_TYPE_LIGHT,
         tg_hit: false,
@@ -1158,9 +1169,7 @@ impl KalleDemos {
                 }
             }
             2 => {
-                if self.body_frame() == REG0_S1 + 10
-                    && env.distance(self.pos) < REG0_F8 + 400.0
-                {
+                if self.body_frame() == REG0_S1 + 10 && env.distance(self.pos) < REG0_F8 + 400.0 {
                     self.body_tg = REG0_S2 + 0x14;
                     self.invuln = 0x1e;
                 }
@@ -1350,12 +1359,7 @@ impl KalleDemos {
         self.speed = step;
         self.pos += self.speed;
         let clock = i32::from(self.clock);
-        add_calc2(
-            &mut self.bob,
-            sin_s(sni(clock * 400)) * 20.0,
-            0.1,
-            10.0,
-        );
+        add_calc2(&mut self.bob, sin_s(sni(clock * 400)) * 20.0, 0.1, 10.0);
         add_calc_angle_s2(
             &mut self.shape_angle[ANGLE_X],
             sn(sin_s(sni(clock * 500)) * 700.0),
@@ -1580,8 +1584,7 @@ impl KalleDemos {
                     self.dead_anm_init(BCK_COA_DEAD1, 5.0, EMODE_NONE, 1.0);
                     self.core_state = 0x65;
                     self.core_pos = self.pos;
-                    let yaw = self
-                        .shape_angle[ANGLE_Y]
+                    let yaw = self.shape_angle[ANGLE_Y]
                         .wrapping_add(MAKAR_YAW_OFFSET)
                         .wrapping_add(REG0_S4);
                     self.core_step = turned(yaw, [0.0, 0.0, REG0_F15 + 7.0]);
@@ -1700,28 +1703,18 @@ impl KalleDemos {
             let step = turned(yaw, [0.0, 0.0, self.sway_a * sin_s(self.sway_clock)]);
             self.core_sway[0].x = step.z;
             self.core_sway[0].z = step.x;
-            let other = self
-                .sway_clock
-                .wrapping_sub(20000)
-                .wrapping_add(REG0_S6);
+            let other = self.sway_clock.wrapping_sub(20000).wrapping_add(REG0_S6);
             let step = turned(yaw, [0.0, 0.0, self.sway_b * sin_s(other)]);
             self.core_sway[1].x = step.z;
             self.core_sway[1].z = step.x;
             self.sway_clock = self.sway_clock.wrapping_add(REG0_S5 + 6000);
-            add_calc2(
-                &mut self.sway_a,
-                0.0,
-                1.0,
-                REG0_F10 + US_SWAY_RATE,
-            );
-            add_calc2(
-                &mut self.sway_b,
-                0.0,
-                1.0,
-                REG0_F10 + US_SWAY_RATE_ALT,
-            );
+            add_calc2(&mut self.sway_a, 0.0, 1.0, REG0_F10 + US_SWAY_RATE);
+            add_calc2(&mut self.sway_b, 0.0, 1.0, REG0_F10 + US_SWAY_RATE_ALT);
             self.eye_pos = self.pos
-                + turned(self.core_yaw, [0.0, CORE_LIFT + HEAD_OFFSET[1], HEAD_OFFSET[2]]);
+                + turned(
+                    self.core_yaw,
+                    [0.0, CORE_LIFT + HEAD_OFFSET[1], HEAD_OFFSET[2]],
+                );
             self.attention = self.eye_pos;
             self.attention.y += ATTENTION_LIFT;
             if self.vine != 0 && self.plant_lean == 0 && self.mode != MODE_START {
@@ -1840,10 +1833,7 @@ impl KalleDemos {
                 let diff = self.target_pos - env.pos();
                 let far = (diff.x * diff.x + diff.z * diff.z).sqrt();
                 if far > REG0_F11 + 1000.0 {
-                    let step = turned(
-                        to_s16(diff.x.atan2(diff.z)),
-                        [0.0, 0.0, REG0_F12 + 1300.0],
-                    );
+                    let step = turned(to_s16(diff.x.atan2(diff.z)), [0.0, 0.0, REG0_F12 + 1300.0]);
                     self.target_pos = env.pos() + step;
                 }
                 self.wait(env, sink);
@@ -1986,8 +1976,7 @@ impl KalleDemos {
             let mut lift = 0.0;
             if 0 < self.vine_count {
                 lift = REG0_F18
-                    + (f32::from(self.vine_count) * (REG0_F17 + VINE_LIFT_SCALE)
-                        + VINE_LIFT_BIAS);
+                    + (f32::from(self.vine_count) * (REG0_F17 + VINE_LIFT_SCALE) + VINE_LIFT_BIAS);
                 if self.mode == MODE_START {
                     lift += 100.0;
                 }
@@ -2089,11 +2078,7 @@ impl KalleDemos {
                         add_calc2(&mut self.cam_centre.z, self.pos.z, 0.2, 200.0);
                         let back = turned(
                             self.cam_yaw,
-                            [
-                                0.0,
-                                REG0_F7 + CAM_LOOK_MOVE[1],
-                                REG0_F6 + CAM_LOOK_MOVE[2],
-                            ],
+                            [0.0, REG0_F7 + CAM_LOOK_MOVE[1], REG0_F6 + CAM_LOOK_MOVE[2]],
                         );
                         add_calc2(&mut self.cam_eye.x, self.pos.x + back.x, 0.1, 200.0);
                         add_calc2(&mut self.cam_eye.y, env.pos().y + back.y, 0.1, 200.0);
@@ -2340,8 +2325,7 @@ impl KalleDemos {
                         add_calc2(&mut self.cam_centre.y, self.core_pos.y, 0.5, 200.0);
                         add_calc2(&mut self.cam_centre.z, self.core_pos.z, 0.2, 200.0);
                     }
-                    let yaw = self
-                        .shape_angle[ANGLE_Y]
+                    let yaw = self.shape_angle[ANGLE_Y]
                         .wrapping_add(MAKAR_YAW_OFFSET)
                         .wrapping_add(REG0_S4);
                     let mut back = turned(yaw, MAKAR_OFFSET_TALL);
@@ -2380,7 +2364,13 @@ impl KalleDemos {
                     self.brk_on = 1;
                     self.makar_mode = MAKAR_OFF;
                     let angle = self.shape_angle[ANGLE_Y].wrapping_add(0x8BB8_u16 as i16);
-                    sink.spawn_actor(super::makar::MAKAR_ACTOR, 0, self.makar_pos, angle, self.room);
+                    sink.spawn_actor(
+                        super::makar::MAKAR_ACTOR,
+                        0,
+                        self.makar_pos,
+                        angle,
+                        self.room,
+                    );
                 }
                 DEMO_ORBIT => {
                     let rate = sn(self.cam_zoom * 22384.0);
@@ -2394,12 +2384,7 @@ impl KalleDemos {
                     );
                     let rate = sn(self.cam_zoom * 3000.0);
                     add_calc_angle_s2(&mut self.cam_pitch, MAKAR_HURT_PITCH, 0x10, rate);
-                    add_calc2(
-                        &mut self.cam_dist,
-                        500.0,
-                        0.0625,
-                        self.cam_zoom * 1000.0,
-                    );
+                    add_calc2(&mut self.cam_dist, 500.0, 0.0625, self.cam_zoom * 1000.0);
                     add_calc2(&mut self.cam_zoom, REG0_F10 + 0.0048, 0.1, 0.000048);
                     let back = tilted(
                         self.cam_pitch,
@@ -2436,9 +2421,8 @@ impl KalleDemos {
             self.cam_eye.y += lift;
             self.cam_centre.x += step;
             self.cam_centre.y += lift;
-            let roll = sn(
-                self.cam_shake * cos_s(self.clock.wrapping_mul(SHAKE_CLOCK)) * SHAKE_SWING,
-            );
+            let roll =
+                sn(self.cam_shake * cos_s(self.clock.wrapping_mul(SHAKE_CLOCK)) * SHAKE_SWING);
             self.cam_roll = roll;
             add_calc2(&mut self.cam_shake, 0.0, 1.0, REG0_F16 + 2.0);
             self.demo_step = self.demo_step.wrapping_add(1);

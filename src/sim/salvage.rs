@@ -86,10 +86,13 @@ pub struct Control {
 
 impl Default for Control {
     fn default() -> Self {
-        let mut info = vec![Info {
-            room_no: -1,
-            ..Info::default()
-        }; MAX_TOTAL];
+        let mut info = vec![
+            Info {
+                room_no: -1,
+                ..Info::default()
+            };
+            MAX_TOTAL
+        ];
         for slot in &mut info {
             slot.room_no = -1;
         }
@@ -139,7 +142,15 @@ impl Control {
             .is_some_and(|word| word & (1 << bit) != 0)
     }
 
-    fn invalid(&self, no: usize, room_no: i8, cmap_no: i32, kind: u8, save_no: u8, switch_no: i32) -> bool {
+    fn invalid(
+        &self,
+        no: usize,
+        room_no: i8,
+        cmap_no: i32,
+        kind: u8,
+        save_no: u8,
+        switch_no: i32,
+    ) -> bool {
         if room_no != 0 && self.room_num > MAX_ROOM {
             return true;
         }
@@ -178,7 +189,14 @@ impl Control {
             (self.sea_num, i32::from(params.room_no_prm))
         };
         if no >= MAX_TOTAL
-            || self.invalid(no, room_no, cmap_no, params.kind, params.save_no, i32::from(params.switch_no))
+            || self.invalid(
+                no,
+                room_no,
+                cmap_no,
+                params.kind,
+                params.save_no,
+                i32::from(params.switch_no),
+            )
         {
             return;
         }
@@ -199,17 +217,23 @@ impl Control {
                 if !switches.test(params.switch_no) {
                     show = true;
                 }
-                if params.save_no != SAVE_NO_ALWAYS && self.ocean_bit(grid, u16::from(params.save_no)) {
+                if params.save_no != SAVE_NO_ALWAYS
+                    && self.ocean_bit(grid, u16::from(params.save_no))
+                {
                     return;
                 }
             }
             3 => {
-                if params.save_no != SAVE_NO_ALWAYS && self.ocean_bit(grid, u16::from(params.save_no)) {
+                if params.save_no != SAVE_NO_ALWAYS
+                    && self.ocean_bit(grid, u16::from(params.save_no))
+                {
                     return;
                 }
             }
             4 => {
-                if params.save_no != SAVE_NO_ALWAYS && self.ocean_bit(grid, u16::from(params.save_no)) {
+                if params.save_no != SAVE_NO_ALWAYS
+                    && self.ocean_bit(grid, u16::from(params.save_no))
+                {
                     return;
                 }
                 if day.daynight() == TIME_DAY {
@@ -285,8 +309,7 @@ impl Control {
             }
             let in_range = event_running
                 || distance > threshold * 100.0
-                || slot.kind == 2
-                    && distance <= NEAR_RANGE;
+                || slot.kind == 2 && distance <= NEAR_RANGE;
             if slot.check_used(1) && distance <= NEAR_RANGE && in_range {
                 chase(&mut slot.alpha, ALPHA_FULL, step);
                 slot.draw_mode = 1;
@@ -330,10 +353,18 @@ fn chase(value: &mut u8, target: u8, step: f32) -> bool {
     }
     if *value < target {
         let next = f32::from(*value) + step;
-        *value = if next >= f32::from(target) { target } else { next as u8 };
+        *value = if next >= f32::from(target) {
+            target
+        } else {
+            next as u8
+        };
     } else {
         let next = f32::from(*value) - step;
-        *value = if next <= f32::from(target) { target } else { next as u8 };
+        *value = if next <= f32::from(target) {
+            target
+        } else {
+            next as u8
+        };
     }
     *value == target
 }

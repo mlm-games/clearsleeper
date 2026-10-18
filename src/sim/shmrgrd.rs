@@ -4,7 +4,7 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::events::{SimEvent, SimEvents};
 use super::flags::Switches;
-use super::hammer::{self, Cut, CUT_HAMMER_FRONTSWING, CUT_HAMMER_SIDESWING};
+use super::hammer::{self, CUT_HAMMER_FRONTSWING, CUT_HAMMER_SIDESWING, Cut};
 use super::player::Player;
 use super::walk;
 
@@ -167,8 +167,7 @@ pub fn is_guard(name: &str) -> bool {
 pub fn contact(guard: &Shmrgrd, base: Vec3, player: &Player) -> bool {
     let reach = CYL_RADIUS_TG + hammer::AT_RADIUS;
     let gap = player.pos - base;
-    gap.x * gap.x + gap.z * gap.z <= reach * reach
-        && gap.y.abs() <= CYL_HEIGHT_TG * 0.5
+    gap.x * gap.x + gap.z * gap.z <= reach * reach && gap.y.abs() <= CYL_HEIGHT_TG * 0.5
 }
 
 pub fn facing(base: Vec3, player: &Player) -> bool {
@@ -245,4 +244,3 @@ fn search_gap(entity: Entity, pos: Vec3, list: &[(Entity, Vec3, bool)]) -> Optio
     }
     None
 }
-

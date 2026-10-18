@@ -47,7 +47,10 @@ impl Bwdg {
     /// `:236`), `wave_cont(i_this, 1)` (`:237`) and the four `dBgWHf` calls (`:239-241`) - archive,
     /// heap, moving-background and mesh work. What survives is `boss = NULL` (`:228`).
     pub fn spawn() -> Self {
-        Self { boss: None, frame: 0 }
+        Self {
+            boss: None,
+            frame: 0,
+        }
     }
 
     /// `daBwdg_Execute` (`:167-181`). While `boss == NULL` the function returns TRUE immediately

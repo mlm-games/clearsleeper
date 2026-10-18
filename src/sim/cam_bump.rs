@@ -1,7 +1,7 @@
 use glam::Vec3;
 
 use super::cam_follow::{SAngle, SGlobe, ViewCache, horizontal_distance};
-use super::cam_style::{self, param, CamEngine};
+use super::cam_style::{self, CamEngine, param};
 use super::camera::Camera;
 use super::collision::Collision;
 use super::player::Player;
@@ -270,17 +270,9 @@ pub fn forward_check_angle(
 
     let (first, second) = (weighted[0], weighted[1]);
     let mut ret = if first >= SAngle::ZERO && second >= SAngle::ZERO {
-        if first >= second {
-            -first
-        } else {
-            -second
-        }
+        if first >= second { -first } else { -second }
     } else if first <= SAngle::ZERO && second <= SAngle::ZERO {
-        if first <= second {
-            -first
-        } else {
-            -second
-        }
+        if first <= second { -first } else { -second }
     } else {
         -first
     };
@@ -431,14 +423,8 @@ impl Camera {
                         if kind == 3 {
                             kind = 2;
                         }
-                        let (pulled_eye, pulled_direction) = self.pull_in_eye(
-                            attention,
-                            &hit,
-                            kind,
-                            wall_up_distance,
-                            flags,
-                            solid,
-                        );
+                        let (pulled_eye, pulled_direction) =
+                            self.pull_in_eye(attention, &hit, kind, wall_up_distance, flags, solid);
                         result |= 1;
                         (pulled_eye, pulled_direction, kind)
                     }
@@ -598,9 +584,8 @@ impl Camera {
         let cross = hit.point;
         let margin = comp_wall_margin(solid, center, cross, 0.5 + chk.gaze_back_margin);
 
-        let lift = self.event_flags & evflag::GROUND_PROBE != 0
-            && flags & 0x10 != 0
-            && hit_type != 4;
+        let lift =
+            self.event_flags & evflag::GROUND_PROBE != 0 && flags & 0x10 != 0 && hit_type != 4;
         let lifted = if lift {
             let mut reach = wall_up_distance - (center.y - attention.y);
             let distance = horizontal_distance(cross, center) as f32;
@@ -633,11 +618,7 @@ impl Camera {
             margin
         };
 
-        let cushion = if lift {
-            chk.wall_back_cushion
-        } else {
-            1.0
-        };
+        let cushion = if lift { chk.wall_back_cushion } else { 1.0 };
         self.bump.eye += (lifted - self.bump.eye) * cushion;
         self.finish_pull(attention)
     }
@@ -695,7 +676,9 @@ impl Camera {
                 0.5 + self.bump.chk.gaze_back_margin,
             );
         }
-        let gap = (direction.latitude() - cache.direction.latitude()).degree().abs();
+        let gap = (direction.latitude() - cache.direction.latitude())
+            .degree()
+            .abs();
         if gap < 0.2 {
             self.event_flags &= !evflag::WALL_UP;
         }

@@ -277,7 +277,11 @@ impl Ohatch {
     /// textually identical, so they share one body.
     fn trigger(&mut self, events: &mut SimEvents, vibration: &mut Vibration) {
         events.list.push(SimEvent::Se(SE_FIG_HATCH_OPEN));
-        vibration.start_shock(TRIGGER_PATTERN, TRIGGER_FLAGS, Vec3::from_array(TRIGGER_COORD));
+        vibration.start_shock(
+            TRIGGER_PATTERN,
+            TRIGGER_FLAGS,
+            Vec3::from_array(TRIGGER_COORD),
+        );
         self.action = Action::Tremor;
     }
 
@@ -308,8 +312,7 @@ impl Ohatch {
         // call. RULE 5b's one conversion path is `walk::from_s16`.
         let arg = (f32::from(self.angle) / HIO_M0C * HALF_TURN) as i16;
         // `s32 uVar2 = (cM_ssin(sin) + HIO(m1C)) / (HIO(m1C) + 1.0f) * HIO(m08);` (:253)
-        let step =
-            (walk::from_s16(arg).sin() + HIO_M1C) / (HIO_M1C + 1.0) * HIO_M08;
+        let step = (walk::from_s16(arg).sin() + HIO_M1C) / (HIO_M1C + 1.0) * HIO_M08;
         // `m2D8 += uVar2;` (:255) - `m2D8` is an `s16`, so the `s32` step truncates.
         self.angle = self.angle.wrapping_add(step as i16);
         // `if (m2D8 <= (s16)HIO(m0C)) {` (:257) - the hinge has reached the open stop.

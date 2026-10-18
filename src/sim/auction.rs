@@ -135,7 +135,6 @@ const NEXT_STAGE: &str = "sea";
 const NEXT_STAGE_ROOM: u8 = 11;
 const NEXT_STAGE_START: u8 = 3;
 
-
 const ITEM_ROOM: i8 = -1;
 const ITEM_SET_ID: u16 = 0xFFFF;
 
@@ -906,7 +905,8 @@ impl Auction {
     fn order_event(&mut self, ctx: &mut Ctx<'_, '_, '_>, index: i16) {
         if index >= 0 {
             let entity = ctx.entity;
-            ctx.active.order(ctx.list, usize::from(index as u16), entity);
+            ctx.active
+                .order(ctx.list, usize::from(index as u16), entity);
         }
     }
 
@@ -961,7 +961,8 @@ impl Auction {
             None => -1,
         };
         if self.act < 0 {
-            ctx.active.end_staff_cut(ctx.list, ctx.ev_flags, STAFF_AUCTION);
+            ctx.active
+                .end_staff_cut(ctx.list, ctx.ev_flags, STAFF_AUCTION);
             return;
         }
         if advance {
@@ -989,7 +990,8 @@ impl Auction {
             _ => true,
         };
         if evt_res {
-            ctx.active.end_staff_cut(ctx.list, ctx.ev_flags, STAFF_AUCTION);
+            ctx.active
+                .end_staff_cut(ctx.list, ctx.ev_flags, STAFF_AUCTION);
         }
         if self.m835 & M835_STOP != 0 {
             self.m835 &= !M835_STOP;
@@ -1300,9 +1302,8 @@ impl Auction {
         if idx != 0 {
             let mult = self.bid_multiplier();
             let npc = NPC_DAT[idx as usize];
-            let inc =
-                (self.rnd_f(f32::from(npc.inc_max) - f32::from(npc.inc_min)) + f32::from(npc.inc_min))
-                    as i16;
+            let inc = (self.rnd_f(f32::from(npc.inc_max) - f32::from(npc.inc_min))
+                + f32::from(npc.inc_min)) as i16;
             self.curr_bid = self.curr_bid.wrapping_add((mult * f32::from(inc)) as i16);
             self.bid_value = self.curr_bid;
             next_msg = MSG_NEXT_BID;
@@ -1497,7 +1498,13 @@ impl Auction {
         };
         let mut aim = npc_pos;
         aim.y += self.picon_ofs(self.pending_speaker) + ITEM_LIFT;
-        let gap = add_calc_pos(&mut self.cam_from, aim, BIKON_SCALE, BIKON_TARGET, BIKON_TOL);
+        let gap = add_calc_pos(
+            &mut self.cam_from,
+            aim,
+            BIKON_SCALE,
+            BIKON_TARGET,
+            BIKON_TOL,
+        );
         if gap == 0.0 {
             self.bid_mode = PROC_BIKON_W;
             let mut effect = npc_pos;
@@ -2079,10 +2086,7 @@ impl Ctx<'_, '_, '_> {
                 .as_ref()
                 .map(|link| (link.pos, walk::to_s16(link.yaw)));
         }
-        self.npcs
-            .get(idx)
-            .copied()
-            .map(|npc| (npc.pos, npc.yaw))
+        self.npcs.get(idx).copied().map(|npc| (npc.pos, npc.yaw))
     }
 
     fn npc_pos(&self, idx: u8) -> Option<Vec3> {
@@ -2110,7 +2114,6 @@ impl Ctx<'_, '_, '_> {
     fn set_blend(&mut self, blend: f32) {
         self.blend = blend;
     }
-
 }
 
 pub fn control(

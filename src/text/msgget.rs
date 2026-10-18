@@ -26,7 +26,11 @@ pub fn hyrule_language_check(clear_count: u8, msg_no: u32) -> bool {
     HYRULE_MSGS.contains(&msg_no)
 }
 
-pub fn search_message_number<F: MsgArchive + ?Sized>(archive: &F, clear_count: u8, msg_no: u32) -> u32 {
+pub fn search_message_number<F: MsgArchive + ?Sized>(
+    archive: &F,
+    clear_count: u8,
+    msg_no: u32,
+) -> u32 {
     let mut get = MsgGet::default();
     let mut i = msg_no & 0xFFFF;
     while i < SEARCH_LIMIT {
@@ -49,7 +53,10 @@ fn num_entry(head: &[u8]) -> Option<usize> {
 }
 
 fn entry_at(head: &[u8], index: u32) -> Option<MesgEntry> {
-    MesgEntry::parse(head, FIRST_BLOCK + ENTRY_TABLE_AT + index as usize * MesgEntry::LEN)
+    MesgEntry::parse(
+        head,
+        FIRST_BLOCK + ENTRY_TABLE_AT + index as usize * MesgEntry::LEN,
+    )
 }
 
 fn data_block(head: &[u8]) -> Option<usize> {

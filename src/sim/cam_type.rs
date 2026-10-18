@@ -18,7 +18,10 @@ pub const TYPE_COUNT: usize = 63;
 
 /// `dCamera_c::types`.
 pub const TYPES: &[CamType] = &[
-    CamType { name: "Empty", styles: [CamStyleId::NONE as i16; 20] },
+    CamType {
+        name: "Empty",
+        styles: [CamStyleId::NONE as i16; 20],
+    },
     CamType {
         name: "Plain",
         styles: slots! {
@@ -457,11 +460,41 @@ pub const TYPES: &[CamType] = &[
 
 /// `dCamera_c::mvBGTypes`; motion-background ids name a camera type.
 pub const MV_BG_TYPES: [&str; 35] = [
-    "????", "Field", "Dungeon", "Plain", "DungeonDown", "DungeonUp", "DungeonCorner", "Jump",
-    "DungeonWide", "Room", "FieldCushion", "OverLook", "Corridor", "Subject", "DungeonPassage",
-    "Cliff", "Cliff2", "MajTower", "Boss01", "Boss02", "Gamoss", "MiniIsland", "Amoss", "Cafe",
-    "P_Ganon1", "P_Ganon2", "WindBoss", "P_Ganon3", "G_BedRoom", "G_Roof", "G_BedRoom2", "Boss04",
-    "WindHall", "BigBird", "DStairs",
+    "????",
+    "Field",
+    "Dungeon",
+    "Plain",
+    "DungeonDown",
+    "DungeonUp",
+    "DungeonCorner",
+    "Jump",
+    "DungeonWide",
+    "Room",
+    "FieldCushion",
+    "OverLook",
+    "Corridor",
+    "Subject",
+    "DungeonPassage",
+    "Cliff",
+    "Cliff2",
+    "MajTower",
+    "Boss01",
+    "Boss02",
+    "Gamoss",
+    "MiniIsland",
+    "Amoss",
+    "Cafe",
+    "P_Ganon1",
+    "P_Ganon2",
+    "WindBoss",
+    "P_Ganon3",
+    "G_BedRoom",
+    "G_Roof",
+    "G_BedRoom2",
+    "Boss04",
+    "WindHall",
+    "BigBird",
+    "DStairs",
 ];
 
 /// `dCamera_c::GetCameraTypeFromCameraName`: first table row whose name matches.

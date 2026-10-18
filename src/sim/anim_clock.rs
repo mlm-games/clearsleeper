@@ -135,14 +135,7 @@ impl FrameCtrl {
 
     /// `setFrameCtrl`, `main.cpp:2938-2949`: the whole cursor in one call, with the loop point put
     /// on the end the rate runs away from.
-    pub fn set_frame_ctrl(
-        &mut self,
-        attribute: Mode,
-        start: i16,
-        end: i16,
-        rate: f32,
-        frame: f32,
-    ) {
+    pub fn set_frame_ctrl(&mut self, attribute: Mode, start: i16, end: i16, rate: f32, frame: f32) {
         self.attribute = attribute;
         self.end = end;
         self.rate = rate;

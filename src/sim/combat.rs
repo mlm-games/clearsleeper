@@ -7,8 +7,8 @@ use super::collision::Collision;
 use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
-    AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
-    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, Attacker, HitAudio, HitStop,
+    AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, Attacker, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
+    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, HitAudio, HitStop,
     NAME_PLAYER, PlayerCut, Target,
 };
 use super::enemy;
@@ -134,7 +134,11 @@ fn cut_type(kind: CutKind) -> u8 {
 /// The AT special parameter: the reference's normal cuts take `dCcG_At_Spl_UNK0` and its finish
 /// cuts take `dCcG_At_Spl_UNK1`, the value that marks the hit a critical one.
 fn cut_spl(kind: CutKind) -> u8 {
-    if is_finisher(kind) { AT_SPL_UNK1 } else { AT_SPL_UNK0 }
+    if is_finisher(kind) {
+        AT_SPL_UNK1
+    } else {
+        AT_SPL_UNK0
+    }
 }
 
 /// The cut count the hit-sound selector ladder reads: the chain step, which the reference sets to
@@ -279,10 +283,7 @@ pub fn control(
                 || gates.hop.active
                 || gates.jump.active
                 || !grounded(gates.collision.as_deref(), player.pos)
-                || !super::link_proc::allows(
-                    gates.proc.as_deref(),
-                    super::link_proc::CUT_GROUND,
-                )
+                || !super::link_proc::allows(gates.proc.as_deref(), super::link_proc::CUT_GROUND)
             {
                 continue;
             }
@@ -372,11 +373,13 @@ pub fn control(
                 registry.proc_id(player_entity).unwrap_or(ERROR_PROC_ID),
             );
             let crossings = {
-                let tg: Vec<TgObj<'_>> = actors.iter().filter_map(|(entity, actor, bodies, hp, _)| {
-                    if hp.is_none() {
-                        return None;
-                    }
-                    Some(TgObj::new(
+                let tg: Vec<TgObj<'_>> = actors
+                    .iter()
+                    .filter_map(|(entity, actor, bodies, hp, _)| {
+                        if hp.is_none() {
+                            return None;
+                        }
+                        Some(TgObj::new(
                             entity,
                             bodies?,
                             actor.weight_uc,
@@ -385,7 +388,8 @@ pub fn control(
                     })
                     .collect();
                 crate::sim::contact_hit::at_tg(std::slice::from_ref(&at), &tg)
-            };            let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
+            };
+            let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for crossing in crossings {
                 let Ok((entity, actor, _, hp, mut hurt)) = actors.get_mut(crossing.target) else {
                     continue;

@@ -296,16 +296,66 @@ pub const BUTTON_COLOR: [[u8; 4]; 24] = [
 ];
 
 pub const ITEM_ICON_NO: [u8; 60] = [
-    ITEM_TELESCOPE, ITEM_SAIL, ITEM_WIND_WAKER, ITEM_GRAPPLING_HOOK, ITEM_SPOILS_BAG, ITEM_BOOMERANG,
-    ITEM_DEKU_LEAF, ITEM_TINGLE_TUNER, ITEM_PICTO_BOX, ITEM_IRON_BOOTS, ITEM_MAGIC_ARMOR, ITEM_BAIT_BAG,
-    ITEM_BOW, ITEM_BOMB_BAG, ITEM_EMPTY_BOTTLE, ITEM_RED_POTION, ITEM_GREEN_POTION, ITEM_BLUE_POTION,
-    ITEM_DELIVERY_BAG, ITEM_HOOKSHOT, ITEM_SKULL_HAMMER, ITEM_MAGIC_ARMOR, ITEM_MAGIC_ARMOR, ITEM_MAGIC_ARMOR,
-    ITEM_SKULL_NECKLACE, ITEM_BOBOBA_SEED, ITEM_GOLDEN_FEATHER, ITEM_KNIGHTS_CREST, ITEM_RED_JELLY, ITEM_GREEN_JELLY,
-    ITEM_BLUE_JELLY, ITEM_JOY_PENDANT, ITEM_NONE, ITEM_NONE, ITEM_NONE, ITEM_NONE,
-    ITEM_HYOI_PEAR, ITEM_BIRD_BAIT_5, ITEM_NONE, ITEM_NONE, ITEM_NONE, ITEM_NONE,
-    ITEM_NONE, ITEM_NONE, ITEM_NONE, ITEM_NONE, ITEM_NONE, ITEM_NONE,
-    ITEM_TOWN_FLOWER, ITEM_SEA_FLOWER, ITEM_EXOTIC_FLOWER, ITEM_HEROS_FLAG, ITEM_BIG_CATCH_FLAG, ITEM_BIG_SALE_FLAG,
-    ITEM_PINWHEEL, ITEM_SICKLE_MOON_FLAG, ITEM_SKULL_TOWER_IDOL, ITEM_FOUNTAIN_IDOL, ITEM_POSTMAN_STATUE, ITEM_SHOP_GURU_STATUE,
+    ITEM_TELESCOPE,
+    ITEM_SAIL,
+    ITEM_WIND_WAKER,
+    ITEM_GRAPPLING_HOOK,
+    ITEM_SPOILS_BAG,
+    ITEM_BOOMERANG,
+    ITEM_DEKU_LEAF,
+    ITEM_TINGLE_TUNER,
+    ITEM_PICTO_BOX,
+    ITEM_IRON_BOOTS,
+    ITEM_MAGIC_ARMOR,
+    ITEM_BAIT_BAG,
+    ITEM_BOW,
+    ITEM_BOMB_BAG,
+    ITEM_EMPTY_BOTTLE,
+    ITEM_RED_POTION,
+    ITEM_GREEN_POTION,
+    ITEM_BLUE_POTION,
+    ITEM_DELIVERY_BAG,
+    ITEM_HOOKSHOT,
+    ITEM_SKULL_HAMMER,
+    ITEM_MAGIC_ARMOR,
+    ITEM_MAGIC_ARMOR,
+    ITEM_MAGIC_ARMOR,
+    ITEM_SKULL_NECKLACE,
+    ITEM_BOBOBA_SEED,
+    ITEM_GOLDEN_FEATHER,
+    ITEM_KNIGHTS_CREST,
+    ITEM_RED_JELLY,
+    ITEM_GREEN_JELLY,
+    ITEM_BLUE_JELLY,
+    ITEM_JOY_PENDANT,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_HYOI_PEAR,
+    ITEM_BIRD_BAIT_5,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_NONE,
+    ITEM_TOWN_FLOWER,
+    ITEM_SEA_FLOWER,
+    ITEM_EXOTIC_FLOWER,
+    ITEM_HEROS_FLAG,
+    ITEM_BIG_CATCH_FLAG,
+    ITEM_BIG_SALE_FLAG,
+    ITEM_PINWHEEL,
+    ITEM_SICKLE_MOON_FLAG,
+    ITEM_SKULL_TOWER_IDOL,
+    ITEM_FOUNTAIN_IDOL,
+    ITEM_POSTMAN_STATUE,
+    ITEM_SHOP_GURU_STATUE,
 ];
 
 pub const ITEM_TEXTURE: [&str; 0x74] = [
@@ -561,35 +611,15 @@ pub const IP_TAGS: [&str; 6] = ["ip01", "ip03", "ip05", "ip07", "ip09", "ip11"];
 pub const NOTE_SLOTS: usize = 15;
 pub const CURSOR_PARTS: usize = 4;
 pub const PLACE_GROUPS: usize = 6;
-pub const MAIN_PANES: [usize; 8] = [P_PANE_BG, P_WK01, P_WK00, P_0301, P_1301, P_1310, P_1401, P_1410];
+pub const MAIN_PANES: [usize; 8] = [
+    P_PANE_BG, P_WK01, P_WK00, P_0301, P_1301, P_1310, P_1401, P_1410,
+];
 pub const FADE_EXEMPT: [usize; 12] = [
-    P_STR0,
-    P_ST00,
-    P_NT00,
-    P_NK00,
-    P_NO11,
-    P_WD,
-    P_NM00,
-    P_NM01,
-    P_ITNM,
-    P_ITNK,
-    P_TL00,
-    P_TK00,
+    P_STR0, P_ST00, P_NT00, P_NK00, P_NO11, P_WD, P_NM00, P_NM01, P_ITNM, P_ITNK, P_TL00, P_TK00,
 ];
 
 pub const TEXT_PANES: [usize; 13] = [
-    P_STR0,
-    P_ST00,
-    P_NT00,
-    P_NK00,
-    P_NO11,
-    P_WD,
-    P_NM00,
-    P_NM01,
-    P_ITNM,
-    P_ITNK,
-    P_MSK0,
-    P_TL00,
+    P_STR0, P_ST00, P_NT00, P_NK00, P_NO11, P_WD, P_NM00, P_NM01, P_ITNM, P_ITNK, P_MSK0, P_TL00,
     P_TK00,
 ];
 
@@ -834,24 +864,16 @@ pub fn item_num(item: u8) -> u8 {
 }
 
 pub fn item_texture(item: u8) -> &'static str {
-    ITEM_TEXTURE
-        .get(usize::from(item))
-        .copied()
-        .unwrap_or("")
+    ITEM_TEXTURE.get(usize::from(item)).copied().unwrap_or("")
 }
 
 pub fn item_message(item: u8) -> i16 {
-    ITEM_MESSAGE
-        .get(usize::from(item))
-        .copied()
-        .unwrap_or(0)
+    ITEM_MESSAGE.get(usize::from(item)).copied().unwrap_or(0)
 }
 
 pub fn is_recollect_disabled(item: u8, boss_rematch: bool) -> bool {
     boss_rematch
-        && (item == ITEM_WATER_BOTTLE
-            || item == ITEM_FIREFLY_BOTTLE
-            || item == ITEM_FOREST_WATER)
+        && (item == ITEM_WATER_BOTTLE || item == ITEM_FIREFLY_BOTTLE || item == ITEM_FOREST_WATER)
 }
 
 pub fn boss_rematch(stage_boss: bool, start_stage: &str) -> bool {
@@ -1885,9 +1907,9 @@ impl MenuCloth {
         self.salt = self.salt.wrapping_add(0x9E37_79B9);
         match self.kind {
             CLOTH_TYPE_DEFAULT => {
-                self.init_angle_z = self
-                    .init_angle_z
-                    .wrapping_add(deg2s(CLOTH_RANDOM_Z_BASE + rand_fx(CLOTH_RANDOM_Z_DEG, self.salt)));
+                self.init_angle_z = self.init_angle_z.wrapping_add(deg2s(
+                    CLOTH_RANDOM_Z_BASE + rand_fx(CLOTH_RANDOM_Z_DEG, self.salt),
+                ));
                 self.scale = tune.scale;
                 self.rot = [0, 0, self.init_angle_z];
                 let mut n = tune.wave_pre_steps;
@@ -1903,9 +1925,8 @@ impl MenuCloth {
             _ => {
                 self.scale = tune.scale;
                 self.rot = tune.rot;
-                self.rot[2] = self
-                    .rot[2]
-                    .wrapping_add(deg2s(rand_fx(CLOTH_ONLY_RANDOM_DEG, self.salt)));
+                self.rot[2] =
+                    self.rot[2].wrapping_add(deg2s(rand_fx(CLOTH_ONLY_RANDOM_DEG, self.salt)));
                 let mut n = tune.wave_pre_steps;
                 while n != 0 {
                     n -= 1;
@@ -1939,7 +1960,12 @@ impl MenuCloth {
                             .wrapping_add((x as i16).wrapping_mul(tune.wave_freq_x)),
                     );
                 let index = x + y * CLOTH_INNER;
-                add_calc_pos(&mut self.verts[index].pos, pos, CLOTH_WAVE_MOVE_SCALE, tune.max_step);
+                add_calc_pos(
+                    &mut self.verts[index].pos,
+                    pos,
+                    CLOTH_WAVE_MOVE_SCALE,
+                    tune.max_step,
+                );
             }
         }
         self.refresh_normals();
@@ -1968,7 +1994,12 @@ impl MenuCloth {
                             .wrapping_add((y as i16).wrapping_mul(tune.wave_freq_y)),
                     );
                 let index = x + y * CLOTH_INNER;
-                add_calc_pos(&mut self.verts[index].pos, pos, CLOTH_WAVE_MOVE_SCALE, tune.max_step);
+                add_calc_pos(
+                    &mut self.verts[index].pos,
+                    pos,
+                    CLOTH_WAVE_MOVE_SCALE,
+                    tune.max_step,
+                );
             }
         }
         self.refresh_normals();
@@ -3060,7 +3091,9 @@ impl ItemMenu {
             self.panes.note_icon_mut(index).user_area = -1;
         }
         if self.opt_ruby {
-            self.panes.pane_mut(RUBY_OPTION_PANE).pane_trans(0.0, RUBY_OPTION_DY);
+            self.panes
+                .pane_mut(RUBY_OPTION_PANE)
+                .pane_trans(0.0, RUBY_OPTION_DY);
         }
         let anchor_angle = self.panes.pane(P_NO11).rotation as i16;
         self.panes.pane_mut(P_NO11).user_area = anchor_angle;
@@ -3083,9 +3116,7 @@ impl ItemMenu {
                 .set_font_size(name_font_x, name_font_y);
         }
         let name_char_space = self.panes.name_box(0).get_char_space();
-        self.panes
-            .name_box_mut(1)
-            .set_char_space(name_char_space);
+        self.panes.name_box_mut(1).set_char_space(name_char_space);
         for index in 0..SUB_ITEM_COUNT {
             self.panes.sub_item_mut(index).hide();
             self.panes.sub_shadow_mut(index).hide();
@@ -3124,8 +3155,12 @@ impl ItemMenu {
             self.panes.cursor_mut(index).append(CURSOR_TEXTURE);
         }
         for index in 0..NOTE_SLOTS {
-            self.panes.note_icon_mut(index).change_texture(OUT_FONT_TEXTURE);
-            self.panes.note_icon_mut(index).blend_init(BLEND_SHADOW_TEXTURE);
+            self.panes
+                .note_icon_mut(index)
+                .change_texture(OUT_FONT_TEXTURE);
+            self.panes
+                .note_icon_mut(index)
+                .blend_init(BLEND_SHADOW_TEXTURE);
         }
         self.sub_menu_item_base = 0;
         self.select_item_slot = 0;
@@ -3460,7 +3495,10 @@ impl ItemMenu {
             }
         }
         self.select_item_slot = self.now_item;
-        let pane = self.panes.item_icon(usize::from(self.select_item_slot)).clone();
+        let pane = self
+            .panes
+            .item_icon(usize::from(self.select_item_slot))
+            .clone();
         *bridge = ItemMoveBridge {
             flag: 1,
             button: self.select_item_btn,
@@ -3757,15 +3795,12 @@ impl ItemMenu {
         }
     }
 
-    fn item_name_set(
-        &mut self,
-        font: &mut FontBank,
-        archive: &dyn MsgArchive,
-        clear_count: u8,
-    ) {
+    fn item_name_set(&mut self, font: &mut FontBank, archive: &dyn MsgArchive, clear_count: u8) {
         let mut get = ItemMsgGet::default();
         let mut msg_no = 0u32;
-        self.panes.out_box_mut(0).set_font_size(NAME_CELL_SCALE, NAME_CELL_SCALE);
+        self.panes
+            .out_box_mut(0)
+            .set_font_size(NAME_CELL_SCALE, NAME_CELL_SCALE);
         let size = self.panes.name_box(0).get_font_size();
         self.panes.name_box_mut(1).set_font_size(size.0, size.1);
         let char_space = self.panes.name_box(0).get_char_space();
@@ -3860,7 +3895,8 @@ impl ItemMenu {
         };
         let msg = self.out_font.ruby_msg;
         let mut panes = std::mem::take(&mut self.panes);
-        self.out_font.message_set(&mut panes, font, archive, clear_count, msg);
+        self.out_font
+            .message_set(&mut panes, font, archive, clear_count, msg);
         self.panes = panes;
         let (x, y) = (
             self.panes.out_box(0).pos_top_left.x,
@@ -3869,12 +3905,7 @@ impl ItemMenu {
         self.out_font.set_left_up_pos(x, y);
     }
 
-    fn item_note_set(
-        &mut self,
-        font: &mut FontBank,
-        archive: &dyn MsgArchive,
-        clear_count: u8,
-    ) {
+    fn item_note_set(&mut self, font: &mut FontBank, archive: &dyn MsgArchive, clear_count: u8) {
         let mut get = ItemMsgGet::default();
         self.note_buf = [String::new(), String::new()];
         self.dummy_buf = [String::new(), String::new()];
@@ -4001,7 +4032,9 @@ impl ItemMenu {
                 self.panes.note_icon_mut(index).set_white(icon_color(icon));
                 self.panes.note_icon_mut(index).set_black(0x0000_0000);
             }
-            self.panes.note_icon_mut(index).set_blend([0.0, 1.0, 1.0, 1.0]);
+            self.panes
+                .note_icon_mut(index)
+                .set_blend([0.0, 1.0, 1.0, 1.0]);
             self.panes
                 .note_shadow_mut(index)
                 .set_blend([0.0, 1.0, 1.0, 1.0]);
@@ -4062,7 +4095,9 @@ impl ItemMenu {
                     &mut size_y,
                     &mut timer,
                 ),
-                ICON_MAIN_STICK_UP | ICON_MAIN_STICK_DOWN | ICON_MAIN_STICK_LEFT
+                ICON_MAIN_STICK_UP
+                | ICON_MAIN_STICK_DOWN
+                | ICON_MAIN_STICK_LEFT
                 | ICON_MAIN_STICK_RIGHT => out_font_stick_dir_draw(
                     self.panes.note_icon_mut(index),
                     &mut x,
@@ -4349,8 +4384,8 @@ impl ItemMenu {
             return;
         }
         value_increase(i32::from(end), i32::from(now), 0);
-        let y = f32::from(self.tuning.name_y)
-            * value_increase(i32::from(end), i32::from(end - now), 0);
+        let y =
+            f32::from(self.tuning.name_y) * value_increase(i32::from(end), i32::from(end - now), 0);
         self.name_trans(0.0, y);
         self.panes.pane_mut(P_NM00).set_init_alpha();
         self.panes.pane_mut(P_ITNM).set_init_alpha();
@@ -4361,10 +4396,7 @@ impl ItemMenu {
         if value >= 10 {
             value = 0;
         }
-        let texture = NUMBER_TEX
-            .get(usize::from(value))
-            .copied()
-            .unwrap_or("");
+        let texture = NUMBER_TEX.get(usize::from(value)).copied().unwrap_or("");
         self.panes.pane_mut(index).change_texture(texture);
     }
 
@@ -4828,7 +4860,14 @@ impl ItemMenu {
         clear_count: u8,
         out: &mut MenuOutput,
     ) -> bool {
-        self.open_common(font, archive, clear_count, ITEM_TUNING_FADE_FRAMES, out, true)
+        self.open_common(
+            font,
+            archive,
+            clear_count,
+            ITEM_TUNING_FADE_FRAMES,
+            out,
+            true,
+        )
     }
 
     pub fn open_page(
@@ -4839,14 +4878,7 @@ impl ItemMenu {
         clear_count: u8,
         out: &mut MenuOutput,
     ) -> bool {
-        self.open_common(
-            font,
-            archive,
-            clear_count,
-            tuning.page_frames,
-            out,
-            false,
-        )
+        self.open_common(font, archive, clear_count, tuning.page_frames, out, false)
     }
 
     fn open_common(
@@ -4968,15 +5000,7 @@ impl ItemMenu {
             self.panes.sub_frame_mut(index).set_now_alpha_zero();
         }
         for index in [
-            P_BLAK,
-            P_PANE_BG,
-            P_WK01,
-            P_WK00,
-            P_0301,
-            P_1301,
-            P_1310,
-            P_1401,
-            P_1410,
+            P_BLAK, P_PANE_BG, P_WK01, P_WK00, P_0301, P_1301, P_1310, P_1401, P_1410,
         ] {
             self.panes.pane_mut(index).set_now_alpha_zero();
         }
@@ -5015,7 +5039,16 @@ impl ItemMenu {
         if self.item_mode == 0 {
             if !self.note_check() {
                 if !pad.start && !pad.lock_r && !pad.lock_l {
-                    self.input(pad, tuning, bridge, previous, font, archive, clear_count, out);
+                    self.input(
+                        pad,
+                        tuning,
+                        bridge,
+                        previous,
+                        font,
+                        archive,
+                        clear_count,
+                        out,
+                    );
                 }
             } else {
                 self.note_appear(pad, out);
@@ -5551,9 +5584,7 @@ impl MenuWindow {
                     let done = self
                         .item
                         .as_mut()
-                        .map(|item| {
-                            item.open(ctx.font, ctx.archive, ctx.clear_count, ctx.out)
-                        })
+                        .map(|item| item.open(ctx.font, ctx.archive, ctx.clear_count, ctx.out))
                         .unwrap_or(false);
                     if done {
                         return STATE_ITEM_MOVE;
@@ -5692,7 +5723,9 @@ impl MenuWindow {
             STATE_COLLECT_MOVE => {
                 self.cloth_move();
                 let note_open = self.collect.note_open;
-                if (ctx.pad.start || ctx.pad.b) && !note_open && (self.collect.mode == 0 || self.collect.mode == 2)
+                if (ctx.pad.start || ctx.pad.b)
+                    && !note_open
+                    && (self.collect.mode == 0 || self.collect.mode == 2)
                 {
                     self.cloth_alpha_out();
                     self.collect.trigger_info = 0;
@@ -5870,9 +5903,8 @@ impl MenuWindow {
         if blocked {
             return STATE_NO_MENU;
         }
-        let camera_busy = ctx.env.camera_telescope
-            || ctx.env.camera_pictobox
-            || ctx.env.player_status_800000;
+        let camera_busy =
+            ctx.env.camera_telescope || ctx.env.camera_pictobox || ctx.env.player_status_800000;
         if camera_busy {
             return STATE_NO_MENU;
         }
