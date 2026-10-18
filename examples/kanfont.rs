@@ -39,6 +39,7 @@ fn main() {
             tile += 1;
         }
     }
-    std::fs::write("/tmp/opencode/rust_page.raw", &out).unwrap();
+    let path = std::env::temp_dir().join("rust_page.raw");
+    std::fs::write(&path, &out).unwrap();
     println!("wrote {} texels ink {}", out.len(), out.iter().filter(|v| **v > 0).count());
 }

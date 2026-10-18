@@ -567,9 +567,6 @@ impl<'a> HeaderWriter<'a> {
 mod tests {
     use super::*;
 
-    const SMOKE_PATH: &str = "/tmp/opencode/smoke.dff";
-    const MISSING_PATH: &str = "/tmp/opencode/no_such_recording.dff";
-
     fn word32(bytes: &[u8], at: usize) -> u32 {
         let mut out = [0_u8; 4];
         out.copy_from_slice(&bytes[at..at + 4]);
@@ -627,7 +624,10 @@ mod tests {
 
     #[test]
     fn loads_a_recorded_video() {
-        let file = DffFile::load(Path::new(SMOKE_PATH)).expect("smoke recording");
+        let path =
+            std::env::temp_dir().join(format!("clearsleeper_dff_smoke_{}.dff", std::process::id()));
+        sample().save(&path).expect("save smoke recording");
+        let file = DffFile::load(&path).expect("smoke recording");
         assert_eq!(file.frames.len(), 1);
         assert_eq!(file.frames[0].fifo_data.len(), 8);
         assert_eq!(file.game_id, "GZLE01");
@@ -716,10 +716,11 @@ mod tests {
 
     #[test]
     fn damaged_files_error_instead_of_panicking() {
-        assert!(matches!(
-            DffFile::load(Path::new(MISSING_PATH)),
-            Err(DffError::Io(_))
+        let missing = std::env::temp_dir().join(format!(
+            "clearsleeper_dff_missing_{}.dff",
+            std::process::id()
         ));
+        assert!(matches!(DffFile::load(&missing), Err(DffError::Io(_))));
 
         let intact = sample().to_bytes();
         let frame_list = word64(&intact, 0x3C) as usize;

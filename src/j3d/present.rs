@@ -187,9 +187,7 @@ mod tests {
     #[test]
     fn a_replayed_draw_becomes_a_group_the_frame_can_take() {
         let file = recording();
-        let path = std::path::Path::new("/tmp/opencode/present_basic.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -216,9 +214,7 @@ mod tests {
     #[test]
     fn a_recordings_vertex_colour_reaches_the_group() {
         let file = recording();
-        let path = std::path::Path::new("/tmp/opencode/present_color.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -232,9 +228,7 @@ mod tests {
     #[test]
     fn a_recordings_bounds_aim_the_camera() {
         let file = recording();
-        let path = std::path::Path::new("/tmp/opencode/present_frame.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -289,9 +283,7 @@ mod tests {
             memory_updates: Vec::new(),
         });
 
-        let path = std::path::Path::new("/tmp/opencode/present_normal_uv.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");

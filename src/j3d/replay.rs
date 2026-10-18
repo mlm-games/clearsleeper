@@ -1181,7 +1181,6 @@ fn be_f32(bytes: &[u8], at: usize) -> Option<f32> {
 mod tests {
     use super::*;
     use crate::dff::{DffFile, Frame, MemoryUpdateType};
-    use std::path::Path;
 
     /// A `VCD` entry that stores its value inline (`GXAttrType`, `GXEnum.h:227`).
     const GX_DIRECT: u8 = 1;
@@ -1195,7 +1194,6 @@ mod tests {
     /// One replay of one synthetic frame: the caller leaves the CP image and
     /// the stream it wants, plus the writes the recording carries.
     fn replay_frame(
-        name: &str,
         setup: impl FnOnce(&mut DffFile),
         stream: Vec<u8>,
         updates: Vec<MemoryUpdate>,
@@ -1209,9 +1207,7 @@ mod tests {
             memory_updates: updates,
         });
 
-        let path = std::path::PathBuf::from(format!("/tmp/opencode/replay_{name}.dff"));
-        file.save(&path).expect("save");
-        let loaded = DffFile::load(&path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -1220,13 +1216,8 @@ mod tests {
 
     /// Replay one synthetic recording whose vertex carries a direct `f32`
     /// position, plus whatever else the caller sets up.
-    fn replay_stream(
-        name: &str,
-        setup: impl FnOnce(&mut DffFile),
-        stream: Vec<u8>,
-    ) -> Vec<DrawGeometry> {
+    fn replay_stream(setup: impl FnOnce(&mut DffFile), stream: Vec<u8>) -> Vec<DrawGeometry> {
         let replay = replay_frame(
-            name,
             |file| {
                 // Position direct, three `f32` components (`VCD_lo` bits 9..10,
                 // `VAT_A` position bits 0..8).
@@ -1280,9 +1271,7 @@ mod tests {
             memory_updates: Vec::new(),
         });
 
-        let path = Path::new("/tmp/opencode/replay_two_writes.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -1314,9 +1303,7 @@ mod tests {
             memory_updates: Vec::new(),
         });
 
-        let path = Path::new("/tmp/opencode/replay_two_materials.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -1337,9 +1324,7 @@ mod tests {
             memory_updates: Vec::new(),
         });
 
-        let path = Path::new("/tmp/opencode/replay_truncated.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -1357,9 +1342,7 @@ mod tests {
             memory_updates: Vec::new(),
         });
 
-        let path = Path::new("/tmp/opencode/replay_bad_id.dff");
-        file.save(path).expect("save");
-        let loaded = DffFile::load(path).expect("load");
+        let loaded = DffFile::from_bytes(&file.to_bytes()).expect("load");
 
         let mut replay = Replay::new(&loaded.bp_mem, &loaded.cp_mem);
         replay.frame(&loaded.frames[0]).expect("replay");
@@ -1381,7 +1364,7 @@ mod tests {
         stream.extend_from_slice(&vertex(0.0, 1.0, 0.0));
         stream.extend_from_slice(&vertex(1.0, 1.0, 0.0));
 
-        let geometry = replay_stream("geometry", |_| {}, stream);
+        let geometry = replay_stream(|_| {}, stream);
 
         assert_eq!(geometry.len(), 1);
         let geometry = &geometry[0];
@@ -1423,7 +1406,7 @@ mod tests {
             ),
         ];
 
-        for (index, (ctype, frac, uv_bytes, expected)) in cases.into_iter().enumerate() {
+        for (ctype, frac, uv_bytes, expected) in cases {
             // Texcoord 0 direct, two components (`VCD_Hi` bits 0..1,
             // `VAT_A` texcoord 0 bits 21..29).
             let stream = {
@@ -1435,7 +1418,6 @@ mod tests {
                 stream
             };
             let geometry = replay_stream(
-                &format!("uv_{index}"),
                 move |file| {
                     file.cp_mem[0x60] = u32::from(GX_DIRECT);
                     file.cp_mem[0x70] |= (1 << 21) | (ctype << 22) | (frac << 25);
@@ -1484,7 +1466,6 @@ mod tests {
             stream
         };
         let replay = replay_frame(
-            "indexed_arrays",
             |file| {
                 file.cp_mem[0x50] = (u32::from(GX_INDEX8) << 9) | (u32::from(GX_INDEX8) << 11);
                 file.cp_mem[0x60] = u32::from(GX_INDEX8);
@@ -1527,7 +1508,6 @@ mod tests {
             stream
         };
         let replay = replay_frame(
-            "write_offsets",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_INDEX8) << 9;
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1);
@@ -1560,7 +1540,6 @@ mod tests {
     fn an_index_outside_the_recorded_array_is_a_gap() {
         const POS: u32 = 0x0010_0000;
         let replay = replay_frame(
-            "index_miss",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_INDEX8) << 9;
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1);
@@ -1589,7 +1568,6 @@ mod tests {
     #[test]
     fn an_index_without_a_declared_array_is_a_gap() {
         let replay = replay_frame(
-            "no_array",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_INDEX8) << 9;
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1);
@@ -1614,7 +1592,6 @@ mod tests {
     fn an_all_ones_position_index_skips_the_vertex() {
         const POS: u32 = 0x0010_0000;
         let replay = replay_frame(
-            "index_skip",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_INDEX8) << 9;
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1);
@@ -1636,7 +1613,6 @@ mod tests {
     #[test]
     fn a_two_component_position_reads_z_as_zero() {
         let replay = replay_frame(
-            "position_xy",
             |file| {
                 // Position direct, two `f32` components (`VAT_A` bit 0 clear).
                 file.cp_mem[0x50] = u32::from(GX_DIRECT) << 9;
@@ -1659,7 +1635,6 @@ mod tests {
     #[test]
     fn a_bi_normal_set_reads_its_three_vectors() {
         let replay = replay_frame(
-            "normal_nbt",
             |file| {
                 file.cp_mem[0x50] = (u32::from(GX_DIRECT) << 9) | (u32::from(GX_DIRECT) << 11);
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1) | (1 << 9) | (GX_F32 << 10);
@@ -1707,7 +1682,6 @@ mod tests {
             stream
         };
         let replay = replay_frame(
-            "normal_nbt_index3",
             |file| {
                 file.cp_mem[0x50] = (u32::from(GX_DIRECT) << 9) | (u32::from(GX_INDEX8) << 11);
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1) | (1 << 9) | (GX_F32 << 10) | (1 << 31);
@@ -1732,7 +1706,6 @@ mod tests {
     #[test]
     fn a_one_component_texcoord_reads_t_as_zero() {
         let replay = replay_frame(
-            "tex_s",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_DIRECT) << 9;
                 file.cp_mem[0x60] = u32::from(GX_DIRECT);
@@ -1758,7 +1731,6 @@ mod tests {
     #[test]
     fn an_unreadable_colour_type_is_a_gap() {
         let replay = replay_frame(
-            "colour_type",
             |file| {
                 file.cp_mem[0x50] = (u32::from(GX_DIRECT) << 9) | (u32::from(GX_DIRECT) << 13);
                 // Colour 0 direct, `GXColorType` 6, which `VertexLoader_Color`
@@ -1795,7 +1767,6 @@ mod tests {
     fn the_unnamed_comp_types_read_as_float() {
         const TEX: u32 = 0x0010_0000;
         let replay = replay_frame(
-            "assumed_float",
             |file| {
                 file.cp_mem[0x50] = u32::from(GX_DIRECT) << 9;
                 file.cp_mem[0x60] = u32::from(GX_INDEX8);
@@ -1830,7 +1801,6 @@ mod tests {
         let row = packed.to_be_bytes()[1..].to_vec();
 
         let replay = replay_frame(
-            "indexed_colour",
             |file| {
                 file.cp_mem[0x50] = (u32::from(GX_DIRECT) << 9) | (u32::from(GX_INDEX8) << 13);
                 file.cp_mem[0x70] = 1 | (GX_F32 << 1) | (1 << 13) | (4 << 14);
@@ -1871,7 +1841,6 @@ mod tests {
             stream
         };
         let replay = replay_frame(
-            "indexed_xf",
             |file| {
                 // Array 12 is `XF_A`, array 13 `XF_B`, 14 `XF_C`, 15 `XF_D`
                 // (`OpcodeDecoding.h`: `GX_LOAD_INDX_A` = 0x20, 0x20/8 = 4, and
