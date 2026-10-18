@@ -269,8 +269,8 @@ mod tests {
                 stream.extend_from_slice(&value.to_be_bytes());
             }
             // A +Z normal: `2^-14` units, so 16384 is 1.0.
-            for _ in 0..3 {
-                stream.extend_from_slice(&16384_i16.to_be_bytes());
+            for value in [0_i16, 0, 16384] {
+                stream.extend_from_slice(&value.to_be_bytes());
             }
             // `2^-8` units, so 256 is 1.0.
             stream.extend_from_slice(&(u as i16).to_be_bytes());
