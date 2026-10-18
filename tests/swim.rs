@@ -115,13 +115,11 @@ fn swim_app() -> App {
     app.sim
         .world
         .insert_resource(Collision::parse(&dzb(&verts, &tris)).expect("stage collision"));
-    app.sim.world.insert_resource(Sea::new(SeaTables::new(|room| {
-        if room == 9 {
-            0
-        } else {
-            1
-        }
-    })));
+    app.sim.world.insert_resource(Sea::new(SeaTables::new(
+        |room| {
+            if room == 9 { 0 } else { 1 }
+        },
+    )));
     app
 }
 
@@ -181,7 +179,10 @@ fn golden_deep_water_plunges_then_buoys_to_the_surface() {
     }
 
     assert!(entered > 0, "open water catches the falling player");
-    assert!(surfaced_at > entered, "buoyancy returns Link to the surface");
+    assert!(
+        surfaced_at > entered,
+        "buoyancy returns Link to the surface"
+    );
     assert_eq!(
         swim(&app).air,
         900 - (40 - entered + 1) as i32,
@@ -274,7 +275,11 @@ fn golden_air_drains_only_in_deep_water() {
     teleport(&mut app, Vec3::new(-500.0, -100.0, -500.0));
     tick(&mut app);
     assert!(swim(&app).active, "mid-depth water keeps swimming");
-    assert_eq!(swim(&app).air, 900, "shallow water refills the breath meter");
+    assert_eq!(
+        swim(&app).air,
+        900,
+        "shallow water refills the breath meter"
+    );
     for _ in 0..10 {
         tick(&mut app);
     }
@@ -297,5 +302,9 @@ fn golden_snapshot_ground_y_tracks_the_water_surface() {
     }
     assert!(!swim(&app).active, "wading never swims");
     assert_eq!(player(&app).pos.y, -72.5);
-    assert_eq!(app.snapshot().ground_y, -70.0, "wading keeps the floor camera");
+    assert_eq!(
+        app.snapshot().ground_y,
+        -70.0,
+        "wading keeps the floor camera"
+    );
 }

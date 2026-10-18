@@ -252,7 +252,9 @@ fn entries(
         }
         entries.push(Entry {
             channels,
-            color_id: *data.get(entry_at + ENTRY_COLOR_ID).ok_or(BrkError::Truncated)?,
+            color_id: *data
+                .get(entry_at + ENTRY_COLOR_ID)
+                .ok_or(BrkError::Truncated)?,
         });
     }
     Ok(entries)

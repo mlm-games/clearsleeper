@@ -197,12 +197,7 @@ impl Gryw {
     /// the model's joint animation and nothing in the translation unit reads a frame or a rate
     /// back off it, so the port's `j3d` BCK reader has no consumer here. The four emitters
     /// (`:238`) go through [`particle_set`](Self::particle_set).
-    fn switch_wait_act_proc(
-        &mut self,
-        pos: Vec3,
-        switches: &Switches,
-        fx: &mut DamageFxQueue,
-    ) {
+    fn switch_wait_act_proc(&mut self, pos: Vec3, switches: &Switches, fx: &mut DamageFxQueue) {
         if self.switch_no == SWITCH_NONE {
             return;
         }

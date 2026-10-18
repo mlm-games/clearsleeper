@@ -1,9 +1,9 @@
 use std::f32::consts::TAU;
 
+use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::knob00::Knob00;
 use clearsleeper::sim::player::Player;
-use clearsleeper::App;
 
 /// The stage, room and spawn the house door leads to, from
 /// `tww/src/d/actor/d_a_npc_ba1.cpp:1231` (`cut_move_START_TALE1`:
@@ -64,9 +64,14 @@ fn golden_walking_through_the_house_door_enters_link_rm() {
         link.pos, expected.0,
         "walking through the door puts Link where link's house spawns him"
     );
-    let mut next = app.sim.world.resource::<clearsleeper::sim::transition::NextStage>();
+    let mut next = app
+        .sim
+        .world
+        .resource::<clearsleeper::sim::transition::NextStage>();
     assert_eq!(
-        next.target.as_ref().map(|target| (target.stage.as_str(), target.room, target.start)),
+        next.target
+            .as_ref()
+            .map(|target| (target.stage.as_str(), target.room, target.start)),
         None,
         "the destination is consumed by the swap, not left pending"
     );

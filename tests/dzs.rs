@@ -152,10 +152,7 @@ fn golden_stage_tables_kankyo_chain_and_wave_max() {
     );
     assert_eq!(
         tables.boot_sea_colors(),
-        Some((
-            [1.0, 1.0, 1.0],
-            [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
-        ))
+        Some(([1.0, 1.0, 1.0], [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],))
     );
 
     let stage = dzs::parse(&synthetic()).unwrap();

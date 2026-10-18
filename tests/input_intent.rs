@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use clearsleeper::sim::intent::MoveIntent;
 use clearsleeper::App;
+use clearsleeper::sim::intent::MoveIntent;
 use glam::Vec2;
 use repose_core::input::PhysicalKey;
 use repose_core::runtime::Scheduler;
@@ -18,7 +18,10 @@ fn golden_keyboard_walk_intent() {
 
     sched.held_keys = held(&[PhysicalKey::KeyW]);
     app.stage_polled(&sched);
-    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::new(0.0, 1.0));
+    assert_eq!(
+        app.sim.world.resource::<MoveIntent>().axis,
+        Vec2::new(0.0, 1.0)
+    );
 
     sched.held_keys = held(&[PhysicalKey::KeyD, PhysicalKey::KeyS]);
     app.stage_polled(&sched);
@@ -37,5 +40,8 @@ fn staged_intent_reaches_ticks() {
     app.stage_axis(Vec2::new(1.0, 0.0));
     let ran = app.advance(std::time::Duration::from_millis(100));
     assert_eq!(ran, 3);
-    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::new(1.0, 0.0));
+    assert_eq!(
+        app.sim.world.resource::<MoveIntent>().axis,
+        Vec2::new(1.0, 0.0)
+    );
 }

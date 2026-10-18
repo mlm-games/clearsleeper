@@ -9,7 +9,10 @@ fn main() {
     let code = font.font_code(0x8141);
     font.load_image(code as u16);
     let font = bank.get(0).unwrap();
-    println!("font_code(0x8141)={code} cell=({},{})", font.cell_x, font.cell_y);
+    println!(
+        "font_code(0x8141)={code} cell=({},{})",
+        font.cell_x, font.cell_y
+    );
     println!(
         "page={}B data_at={} data_size={} tex={}x{}",
         font.tex_page().len(),
@@ -41,5 +44,9 @@ fn main() {
     }
     let path = std::env::temp_dir().join("rust_page.raw");
     std::fs::write(&path, &out).unwrap();
-    println!("wrote {} texels ink {}", out.len(), out.iter().filter(|v| **v > 0).count());
+    println!(
+        "wrote {} texels ink {}",
+        out.len(),
+        out.iter().filter(|v| **v > 0).count()
+    );
 }

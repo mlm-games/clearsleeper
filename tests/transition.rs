@@ -220,7 +220,13 @@ fn golden_swap_stage_teleports_and_rebuilds() {
     }
 
     let tables = dzs::parse(&interior()).unwrap().with_name("House01");
-    app.swap_stage(tables, vec![0], Vec3::new(5.0, 0.0, 7.0), 1.5, clearsleeper::sim::transition::LAYER_NONE);
+    app.swap_stage(
+        tables,
+        vec![0],
+        Vec3::new(5.0, 0.0, 7.0),
+        1.5,
+        clearsleeper::sim::transition::LAYER_NONE,
+    );
 
     let player = player(&app);
     assert_eq!(player.pos, Vec3::new(5.0, 0.0, 7.0));
@@ -260,7 +266,13 @@ fn golden_swap_stage_teleports_and_rebuilds() {
 fn golden_apply_exit_keeps_the_stage_when_the_target_is_missing() {
     let mut app = App::new();
     let tables = dzs::parse(&interior()).unwrap().with_name("House01");
-    app.swap_stage(tables, vec![0], Vec3::new(1.0, 0.0, 9.0), 0.0, clearsleeper::sim::transition::LAYER_NONE);
+    app.swap_stage(
+        tables,
+        vec![0],
+        Vec3::new(1.0, 0.0, 9.0),
+        0.0,
+        clearsleeper::sim::transition::LAYER_NONE,
+    );
     let (verts, tris) = floor_quad(0.0);
     app.sim
         .world

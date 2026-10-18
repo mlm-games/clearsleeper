@@ -1,4 +1,6 @@
-use clearsleeper::ui_menu_save::{blank_save, MemCard, SlotState, CARD_STAT_CREATE, CARD_STAT_WAIT};
+use clearsleeper::ui_menu_save::{
+    CARD_STAT_CREATE, CARD_STAT_WAIT, MemCard, SlotState, blank_save,
+};
 
 fn card(dir: &std::path::Path) -> MemCard {
     let mut card = MemCard::new(dir.to_path_buf());

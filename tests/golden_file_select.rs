@@ -12,8 +12,7 @@ const CHANNEL_TOL: i16 = 8;
 const MAX_DIFF_FRACTION: f64 = 0.01;
 
 fn golden_path() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/goldens/file_select.png")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/file_select.png")
 }
 
 fn decode(png: &[u8]) -> (u32, u32, Vec<[u8; 4]>) {
@@ -39,12 +38,7 @@ fn golden_file_select() {
 
     let mut png_bytes = Vec::new();
     image::codecs::png::PngEncoder::new(&mut png_bytes)
-        .write_image(
-            &rgba,
-            shot::W,
-            shot::H,
-            image::ExtendedColorType::Rgba8,
-        )
+        .write_image(&rgba, shot::W, shot::H, image::ExtendedColorType::Rgba8)
         .expect("encode png");
 
     let path = golden_path();
@@ -63,7 +57,10 @@ fn golden_file_select() {
     let total = (gw * gh) as f64;
     let mut differing = 0usize;
     for (g, a) in gp.iter().zip(ap.iter()) {
-        if g.iter().zip(a.iter()).any(|(&gc, &ac)| (gc as i16 - ac as i16).abs() > CHANNEL_TOL) {
+        if g.iter()
+            .zip(a.iter())
+            .any(|(&gc, &ac)| (gc as i16 - ac as i16).abs() > CHANNEL_TOL)
+        {
             differing += 1;
         }
     }

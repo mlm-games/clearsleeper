@@ -41,7 +41,10 @@ const TARGET_RADIUS: f32 = 6.0;
 
 fn spawn_target(app: &mut App, pos: Vec3) -> Entity {
     let mut bodies = ContactBodies::default();
-    bodies.add(Shape::sphere(Vec3::ZERO, TARGET_RADIUS), bodies::default_obj());
+    bodies.add(
+        Shape::sphere(Vec3::ZERO, TARGET_RADIUS),
+        bodies::default_obj(),
+    );
     let id = app
         .sim
         .world

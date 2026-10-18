@@ -54,17 +54,15 @@ fn floor_quad(y: f32) -> ([[f32; 3]; 4], [[u16; 3]; 2]) {
 
 fn wall_quad(x: f32, y0: f32, y1: f32) -> ([[f32; 3]; 4], [[u16; 3]; 2]) {
     (
-        [
-            [x, y0, -10.0],
-            [x, y0, 10.0],
-            [x, y1, 10.0],
-            [x, y1, -10.0],
-        ],
+        [[x, y0, -10.0], [x, y0, 10.0], [x, y1, 10.0], [x, y1, -10.0]],
         [[0, 1, 2], [0, 2, 3]],
     )
 }
 
-fn merge(a: ([[f32; 3]; 4], [[u16; 3]; 2]), b: ([[f32; 3]; 4], [[u16; 3]; 2])) -> (Vec<[f32; 3]>, Vec<[u16; 3]>) {
+fn merge(
+    a: ([[f32; 3]; 4], [[u16; 3]; 2]),
+    b: ([[f32; 3]; 4], [[u16; 3]; 2]),
+) -> (Vec<[f32; 3]>, Vec<[u16; 3]>) {
     let mut verts = a.0.to_vec();
     let mut tris = a.1.to_vec();
     let offset = verts.len() as u16;
@@ -113,10 +111,7 @@ fn golden_ground_heights_take_highest_surface() {
 fn golden_wall_blocks_and_slides_along_free_axis() {
     let (floor_verts, floor_tris) = floor_quad(0.0);
     let (wall_verts, wall_tris) = wall_quad(5.0, 0.0, 60.0);
-    let (verts, tris) = merge(
-        (floor_verts, floor_tris),
-        (wall_verts, wall_tris),
-    );
+    let (verts, tris) = merge((floor_verts, floor_tris), (wall_verts, wall_tris));
     let collision = Collision::parse(&dzb(&verts, &tris)).unwrap();
 
     let to = Vec3::new(10.0, 0.0, 0.0);

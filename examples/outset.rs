@@ -40,17 +40,26 @@ fn main() {
                         max[k] = max[k].max(a.pos[k]);
                     }
                 }
-                println!("actor bounds x {:.1}..{:.1}  y {:.1}..{:.1}  z {:.1}..{:.1}",
-                    min[0], max[0], min[1], max[1], min[2], max[2]);
+                println!(
+                    "actor bounds x {:.1}..{:.1}  y {:.1}..{:.1}  z {:.1}..{:.1}",
+                    min[0], max[0], min[1], max[1], min[2], max[2]
+                );
                 let _ = c;
             }
             for a in room.actors.iter().filter(|a| a.name == "P1a") {
-                println!("player start P1a: pos={:?} angle={:?} params={:#x}", a.pos, a.angle, a.parameters);
+                println!(
+                    "player start P1a: pos={:?} angle={:?} params={:#x}",
+                    a.pos, a.angle, a.parameters
+                );
             }
             for a in room.actors.iter().filter(|a| a.name == "Dk") {
                 println!("dragon Dk: pos={:?} params={:#x}", a.pos, a.parameters);
             }
-            for a in room.actors.iter().filter(|a| a.name == "NpcSo" || a.name == "AND_SW2") {
+            for a in room
+                .actors
+                .iter()
+                .filter(|a| a.name == "NpcSo" || a.name == "AND_SW2")
+            {
                 println!("{}: pos={:?} params={:#x}", a.name, a.pos, a.parameters);
             }
             for id in 0..8u8 {

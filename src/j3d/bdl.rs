@@ -215,7 +215,9 @@ impl RoomMesh {
     /// node transforms that block carries; a node past the joint array is the reference's
     /// out-of-range read, so it answers nothing.
     pub fn node_transform(&self, node: u32) -> Option<Mat4> {
-        self.joint_matrices.get(usize::try_from(node).ok()?).copied()
+        self.joint_matrices
+            .get(usize::try_from(node).ok()?)
+            .copied()
     }
 }
 
@@ -1106,14 +1108,7 @@ fn material_coord(
     if stage_num > TEV_STAGE_MAX {
         return Err(BdlError::Descriptor);
     }
-    let tex_gen = material_tex_gen(
-        data,
-        start,
-        end,
-        init,
-        tex_gen_num,
-        tex_coord_table,
-    )?;
+    let tex_gen = material_tex_gen(data, start, end, init, tex_gen_num, tex_coord_table)?;
     let tev_order_table_at = at(start, tev_order_table as usize)?;
     let mut coord = None;
     for stage in 0..usize::from(stage_num) {

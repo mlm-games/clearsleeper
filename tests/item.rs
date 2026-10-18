@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::combat::HitPoints;
-use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::arrow::{self, Arrow};
 use clearsleeper::sim::boomerang::Boomerang;
+use clearsleeper::sim::combat::HitPoints;
+use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::item::{self, Bomb, Held, Kind};
 use clearsleeper::sim::player::Player;
 use glam::Vec3;
@@ -243,7 +243,13 @@ fn golden_projectiles_do_not_survive_a_stage_change() {
     assert_eq!(bombs(&app).len(), 1);
     let tables = clearsleeper::assets::load_stage_tables(clearsleeper::assets::SEA_STAGE)
         .expect("the home stage loads");
-    app.swap_stage(tables, Vec::new(), Vec3::ZERO, 0.0, clearsleeper::sim::transition::LAYER_NONE);
+    app.swap_stage(
+        tables,
+        Vec::new(),
+        Vec3::ZERO,
+        0.0,
+        clearsleeper::sim::transition::LAYER_NONE,
+    );
     assert!(
         bombs(&app).is_empty() && arrows(&app).is_empty() && spins(&app).is_empty(),
         "nothing in flight follows you into the next room"

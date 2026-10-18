@@ -38,7 +38,10 @@ fn golden_fall_lands_on_flat_ground() {
         frame(&mut app, &[]);
     }
     let p = player(&mut app);
-    assert_eq!(p.pos.y, -2.5, "grounded steady state sinks one gravity step");
+    assert_eq!(
+        p.pos.y, -2.5,
+        "grounded steady state sinks one gravity step"
+    );
     assert_eq!(p.speed_y, -2.5);
     assert_eq!(p.pos.x, 0.0);
     assert_eq!(p.pos.z, 0.0);

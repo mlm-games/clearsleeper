@@ -1515,14 +1515,8 @@ impl ActorBody {
             }
             48 => self.parent = parent_lookup(content, ctx),
             49 => {
-                self.parent_node = node_command(
-                    self.parent_node,
-                    self.parent,
-                    operation,
-                    content,
-                    at,
-                    ctx,
-                )
+                self.parent_node =
+                    node_command(self.parent_node, self.parent, operation, content, at, ctx)
             }
             50 => set_variable(&mut self.vars, 12, operation, content, size, at, ctx),
             51 => self.relation = parent_lookup(content, ctx),
@@ -1637,14 +1631,8 @@ impl CameraBody {
         match group {
             48 => self.parent = parent_lookup(content, ctx),
             49 => {
-                self.parent_node = node_command(
-                    self.parent_node,
-                    self.parent,
-                    operation,
-                    content,
-                    at,
-                    ctx,
-                )
+                self.parent_node =
+                    node_command(self.parent_node, self.parent, operation, content, at, ctx)
             }
             50 => set_variable(&mut self.vars, 10, operation, content, size, at, ctx),
             21 => set_variable(&mut self.vars, 0, operation, content, size, at, ctx),
@@ -2342,14 +2330,8 @@ impl ParticleBody {
             }
             48 => self.parent = parent_lookup(content, ctx),
             49 => {
-                self.parent_node = node_command(
-                    self.parent_node,
-                    self.parent,
-                    operation,
-                    content,
-                    at,
-                    ctx,
-                )
+                self.parent_node =
+                    node_command(self.parent_node, self.parent, operation, content, at, ctx)
             }
             50 => set_variable(&mut self.vars, 17, operation, content, size, at, ctx),
             9 => set_variable(&mut self.vars, 0, operation, content, size, at, ctx),

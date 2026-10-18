@@ -302,7 +302,12 @@ impl Warpls {
         [self.activation_idx, self.warping_idx]
             .into_iter()
             .flatten()
-            .any(|slot| matches!(active.stage_of(slot), Some(Stage::Play) | Some(Stage::Close)))
+            .any(|slot| {
+                matches!(
+                    active.stage_of(slot),
+                    Some(Stage::Play) | Some(Stage::Close)
+                )
+            })
     }
 
     /// `warp_eff_start()` (`:319-334`).

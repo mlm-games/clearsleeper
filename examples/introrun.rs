@@ -1,9 +1,9 @@
 use clearsleeper::assets;
 use clearsleeper::intro::{self, Intro};
 use clearsleeper::j2d;
+use clearsleeper::text::driver;
 use clearsleeper::text::font::FontBank;
 use clearsleeper::text::raster::Canvas;
-use clearsleeper::text::driver;
 
 fn main() {
     let Ok(root) = std::env::var("CS_ASSETS") else {
@@ -34,13 +34,23 @@ fn main() {
         messages.insert(intro.text.msg_no);
         max_state = max_state.max(intro.state);
         let mut canvas = Canvas::new(640, 480);
-        clearsleeper::intro::render(&mut canvas, &screen, &intro, &mut fonts, &|_c, _n, _b, _a| {});
+        clearsleeper::intro::render(
+            &mut canvas,
+            &screen,
+            &intro,
+            &mut fonts,
+            &|_c, _n, _b, _a| {},
+        );
         if canvas.pixels.chunks_exact(4).any(|p| p[3] > 0) {
             text_frames += 1;
         }
         frames += 1;
     }
-    println!("intro completed: {} after {frames} frames ({:.1}s at 30fps)", intro.done, frames as f32 / 30.0);
+    println!(
+        "intro completed: {} after {frames} frames ({:.1}s at 30fps)",
+        intro.done,
+        frames as f32 / 30.0
+    );
     println!("max state reached: {max_state}");
     println!("distinct states visited: {}", states.len());
     println!("messages shown: {:#x?}", messages);

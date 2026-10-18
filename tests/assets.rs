@@ -1,7 +1,7 @@
 use std::io::Write as _;
 use std::time::Duration;
 
-use clearsleeper::archive::{yaz0_decode, Archive, AssetError};
+use clearsleeper::archive::{Archive, AssetError, yaz0_decode};
 use clearsleeper::assets::{
     AssetRoot, SEA_STAGE, STAGE_SPAWN_POINT, msg_table_from_bmg, stage_spawn,
 };
@@ -158,7 +158,10 @@ fn golden_archive_walks_nested_entries() {
     assert_eq!(archive.read("sub/nested.bin").unwrap(), b"NESTED!!");
     assert_eq!(archive.read("sub/../hello.bin").unwrap(), b"hello!");
     assert!(
-        matches!(archive.read("absent.bin"), Err(AssetError::MissingEntry { .. })),
+        matches!(
+            archive.read("absent.bin"),
+            Err(AssetError::MissingEntry { .. })
+        ),
         "expected missing entry"
     );
     assert!(
@@ -189,10 +192,7 @@ fn missing_root_and_missing_file_are_distinct_errors() {
 
     std::fs::create_dir_all(&root_path).unwrap();
     assert!(
-        matches!(
-            root.read("absent.bin"),
-            Err(AssetError::MissingFile { .. })
-        ),
+        matches!(root.read("absent.bin"), Err(AssetError::MissingFile { .. })),
         "expected missing file"
     );
 
@@ -203,10 +203,7 @@ fn missing_root_and_missing_file_are_distinct_errors() {
 
     if std::env::var_os(clearsleeper::assets::ASSETS_ENV).is_none() {
         assert!(
-            matches!(
-                AssetRoot::from_env(),
-                Err(AssetError::MissingRoot { .. })
-            ),
+            matches!(AssetRoot::from_env(), Err(AssetError::MissingRoot { .. })),
             "expected missing root for unset CS_ASSETS"
         );
     }
@@ -223,13 +220,13 @@ fn real_disc_archives_load_through_cs_assets() {
     let raw = root.read_archive("files/res/Object/Vobj07.arc").unwrap();
     assert_eq!(raw.read("bdl/vobj07.bdl").unwrap().len(), 31_456);
 
-    let packed = root.read_archive("files/res/Stage/Abesso/Stage.arc").unwrap();
+    let packed = root
+        .read_archive("files/res/Stage/Abesso/Stage.arc")
+        .unwrap();
     assert_eq!(packed.read("dat/event_list.dat").unwrap().len(), 130_352);
     assert_eq!(packed.read("dzs/stage.dzs").unwrap().len(), 864);
 
-    let room = root
-        .read_archive("files/res/Stage/sea/Room44.arc")
-        .unwrap();
+    let room = root.read_archive("files/res/Stage/sea/Room44.arc").unwrap();
     assert_eq!(room.read("dzb/room.dzb").unwrap().len(), 124_416);
 
     let stage = clearsleeper::assets::load_stage(SEA_STAGE).expect("stage loads from disc");
@@ -294,9 +291,7 @@ fn golden_room_mesh_matches_disc_geometry() {
         (12, 6),
         (64, 40),
     ];
-    for (index, (group, (vertices, triangles))) in
-        mesh.groups.iter().zip(shapes).enumerate()
-    {
+    for (index, (group, (vertices, triangles))) in mesh.groups.iter().zip(shapes).enumerate() {
         assert_eq!(group.texture_page, pages[index], "group {index}");
         assert_eq!(group.positions.len(), vertices, "group {index} positions");
         assert_eq!(group.indices.len(), triangles * 3, "group {index} indices");
@@ -371,7 +366,11 @@ fn golden_room_mesh_matches_disc_geometry() {
     ];
     for (index, (width, height)) in expected_sizes.into_iter().enumerate() {
         let texture = &mesh.textures[index];
-        assert_eq!((texture.width, texture.height), (width, height), "texture {index}");
+        assert_eq!(
+            (texture.width, texture.height),
+            (width, height),
+            "texture {index}"
+        );
         assert_eq!(
             texture.rgba.len() as u32,
             width * height * 4,
@@ -515,7 +514,9 @@ fn golden_room_mesh_matches_disc_geometry() {
     ];
     for (index, expected) in tracks.into_iter().enumerate() {
         assert_eq!(
-            mesh.groups[index].anim.map(|binding| (binding.set, binding.track)),
+            mesh.groups[index]
+                .anim
+                .map(|binding| (binding.set, binding.track)),
             expected.map(|track| (0, track)),
             "group {index} anim"
         );
@@ -559,10 +560,7 @@ fn golden_stage_tables_match_disc() {
         );
     }
 
-    assert_eq!(
-        clearsleeper::assets::start_set(&tables),
-        vec![0_u8, 44_u8]
-    );
+    assert_eq!(clearsleeper::assets::start_set(&tables), vec![0_u8, 44_u8]);
 }
 
 #[test]
@@ -628,8 +626,12 @@ fn real_disc_room_fili_names_the_scene_particle_archive() {
         Some(clearsleeper::sim::jpa::NO_SCENE),
         "the sea stage names no Pscene of its own"
     );
-    let set = clearsleeper::assets::load_room_set(&tables, &clearsleeper::assets::start_set(&tables), |_| 0)
-        .expect("start island room set loads from disc");
+    let set = clearsleeper::assets::load_room_set(
+        &tables,
+        &clearsleeper::assets::start_set(&tables),
+        |_| 0,
+    )
+    .expect("start island room set loads from disc");
     assert_eq!(
         set.particle_no,
         Some(20),
@@ -687,10 +689,7 @@ fn golden_boot_palette_and_sea_match_disc() {
     );
     assert_eq!(
         tables.boot_sea_colors(),
-        Some((
-            [1.0, 1.0, 1.0],
-            [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
-        ))
+        Some(([1.0, 1.0, 1.0], [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],))
     );
     let shade = clearsleeper::assets::load_sea_shade().expect("sea texture loads from disc");
     assert!((shade - 0.148_063_15).abs() < 1e-6, "shade {shade}");
@@ -729,10 +728,7 @@ fn golden_snapshot_carries_sky_and_shore_sea() {
         [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],
         "zero flat interpolation keeps the diffuse sea tint"
     );
-    assert_eq!(
-        shore.origin,
-        glam::Vec2::new(-185_600.0, 274_400.0)
-    );
+    assert_eq!(shore.origin, glam::Vec2::new(-185_600.0, 274_400.0));
 
     {
         let mut query = app
@@ -823,14 +819,7 @@ fn golden_dzr_spawn_selects_entry_by_point() {
     );
 }
 
-fn push_spawn_entry(
-    out: &mut Vec<u8>,
-    x: f32,
-    y: f32,
-    z: f32,
-    angle_y: i16,
-    angle_z: i16,
-) {
+fn push_spawn_entry(out: &mut Vec<u8>, x: f32, y: f32, z: f32, angle_y: i16, angle_z: i16) {
     out.extend_from_slice(b"Link\0\0\0\0");
     out.extend_from_slice(&0xffff_002c_u32.to_be_bytes());
     out.extend_from_slice(&x.to_be_bytes());
@@ -850,7 +839,8 @@ fn synthetic_archive() -> Vec<u8> {
         out.extend_from_slice(&value.to_be_bytes());
     }
     fn hash(name: &str) -> u16 {
-        name.bytes().fold(0_u32, |h, b| (h * 3 + u32::from(b)) & 0xFFFF) as u16
+        name.bytes()
+            .fold(0_u32, |h, b| (h * 3 + u32::from(b)) & 0xFFFF) as u16
     }
     fn entry(
         out: &mut Vec<u8>,
@@ -936,23 +926,14 @@ fn golden_open_sea_swim_carries_the_surface_into_the_snapshot() {
     let mut surfaced_at = 0_u32;
     for step in 1..=40 {
         app.advance(tick);
-        let swim = *app
-            .sim
-            .world
-            .resource::<clearsleeper::sim::swim::Swim>();
-        let water = *app
-            .sim
-            .world
-            .resource::<clearsleeper::sim::water::Water>();
+        let swim = *app.sim.world.resource::<clearsleeper::sim::swim::Swim>();
+        let water = *app.sim.world.resource::<clearsleeper::sim::water::Water>();
         let p = {
             let mut query = app
                 .sim
                 .world
                 .query::<&mut clearsleeper::sim::player::Player>();
-            *query
-                .iter_mut(&mut app.sim.world)
-                .next()
-                .expect("player")
+            *query.iter_mut(&mut app.sim.world).next().expect("player")
         };
         if swim.active && entered == 0 {
             entered = step;
@@ -969,7 +950,10 @@ fn golden_open_sea_swim_carries_the_surface_into_the_snapshot() {
     }
 
     assert!(entered > 0, "open sea engages swimming");
-    assert!(surfaced_at > entered, "buoyancy returns Link to the surface");
+    assert!(
+        surfaced_at > entered,
+        "buoyancy returns Link to the surface"
+    );
     let air = app
         .sim
         .world

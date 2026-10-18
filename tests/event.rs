@@ -10,8 +10,8 @@ use clearsleeper::sim::event::{
 use clearsleeper::sim::flags::{EventFlags, StoryBits};
 use clearsleeper::sim::intent::DoIntent;
 use clearsleeper::sim::msg::{
-    MsgBox, MsgEntry, MsgTable, MSG_BOX_CLOSING, MSG_BOX_CLOSED, MSG_BOX_OPENING,
-    MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS, MSG_TYPING,
+    MSG_BOX_CLOSED, MSG_BOX_CLOSING, MSG_BOX_OPENING, MSG_DESTROYED, MSG_DISPLAYED, MSG_ENDS,
+    MSG_TYPING, MsgBox, MsgEntry, MsgTable,
 };
 use clearsleeper::sim::talk::Talk;
 use clearsleeper::sim::transition::{NextStage, Target};
@@ -222,7 +222,9 @@ fn run_control(list: &EventList) -> World {
     world.insert_resource(clearsleeper::sim::door::StayRoom::default());
     world.insert_resource(clearsleeper::sim::daynight::DayNight::default());
     assert!(
-        world.resource_mut::<ActiveEvent>().order(list, 0, Entity::PLACEHOLDER),
+        world
+            .resource_mut::<ActiveEvent>()
+            .order(list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     world
@@ -360,7 +362,10 @@ fn golden_order_starts_plays_and_closes() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event exists and takes the order"
     );
     assert_eq!(
@@ -369,7 +374,10 @@ fn golden_order_starts_plays_and_closes() {
         "and waits for the next tick"
     );
     assert!(
-        !app.sim.world.resource_mut::<ActiveEvent>().order(&list, 9, Entity::PLACEHOLDER),
+        !app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 9, Entity::PLACEHOLDER),
         "unknown indices are refused"
     );
     app.sim.world.resource_mut::<EventFlags>().set(100);
@@ -420,7 +428,10 @@ fn golden_timekeeper_counts_down_before_the_chain_moves() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER);
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, Entity::PLACEHOLDER);
     tick(&mut app);
     assert_eq!(active(&app).cut_of(0, 0), Some(0), "counting down");
     assert!(!flags(&app).test(5), "the first frame loads the timer");
@@ -462,7 +473,10 @@ fn golden_cut_start_flags_hold_the_chain_until_they_are_set() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER);
+    app.sim
+        .world
+        .resource_mut::<ActiveEvent>()
+        .order(&list, 0, Entity::PLACEHOLDER);
     tick(&mut app);
     assert_eq!(
         active(&app).cut_of(0, 0),
@@ -622,7 +636,10 @@ fn golden_soldier_wait_counts_down_and_unknown_cuts_end_at_once() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -661,7 +678,10 @@ fn golden_camera_cuts_wait_out_timers_or_end_at_once() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -701,7 +721,10 @@ fn golden_link_and_ship_cuts_end_or_wait_on_their_locomotion() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -753,7 +776,10 @@ fn golden_link_anim_cut_waits_out_its_animation() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     for _ in 0..28 {
@@ -787,10 +813,7 @@ fn golden_link_anim_cut_reads_frame_counts_from_the_animation_table() {
     ))
     .expect("fixture parses");
     let mut pend = boot(list.clone());
-    pend
-        .sim
-        .world
-        .insert_resource(LinkAnms::default());
+    pend.sim.world.insert_resource(LinkAnms::default());
     assert!(
         pend.sim
             .world
@@ -812,7 +835,10 @@ fn golden_link_anim_cut_reads_frame_counts_from_the_animation_table() {
         .resource_mut::<LinkAnms>()
         .insert("saltation", 0, 150);
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     for _ in 0..150 {
@@ -846,7 +872,10 @@ fn golden_link_instant_cuts_end_at_once() {
     .expect("fixture parses");
     let mut app = boot(list.clone());
     assert!(
-        app.sim.world.resource_mut::<ActiveEvent>().order(&list, 0, Entity::PLACEHOLDER),
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER),
         "the event takes the order"
     );
     tick(&mut app);
@@ -856,10 +885,7 @@ fn golden_link_instant_cuts_end_at_once() {
     tick(&mut app);
     assert_eq!(active(&app).cut_of(0, 0), Some(2), "then the dash");
     tick(&mut app);
-    assert!(
-        !flags(&app).test(4),
-        "the dash still waits on locomotion"
-    );
+    assert!(!flags(&app).test(4), "the dash still waits on locomotion");
 }
 
 #[test]
@@ -879,7 +905,10 @@ fn golden_soldier_turn_and_move_cuts_turn_then_walk_to_the_player() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    let mut players = app.sim.world.query::<&mut clearsleeper::sim::player::Player>();
+    let mut players = app
+        .sim
+        .world
+        .query::<&mut clearsleeper::sim::player::Player>();
     {
         let mut player = players.iter_mut(&mut app.sim.world).next().unwrap();
         player.pos = Vec3::ZERO;
@@ -920,10 +949,7 @@ fn golden_soldier_turn_and_move_cuts_turn_then_walk_to_the_player() {
         "the soldier stopped next to the player at {}",
         actor.pos.x
     );
-    assert_eq!(
-        actor.angle[1], -16384,
-        "the turn ended facing the player"
-    );
+    assert_eq!(actor.angle[1], -16384, "the turn ended facing the player");
     tick(&mut app);
     assert!(active(&app).end_check(0), "the event closes");
 }
@@ -1061,7 +1087,11 @@ fn golden_talk_msg_drives_one_message_through_open_type_and_close() {
     );
     press(&mut app, false);
     tick(&mut app);
-    assert_eq!(box_status(&app), MSG_ENDS, "the driver marks it for closing");
+    assert_eq!(
+        box_status(&app),
+        MSG_ENDS,
+        "the driver marks it for closing"
+    );
     press(&mut app, true);
     tick(&mut app);
     assert_eq!(
@@ -1116,16 +1146,15 @@ fn golden_get_item_cut_presents_its_partner_from_the_cut_parameter() {
             lines: 4,
         },
     );
-    assert!(app
-        .sim
-        .world
-        .resource_mut::<ActiveEvent>()
-        .order(&list, 0, Entity::PLACEHOLDER));
+    assert!(
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER)
+    );
     tick(&mut app);
     let partner = *app.sim.world.resource::<ItemPartner>();
-    let entity = partner
-        .entity
-        .expect("the cut spawns its present partner");
+    let entity = partner.entity.expect("the cut spawns its present partner");
     assert_eq!(partner.item, 15, "the cut parameter names the item");
     let present = app
         .sim
@@ -1133,7 +1162,10 @@ fn golden_get_item_cut_presents_its_partner_from_the_cut_parameter() {
         .get::<PresentItem>(entity)
         .expect("the partner is a present item");
     assert_eq!(present.item, 15, "the partner carries the item");
-    assert!(present.hidden, "the partner stays hidden through the animation");
+    assert!(
+        present.hidden,
+        "the partner stays hidden through the animation"
+    );
     let mut opened = 0;
     while !app.sim.world.resource::<MsgBox>().active() {
         tick(&mut app);
@@ -1168,7 +1200,11 @@ fn golden_get_item_cut_presents_its_partner_from_the_cut_parameter() {
     );
     press(&mut app, false);
     tick(&mut app);
-    assert_eq!(box_status(&app), MSG_ENDS, "the driver marks it for closing");
+    assert_eq!(
+        box_status(&app),
+        MSG_ENDS,
+        "the driver marks it for closing"
+    );
     press(&mut app, true);
     tick(&mut app);
     assert_eq!(
@@ -1219,11 +1255,12 @@ fn golden_get_item_cut_waits_for_an_outside_partner() {
     ))
     .expect("fixture parses");
     let mut app = boot(list.clone());
-    assert!(app
-        .sim
-        .world
-        .resource_mut::<ActiveEvent>()
-        .order(&list, 0, Entity::PLACEHOLDER));
+    assert!(
+        app.sim
+            .world
+            .resource_mut::<ActiveEvent>()
+            .order(&list, 0, Entity::PLACEHOLDER)
+    );
     for _ in 0..40 {
         tick(&mut app);
     }
@@ -1247,10 +1284,7 @@ fn golden_talk_msg_ends_the_cut_when_current_message_is_the_end() {
             named_cut("TALK_MSG", [-1, -1, -1], 7, 0, 1),
             named_cut("STOP", [-1, -1, -1], 8, u32::MAX, -1),
         ],
-        vec![
-            record("msg_num", 3, 0, 1),
-            record("end_msg", 3, 1, -1),
-        ],
+        vec![record("msg_num", 3, 0, 1), record("end_msg", 3, 1, -1)],
         Vec::new(),
         vec![
             4242_i32.to_be_bytes().to_vec(),
@@ -1338,7 +1372,10 @@ fn golden_message_staff_creates_pushes_and_finishes_the_box() {
     );
     tick(&mut app);
     tick(&mut app);
-    assert!(flags(&app).test(7), "CREATE_MSG ends after the resolve frames");
+    assert!(
+        flags(&app).test(7),
+        "CREATE_MSG ends after the resolve frames"
+    );
     let mut typed = 0;
     while box_status(&app) != MSG_TYPING {
         tick(&mut app);
@@ -1376,11 +1413,7 @@ fn golden_message_staff_creates_pushes_and_finishes_the_box() {
     }
     assert_eq!(closed, 10, "closing takes ten frames");
     tick(&mut app);
-    assert_eq!(
-        box_status(&app),
-        MSG_DESTROYED,
-        "FINISH destroys the box"
-    );
+    assert_eq!(box_status(&app), MSG_DESTROYED, "FINISH destroys the box");
     assert!(flags(&app).test(9), "the chain finishes");
     let mut done = 0;
     while !active(&app).end_check(0) {

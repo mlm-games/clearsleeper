@@ -239,10 +239,16 @@ fn golden_joint_name_table_resolves_node_ids() {
     assert_eq!(mesh.joint_names, vec!["root".to_owned(), "arm".to_owned()]);
     assert_eq!(mesh.find_node_id(b"root"), Some(0));
     assert_eq!(mesh.find_node_id(b"arm"), Some(1));
-    assert_eq!(mesh.find_node_id(b"ar"), None, "the compare is not a prefix");
+    assert_eq!(
+        mesh.find_node_id(b"ar"),
+        None,
+        "the compare is not a prefix"
+    );
     assert_eq!(mesh.find_node_id(b"leg"), None);
     let node = mesh.find_node_id(b"arm").expect("arm is joint 1");
-    let transform = mesh.node_transform(node).expect("joint 1 has a node matrix");
+    let transform = mesh
+        .node_transform(node)
+        .expect("joint 1 has a node matrix");
     assert_eq!(transform.w_axis.truncate().to_array(), [0.0, 0.0, 5.0]);
     assert_eq!(mesh.node_transform(2), None);
 }

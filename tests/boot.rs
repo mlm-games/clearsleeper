@@ -1,8 +1,8 @@
 use std::time::Duration;
 
+use clearsleeper::App;
 use clearsleeper::sim::area::Area;
 use clearsleeper::sim::player::Player;
-use clearsleeper::App;
 
 #[test]
 fn golden_boot_spawns_one_player_in_area() {

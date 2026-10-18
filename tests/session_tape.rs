@@ -43,7 +43,11 @@ fn session() -> (u64, Player) {
     assert!((b.yaw - expected_yaw).abs() < 1e-9, "yaw = {}", b.yaw);
     let stick = Vec2::new(1.0, 1.0).clamp_length_max(1.0).length();
     assert_eq!(b.speed, 17.0 * (stick * stick));
-    assert!(b.pos.x < -80.0, "arc must bend camera-right: x = {}", b.pos.x);
+    assert!(
+        b.pos.x < -80.0,
+        "arc must bend camera-right: x = {}",
+        b.pos.x
+    );
     assert!(b.pos.z > 250.0, "z = {}", b.pos.z);
 
     for _ in 0..10 {
@@ -57,7 +61,10 @@ fn session() -> (u64, Player) {
         frame(&mut app, &[PhysicalKey::KeyW]);
     }
     let d = player(&mut app);
-    assert!(d.pos.z < c.pos.z, "camera-relative forward must flip with yaw");
+    assert!(
+        d.pos.z < c.pos.z,
+        "camera-relative forward must flip with yaw"
+    );
 
     let ticks = app.sim.world.resource::<CurrentFrame>().0;
     assert_eq!(ticks, 40);

@@ -244,7 +244,10 @@ fn clear_resource_manager_force_deletes_that_slot_s_emitters() {
         !jpa.emitters[swept].active,
         "the slot's emitter goes back to the pool"
     );
-    assert_eq!(jpa.emitters[swept], clearsleeper::sim::jpa::Emitter::default());
+    assert_eq!(
+        jpa.emitters[swept],
+        clearsleeper::sim::jpa::Emitter::default()
+    );
     assert!(jpa.emitters[kept].active, "the other slot's emitter stays");
     assert!(jpa.bank.manager(1).is_none());
     assert!(jpa.bank.manager(2).is_some());

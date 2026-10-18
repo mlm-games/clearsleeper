@@ -92,10 +92,7 @@ fn golden_sea_wave_samples_follow_grid_planes() {
     let sample_x = origin_x + 3.5 * GRID_SIZE;
     let sample_z = origin_z + 32.5 * GRID_SIZE;
     let height = sea.height_at(sample_x, sample_z);
-    assert!(
-        (height - 0.583_333_3).abs() < 1e-4,
-        "plane sample {height}"
-    );
+    assert!((height - 0.583_333_3).abs() < 1e-4, "plane sample {height}");
 }
 
 #[test]
@@ -108,7 +105,10 @@ fn golden_sea_open_water_waves_advance_each_tick() {
 
     sea.execute(140_000.0, 0.0);
     let after = sea.heights()[32 * GRID_CELLS + 32];
-    assert!((before - after).abs() > 1e-6, "waves must advance: {before}");
+    assert!(
+        (before - after).abs() > 1e-6,
+        "waves must advance: {before}"
+    );
 
     for _ in 0..300 {
         sea.execute(140_000.0, 0.0);

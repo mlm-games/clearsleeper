@@ -367,7 +367,10 @@ pub enum DemoCommandGap {
     /// (`d_a_demo00.cpp:169`, `:303`). A stage object whose model has no such joint - or no model
     /// at all, because no shape was staged or the archive could not answer - is this gap, which
     /// names the object the lookup ran in.
-    NodeName { object: DemoObjectRef, name: Vec<u8> },
+    NodeName {
+        object: DemoObjectRef,
+        name: Vec<u8>,
+    },
     /// `TJPACallback_::execute`'s parented branch calls
     /// `JStage::TObject::JSGGetNodeTransformation` for the parent node's matrix
     /// (`object-particle.cpp:248-259`); the matrix is the demo actor's J3D animation matrix
@@ -667,7 +670,8 @@ impl DemoNodeTable {
                     })
                 })
                 .collect();
-            let ctrl = crate::j3d::ctrl::FrameCtrl::init_play(anm.frame_max, crate::j3d::ctrl::MODE_NULL);
+            let ctrl =
+                crate::j3d::ctrl::FrameCtrl::init_play(anm.frame_max, crate::j3d::ctrl::MODE_NULL);
             TexNoPass { anm, ctrl, units }
         });
         self.tex_pattern = registered;
@@ -688,7 +692,10 @@ impl DemoNodeTable {
         init: PassInit,
     ) {
         let select = id & PASS_SELECT_BIT != 0;
-        let frame = self.texture_srt.as_ref().map_or(0.0, |pass| pass.ctrl.frame());
+        let frame = self
+            .texture_srt
+            .as_ref()
+            .map_or(0.0, |pass| pass.ctrl.frame());
         let registered = pass.map(|anm| {
             let tracks: Vec<TexMtxTrack> = anm
                 .names
@@ -807,7 +814,10 @@ impl DemoNodeTable {
     /// `JUTNameTab::getIndex(name)` - `JUTNameTab.cpp:368-378`: the entry index, which is the
     /// node id `JSGGetNodeTransformation` is handed. `None` is retail's `-1`.
     pub fn find_node_id(&self, name: &[u8]) -> Option<u32> {
-        let index = self.names.iter().position(|joint| joint.as_bytes() == name)?;
+        let index = self
+            .names
+            .iter()
+            .position(|joint| joint.as_bytes() == name)?;
         u32::try_from(index).ok()
     }
 
@@ -847,8 +857,7 @@ impl DemoNodeTable {
                 {
                     // `0xFFFF` is `J3DMaterialFactory`'s own "no texture" value, which the port's
                     // unit holds as `None`.
-                    *slot =
-                        (tex_no != crate::j3d::bdl::MATERIAL_UNTEXTURED).then_some(tex_no);
+                    *slot = (tex_no != crate::j3d::bdl::MATERIAL_UNTEXTURED).then_some(tex_no);
                 }
             }
         }
@@ -901,7 +910,12 @@ const TEV_COLOR_APPLIED: usize = 3;
 /// `actPerformance`'s per-key swap (`:352-367`, `:379-394`): the swap takes `EMode_LOOP` and the
 /// cursor the pass already had when the staged id carries [`PASS_SELECT_BIT`], and
 /// `EMode_NULL` with a zero start otherwise (`m_Do_ext.cpp:85-114`).
-fn pass_init(frame_max: u16, select: bool, init: PassInit, frame: f32) -> crate::j3d::ctrl::FrameCtrl {
+fn pass_init(
+    frame_max: u16,
+    select: bool,
+    init: PassInit,
+    frame: f32,
+) -> crate::j3d::ctrl::FrameCtrl {
     let attribute = match init {
         PassInit::Heap => crate::j3d::ctrl::MODE_NULL,
         PassInit::Swap if select => crate::j3d::ctrl::MODE_LOOP,
@@ -1055,10 +1069,7 @@ impl RoomDemoArchive {
     }
 
     /// `J3DAnmTexPattern` under the staged `mBtpID` (`d_a_demo00.cpp:173-187`).
-    pub fn tex_pattern(
-        &mut self,
-        id: u16,
-    ) -> Result<Option<crate::j3d::btp::TexPattern>, DemoGap> {
+    pub fn tex_pattern(&mut self, id: u16) -> Result<Option<crate::j3d::btp::TexPattern>, DemoGap> {
         let Some(data) = self.pass(id)?.map(<[u8]>::to_vec) else {
             return Ok(None);
         };
