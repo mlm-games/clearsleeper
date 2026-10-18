@@ -52,7 +52,7 @@
 //! `daHo_packet_c::mPos[2][85]` / `mNrm[2][85]` / `mBackNrm[2][85]` (`d_a_grid.h:41`, `:42`,
 //! `:43`), ping-ponged by `changeCurrentPos() { field_0x18a2 ^= 1; }` (`d_a_grid.h:30`, called at
 //! `:388`), and `85 = 12 * 7 + 1`. Inside `ho_move` the column index `var_r23` walks 0..=12:
-//! ```
+//! ```c
 //! var_r23 = var_r24 < 6 ? var_r23 : var_r23 + 1;   // :560
 //! var_r24 = var_r24 < 6 ? var_r24 + 1 : 0;         // :561
 //! ```
@@ -93,7 +93,7 @@ const ALPHA_NEAR: u8 = 50; // <- d_a_grid.cpp:28 (daHo_HIO_c::field_0x31)
 /// `daHo_HIO_c() { ... field_0x34 = 900.0f; ... }` (`:29`) - the camera distance over which the sail
 /// fades in, and the divisor of `rate` (`:794`, `:797`).
 const ALPHA_FADE_RANGE: f32 = 900.0; // <- d_a_grid.cpp:29 (daHo_HIO_c::field_0x34)
-/// ```
+/// ```c
 /// if (target_alpha > alpha + 5) { mPacket.setAlpha(alpha + 5); }
 /// else if (target_alpha < alpha - 5) { mPacket.setAlpha(alpha - 5); }
 /// else { mPacket.setAlpha(target_alpha); }
@@ -103,7 +103,7 @@ const ALPHA_STEP: i32 = 5; // <- d_a_grid.cpp:805, :807
 /// `daHo_packet_c() { ... mAlpha = 0xFF; ... }` (`d_a_grid.h:15`) - the sail starts opaque; the ramp
 /// only ever pulls it down when the camera comes close.
 const ALPHA_INIT: u8 = 0xFF; // <- d_a_grid.h:15 (daHo_packet_c::mAlpha)
-/// ```
+/// ```c
 /// if (scale.y < 0.06f) { return true; }
 /// ```
 /// (`:813-815` in `_execute`, `:823-825` in `_draw`) - below this vertical squash the cloth is not

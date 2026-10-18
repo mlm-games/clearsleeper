@@ -254,7 +254,7 @@ impl Toge {
 
     /// The body of `case 4` (`:261-274`).
     ///
-    /// ```
+    /// ```c
     /// if (cLib_addCalc(&unk470, unk474, 0.1f, f31, f30) == 0) {
     ///     if (unk470 < 0) { unk474 = 0; }
     ///     else if (unk485 != 0) { unk486 = timer; mEventState = 1; unk485 = 0; }

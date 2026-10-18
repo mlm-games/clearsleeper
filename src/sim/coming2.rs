@@ -49,19 +49,19 @@ use super::ship::Ship;
 /// `g_profile_Coming2` (`d_a_coming2.cpp:676-691`).
 pub const COMING2_ACTORS: [&str; 1] = ["Com_B"];
 
-/// ```
+/// ```c
 /// unk_2A6 = 600;
 /// ```
 /// (`:216` `init_coming_info`, `:366` `coming_wait_init`) - the room-change grace period, in ticks.
 const ROOM_GRACE: i16 = 600; // <- d_a_coming2.cpp:216, :366
-/// ```
+/// ```c
 /// unk_29C = (s32)cM_rndF(2.0f) & 1;
 /// ```
 /// (`:217`) - the lane offset, chosen at random. There is NO global `cM_rndF` in this sim (the brief
 /// lists it), so `Coming2::spawn` uses the crate's established per-actor xorshift
 /// (`buoybarrel.rs:349-354`, `agbsw0.rs:561-573`).
 const SIDE_SPAN: f32 = 2.0; // <- d_a_coming2.cpp:217
-/// ```
+/// ```c
 /// f32 fVar1 = unk_2A0;
 /// if (fVar1 < 35.0f) { fVar1 = 35.0f; } else { fVar1 = unk_2A0; }
 /// sp18.x = 0.0f; sp18.y = 100.0f; sp18.z = fVar1 * 135.0f;
@@ -70,7 +70,7 @@ const SIDE_SPAN: f32 = 2.0; // <- d_a_coming2.cpp:217
 const SPEED_FLOOR: f32 = 35.0; // <- d_a_coming2.cpp:73
 const ARM_SCALE: f32 = 135.0; // <- d_a_coming2.cpp:79
 const ARM_LIFT: f32 = 100.0; // <- d_a_coming2.cpp:78
-/// ```
+/// ```c
 /// s16 arr[2] = {0x546, -0x546};
 /// s16 sVar3 = arr[(unk_2A4 + unk_29C) & 1];
 /// sVar3 = sVar3 > 0 ? sVar3 + ((unk_2A4 >> 2) & 0xF) * 0x168
@@ -81,7 +81,7 @@ const ARM_LIFT: f32 = 100.0; // <- d_a_coming2.cpp:78
 const SIDE_YAW: [i16; 2] = [0x546, -0x546]; // <- d_a_coming2.cpp:81
 const FAN_STEP: i32 = 0x168; // <- d_a_coming2.cpp:83
 const FAN_FOLD: i32 = 0xF; // <- d_a_coming2.cpp:83
-/// ```
+/// ```c
 /// if (unk_46C < 0xB4) { ... unk_46C++; } else { ... coming_process_init(0); }
 /// ```
 /// (`:480`, `:485`, `:486`) - how long the ship-crossing test runs before giving up.
@@ -120,7 +120,7 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// ```
+    /// ```c
     /// if (arg1 >= 0 && arg1 < 5) { if ((this->*init_table[arg1])()) { unk_46E = arg1; return true; } }
     /// return false;
     /// ```
@@ -233,7 +233,7 @@ pub struct Coming2 {
 impl Coming2 {
     /// `daComing2::Act_c::_create` (`:589-609`).
     ///
-    /// ```
+    /// ```c
     /// fopAcM_ct(this, daComing2::Act_c);
     /// unk_299 = -1;
     /// init_barrel_info();          // 15x init_barrelN_info
@@ -314,7 +314,7 @@ impl Coming2 {
     }
 
     /// `daComing2::Act_c::chase_ship` (`:48-55`):
-    /// ```
+    /// ```c
     /// fpc_ProcID proc = fopAcM_GetLinkId(this);
     /// fopAc_ac_c* actor = fopAcM_SearchByID(proc);
     /// if (actor != NULL) { current.pos = actor->current.pos; shape_angle = actor->shape_angle; }
@@ -332,7 +332,7 @@ impl Coming2 {
     }
 
     /// `daComing2::get_speed` (`:58-62`):
-    /// ```
+    /// ```c
     /// f32 x = actor->current.pos.x - actor->old.pos.x;
     /// f32 z = actor->current.pos.z - actor->old.pos.z;
     /// return std::sqrtf(x * x + z * z);
@@ -348,7 +348,7 @@ impl Coming2 {
 
     /// `daComing2::Act_c::renew_scope_info` (`:65-98`).
     ///
-    /// ```
+    /// ```c
     /// unk_2A0 = get_speed(this);
     /// f32 fVar1 = unk_2A0;
     /// if (fVar1 < 35.0f) { fVar1 = 35.0f; } else { fVar1 = unk_2A0; }
@@ -415,7 +415,7 @@ impl Coming2 {
     /// `daComing2::checkLineCrossXZ` (`:269-285`) - the pure segment-crossing test
     /// `coming_checkS_main` calls.
     ///
-    /// ```
+    /// ```c
     /// cXyz sp44(arg1->x - arg0->x, 0.0f, arg1->z - arg0->z);
     /// cXyz sp38(arg2->x - arg0->x, 0.0f, arg2->z - arg0->z);
     /// cXyz sp2C(arg3->x - arg0->x, 0.0f, arg3->z - arg0->z);
@@ -529,7 +529,7 @@ impl Coming2 {
     }
 
     /// `minus_coming_point1` (`d_a_coming2.h:42-48`):
-    /// ```
+    /// ```c
     /// s32 evnt = dComIfGs_getEventReg(dSv_event_flag_c::UNK_7EFF);
     /// u8 evnt2 = (evnt - 1 < 0) ? 0 : evnt - 1;
     /// dComIfGs_setEventReg(dSv_event_flag_c::UNK_7EFF, evnt2);
@@ -570,7 +570,7 @@ impl Coming2 {
     }
 
     /// `coming_clear_main` (`:355-362`):
-    /// ```
+    /// ```c
     /// if (request_all_barrel_exit() && request_all_flag_exit()) {
     ///     init_barrel_info();
     ///     init_coming_info();
@@ -608,7 +608,7 @@ impl Coming2 {
 
     /// `coming_wait_main` (`:372-394`):
     ///
-    /// ```
+    /// ```c
     /// daPy_py_c* player = daPy_getPlayerActorClass();
     /// if (player != NULL) {
     ///     if (dComIfGp_checkPlayerStatus0(0, daPyStts0_SHIP_RIDE_e)) {
@@ -673,7 +673,7 @@ impl Coming2 {
 
     /// `coming_checkS_main` (`:479-493`):
     ///
-    /// ```
+    /// ```c
     /// if (unk_46C < 0xB4) {
     ///     if (checkLineCrossXZ(&old.pos, &current.pos, &mStartBuoy[0].unk_04, &mStartBuoy[1].unk_04)) {
     ///         request_all_flag_exit();
@@ -714,7 +714,7 @@ impl Coming2 {
 
     /// `coming_game_main` (`:505-550`):
     ///
-    /// ```
+    /// ```c
     /// u32 unk294 = unk_2A4;
     /// if (unk294 >= 15) { return; }
     /// if (unk_29A == 1) { ...make_coming_param + spawn...; if (unk_2A8++ >= 60) {
@@ -743,7 +743,7 @@ impl Coming2 {
 
     /// `daComing2::Act_c::barrel_execute` (`:306-336`) for one slot.
     ///
-    /// ```
+    /// ```c
     /// fpc_ProcID barrelProc = mBarrelInfo[idx].unk_00;
     /// if (barrelProc != fpcM_ERROR_PROCESS_ID_e) {
     ///     if ((BOOL)fopAcM_SearchByID(barrelProc, (fopAc_ac_c**)&barrel) == TRUE) {
@@ -827,7 +827,7 @@ impl Coming2 {
 
     /// `daComing2::Act_c::request_barrel_exitN` (`:239-254`):
     ///
-    /// ```
+    /// ```c
     /// fpc_ProcID barrelProc = mBarrelInfo[idx].unk_00;
     /// if (barrelProc != fpcM_ERROR_PROCESS_ID_e) {
     ///     if (fopAcM_SearchByID(barrelProc, ...) != NULL && barrel != NULL) {
@@ -851,7 +851,7 @@ impl Coming2 {
     }
 
     /// `daComing2::Act_c::request_all_barrel_exit` (`:257-266`):
-    /// ```
+    /// ```c
     /// for (i = 0; i < 15; i++) { if (request_barrel_exitN(i)) { count++; } }
     /// return count == 15 ? TRUE : FALSE;
     /// ```
@@ -867,7 +867,7 @@ impl Coming2 {
 
     /// `daComing2::Act_c::request_all_flag_exit` (`:288-303`):
     ///
-    /// ```
+    /// ```c
     /// for (s32 i = 0; i < 2; i++) {
     ///     fpc_ProcID buoyProc = mStartBuoy[i].unk_00;
     ///     if (buoyProc != fpcM_ERROR_PROCESS_ID_e && fopAcM_SearchByID(buoyProc, ...) != NULL
@@ -932,7 +932,7 @@ impl Coming2 {
 
     /// `daComing2::Act_c::_execute` (`:617-632`).
     ///
-    /// ```
+    /// ```c
     /// daShip_c* ship = (daShip_c*)fopAcM_SearchByID(fopAcM_GetLinkId(this));
     /// if (ship != NULL) {
     ///     chase_ship();

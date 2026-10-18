@@ -36,7 +36,7 @@ const TYPE_ROPE_B: u8 = 4; // <- d_a_kui.cpp:361
 const TAIL_MASK: u32 = 0xF0; // <- d_a_kui.cpp:483
 /// `fopAcM_setCullSizeBox` is not used; `Create` writes the box with the size setters, for
 /// `i_this->type >= 2` (`:533-535`):
-/// ```
+/// ```c
 /// fopAcM_SetMin(i_this, -200.0f, -1000.0f, -200.0f);
 /// fopAcM_SetMax(i_this,  200.0f,  2000.0f,  200.0f);
 /// ```
@@ -46,7 +46,7 @@ const CULL_MIN_TALL: [f32; 3] = [-200.0, -1000.0, -200.0]; // <- d_a_kui.cpp:534
 const CULL_MAX_TALL: [f32; 3] = [200.0, 2000.0, 200.0]; // <- d_a_kui.cpp:535
 const CULL_MIN_FLAT: [f32; 3] = [-200.0, -200.0, -200.0]; // <- d_a_kui.cpp:537
 const CULL_MAX_FLAT: [f32; 3] = [200.0, 200.0, 200.0]; // <- d_a_kui.cpp:538
-/// ```
+/// ```c
 /// if (actor->health == 3 && i_this->field_0x308 == 0) { i_this->field_0x308 = 1000; }
 /// ```
 /// (`:365-366`) - `field_0x308` is the release countdown.
@@ -55,13 +55,13 @@ const RELEASE_START: i16 = 1000; // <- d_a_kui.cpp:366
 const RELEASE_TRIGGER: i16 = 970; // <- d_a_kui.cpp:375
 /// `actor->current.pos.y = actor->home.pos.y - 70.0f;` (`:369`) - the retracted rope height.
 const ROPE_DROP: f32 = -70.0; // <- d_a_kui.cpp:369
-/// ```
+/// ```c
 /// cLib_addCalcAngleS2(&actor->current.angle.x, target_x_angle, 4, REG0_S(1) + 0x200);
 /// ```
 /// (`:279`) - `REG0_S(1)` folds to 0. The bell's pitch chase, running in the type-3 arm every tick.
 const BELL_CHASE_SCALE: i16 = 4; // <- d_a_kui.cpp:279
 const BELL_CHASE_MAX: i16 = 0x200; // <- d_a_kui.cpp:279
-/// ```
+/// ```c
 /// cLib_addCalcAngleS2(&i_this->field_0x2E2, i_this->field_0x2E4, 4, i_this->field_0x2E6);
 /// cLib_addCalcAngleS2(&i_this->field_0x2E4, 0, 1, REG17_S(6) + 0x80);
 /// cLib_addCalcAngleS2(&i_this->field_0x2E6, REG17_S(7) + 0x100, 1, REG17_S(8) + 0x40);
@@ -74,7 +74,7 @@ const RING_DECAY_MAX: i16 = 0x80; // <- d_a_kui.cpp:310
 const RING_TARGET: i16 = 0x100; // <- d_a_kui.cpp:311
 const RING_STEP_MAX: i16 = 0x40; // <- d_a_kui.cpp:311
 /// `demo_camera` (`:130-200`) - the `field_0x30C` rope-drop profile, `uVar3 == (s32)field_0x2EA`:
-/// ```
+/// ```c
 /// if (uVar3 < 20)      { field_0x30C = cM_ssin((uVar3 & 0x1F) * 0x800) * 5.0f; }
 /// else if (uVar3 <= 27){ cLib_addCalc2(&field_0x30C, -70.0f, 1.0f, 10.0f); }
 /// else if (uVar3 < 42) { field_0x30C = cM_ssin(uVar3 * 0x3A00) * 5.0f + (-70.0f); }
@@ -162,7 +162,7 @@ pub struct Kui {
 impl Kui {
     /// `daKui_Create` (`:467-542`)'s parameter decode, exactly.
     ///
-    /// ```
+    /// ```c
     /// if (fopAcM_GetParam(a_this) == -1) { return cPhs_ERROR_e; }
     /// i_this->type = fopAcM_GetParam(a_this) & 0xF;
     /// i_this->field_0x2A2 = fopAcM_GetParam(a_this) & 0xF0;
@@ -346,7 +346,7 @@ impl Kui {
 
     /// `demo_camera` (`:130-200`), the `field_0x2E8` state machine, minus the camera.
     ///
-    /// ```
+    /// ```c
     /// switch ((s8)i_this->field_0x2E8) {
     /// case 0: break;
     /// case 1:

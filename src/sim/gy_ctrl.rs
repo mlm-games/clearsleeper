@@ -264,7 +264,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::createInit` (`:477-490`), first tick only.
     ///
-    /// ```
+    /// ```c
     /// if (m330 != 0xff) { modeProc(PROC_INIT_e, 0); } else { modeProc(PROC_INIT_e, 1); }
     /// m320 = 0;
     /// m338 = current.pos;
@@ -321,7 +321,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::setTarget` (`:87-138`).
     ///
-    /// ```
+    /// ```c
     /// if (dComIfGp_checkPlayerStatus0(0, daPyStts0_SHIP_RIDE_e) ||
     ///     dComIfGp_checkPlayerStatus0(0, daPyStts0_UNK1000000_e)) {
     ///     if (m3E8 != 0) {
@@ -374,7 +374,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::setPathTargetPos` (`:141-172`).
     ///
-    /// ```
+    /// ```c
     /// switch (m320) {
     /// case 0: sp24 = player.pos; m318 = l_HIO.m1C; m34C += l_HIO.m0A; break;
     /// case 1: if (ship != NULL) { sp24 = ship.pos; m318 = l_HIO.m18; m34C += l_HIO.m0C; } break;
@@ -475,7 +475,7 @@ impl GyCtrl {
     /// `daGy_Ctrl_c::checkPath` (`:191-225`) - is the whole fan of [`AIM_COUNT`] look-ahead rays
     /// clear of geometry?
     ///
-    /// ```
+    /// ```c
     /// if (dComIfGp_event_runCheck()) { return false; }
     /// for (i = 0; i < ARRAY_SSIZE(m3EC); i++) {          // 16, not 5
     ///     s16 tmp = 0xFFF; s16 tmp2 = tmp * i;
@@ -518,7 +518,7 @@ impl GyCtrl {
     /// `daGy_Ctrl_c::searchNearActor` (`:70-84`) as a predicate over the name and the XZ distance
     /// of each actor `fopAcM_Search` would visit.
     ///
-    /// ```
+    /// ```c
     /// if (m328 == 0 && fpcM_GetName(arg1) == fpcNm_GY_CTRLB_e && dVar3 < 6000.0f) { return arg1; }
     /// if (fpcM_GetName(arg1) == fpcNm_DAIOCTA_e || fpcM_GetName(arg1) == fpcNm_OBJ_IKADA_e ||
     ///     fpcM_GetName(arg1) == fpcNm_NPC_SO_e) {
@@ -539,7 +539,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::modeSwWait` (`:312-323`).
     ///
-    /// ```
+    /// ```c
     /// if (m328 == 1) { sw = fopAcM_GetRoomNo(this); }
     /// else if (m328 == 0) { sw = m334; }
     /// if (dComIfGs_isSwitch(m330, sw)) { modeProc(PROC_INIT_e, 1); }
@@ -589,7 +589,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::modeCreate` (`:331-355`)'s spawning block.
     ///
-    /// ```
+    /// ```c
     /// if (m31C < m329 && cLib_calcTimer(&m350) == 0) {
     ///     cXyz sp18 = m290[m31C];
     ///     csXyz sp10(0, 0, 0);
@@ -650,7 +650,7 @@ impl GyCtrl {
 
     /// `daGy_Ctrl_c::modeHide` (`:384-417`), the `VERSION > VERSION_DEMO` arm.
     ///
-    /// ```
+    /// ```c
     /// bool bVar1 = false;
     /// if (m328 == 1) { if (m344 == 1 && m3E8 == 1) { bVar1 = true; } }
     /// else if (m328 == 0 && m3E8 == 1) { bVar1 = true; }

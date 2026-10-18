@@ -125,7 +125,7 @@ impl Sbox {
         Vec3::new(v.x * c + v.z * s, v.y, -v.x * s + v.z * c)
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::shipMtx() {
     ///     daShip_c* ship = dComIfGp_getShipActor();
     ///     if (ship == NULL) { JUT_ASSERT(220, FALSE); }
@@ -165,7 +165,7 @@ impl Sbox {
         out.angle[1] = ship_yaw.wrapping_add(HALF_TURN_MINUS_ONE);
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::demoInitWait() {
     ///     int* puVar1 = dComIfGp_evmng_getMyIntegerP(m2F8, "Timer");
     ///     if (puVar1 != NULL) { m2F4 = *puVar1; } else { m2F4 = 0; }
@@ -176,7 +176,7 @@ impl Sbox {
         self.timer = list.cut_number(cut, KEY_TIMER).unwrap_or(0);
     }
 
-    /// ```
+    /// ```c
     /// BOOL daSbox_c::demoProcWait() {
     ///     if (m2F4 > 0) { m2F4--; } else { dComIfGp_evmng_cutEnd(m2F8); }
     ///     return FALSE;
@@ -195,7 +195,7 @@ impl Sbox {
         }
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::demoInitOpen() {
     ///     mBck1.setPlaySpeed(1.0f); mBck2.setPlaySpeed(1.0f);
     ///     mBtk.setPlaySpeed(1.0f); mBrk.setPlaySpeed(1.0f);
@@ -227,7 +227,7 @@ impl Sbox {
         self.flag |= FLAG_DARK;
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::demoProcOpen() {
     ///     if (chkFlag(1)) {
     ///         if (mBck1.play()) {
@@ -251,7 +251,7 @@ impl Sbox {
         }
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::demoInitDelete() {
     ///     if (chkFlag(2)) {
     ///         if (mEmitter != NULL) { mEmitter->becomeInvalidEmitter(); mEmitter = NULL; }
@@ -272,7 +272,7 @@ impl Sbox {
         }
     }
 
-    /// ```
+    /// ```c
     /// void daSbox_c::demoInitCom() {
     ///     if (dComIfGp_evmng_getMyIntegerP(m2F8, "DISP") != NULL) { setFlag(8); }
     /// }
@@ -284,7 +284,7 @@ impl Sbox {
         }
     }
 
-    /// ```
+    /// ```c
     /// BOOL daSbox_c::demoProc() {
     ///     m2F8 = dComIfGp_evmng_getMyStaffId("tkrSlv");
     ///     if (m2F8 == -1) { return FALSE; }
@@ -355,7 +355,7 @@ impl Sbox {
         Step::Live { end_cut: ended }
     }
 
-    /// ```
+    /// ```c
     /// BOOL daSbox_c::actionWait() {
     ///     shipMtx();
     ///     if (!demoProc()) { fopAcM_delete(this); }

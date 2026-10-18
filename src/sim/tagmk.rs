@@ -77,7 +77,7 @@ pub const STAGE_LEAD: i16 = 0x14; // <- d_a_tag_mk.cpp:513 (20)
 pub const STAGE_TIMED: i16 = 10; // <- d_a_tag_mk.cpp:515
 pub const TIMED_HOLD: i16 = 60; // <- d_a_tag_mk.cpp:516
 pub const TIMED_WAIT: i16 = 180; // <- d_a_tag_mk.cpp:518
-/// ```
+/// ```c
 /// case 0: case 10: if (isTmpBit(UNK_0440)) { m296++; mDoAud_bgmAllMute(30); } break;
 /// case 1: if (isSwitch(getSwbit(), roomNo)) { m296++; } break;
 /// case 2: case 11: if (mCutEndTimer > 0) { mCutEndTimer--; }
@@ -195,7 +195,7 @@ impl Tagmk {
     /// (`:509-510`, an absent channel) and `setTagWpEvId()` (`:503`, which needs the equipped item
     /// and the Triforce count and therefore belongs in [`Tagmk::create_init`]).
     ///
-    /// ```
+    /// ```c
     /// switch (getType()) {
     /// case 3: if (!isEventBit(UNK_2D80)) { setAction(ACT_VILLA_e); [attention + m29C + lifts] }
     ///         else { setAction(ACT_WAIT_e); } break;
@@ -299,7 +299,7 @@ impl Tagmk {
 
     /// `setTagWpEvId` (`:134-142`), reached only from `create`'s `case 2` else chain (`:503`).
     ///
-    /// ```
+    /// ```c
     /// if (dComIfGs_getSelectEquip(0) != dItemNo_MASTER_SWORD_3_e) { mEventIdx = getEventIdx("tagwp2"); }
     /// else if (dComIfGs_getTriforceNum() < 8) { mEventIdx = getEventIdx("tagwp"); }
     /// else { mEventIdx = getEventIdx("tagwp3"); }

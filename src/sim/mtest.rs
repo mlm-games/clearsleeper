@@ -78,7 +78,7 @@ const SCALE_MULT: [[f32; 3]; 8] = [
 const CYL_RADIUS: f32 = 50.0; // <- d_a_obj_mtest.cpp:61
 const CYL_HEIGHT: f32 = 100.0; // <- d_a_obj_mtest.cpp:62
 
-/// ```
+/// ```c
 /// if (M_type == Type_MwtrSB || M_type == Type_MygnSB) {
 ///     fopAcM_setCullSizeBox(this, -3000.0f, -10.0f, -3000.0f, 3000.0f, 10.0f, 3000.0f);
 /// } else if (M_type != Type_Owater) {
@@ -243,7 +243,7 @@ impl Mtest {
     }
 
     /// `daObjMtest::Act_c::chk_appear` (`d_a_obj_mtest.cpp:68-78`):
-    /// ```
+    /// ```c
     /// s32 swSave = prm_get_swSave();
     /// s32 arg0 = prm_get_arg0();
     /// if (arg0 == 0) { return fopAcM_isSwitch(this, swSave) ? true : false; }

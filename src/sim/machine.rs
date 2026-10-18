@@ -79,7 +79,7 @@ impl Machine {
 
 /// `daMachine_c::set_speed` (`d_a_machine.cpp:235-250`).
 ///
-/// ```
+/// ```c
 /// f32 f31 = 5.0f;
 /// daWindMill_c* windmill = search_wind_mill();
 /// if (windmill != NULL) { f1 = (f32)windmill->mAngle[1] / (f32)daWindMill_c::m_max_rot_speed[windmill->mType]; }

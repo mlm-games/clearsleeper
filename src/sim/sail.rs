@@ -29,7 +29,7 @@ pub const SAIL_ACTORS: [&str; 1] = ["Psail"];
 const CULL_MIN: [f32; 3] = [-40.0, 0.0, -40.0]; // <- f_op_actor_mng.cpp:561
 const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:561
 
-/// ```
+/// ```c
 /// static cXyz sail_offset(0.0f, 2100.0f, 100.0f);
 /// cMtx_multVec(l_p_ship->mModel->getBaseTRMtx(), &sail_offset, &i_this->current.pos);
 /// i_this->current.angle = l_p_ship->shape_angle;
@@ -38,14 +38,14 @@ const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:561
 /// mast height; `100.0f` a small forward offset.
 const MAST_TOP: [f32; 3] = [0.0, 2100.0, 100.0]; // <- d_a_sail.cpp:554
 
-/// ```
+/// ```c
 /// i_this->mSailPacket.m1C44 = 0.0f;
 /// i_this->mSailPacket.m1C48 = 0.0f;
 /// ```
 /// (`d_a_sail.cpp:628-629`) - the sail starts fully furled with a zero approach rate.
 const FURLED_ZERO: f32 = 0.0; // <- d_a_sail.cpp:628
 
-/// ```
+/// ```c
 /// if (l_p_ship->m2CE == 0) { l_HIO.m06 = 0; i_this->mSailPacket.m1C44 = 0.6f; }
 /// else { l_HIO.m06 = 1; }
 /// ```
@@ -55,7 +55,7 @@ const FURLED_ZERO: f32 = 0.0; // <- d_a_sail.cpp:628
 /// 60% UNfurled (`m1C44 = 0.6f`).
 const SAILLESS_FURLED: f32 = 0.6; // <- d_a_sail.cpp:640
 
-/// ```
+/// ```c
 /// daSail_HIO_c() { mNo = -1; m05 = 1; m06 = 1; m10 = 0.0f; m07 = 0; }
 /// ```
 /// (`d_a_sail.cpp:23-29`). These are the FILE-SCOPE HIO defaults - `l_HIO` is a
@@ -69,7 +69,7 @@ const HIO_M10: f32 = 0.0; // <- d_a_sail.cpp:27
 /// above `VERSION_DEMO`, and this port targets `VERSION_NTSC_U`. So every `REG_SAIL_*` in
 /// `sail_move` and `sail_pos_move` folds to a literal - the same proof as RULE 2b.
 const REG_SAIL_F25: f32 = 0.0; // <- d_a_sail.cpp:51 (REG_SAIL_F(25))
-/// ```
+/// ```c
 /// if (l_HIO.m06 == 0 && i_this->mSailPacket.m1C44 < REG_SAIL_F(25) + 0.6f) {
 ///     if (i_this->mSailPacket.m1C48 <= 0.0f) { i_this->mSailPacket.m1C48 = 0.015f; }
 ///     else { i_this->mSailPacket.m1C48 -= 0.001f; }
@@ -142,7 +142,7 @@ pub struct Sail {
 impl Sail {
     /// `daSail_Create` (`:596-652`), first tick only.
     ///
-    /// ```
+    /// ```c
     /// i_this->mSailPacket.m1C44 = 0.0f;
     /// i_this->mSailPacket.m1C48 = 0.0f;
     /// ...
@@ -219,7 +219,7 @@ impl Sail {
 
     /// `daSail_Execute` (`:553-559`):
     ///
-    /// ```
+    /// ```c
     /// static cXyz sail_offset(0.0f, 2100.0f, 100.0f);
     /// cMtx_multVec(l_p_ship->mModel->getBaseTRMtx(), &sail_offset, &i_this->current.pos);
     /// i_this->current.angle = l_p_ship->shape_angle;
@@ -247,7 +247,7 @@ impl Sail {
     }
 
     /// `daSail_Create`'s HIO override tail (`:501-503`) of `sail_move`:
-    /// ```
+    /// ```c
     /// if (!demo_move(i_this) && l_HIO.m08 != 0) { i_this->mSailPacket.m1C44 = l_HIO.m0C; }
     /// ```
     ///

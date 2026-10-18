@@ -11,7 +11,7 @@ pub const BG_ACTORS: [&str; 1] = ["Bg"];
 /// `strcmp(dComIfGp_getStartStageName(), "sea") == 0` (`d_a_bg.cpp:308`) - the stage whose room
 /// background models are given the longer unload delay.
 pub const SEA_STAGE: &str = "sea"; // <- d_a_bg.cpp:308
-/// ```
+/// ```c
 /// if (strcmp(dComIfGp_getStartStageName(), "sea") == 0) { mUnloadTimer = 16; }
 /// else { mUnloadTimer = 1; }
 /// ```

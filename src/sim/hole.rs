@@ -175,7 +175,7 @@ impl Hole {
 
     /// `daObj_Hole_c::getPosAndAngle` (`:74-90`).
     ///
-    /// ```
+    /// ```c
     /// cXyz posUp(0.0f, 10.0f, 0.0f);   posUp += current.pos;
     /// cXyz posDown(0.0f, -100.0f, 0.0f); posDown += current.pos;
     /// csXyz unused_angle(0, 0, 0);

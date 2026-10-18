@@ -171,7 +171,7 @@ impl Hbrf1 {
     /// (`:43`) and `m2E4 = 0` (`:44`), split out because two of them need resources `spawn` cannot
     /// see.
     ///
-    /// ```
+    /// ```c
     /// if (prm_get_Type() == 0 && !fopAcM_isSwitch(this, prm_get_swSave())) {
     ///     current.pos.y += 750.0f; mMode = Mode_UP_STOP_e;
     /// } else if (prm_get_Type() == 1 && fopAcM_isSwitch(this, prm_get_swSave())) {
@@ -193,7 +193,7 @@ impl Hbrf1 {
 
     /// `daObjHbrf1_down_stop` (`:94-110`).
     ///
-    /// ```
+    /// ```c
     /// if ((prm_get_Type() == 0 && !fopAcM_isSwitch(this, prm_get_swSave()))
     ///     || (prm_get_Type() != 0 && fopAcM_isSwitch(this, prm_get_swSave()))) {
     ///     if (prm_get_Event() == 0 && !dComIfGs_isEventBit(UNK_1540)) {
@@ -296,7 +296,7 @@ impl Hbrf1 {
 
     /// `daObjHbrf1_up_demo` (`:130-148`).
     ///
-    /// ```
+    /// ```c
     /// current.pos.y += mYOffset;
     /// if (current.pos.y >= home.pos.y + 750.0f) {
     ///     current.pos.y = home.pos.y + 750.0f;

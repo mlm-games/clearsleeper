@@ -17,7 +17,7 @@ use super::flags::{EventReg, Switches};
 /// `const char daObjFerris::Act_c::M_arcname[8] = "Skanran";` (`d_a_obj_ferris.cpp:81`).
 pub const FERRIS_ACTORS: [&str; 1] = ["Skanran"];
 
-/// ```
+/// ```c
 /// static const Attr_c L_attr = { 45, 0x01, 50.0f, 195.0f, { 0.0f, -100.0f, -135.0f }, 1820.0f,
 ///                                0.0f, 30.0f };
 /// ```
@@ -49,7 +49,7 @@ const GONDOLA_OFFSETS: [[f32; 3]; 6] = [
     [-1025.04, 332.98, 162.68], // <- d_a_obj_ferris.cpp:255
     [0.0, 0.0, 0.0],            // <- d_a_obj_ferris.cpp:256
 ];
-/// ```
+/// ```c
 /// cXyz offsets[5] = { cXyz(-993.54f, -325.78f, 37.63f), cXyz(-616.86f, 844.24f, 37.63f),
 ///                    cXyz(612.3f, 847.55f, 37.63f), cXyz(995.28f, -320.43f, 37.63f),
 ///                    cXyz(2.82f, -1045.59f, 37.63f) };
@@ -67,7 +67,7 @@ const RIDE_OFFSETS: [[f32; 3]; 5] = [
 const REST_ANGLE: i16 = 0x1800; // <- d_a_obj_ferris.cpp:194
 /// `mRotSpeed = 45; mRotState = 1;` (`:185-186`) when the stage switch is already on.
 const BOOT_SPEED: i16 = 45; // <- d_a_obj_ferris.cpp:185
-/// ```
+/// ```c
 /// if (mRotTimer < 11) { mRotSpeed = 4; }
 /// else { switch (mRotState) { case 9: case 5: if (!(mFrameTimer & 3)) mRotSpeed--; break;
 ///                              default: mRotSpeed--; break; } }
@@ -77,7 +77,7 @@ const SPIN_UP: i16 = 4; // <- d_a_obj_ferris.cpp:371
 const DECAY_MASK: i16 = 3; // <- d_a_obj_ferris.cpp:376
 /// `if (mRotTimer > 20) { mRotTimer = 0; mRotState++; }` (`:359-362`) - the dwell between states.
 const STATE_DWELL: i16 = 20; // <- d_a_obj_ferris.cpp:359
-/// ```
+/// ```c
 /// case 1: dComIfGs_onEventBit(dSv_event_flag_c::UNK_2104);
 ///        if (!(mFrameTimer & 3)) mRotSpeed++;
 ///        if (now_event(mEventIdx_kanban_start)) { if (mRotSpeed > 67) mRotSpeed = 67; }
@@ -87,7 +87,7 @@ const STATE_DWELL: i16 = 20; // <- d_a_obj_ferris.cpp:359
 /// cap that rises from `Attr_c::field_0x00` to 67 while the start cut plays.
 const RUN_MAX: i16 = 67; // <- d_a_obj_ferris.cpp:421
 const RUN_FLAG: u16 = 0x2104;
-/// ```
+/// ```c
 /// case 10: mRotSpeed = -5;
 ///        if (mRotAngle < 0x1800 || !now_event(mEventIdx_kanban_vive)) { mRotState = 0; mRotSpeed = 0; }
 /// ```
@@ -97,7 +97,7 @@ const SPIN_DOWN: i16 = -5; // <- d_a_obj_ferris.cpp:409
 /// (`:326-327`) - the gondolas' idle sway, in 0x10000 units.
 const WAVE_STEP: i16 = 500; // <- d_a_obj_ferris.cpp:326
 const WAVE_AMP: f32 = 380.0; // <- d_a_obj_ferris.cpp:327
-/// ```
+/// ```c
 /// mDoMtx_multVec(mMtx[i], &offs1, &pt1);   // offs1 = (0.0f, -100.0f, -135.0f)
 /// delta.set(pt1.x - pt0.x, 0.0f, pt1.z - pt0.z);
 /// delta.normalizeRS();
@@ -112,14 +112,14 @@ const LEAN_LIMIT: f32 = 550.0; // <- d_a_obj_ferris.cpp:508, :510
 /// suspension's chase rate.
 const LEAN_SCALE: i16 = 4; // <- d_a_obj_ferris.cpp:516
 const LEAN_MAX: i16 = 0x1000; // <- d_a_obj_ferris.cpp:516
-/// ```
+/// ```c
 /// mEventIdx_kanban_vive = dComIfGp_evmng_getEventIdx("kanran_vive");
 /// mEventIdx_kanban_start = dComIfGp_evmng_getEventIdx("kanran_start");
 /// ```
 /// (`:192-193`) - note the stage file spells the stage `Skanran` but the cut names use `kanran`.
 const EV_KANBAN_VIVE: &str = "kanran_vive"; // <- d_a_obj_ferris.cpp:192
 const EV_KANBAN_START: &str = "kanran_start"; // <- d_a_obj_ferris.cpp:193
-/// ```
+/// ```c
 /// fopAcM_setCullSizeBox(this, -1400.0f, -1400.0f, -500.f, 1400.0f, 1400.0f, 800.0f);
 /// fopAcM_setCullSizeFar(this, 10.0f);
 /// ```
@@ -127,7 +127,7 @@ const EV_KANBAN_START: &str = "kanran_start"; // <- d_a_obj_ferris.cpp:193
 /// `fopAc_CULLBOX_CUSTOM_e` (`:598`). The far plane is a renderer override, not a box.
 const CULL_MIN: [f32; 3] = [-1400.0, -1400.0, -500.0]; // <- d_a_obj_ferris.cpp:182
 const CULL_MAX: [f32; 3] = [1400.0, 1400.0, 800.0]; // <- d_a_obj_ferris.cpp:182
-/// ```
+/// ```c
 /// const dCcD_SrcCyl M_cyl_src = { ... SrcObjAt Type 0, SrcObjTg Type
 ///     ~(AT_TYPE_LIGHT | AT_TYPE_UNK400000 | AT_TYPE_WIND | AT_TYPE_UNK20000 | AT_TYPE_WATER), ... };
 /// ```
@@ -137,7 +137,7 @@ const CULL_MAX: [f32; 3] = [1400.0, 1400.0, 800.0]; // <- d_a_obj_ferris.cpp:182
 /// overwrites them every tick with `CYL_R` / `CYL_H` (`:439-440`) and `CYL_H_2` (`:447`).
 const CYL_DEFAULT_R: f32 = 100.0; // <- d_a_obj_ferris.cpp:46
 const CYL_DEFAULT_H: f32 = 200.0; // <- d_a_obj_ferris.cpp:47
-/// ```
+/// ```c
 /// const dCcD_SrcSph M_sph_src = { ... SrcObjAt Type 0, SrcObjTg Type 0 ... Radius 35.0f };
 /// ```
 /// (`:51-78`). `SrcObjTg Type = 0` (`:29` of the struct, `:55` in the literal) means this sphere is
@@ -229,7 +229,7 @@ impl Ferris {
     /// (`d_a_obj_ferris.h:37-41`), i.e. `((1 << 8) - 1) & (param >> 0)` - the parameter's low byte.
     /// The profile's `Parameters` field is `0` (`:593`), so the whole `u32` is available.
     ///
-    /// ```
+    /// ```c
     /// if (is_switch() == 1) { mRotSpeed = 45; mRotState = 1; } else { mRotSpeed = 0; mRotState = 0; }
     /// mEventIdx_kanban_vive = dComIfGp_evmng_getEventIdx("kanran_vive");
     /// mEventIdx_kanban_start = dComIfGp_evmng_getEventIdx("kanran_start");
@@ -356,7 +356,7 @@ impl Ferris {
 
     /// `daObjFerris::Act_c::exe_event` (`:304-322`).
     ///
-    /// ```
+    /// ```c
     /// switch (mEventState) {
     /// case 1:
     ///     if (eventInfo.checkCommandDemoAccrpt()) { mEventState = 2; }
@@ -556,7 +556,7 @@ impl Ferris {
 
     /// `daObjFerris::Act_c::make_lean` (`:486-519`), the gondolas' pendulum.
     ///
-    /// ```
+    /// ```c
     /// for (i = 0; i < 5; i++) {
     ///     if (mRideState[i] == 1) {
     ///         mDoMtx_multVec(mMtx[i], &offs0, &pt0);
@@ -701,7 +701,7 @@ impl Ferris {
 
     /// `daObjFerris::Act_c::_execute` (`:522-538`).
     ///
-    /// ```
+    /// ```c
     /// mRotAngle += mRotSpeed;
     /// f32 volume = (mRotSpeed / 45.0f) * 100.0f;
     /// volume = volume > 100.0f ? 100.0f : volume;

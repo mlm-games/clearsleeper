@@ -91,7 +91,7 @@ const EV_DEFAULT_TALK: &str = "DEFAULT_TALK"; // <- d_a_dai.cpp:97
 const CULL_MIN: [f32; 3] = [-50.0, 0.0, -50.0]; // <- d_a_dai.cpp:79
 const CULL_MAX: [f32; 3] = [50.0, 200.0, 50.0]; // <- d_a_dai.cpp:79
 
-/// ```
+/// ```c
 /// f32 tmp1 = 100.0f;
 /// f32 tmp2 = 10.0f;
 /// ```
@@ -194,7 +194,7 @@ impl Dai {
     /// tick.
     ///
     /// The one part that survives here is the refusal:
-    /// ```
+    /// ```c
     /// if (!checkItemGet(dItemNo_DELIVERY_BAG_e, TRUE)) { return cPhs_ERROR_e; }
     /// ```
     /// (`:123-125`). `checkItemGet(itemNo, defaultVal)` (`d_item.cpp:539-545`) calls
@@ -364,7 +364,7 @@ impl Dai {
 
     /// `daDai_c::proc` (`d_a_dai.cpp:253-276`).
     ///
-    /// ```
+    /// ```c
     /// fopAc_ac_c* player = dComIfGp_getPlayer(0);
     /// f32 sqrt = (player->current.pos - current.pos).absXZ();
     /// f32 tmp1 = 100.0f;

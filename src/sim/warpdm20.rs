@@ -49,7 +49,7 @@ const EFF_DISTANCE: f32 = 2000.0; // <- d_a_warpdm20.cpp:41, :186
 /// `cXyz sp08(current.pos); sp08.y += 2000.0f; current.pos.y = getSeaY(sp08);` (`:147-150`) - the
 /// sea-surface probe is taken 2000 units ABOVE the actor.
 const SEA_PROBE_LIFT: f32 = 2000.0; // <- d_a_warpdm20.cpp:148
-/// ```
+/// ```c
 /// #if VERSION > VERSION_DEMO
 /// if (current.pos.y == -G_CM3D_F_INF) { current.pos.y = 0.0f; }
 /// #endif
@@ -209,7 +209,7 @@ impl WarpDm20 {
     /// work. The parameter decode is absent: `m2D6` (`daWarpdm20_prm::getType`, `:44-46`) has no
     /// reader, so per RULE 7 it is not stored.
     ///
-    /// ```
+    /// ```c
     /// m2E0 = current.pos;
     /// m2EC.set(1.0f, 1.0f, 1.0f);
     /// m2C8 = 0;
@@ -282,7 +282,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::set_mtx` (`:146-160`).
     ///
-    /// ```
+    /// ```c
     /// cXyz sp08(current.pos);
     /// sp08.y += 2000.0f;
     /// current.pos.y = getSeaY(sp08);
@@ -320,7 +320,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::check_warp` (`:482-492`).
     ///
-    /// ```
+    /// ```c
     /// daShip_c* ship = dComIfGp_getShipActor();
     /// f32 max = 500.0f;
     /// if (dComIfGp_checkPlayerStatus0(0, daPyStts0_SHIP_RIDE_e) && ship != NULL) {
@@ -351,7 +351,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::normal_execute` (`:182-203`).
     ///
-    /// ```
+    /// ```c
     /// JPABaseEmitter* emitter = mRippleCallback.getEmitter();
     /// daPy_py_c* player = daPy_getPlayerActorClass();
     /// f32 abs = (player->current.pos - current.pos).absXZ();
@@ -384,7 +384,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::checkOrder` (`:393-406`).
     ///
-    /// ```
+    /// ```c
     /// if (eventInfo.checkCommandDemoAccrpt()) {
     ///     if (dComIfGp_evmng_startCheck(mEventIdx) && m2C8 != 0) { m2C8 = 0; }
     ///     if (dComIfGp_evmng_endCheck(mEventIdx)) {
@@ -431,7 +431,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::eventOrder` (`:385-390`).
     ///
-    /// ```
+    /// ```c
     /// if (m2C8 == 1) {
     ///     fopAcM_orderOtherEventId(this, mEventIdx, 0xff, 0xffff, 0, 1);
     ///     eventInfo.onCondition(2);
@@ -459,7 +459,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::demo_proc` (`:225-251`).
     ///
-    /// ```
+    /// ```c
     /// static char* action_table[] = { "WAIT", "WARP", "DEAD", "WAIT_DEAD", "WAIT2",
     ///                                 "RETURN_WAIT" };
     /// mStaffIdx = dComIfGp_evmng_getMyStaffId("Gdemo20");
@@ -567,7 +567,7 @@ impl WarpDm20 {
 
     /// `daWarpdm20_c::_execute` (`:163-179`), reduced to `set_mtx` plus the two live branches.
     ///
-    /// ```
+    /// ```c
     /// if (demoActorID == 0) {
     ///     set_effect(0x83d8);
     ///     checkOrder();

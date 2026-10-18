@@ -28,7 +28,7 @@ type s32 = i32;
 /// `g_profile_Obj_Coming` (`d_a_obj_coming.cpp:571-586`).
 pub const COMING_ACTORS: [&str; 1] = ["Com_A"];
 
-/// ```
+/// ```c
 /// static const Attr_c L_Attr = {
 ///     {2, 3, 4, 5, 20, 60, 40, 80, 80, 80, 100, 100, 30, 30, 300, 30},
 ///     {25.0f, 5000.0f, 6000.0f, 5000.0f, 0.05f, 0.05f},
@@ -55,7 +55,7 @@ const APPEAR_BASE: s32 = 300; // <- d_a_obj_coming.cpp:25 (m00[14])
 const APPEAR_SPAN: s32 = 30; // <- d_a_obj_coming.cpp:25 (m00[15])
 /// `L_Attr::L_Hio[0] = 25.0f` - `chk_ship_spd`: `if (ship->speedF > attr()->L_Hio[0])` (`:261`).
 const SHIP_SPEED_MIN: f32 = 25.0; // <- d_a_obj_coming.cpp:26
-/// ```
+/// ```c
 /// f32 tmp1 = cM_rndF(attr()->L_Hio[2]);   // 6000.0f
 /// tmp1 += attr()->L_Hio[1];               // 5000.0f
 /// f32 tmp2 = (cM_rnd() - 0.5f);
@@ -66,7 +66,7 @@ const SHIP_SPEED_MIN: f32 = 25.0; // <- d_a_obj_coming.cpp:26
 const MAKE_FWD_BASE: f32 = 5000.0; // <- d_a_obj_coming.cpp:26 (L_Hio[1])
 const MAKE_FWD_SPAN: f32 = 6000.0; // <- d_a_obj_coming.cpp:26 (L_Hio[2])
 const MAKE_SIDE_SPAN: f32 = 5000.0; // <- d_a_obj_coming.cpp:26 (L_Hio[3])
-/// ```
+/// ```c
 /// f32 dVar2 = cM_rnd();
 /// f32 tmp = attr()->L_Hio[4] + attr()->L_Hio[5];
 /// if (tmp > 0.0f) {
@@ -85,14 +85,14 @@ const GND_MARGIN: f32 = 100.0; // <- d_a_obj_coming.cpp:289
 /// the per-iteration yaw twist.
 const GND_STEP: f32 = 20.0; // <- d_a_obj_coming.cpp:313
 const GND_YAW_STEP: i16 = 20000; // <- d_a_obj_coming.cpp:314
-/// ```
+/// ```c
 /// if (i_this->current.pos.y - tmp->m0C.y < tmp->m1C + 100.0f) { ... }
 /// ```
 /// (`:335`) with `tmp->m1C = 400.0f` (`:411`), plus `fabsf` - the actor-exclusion cylinder's
 /// height half-window and its XZ radius.
 const ACT_HEIGHT: f32 = 400.0; // <- d_a_obj_coming.cpp:411
 const ACT_MARGIN: f32 = 100.0; // <- d_a_obj_coming.cpp:335-336
-/// ```
+/// ```c
 /// return ship->current.pos.absXZ(current.pos) < scale.x * 10000.0f;
 /// ```
 /// (`:256`) - the range fallback, scaled by the actor's OWN `scale.x`. RULE 2: `dStage_actorInit`
@@ -148,7 +148,7 @@ const ITEM_TBL: [[u8; 16]; 7] = [
         0x07,
     ],
 ];
-/// ```
+/// ```c
 /// static const u8 a[] = { 1, 0, 2, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0 };
 /// static const s32 b[] = { 0, 1, 2 };
 /// ```
@@ -160,7 +160,7 @@ const TYPE_INDIRECT: [u8; 21] = [
     1, 0, 2, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0,
 ]; // <- d_a_obj_coming.cpp:380
 const TYPE_TABLE: [u8; 3] = [0, 1, 2]; // <- d_a_obj_coming.cpp:382
-/// ```
+/// ```c
 /// static const s8 item_data[] = {255, 255, 255, 1, 2, 3, 4, 0, 0, 11, 12, 13, 14, 14, 16, 17, 18, 18, 9,
 ///                                 10, 10};
 /// ```
@@ -169,7 +169,7 @@ const TYPE_TABLE: [u8; 3] = [0, 1, 2]; // <- d_a_obj_coming.cpp:382
 const ITEM_DATA: [u8; 21] = [
     255, 255, 255, 1, 2, 3, 4, 0, 0, 11, 12, 13, 14, 14, 16, 17, 18, 18, 9, 10, 10,
 ]; // <- d_a_obj_coming.cpp:390
-/// ```
+/// ```c
 /// static const bool buoy[] = {false, false, true, false, false, false, false, false, false, false,
 ///                             false, false, false, false, false, false, false, false, false, false};
 /// ```
@@ -182,7 +182,7 @@ const BUOY_DATA: [bool; 21] = [
 /// `daObjBuoyflag::Texture_00_e = 0x0` (`d_a_obj_buoyflag.h:24`) - the texture
 /// `mode_barrel2_wait` passes to `make_coming` (`:442`).
 const TEXTURE_00: u8 = 0x00; // <- d_a_obj_coming.cpp:442 (d_a_obj_buoyflag.h:24)
-/// ```
+/// ```c
 /// make_prm: (itemNo << PRM_ITEM_NO_S) | (0x7F << PRM_ITEM_SAVE_S) | (type << PRM_TYPE_S)
 ///          | (buoy << PRM_BUOY_S) | ((tex == Texture_00_e ? 0 : 1) << PRM_TEXTURE_S)
 ///          | (coming << PRM_COMING_S)
@@ -277,7 +277,7 @@ impl Ctrl {
     /// `daObjComing::Ctrl_c::init` (`:34-38`): `init_timer(actor); m00 = 0; m08 = error`.
     ///
     /// `init_timer` (`:41-44`):
-    /// ```
+    /// ```c
     /// s32 waitTime = actor->prm_get_waitTime() * 2;
     /// m04 = (s32)cM_rndF(attr()->m00[4 + waitTime] + attr()->m00[5 + waitTime]);
     /// ```
@@ -294,7 +294,7 @@ impl Ctrl {
     }
 
     /// `set_wait_timer` (`:47-51`):
-    /// ```
+    /// ```c
     /// s32 waitTime = actor->prm_get_waitTime() * 2;
     /// s32 attr2 = attr()->m00[4 + waitTime];
     /// m04 = (s32)cM_rndF(attr()->m00[5 + waitTime]) + attr2;
@@ -466,7 +466,7 @@ impl Coming {
 
     /// `chk_switch` (`:199-207`).
     ///
-    /// ```
+    /// ```c
     /// s32 switchIndex = prm_get_swSave();
     /// if (switchIndex == 0xFF) { return true; }
     /// else if (fopAcM_isSwitch(this, switchIndex)) { return true; }
@@ -486,7 +486,7 @@ impl Coming {
 
     /// `chk_ship_range` (`:251-257`).
     ///
-    /// ```
+    /// ```c
     /// if (prm_get_range()) { return true; }
     /// return ship->current.pos.absXZ(current.pos) < scale.x * 10000.0f;
     /// ```
@@ -507,7 +507,7 @@ impl Coming {
 
     /// `get_make_pos` (`:268-284`), in the SHIP's frame.
     ///
-    /// ```
+    /// ```c
     /// mDoMtx_stack_c::transS(ship->current.pos.x, ship->current.pos.y, ship->current.pos.z);
     /// mDoMtx_stack_c::YrotM(ship->shape_angle.y);
     /// f32 tmp1 = cM_rndF(attr()->L_Hio[2]);
@@ -550,7 +550,7 @@ impl Coming {
 
     /// `barrel2_get_ptn` (`:350-373`).
     ///
-    /// ```
+    /// ```c
     /// daObjComing::Act_c::Ptn_e cVar2 = PTN_15_e;
     /// f32 dVar2 = cM_rnd();
     /// f32 tmp = attr()->L_Hio[4] + attr()->L_Hio[5];
@@ -650,7 +650,7 @@ impl Coming {
 
     /// `chk_make_pos_act` (`:329-342`), the actor-clearance half of `chk_make_pos`:
     ///
-    /// ```
+    /// ```c
     /// if (fopAcM_IsActor(i_this)) {
     ///     s16 proc = fopAcM_GetName(i_this);
     ///     if (proc != fpcNm_SHIP_e && proc != fpcNm_PLAYER_e &&
@@ -681,7 +681,7 @@ impl Coming {
 
     /// `barrel2_get_param` (`:404-426`) - the whole placement decision for one barrel.
     ///
-    /// ```
+    /// ```c
     /// daShip_c* ship = dComIfGp_getShipActor();
     /// if (ship != NULL && chk_ship_spd(ship) && chk_ship_range(ship)) {
     ///     MakeTmp_c sp08;
@@ -749,7 +749,7 @@ impl Coming {
 
     /// `mode_barrel2_wait` (`:429-451`).
     ///
-    /// ```
+    /// ```c
     /// s32 bVar1 = dComIfGp_roomControl_getStayNo();
     /// if (chk_switch() && (fopAcM_GetHomeRoomNo(this) == bVar1 || mRoomId == bVar1 ||
     ///                       prm_get_always())) {
@@ -830,7 +830,7 @@ impl Coming {
 
     /// `mode_barrel2_appear` (`:456-476`).
     ///
-    /// ```
+    /// ```c
     /// if (ctrl->m04 <= 0) {
     ///     if (ctrl->m08 != fpcM_ERROR_PROCESS_ID_e) {
     ///         fopAc_ac_c* ac;
@@ -905,7 +905,7 @@ impl Coming {
 
     /// `daObjComing::Act_c::_execute` (`:497-527`).
     ///
-    /// ```
+    /// ```c
     /// s32 end = attr()->m00[prm_get_makeNum()];
     /// bool bVar2 = true;
     /// for (s32 i = 0; i < end; i++) {

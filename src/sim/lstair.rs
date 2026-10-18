@@ -51,14 +51,14 @@ const TIMER_GONE: i8 = 0x33; // <- d_a_lstair.cpp:215
 /// `f32 f3 = -300.0f;` (`d_a_lstair.cpp:150`) in `setMoveBGMtx`, and the same `-300.0f` is
 /// `target` in `moveBG`'s else arm (`:243`) and in `appear_stair`'s probe (`:265`, `:273`).
 const BG_HIDDEN: f32 = -300.0; // <- d_a_lstair.cpp:150
-/// ```
+/// ```c
 /// f32 maxStep = 10.0f;
 /// f32 minStep = 5.0f;
 /// ```
 /// (`d_a_lstair.cpp:236-237`) - `moveBG`'s `cLib_addCalc` bounds (`:249`).
 const MOVE_MAX: f32 = 10.0; // <- d_a_lstair.cpp:236
 const MOVE_MIN: f32 = 5.0; // <- d_a_lstair.cpp:237
-/// ```
+/// ```c
 /// int r0 = 60;
 /// cLib_addCalc(&mStairYOffset, target, 1.0f / r0, maxStep, minStep);
 /// ```
@@ -406,7 +406,7 @@ impl Lstair {
     }
 
     /// `daLStair_c::set_on_se` (`d_a_lstair.cpp:312-318`):
-    /// ```
+    /// ```c
     /// stage_stag_info_class* stage_info = dComIfGp_getStageStagInfo();
     /// if ((dStage_stagInfo_GetSaveTbl(stage_info)) == dStageType_FF1_e) {
     ///     fopAcM_seStart(this, JA_SE_OBJ_R_STAIR_APPEAR, 0);
@@ -430,7 +430,7 @@ impl Lstair {
 
     /// `daLStair_c::demoMove` (`d_a_lstair.cpp:184-197`).
     ///
-    /// ```
+    /// ```c
     /// if (eventInfo.checkCommandDemoAccrpt()) {
     ///     if (dComIfGp_evmng_endCheck(mEventIdx)) { dComIfGp_event_reset(); }
     /// } else if (mEventState == 1) {

@@ -103,7 +103,7 @@ impl Kantera {
     }
 
     /// `dComIfGp_checkCommandTalk` / the `daKantera_Execute` gate at `:222-228`:
-    /// ```
+    /// ```c
     /// if (i_this->mSwitchNo != 0) {
     ///     if (dComIfGs_isSwitch(i_this->mSwitchNo - 1, fopAcM_GetRoomNo(&i_this->actor))) {
     ///         i_this->mSwitchNo = 0;

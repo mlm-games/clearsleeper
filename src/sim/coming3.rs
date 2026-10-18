@@ -80,7 +80,7 @@ use super::player::Player;
 /// (`:474`) is the shared model archive, not a stage name.
 pub const COMING3_ACTORS: [&str; 1] = ["Com_C"];
 
-/// ```
+/// ```c
 /// BOOL coming_start_init() {
 ///     unk_478 = 0.0f;
 ///     unk_400 = fpcM_ERROR_PROCESS_ID_e;
@@ -94,7 +94,7 @@ pub const COMING3_ACTORS: [&str; 1] = ["Com_C"];
 /// `get_limit_dist()` (`:183-185`) and is reloaded whenever they come back inside it, so the
 /// placement gate at `:188` only opens after `AWAY_TICKS` consecutive far ticks.
 const AWAY_TICKS: i16 = 30; // <- d_a_coming3.cpp:163, :215
-/// ```
+/// ```c
 /// f32 limits[] = {3600.0f, 5000.0f};
 /// return limits[get_challenge_id()];
 /// ```
@@ -132,7 +132,7 @@ pub enum Mode {
 const TABLE_LEN: i16 = 3; // <- d_a_coming3.cpp:302
 
 impl Mode {
-    /// ```
+    /// ```c
     /// if (arg1 >= 0 && arg1 < 3 && (this->*init_table[arg1])()) { unk_444 = arg1; return true; }
     /// return false;
     /// ```
@@ -183,7 +183,7 @@ pub struct Coming3 {
 impl Coming3 {
     /// `daComing3::Act_c::_create` (`:432-448`) plus `coming_process_init(0)` (`:441`).
     ///
-    /// ```
+    /// ```c
     /// unk_47E = shape_angle.z + 1;   // :439 - folded into `challenge_id` below
     /// collision_init();             // :440 - cCcD, omitted
     /// coming_process_init(0);       // :441
@@ -210,7 +210,7 @@ impl Coming3 {
     }
 
     /// `daComing3::Act_c::get_challenge_id` (`:147-150`):
-    /// ```
+    /// ```c
     /// s32 daComing3::Act_c::get_challenge_id() { return (unk_47E - 1) & 1; }
     /// ```
     /// with `unk_47E = shape_angle.z + 1` in `_create` (`:439`), so the stored field and the `& 1`
@@ -221,7 +221,7 @@ impl Coming3 {
     }
 
     /// `daComing3::Act_c::get_limit_dist` (`:152-156`):
-    /// ```
+    /// ```c
     /// f32 limits[] = {3600.0f, 5000.0f};
     /// return limits[get_challenge_id()];
     /// ```
@@ -282,7 +282,7 @@ impl Coming3 {
     }
 
     /// `daComing3::Act_c::coming_process_main` (`:358-370`):
-    /// ```
+    /// ```c
     /// if (unk_444 >= 0 && unk_444 < 3) { (this->*main_table[unk_444])(); }
     /// ```
     /// against `main_table[3] = { coming_start_main, coming_game_main, coming_wait_main }`
@@ -300,7 +300,7 @@ impl Coming3 {
 
     /// `daComing3::Act_c::coming_start_main` (`:168-217`).
     ///
-    /// ```
+    /// ```c
     /// daPy_py_c* player = daPy_getPlayerActorClass();
     /// if (player == NULL) { return; }
     /// cXyz sp30 = player->current.pos;
@@ -349,7 +349,7 @@ impl Coming3 {
 
     /// `daComing3::Act_c::coming_game_main` (`:226-278`).
     ///
-    /// ```
+    /// ```c
     /// daObjBarrel2::Act_c* barrel;
     /// BOOL foundBarrel = fopAcM_SearchByID(unk_400, (fopAc_ac_c**)&barrel);
     /// if (barrel != NULL) { current.pos = barrel->current.pos; shape_angle = barrel->shape_angle; }
@@ -431,7 +431,7 @@ impl Coming3 {
     }
 
     /// `daComing3::Act_c::coming_wait_main` (`:287-297`):
-    /// ```
+    /// ```c
     /// fopAcM_SearchByID(unk_400, &ac1);
     /// daObjBarrel2::Act_c* barrel = (daObjBarrel2::Act_c*)ac1;
     /// if (barrel != NULL && !fopAcM_SearchByID(barrel->get_item_id(), &ac2)) {

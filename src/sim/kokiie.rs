@@ -22,7 +22,7 @@ pub const CULL_HALF_XZ: f32 = 1000.0; // <- d_a_kokiie.cpp:433, :434
 pub const CULL_MIN_Y: f32 = -1000.0; // <- d_a_kokiie.cpp:433
 pub const CULL_MAX_Y: f32 = 1000.0; // <- d_a_kokiie.cpp:434
 
-/// ```
+/// ```c
 /// switch (i_this->m2A0) {
 /// case 1: a_this->scale.x = 0.9f; a_this->scale.z = 0.9f; break;
 /// case 2: a_this->scale.x = 0.8f; a_this->scale.z = 0.8f; break;

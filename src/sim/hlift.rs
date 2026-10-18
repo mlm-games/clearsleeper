@@ -563,7 +563,7 @@ impl Hlift {
 
     /// `daObjHlift::Act_c::chk_demo_end` (`d_a_obj_hlift.cpp:273-279`).
     ///
-    /// ```
+    /// ```c
     /// if (field_0x2F6 != 0 && dComIfGp_evmng_endCheck(mEventId)) {
     ///     dComIfGp_event_reset();
     ///     field_0x2F6 = 0;
