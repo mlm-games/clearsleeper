@@ -172,7 +172,10 @@ impl App {
             dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
-        app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
+        }
         app.movie = movie::title_path().and_then(|path| movie::Movie::open(&path).ok());
         app.actor_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
@@ -2784,6 +2787,9 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
     rlobkit_app_events::android_log::init(env!("CARGO_PKG_NAME"), "warn");
     rlobkit_app_events::system_bars::set_immersive_sticky(true);
     repose_core::locals::set_theme_default(repose_core::locals::Theme::default());
+    if let Some(dir) = android_app.internal_data_path() {
+        game_utils::set_android_data_dir(dir);
+    }
     match android::install_source(&android_app) {
         Ok(Some(summary)) => log::info!("clearsleeper: disc image {summary}"),
         Ok(None) => log::warn!(

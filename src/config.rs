@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use game_utils::save_store::{LoadStatus, SaveStore};
+use game_utils::storage::FsStorage;
 
 use crate::ui_menu_option::{
     ATTENTION_DEFAULT, OptionRow, RUBY_DEFAULT, SOUND_DEFAULT_STEREO, VIBRATION_DEFAULT,
@@ -39,31 +40,39 @@ impl Settings {
     }
 
     pub fn load() -> Self {
-        let path = config_path();
-        match read_config(&path) {
-            Some(settings) if settings.in_range() => settings,
-            Some(_) => {
+        let store = config_store();
+        let loaded = store.load(&is_settings, &[]);
+        let Some(bytes) = loaded.data else {
+            if !matches!(loaded.status, LoadStatus::Missing) {
+                log::warn!(
+                    "clearsleeper: {} is unreadable ({:?})",
+                    store.path().display(),
+                    loaded.status
+                );
+            }
+            return Self::defaults();
+        };
+        match serde_json::from_slice::<Settings>(&bytes) {
+            Ok(settings) if settings.in_range() => settings,
+            Ok(_) => {
                 log::warn!(
                     "clearsleeper: {} holds a value outside its option range; option defaults restored",
-                    path.display()
+                    store.path().display()
                 );
                 Self::defaults()
             }
-            None => Self::defaults(),
+            Err(error) => {
+                log::warn!(
+                    "clearsleeper: {} is malformed ({error}); option defaults restored",
+                    store.path().display()
+                );
+                Self::defaults()
+            }
         }
     }
 
     pub fn save(&self) {
-        let path = config_path();
-        if let Some(parent) = path.parent() {
-            if let Err(error) = std::fs::create_dir_all(parent) {
-                log::warn!(
-                    "clearsleeper: {} is not creatable ({error}); option defaults stay unwritten",
-                    parent.display()
-                );
-                return;
-            }
-        }
+        let store = config_store();
         let text = match serde_json::to_string_pretty(self) {
             Ok(text) => text,
             Err(error) => {
@@ -71,8 +80,11 @@ impl Settings {
                 return;
             }
         };
-        if let Err(error) = std::fs::write(&path, text) {
-            log::warn!("clearsleeper: {} is unwritable ({error})", path.display());
+        if let Err(error) = store.write(text.as_bytes()) {
+            log::warn!(
+                "clearsleeper: {} is unwritable ({error})",
+                store.path().display()
+            );
         }
     }
 
@@ -124,24 +136,10 @@ impl Settings {
     }
 }
 
-fn config_path() -> PathBuf {
-    crate::save::slots_dir().join(CONFIG_FILE)
+fn config_store() -> SaveStore<FsStorage> {
+    SaveStore::new(crate::save::slots_dir(), CONFIG_FILE).with_validator(is_settings)
 }
 
-fn read_config(path: &Path) -> Option<Settings> {
-    match std::fs::read_to_string(path) {
-        Ok(text) => match serde_json::from_str::<Settings>(&text) {
-            Ok(settings) => Some(settings),
-            Err(error) => {
-                log::warn!("clearsleeper: {} is malformed ({error})", path.display());
-                None
-            }
-        },
-        Err(error) => {
-            if error.kind() != std::io::ErrorKind::NotFound {
-                log::warn!("clearsleeper: {} is unreadable ({error})", path.display());
-            }
-            None
-        }
-    }
+fn is_settings(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<Settings>(bytes).is_ok()
 }

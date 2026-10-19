@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use std::path::PathBuf;
 
 use crate::j2d::{Kind, Screen, ScreenPane};
-use crate::save::{DEFAULT_NAME, SAVE_VERSION, SLOTS, SaveGame};
+use crate::save::{DEFAULT_NAME, SAVE_VERSION, SLOTS, SaveGame, SlotRead};
 use crate::sim::health::Health;
 use crate::sim::vibration::Vibration;
 use crate::text::msgget::{MsgArchive, MsgGet};
@@ -965,25 +965,20 @@ impl MemCard {
     /// card is not in its loaded state, `m_Do_MemCard.cpp:203`, and the port's two arms are the
     /// same wait and the same answer.
     ///
-    /// `read_slot_in` answers one `Option`, which cannot say whether the file was absent or
-    /// unreadable, and the two mean opposite things to the file select: absent offers a new file,
-    /// unreadable offers an erase. So the file is read here rather than through
-    /// `read_slot_in`, and the two failures are kept apart.
+    /// `read_slot_state_in` answers the same question through the crash-safe store, which on
+    /// wasm is localStorage rather than `std::fs`: absent offers a new file, unreadable or
+    /// corrupt offers an erase, and the two stay apart.
     pub fn read_slot(&mut self, slot: usize) {
         let Some(slot) = usize::try_from(slot).ok().filter(|&slot| slot < SLOTS) else {
             return;
         };
-        let path = crate::save::slot_path_in(&self.dir, slot);
-        let state = match std::fs::read_to_string(&path) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => SlotState::Absent,
-            Err(_) => SlotState::Corrupt,
-            Ok(text) => match serde_json::from_str::<SaveGame>(&text) {
-                Ok(save) => {
-                    self.slots[slot] = Some(save);
-                    SlotState::Loaded
-                }
-                Err(_) => SlotState::Corrupt,
-            },
+        let state = match crate::save::read_slot_state_in(&self.dir, slot) {
+            SlotRead::Missing => SlotState::Absent,
+            SlotRead::Loaded(save) => {
+                self.slots[slot] = Some(save);
+                SlotState::Loaded
+            }
+            SlotRead::Unreadable | SlotRead::Corrupt => SlotState::Corrupt,
         };
         if state == SlotState::Absent {
             self.slots[slot] = None;

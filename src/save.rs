@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
+use game_utils::save::SaveManager;
+use game_utils::save_store::{LoadStatus, SaveStore};
+use game_utils::storage::FsStorage;
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +20,10 @@ use crate::{App, assets};
 pub const SAVE_VERSION: u32 = 1;
 pub const DEFAULT_NAME: &str = "Link";
 pub const SLOTS: usize = 3;
+const SAVE_QUALIFIER: &str = "com";
+const SAVE_ORG: &str = "mlm-games";
+const SAVE_APP: &str = "clearsleeper";
+const SLOT_FILE: &str = "slot0.json";
 const FLAG_BYTES: usize = 0x100;
 const STORY_BYTES: usize = 0x100;
 const ARRIVAL_BYTES: usize = 49;
@@ -85,6 +91,20 @@ pub struct SaveGame {
     pub date: u8,
     #[serde(default)]
     pub get_bag: u16,
+}
+
+/// What one slot's file held. `Missing` and `Corrupt` are different answers to the file select:
+/// the first offers a new file, the second offers an erase.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SlotRead {
+    Missing,
+    Unreadable,
+    Corrupt,
+    Loaded(SaveGame),
+}
+
+fn is_save(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<SaveGame>(bytes).is_ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -324,60 +344,84 @@ impl App {
     }
 }
 
-pub fn write_save(path: &Path, save: &SaveGame) -> anyhow::Result<()> {
-    let text = serde_json::to_string(save)?;
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, text).with_context(|| format!("writing {}", tmp.display()))?;
-    std::fs::rename(&tmp, path).with_context(|| format!("committing {}", path.display()))?;
-    Ok(())
+fn save_manager() -> SaveManager<FsStorage> {
+    SaveManager::new(SAVE_QUALIFIER, SAVE_ORG, SAVE_APP, SLOT_FILE, SAVE_VERSION)
 }
 
-pub fn read_save(path: &Path) -> anyhow::Result<SaveGame> {
-    let text =
-        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-    Ok(serde_json::from_str(&text)?)
-}
-
+/// The save directory: `CS_SAVE_DIR` when set, otherwise the platform data dir
+/// `game-utils` resolves. Linux stays on `$XDG_DATA_HOME/clearsleeper`; Windows, macOS and
+/// Android move to the stack's standard `ProjectDirs`/internal-data directory, where the
+/// other repame games keep their saves. On wasm it is the virtual
+/// `com-mlm-games-clearsleeper` path `ropfs` backs with localStorage, so no
+/// `std::env::temp_dir` is reachable.
 pub fn slots_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("CS_SAVE_DIR") {
         if !dir.is_empty() {
             return PathBuf::from(dir);
         }
     }
-    let mut dir = windows_appdata()
-        .or_else(|| non_empty_env("XDG_DATA_HOME"))
-        .or_else(|| non_empty_env("HOME").map(|home| PathBuf::from(home).join(".local/share")))
-        .unwrap_or_else(std::env::temp_dir);
-    dir.push("clearsleeper");
-    dir
+    save_manager().data_dir()
 }
 
-fn non_empty_env(key: &str) -> Option<PathBuf> {
-    std::env::var(key)
-        .ok()
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+fn slot_store(dir: &Path, slot: usize) -> SaveStore<FsStorage> {
+    SaveStore::new(dir, format!("slot{slot}.json")).with_validator(is_save)
 }
 
-#[cfg(target_os = "windows")]
-fn windows_appdata() -> Option<PathBuf> {
-    non_empty_env("APPDATA")
+fn store_at(path: &Path) -> anyhow::Result<SaveStore<FsStorage>> {
+    let dir = path
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("save path {} has no file name", path.display()))?;
+    Ok(SaveStore::new(dir, name.to_string_lossy().into_owned()).with_validator(is_save))
 }
 
-#[cfg(not(target_os = "windows"))]
-fn windows_appdata() -> Option<PathBuf> {
-    None
+pub fn write_save(path: &Path, save: &SaveGame) -> anyhow::Result<()> {
+    let text = serde_json::to_string(save)?;
+    store_at(path)?
+        .write(text.as_bytes())
+        .map_err(|error| anyhow::anyhow!("writing {}: {error}", path.display()))
+}
+
+pub fn read_save(path: &Path) -> anyhow::Result<SaveGame> {
+    let loaded = store_at(path)?.load(&is_save, &[]);
+    let Some(bytes) = loaded.data else {
+        anyhow::bail!("reading {}: {:?}", path.display(), loaded.status);
+    };
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 pub fn slot_path_in(dir: &Path, slot: usize) -> PathBuf {
     dir.join(format!("slot{slot}.json"))
 }
 
+pub fn read_slot_state_in(dir: &Path, slot: usize) -> SlotRead {
+    let loaded = slot_store(dir, slot).load(&is_save, &[]);
+    match loaded.data {
+        Some(bytes) => match serde_json::from_slice::<SaveGame>(&bytes) {
+            Ok(save) => SlotRead::Loaded(save),
+            Err(_) => SlotRead::Corrupt,
+        },
+        None => match loaded.status {
+            LoadStatus::Missing => SlotRead::Missing,
+            LoadStatus::Unreadable => SlotRead::Unreadable,
+            _ => SlotRead::Corrupt,
+        },
+    }
+}
+
 pub fn read_slot_in(dir: &Path, slot: usize) -> Option<SaveGame> {
-    read_save(&slot_path_in(dir, slot)).ok()
+    match read_slot_state_in(dir, slot) {
+        SlotRead::Loaded(save) => Some(save),
+        _ => None,
+    }
 }
 
 pub fn write_slot_in(dir: &Path, slot: usize, save: &SaveGame) -> anyhow::Result<()> {
-    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
-    write_save(&slot_path_in(dir, slot), save)
+    let text = serde_json::to_string(save)?;
+    slot_store(dir, slot)
+        .write(text.as_bytes())
+        .map_err(|error| anyhow::anyhow!("writing {}: {error}", slot_path_in(dir, slot).display()))
 }
