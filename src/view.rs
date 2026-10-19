@@ -87,11 +87,30 @@ pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
     (-cam_yaw.cos()).atan2(-cam_yaw.sin())
 }
 
+/// The room's texture pages, as array layers.
+///
+/// `repame-view3d` creates the batch's pages as one square D2 array texture, and
+/// `wgpu-hal`'s GL backend picks the GL texture target from the layer count alone:
+/// square D2 textures whose layer count is a multiple of six become cube or cube
+/// array textures (`TextureDescriptor::is_cube_compatible`, wgpu-hal issues #1614
+/// and #1574), and a single layer becomes a plain 2D texture. The batch still asks
+/// for an array view, and WebGL2 has no cube array sampler, so on the web every
+/// page of a twelve-page room fails to upload. One unused layer keeps the target a
+/// 2D array; no page indexes the padding.
+fn array_layers(pages: usize) -> u32 {
+    let pages = pages.max(1);
+    if pages == 1 || pages % 6 == 0 {
+        (pages + 1) as u32
+    } else {
+        pages as u32
+    }
+}
+
 pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
     match room {
         Some(room) => BatchDesc {
             layer_size: LAYER_SIZE,
-            layers: room.textures.len().max(1) as u32,
+            layers: array_layers(room.textures.len()),
             filter: SceneFilter::Linear,
             mips: 1,
         },
@@ -537,4 +556,19 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     );
     group.depth_test = true;
     group
+}
+
+#[cfg(test)]
+mod tests {
+    use super::array_layers;
+
+    #[test]
+    fn pages_never_ask_for_a_cube_or_a_single_layer_array() {
+        for pages in 0..=32 {
+            let layers = array_layers(pages);
+            assert!(layers as usize >= pages.max(1));
+            assert_ne!(layers, 1);
+            assert_ne!(layers % 6, 0);
+        }
+    }
 }
