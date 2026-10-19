@@ -30,7 +30,7 @@ pub const RETURN_REACH: f32 = SPEED * 2.0;
 pub const HIT_REACH: f32 = SPEED;
 pub const CAPSULE_RADIUS: f32 = 30.0;
 pub const SPIN: i16 = 0x1F00;
-/// `0x3000` s16, the heading a free fly-out throw adds (`d_a_boomerang.cpp:519`).
+/// `0x3000` s16, the heading a free fly-out throw adds (`d_a_boomerang.cpp:518`).
 pub const NOMINAL_TURN: f32 = 0.1875;
 pub const TURN_BASE: f32 = 20.0;
 pub const TURN_SOFT: f32 = 18.0;
@@ -89,8 +89,8 @@ impl Boomerang {
         self.model_yaw = 0;
         self.aim_at(heading, pitch, locks);
         // `procWait`: an unlocked throw travels to a point `getFlyMax()` out along the throw
-        // (`d_a_boomerang.cpp:503-510`), and only at that throw does the aim carry `+0x3000` and
-        // `mFreeFlyOut` open (`:517-524`); a locked throw aims straight at its target (`:525-528`).
+        // (`d_a_boomerang.cpp:503-509`), and only at that throw does the aim carry `+0x3000` and
+        // `mFreeFlyOut` open (`:517-523`); a locked throw aims straight at its target (`:524-527`).
         if locks == 0 {
             self.heading += NOMINAL_TURN * core::f32::consts::TAU;
             self.free = true;
@@ -166,7 +166,7 @@ impl Boomerang {
         let delta = player.pos - self.pos;
         let distance = delta.length();
         if distance > NOMINAL_RANGE {
-            // `setAimPos` (`d_a_boomerang.cpp:445-448`): the return flight aims at the player's
+            // `setAimPos` (`d_a_boomerang.cpp:446-448`): the return flight aims at the player's
             // catch point, so the target is the player itself and never a fresh fly-out point.
             let flat = delta.x.hypot(delta.z);
             self.pitch = -(delta.y).atan2(flat);

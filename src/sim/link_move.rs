@@ -2282,10 +2282,10 @@ pub fn control(
                 // The cuts are `Combat`'s, so nothing in the asks above ever answers them; without
                 // this arm a finished swing keeps the process and `allows(CUT_GROUND)` refuses
                 // every later one. `procCutL` and its siblings leave through `checkNextMode` the
-                // tick their own frame control does (`d_a_player_sword.inc:900-903`, `:909-919`;
+                // tick their own frame control does (`d_a_player_sword.inc:902-906`, `:909-919`;
                 // `checkNextMode`'s entry, `d_a_player_main.cpp:4412-4413`), and the port's cut
                 // frame control is the combat state itself: while the swing lives `named` answers
-                // the cut back, so once it is gone the cut resolves to the guard that now holds.
+                // the cut back, so once it is gone the cut resolves to whatever guard now holds.
                 if !probe.combat.active && CUT_AIR.contains(&proc.current) {
                     enter(
                         &mut state,
