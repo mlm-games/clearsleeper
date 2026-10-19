@@ -75,6 +75,75 @@
 //! open or write warns once through `log::warn!` and then goes silent for the rest of the
 //! session, so tracing can never turn a failing disk into a failed game.
 //!
+//! # Retail field mapping
+//!
+//! Where each field of the line comes from in the retail game, so a dumper on the retail
+//! side can read the same value. The input side of the same comparison is
+//! [`crate::input_tape`], the pad tape, and the headless runner is `examples/trace_boot.rs`.
+//! The addresses are the GZLE01 (USA rev 0) ones the decomp's
+//! `config/GZLE01/symbols.txt` gives, and the citations are the decomp's own files and
+//! lines. Nearly every field hangs off one global, `g_dComIfG_gameInfo` at `0x803C4C08`
+//! (`include/d/d_com_inf_game.h:927`, `config/GZLE01/symbols.txt:17472`), a
+//! `dComIfG_inf_c` whose `save` is at `+0x00000` and whose `play` is at `+0x012A0`
+//! (`include/d/d_com_inf_game.h:911-912`). The player is the `fopAc_ac_c` the play structure
+//! points at, so the actor's own fields are offsets from that pointer.
+//!
+//! | field | retail source | address | citation |
+//! |---|---|---|---|
+//! | `tick` | none: the port's own counter. The retail game keeps no global frame counter the decomp names, so the two sides are lined up by the harness's rule - the port's tick N is the guest's frame N | - | `sim::frame::CurrentFrame` |
+//! | `stage` | `dComIfG_play_c::mCurStage.mName`, the stage name | `0x803C9D3C` | `include/d/d_com_inf_game.h:719` (play+0x3E94), `include/d/d_stage.h:949` (+0x0) |
+//! | `room` | `dStage_roomControl_c::mStayNo`, the stay room | `0x803F6A78` | `include/d/d_stage.h:904`, `:930`; `config/GZLE01/symbols.txt:18667` |
+//! | `px` `py` `pz` | the player actor's `fopAc_ac_c::current.pos` | actor+0x1F8 | `include/f_op/f_op_actor.h:289` |
+//! | `yaw` | the player actor's `current.angle.y`, an s16 on the 0x10000 circle | actor+0x206 | `include/f_op/f_op_actor.h:289` (the `actor_place current` at +0x1F8, its `angle` at +0x0C) |
+//! | `face` | the player actor's `shape_angle.y` | actor+0x20E | `include/f_op/f_op_actor.h:290` |
+//! | `speed` | `daPy_lk_c::mNormalSpeed` | actor+0x35BC | `include/d/actor/d_a_player_main.h:2272` |
+//! | `speed_y` | no named retail field: the player keeps its velocity in the unnamed `cXyz` fields beside `mOldSpeed` | actor+0x3694 | `include/d/actor/d_a_player_main.h:2313-2316` |
+//! | `hp` `hpmax` | `dSv_player_status_a_c::mLife` and `mMaxLife` | `0x803C4C0A`, `0x803C4C08` | `include/d/d_save.h:40-41`; the path `dSv_info_c::mSavedata` (+0x0000, `d_save.h:973`) → `dSv_save_c::mPlayer` (+0x000, `d_save.h:906`) → `dSv_player_c::mPlayerStatusA` (+0x000, `d_save.h:604`) |
+//! | `rupees` | `dSv_player_status_a_c::mRupee` | `0x803C4C0C` | `include/d/d_save.h:42` |
+//! | `sw` | `dSv_memBit_c::mSwitch[4]`, the current stage's save switch register | `0x803C4F8C` + stage*0x24 | `include/d/d_save.h:676`; `dSv_save_c::mMemory[STAGE_MAX]` at +0x380 (`d_save.h:907`), one `dSv_memory_c` of 0x24 bytes a stage |
+//! | `ef` | `dEvDtFlag_c::mFlag[320]`, the event manager's flag words | `0x803C9F10` | `include/d/d_event_data.h:172`; `dEvent_manager_c::mFlag` at +0x03C (`include/d/d_event_manager.h:77`); `dComIfG_play_c::mEvtManager` at +0x402C (`include/d/d_com_inf_game.h:725`) |
+//! | `sb` | `dSv_event_c::mFlags[0x100]`, the save's event bits | `0x803C522C` | `include/d/d_save.h:707`; `dSv_save_c::mEvent` at +0x624 (`d_save.h:909`) |
+//! | `evt` | the event's own index in the loaded event data, the array `dEvent_manager_c::mList` points at. The data is on the heap, so the index is the value to read, not an address | - | `include/d/d_event_manager.h:73`; `dEvDtBase_c::getEventP` (`include/d/d_event_data.h:187`) |
+//! | `evtst` | `dEvDtEvent_c::mEventState` | event+0xA4 | `include/d/d_event_data.h:157`; the states `NONE_e` `ORDER_e` `PLAY_e` `UNK3_e` `CLOSE_e` at `:136-142` |
+//! | `proc` | `daPy_lk_c::mCurProc`, the player's own process | actor+0x31D8 | `include/d/actor/d_a_player_main.h:2101` |
+//! | `talk` | no single address: the retail message window is a process (`dMsgCtrl_c`) and the decomp names no state word for it | - | the port's own `sim::talk::Dialogue::open` |
+//! | `rng` | none: the port owns no central RNG stream | - | the port's own fixed word |
+//! | `a<proc>:` | the actor list lives on the heap and is enumerated, not read - see below | - | see below |
+//!
+//! The player actor pointer is `dComIfG_play_c::mPlayerInfo[0].mpPlayer` at `0x803CA74C`
+//! (`include/d/d_com_inf_game.h:784-786`, `dComIfGp_getPlayer(0)` at `:2339-2341`); the
+//! same pointer is also kept in `mpPlayerPtr[0]` at `0x803CA754` (`:787`).
+//!
+//! The `sw` register is the per-stage save array the port models. The live scene's own
+//! switch register is the per-zone one, `dSv_zoneBit_c::mSwitch[3]` (u16 words,
+//! `include/d/d_save.h:761`) at `0x803C53B2` + zone*0x4C (`dSv_info_c::mZone[ZONE_MAX]` at
+//! +0x07A8, `d_save.h:976`; `dSv_zone_c::mZoneBit` at +0x02, `d_save.h:787`), and that is
+//! what `dComIfGs_onSwitch(no, roomNo)` writes (`include/d/d_com_inf_game.h:1807-1820`). A
+//! dumper that reads the register the scene's actors read has to read the zone's, and a
+//! dumper that reads the port's `sw` has to read the stage's.
+//!
+//! The actor list has no single address, so it is enumerated:
+//!
+//! 1. The layer list's head, `l_fpcLy_LayerList.mpHead` at `0x803726DC`
+//!    (`config/GZLE01/symbols.txt:14681`), is the root layer
+//!    (`src/f_pc/f_pc_layer.cpp:85-88`).
+//! 2. The root layer's `mNodeListTree.mpLists` (layer+0x10, `include/f_pc/f_pc_layer.h:17`)
+//!    is the array of ten `node_list_class`, one per group, each 12 bytes
+//!    (`include/SSystem/SComponent/c_list.h:6-10`). `fpcM_Init` creates the root layer and
+//!    those ten lists (`src/f_pc/f_pc_manager.cpp:297-303`).
+//! 3. Each list's `mpHead` (list+0x00) is a chain of `node_class`, 12 bytes a link
+//!    (`include/SSystem/SComponent/c_node.h:5-9`), and the link's `mpData` (node+0x04) is
+//!    the process.
+//! 4. The process is the actor: its id is `base_process_class::mBsPcId` (process+0x04) and
+//!    its name `mProcName` (process+0x08), the name the port's `kind` hash stands in for
+//!    (`include/f_pc/f_pc_base.h:15-16`).
+//!
+//! An actor token's `x`, `y` and `z` are the actor's `current.pos` (actor+0x1F8) and its
+//! `yaw` is `current.angle.y` (actor+0x206), the same fields the player's are. Its `hp` is
+//! the port's own `sim::combat::HitPoints`: retail keeps an enemy's life in the actor's own
+//! class and `fopAc_ac_c` has no health field at all
+//! (`include/f_op/f_op_actor.h:268-319`), so there is no single address for it.
+//!
 //! # Reading a trace
 //!
 //! [`parse_text`] turns a whole file into lines in file order; [`parse_line`] reads one

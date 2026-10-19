@@ -43,6 +43,29 @@ Release artifacts: `cargo build --release`, `trunk build --release`,
 (or `package.metadata.android.signing.release`); keystores stay
 untracked.
 
+## Retail comparison
+
+The port can be run headless against a retail oracle: a fresh session, a scripted pad
+tape, and a per-tick digest of the world.
+
+    cargo run --example trace_boot -- 600 /tmp/port.trace
+    cargo run --example trace-diff -- /tmp/port.trace /tmp/retail.trace
+
+`trace_boot` opens no window, no GPU device and no audio device. `CS_DISC` names the disc
+image to install and `CS_ASSETS` the extracted tree to fall back on, `CS_INPUT` the tape to
+replay, and `CS_TRACE` (or the second argument) where the digest goes; the tick count is
+the first argument, `CS_TRACE_TICKS`, or 600. The digest's grammar and the field each key
+comes from in the retail game are in `src/trace.rs`.
+
+The tape is one line per retrace, the pad state the guest is given:
+
+    retrace=<N> button=0x<hex> stick=<x>,<y> c=<x>,<y> l=<L> r=<R>
+
+`button` is the GameCube pad word (`A` 0x0100, `B` 0x0200, `X` 0x0400, `Y` 0x0800, `Z`
+0x0010, `L` 0x0040, `R` 0x0020, `START` 0x1000, the D-pad 0x0001-0x0008), `stick` and `c`
+are the two sticks as the centred bytes the pad sent, and `l` and `r` are the analog
+triggers. A retrace with no line holds the state of the line before it.
+
 Disclaimer: This does not provide any copyrighted assets. You need to bring your own copy of the game.
 
 The disc image is the primary source on every platform: the file is read with the same

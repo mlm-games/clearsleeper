@@ -30,6 +30,7 @@ pub mod dzs;
 pub mod gx_decode;
 pub mod hud;
 pub mod input;
+pub mod input_tape;
 pub mod intro;
 pub mod j2d;
 pub mod j3d;
@@ -240,6 +241,15 @@ impl App {
             input::c_stick_from_keys(held, sched.window_focused),
         );
         self.stage_menu(held, sched.window_focused);
+    }
+
+    /// Stage the pad state one tape line carries: the main stick as the move axis, the face
+    /// buttons as the pad's hold word and the C-stick as the sub-stick. The trigger word is
+    /// the edge against the previous poll, the way `mDoCPd_Convert` splits the pad's hold and
+    /// trigger words (`m_Do/m_Do_controller_pad.cpp:20-45`).
+    pub fn stage_pad_state(&mut self, state: &input_tape::PadState) {
+        self.stage_axis(state.move_axis());
+        self.stage_pad(state.hold(), state.c_axis());
     }
 
     /// Stage the pad's face buttons and C-stick. The trigger word is the edge against the
