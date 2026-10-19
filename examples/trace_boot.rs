@@ -13,7 +13,8 @@
 //!   600 when neither is.
 //! - `trace-file` is where the trace goes, `CS_TRACE` when it is not given. The path is the
 //!   one the trace hook reads (`CS_TRACE`), so a path given here is installed as that
-//!   variable before the session is built.
+//!   variable before the session is built. The hook appends, so the file is emptied first
+//!   and a run's digest is the whole of it.
 //!
 //! The environment the session reads: `CS_DISC` names the disc image to install, `CS_ASSETS`
 //! the extracted tree to fall back on, and `CS_INPUT` the tape to replay.
@@ -47,6 +48,10 @@ fn main() {
         std::process::exit(2);
     };
     unsafe { std::env::set_var("CS_TRACE", &trace) };
+    if let Err(error) = std::fs::File::create(&trace) {
+        eprintln!("trace_boot: {}: {error}", trace.display());
+        std::process::exit(1);
+    }
 
     if let Some(disc) = std::env::var_os("CS_DISC").filter(|value| !value.is_empty()) {
         match clearsleeper::source::install_file(Path::new(&disc)) {
