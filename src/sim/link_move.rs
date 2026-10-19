@@ -11,7 +11,7 @@ use super::health::Health;
 use super::hop::Hop;
 use super::intent::{CameraYaw, MoveIntent, PadButtons};
 use super::jump::{Direction, Jump, JumpKind, direction};
-use super::link_proc::{LinkProc, Proc};
+use super::link_proc::{CUT_AIR, LinkProc, Proc};
 use super::lock::Lock;
 use super::player::Player;
 use super::pushable::{
@@ -2277,7 +2277,27 @@ pub fn control(
                 state.asked = Some(want);
                 state.gap = gap;
             }
-            None => state.gap = MoveGap::Ready,
+            None => {
+                state.gap = MoveGap::Ready;
+                // The cuts are `Combat`'s, so nothing in the asks above ever answers them; without
+                // this arm a finished swing keeps the process and `allows(CUT_GROUND)` refuses
+                // every later one. `procCutL` and its siblings leave through `checkNextMode` the
+                // tick their own frame control does (`d_a_player_sword.inc:900-903`, `:909-919`;
+                // `checkNextMode`'s entry, `d_a_player_main.cpp:4412-4413`), and the port's cut
+                // frame control is the combat state itself: while the swing lives `named` answers
+                // the cut back, so once it is gone the cut resolves to the guard that now holds.
+                if !probe.combat.active && CUT_AIR.contains(&proc.current) {
+                    enter(
+                        &mut state,
+                        &mut proc,
+                        &probe,
+                        player,
+                        clock,
+                        named(player, &probe),
+                        true,
+                    );
+                }
+            }
         }
         return;
     }
