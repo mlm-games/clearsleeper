@@ -26,11 +26,40 @@ fn unreadable_slot_is_corrupt_and_holds_no_save() {
     let dir = std::env::temp_dir().join(format!("cs-card-corrupt-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("slot0.json"), "{ not json").unwrap();
+    std::fs::write(dir.join("slot0.ron"), "{ not a document").unwrap();
     let card = card(&dir);
     assert_eq!(card.slot_state[0], SlotState::Corrupt);
     assert!(card.slots[0].is_none());
     assert_eq!(card.status, CARD_STAT_CREATE);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn legacy_json_slot_is_adopted_into_the_envelope_and_left_in_place() {
+    let dir = std::env::temp_dir().join(format!("cs-card-legacy-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let save = blank_save();
+    std::fs::write(dir.join("slot0.json"), serde_json::to_vec(&save).unwrap()).unwrap();
+    std::fs::write(dir.join("slot1.json"), "{ not json").unwrap();
+
+    let card = card(&dir);
+    assert_eq!(card.slot_state[0], SlotState::Loaded);
+    assert_eq!(card.slots[0], Some(save.clone()));
+    assert_eq!(
+        card.slot_state[1],
+        SlotState::Corrupt,
+        "a legacy file that is not a save keeps the erase answer"
+    );
+    assert!(
+        dir.join("slot0.json").exists(),
+        "the legacy file is left in place for an older build"
+    );
+    assert!(
+        dir.join("slot0.ron").exists(),
+        "the envelope copy lands beside it"
+    );
+    assert_eq!(clearsleeper::save::read_slot_in(&dir, 0), Some(save));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

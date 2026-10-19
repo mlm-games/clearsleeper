@@ -1,11 +1,22 @@
-use game_utils::save_store::{LoadStatus, SaveStore};
-use game_utils::storage::FsStorage;
+use repame_save::{SaveError, SaveFile};
 
+use crate::save::Legacy;
 use crate::ui_menu_option::{
     ATTENTION_DEFAULT, OptionRow, RUBY_DEFAULT, SOUND_DEFAULT_STEREO, VIBRATION_DEFAULT,
 };
 
-const CONFIG_FILE: &str = "settings.json";
+/// The game's own options document. `repame-save`'s `SettingsStore` carries the
+/// stack's `Settings` (audio gains, display flags, accessibility), which has no
+/// field for the four retail options this game binds, and the crate's own rule
+/// for a game-specific preference is the game's document, not the shell's. This
+/// is that document: the same envelope, store, and `AppId` the `SettingsStore`
+/// wraps, under a name that leaves the stack's `settings.ron` free.
+const CONFIG_FILE: &str = "options.ron";
+
+/// The raw JSON file the same options were written to before this document.
+const LEGACY_CONFIG_FILE: &str = "settings.json";
+
+const CONFIG_SCHEMA: u32 = 1;
 
 const ROWS: [OptionRow; 4] = [
     OptionRow::Attention,
@@ -40,50 +51,58 @@ impl Settings {
     }
 
     pub fn load() -> Self {
-        let store = config_store();
-        let loaded = store.load(&is_settings, &[]);
-        let Some(bytes) = loaded.data else {
-            if !matches!(loaded.status, LoadStatus::Missing) {
-                log::warn!(
-                    "clearsleeper: {} is unreadable ({:?})",
-                    store.path().display(),
-                    loaded.status
-                );
-            }
-            return Self::defaults();
-        };
-        match serde_json::from_slice::<Settings>(&bytes) {
-            Ok(settings) if settings.in_range() => settings,
-            Ok(_) => {
+        let file = config_file();
+        match file.load::<Settings>() {
+            Ok(Some(settings)) if settings.in_range() => settings,
+            Ok(Some(_)) => {
                 log::warn!(
                     "clearsleeper: {} holds a value outside its option range; option defaults restored",
-                    store.path().display()
+                    file.path().display()
                 );
                 Self::defaults()
             }
+            Ok(None) => Self::adopt_legacy(),
+            // A corrupt document left no options behind: the legacy copy is
+            // the only one left, so it is adopted rather than reset.
+            Err(error @ SaveError::Corrupt { .. }) => {
+                log::warn!("clearsleeper: {error}");
+                Self::adopt_legacy()
+            }
             Err(error) => {
-                log::warn!(
-                    "clearsleeper: {} is malformed ({error}); option defaults restored",
-                    store.path().display()
-                );
+                log::warn!("clearsleeper: {error}");
                 Self::defaults()
             }
         }
     }
 
-    pub fn save(&self) {
-        let store = config_store();
-        let text = match serde_json::to_string_pretty(self) {
-            Ok(text) => text,
-            Err(error) => {
-                log::warn!("clearsleeper: option defaults do not serialise ({error})");
-                return;
-            }
+    /// Carry the pre-`repame-save` `settings.json` across: raw JSON under the
+    /// live directory first, then the platform directories used before the
+    /// data-dir move. The legacy file is left in place.
+    fn adopt_legacy() -> Self {
+        let adopted = crate::save::adopt_legacy::<Settings>(
+            &config_file(),
+            LEGACY_CONFIG_FILE,
+            &crate::save::slots_dir(),
+        );
+        let Legacy::Adopted(settings) = adopted else {
+            return Self::defaults();
         };
-        if let Err(error) = store.write(text.as_bytes()) {
+        if settings.in_range() {
+            settings
+        } else {
+            log::warn!(
+                "clearsleeper: the adopted options hold a value outside its option range; option defaults restored"
+            );
+            Self::defaults()
+        }
+    }
+
+    pub fn save(&self) {
+        let file = config_file();
+        if let Err(error) = file.save(self) {
             log::warn!(
                 "clearsleeper: {} is unwritable ({error})",
-                store.path().display()
+                file.path().display()
             );
         }
     }
@@ -136,10 +155,6 @@ impl Settings {
     }
 }
 
-fn config_store() -> SaveStore<FsStorage> {
-    SaveStore::new(crate::save::slots_dir(), CONFIG_FILE).with_validator(is_settings)
-}
-
-fn is_settings(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<Settings>(bytes).is_ok()
+fn config_file() -> SaveFile {
+    SaveFile::in_dir(crate::save::slots_dir(), CONFIG_FILE, CONFIG_SCHEMA)
 }

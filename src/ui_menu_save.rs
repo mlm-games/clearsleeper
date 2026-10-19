@@ -967,7 +967,9 @@ impl MemCard {
     ///
     /// `read_slot_state_in` answers the same question through the crash-safe store, which on
     /// wasm is localStorage rather than `std::fs`: absent offers a new file, unreadable or
-    /// corrupt offers an erase, and the two stay apart.
+    /// corrupt offers an erase, and the two stay apart. A slot written before the `repame-save`
+    /// move is adopted from its raw `slotN.json` beside the document, so an old save reads as a
+    /// file rather than collapsing into absent.
     pub fn read_slot(&mut self, slot: usize) {
         let Some(slot) = usize::try_from(slot).ok().filter(|&slot| slot < SLOTS) else {
             return;

@@ -1,9 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use game_utils::save::SaveManager;
-use game_utils::save_store::{LoadStatus, SaveStore};
-use game_utils::storage::FsStorage;
 use glam::Vec3;
+use repame_save::{AppId, FsStorage, SaveError, SaveFile, Storage};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
@@ -17,13 +16,23 @@ use crate::sim::player::Player;
 use crate::sim::talk::Dialogue;
 use crate::{App, assets};
 
+/// A slot's schema in the `repame-save` envelope. The payload keeps its own
+/// `version` field, stamped with the same number.
 pub const SAVE_VERSION: u32 = 1;
 pub const DEFAULT_NAME: &str = "Link";
 pub const SLOTS: usize = 3;
-const SAVE_QUALIFIER: &str = "com";
-const SAVE_ORG: &str = "mlm-games";
-const SAVE_APP: &str = "clearsleeper";
-const SLOT_FILE: &str = "slot0.json";
+
+/// The game's reverse-DNS identity. `AppId::data_dir` resolves the same
+/// per-platform directory the stack's other games save into; on Android the
+/// runtime dir `set_android_data_dir` records from `android_main` keeps it on
+/// the app's internal data path.
+const APP: AppId = AppId::new("com.mlm-games.clearsleeper");
+
+/// The directory name every pre-`repame-save` build stamped its raw JSON
+/// under, before the data directory moved onto this game's [`APP`].
+#[cfg(not(target_arch = "wasm32"))]
+const LEGACY_APP: &str = "clearsleeper";
+
 const FLAG_BYTES: usize = 0x100;
 const STORY_BYTES: usize = 0x100;
 const ARRIVAL_BYTES: usize = 49;
@@ -101,10 +110,6 @@ pub enum SlotRead {
     Unreadable,
     Corrupt,
     Loaded(SaveGame),
-}
-
-fn is_save(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<SaveGame>(bytes).is_ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -344,30 +349,25 @@ impl App {
     }
 }
 
-fn save_manager() -> SaveManager<FsStorage> {
-    SaveManager::new(SAVE_QUALIFIER, SAVE_ORG, SAVE_APP, SLOT_FILE, SAVE_VERSION)
-}
-
-/// The save directory: `CS_SAVE_DIR` when set, otherwise the platform data dir
-/// `game-utils` resolves. Linux stays on `$XDG_DATA_HOME/clearsleeper`; Windows, macOS and
-/// Android move to the stack's standard `ProjectDirs`/internal-data directory, where the
-/// other repame games keep their saves. On wasm it is the virtual
-/// `com-mlm-games-clearsleeper` path `ropfs` backs with localStorage, so no
-/// `std::env::temp_dir` is reachable.
+/// [`CS_SAVE_DIR`] when set, otherwise the app's data directory. On wasm that
+/// is the virtual `com-mlm-games-clearsleeper` path `ropfs` backs with
+/// localStorage: no platform environment resolves there and no `temp_dir` is
+/// reachable.
 pub fn slots_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("CS_SAVE_DIR") {
         if !dir.is_empty() {
             return PathBuf::from(dir);
         }
     }
-    save_manager().data_dir()
+    APP.data_dir()
 }
 
-fn slot_store(dir: &Path, slot: usize) -> SaveStore<FsStorage> {
-    SaveStore::new(dir, format!("slot{slot}.json")).with_validator(is_save)
+/// One slot's versioned document: `slotN.ron` under `dir`.
+fn slot_file(dir: &Path, slot: usize) -> SaveFile {
+    SaveFile::in_dir(dir, format!("slot{slot}.ron"), SAVE_VERSION)
 }
 
-fn store_at(path: &Path) -> anyhow::Result<SaveStore<FsStorage>> {
+fn store_at(path: &Path) -> anyhow::Result<SaveFile> {
     let dir = path
         .parent()
         .filter(|dir| !dir.as_os_str().is_empty())
@@ -375,40 +375,65 @@ fn store_at(path: &Path) -> anyhow::Result<SaveStore<FsStorage>> {
     let name = path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("save path {} has no file name", path.display()))?;
-    Ok(SaveStore::new(dir, name.to_string_lossy().into_owned()).with_validator(is_save))
+    Ok(SaveFile::in_dir(
+        dir,
+        name.to_string_lossy().into_owned(),
+        SAVE_VERSION,
+    ))
 }
 
 pub fn write_save(path: &Path, save: &SaveGame) -> anyhow::Result<()> {
-    let text = serde_json::to_string(save)?;
     store_at(path)?
-        .write(text.as_bytes())
+        .save(save)
         .map_err(|error| anyhow::anyhow!("writing {}: {error}", path.display()))
 }
 
 pub fn read_save(path: &Path) -> anyhow::Result<SaveGame> {
-    let loaded = store_at(path)?.load(&is_save, &[]);
-    let Some(bytes) = loaded.data else {
-        anyhow::bail!("reading {}: {:?}", path.display(), loaded.status);
-    };
-    Ok(serde_json::from_slice(&bytes)?)
+    match store_at(path)?.load::<SaveGame>() {
+        Ok(Some(save)) => Ok(save),
+        Ok(None) => anyhow::bail!("reading {}: no save file", path.display()),
+        Err(error) => anyhow::bail!("reading {}: {error}", path.display()),
+    }
 }
 
 pub fn slot_path_in(dir: &Path, slot: usize) -> PathBuf {
-    dir.join(format!("slot{slot}.json"))
+    dir.join(format!("slot{slot}.ron"))
 }
 
 pub fn read_slot_state_in(dir: &Path, slot: usize) -> SlotRead {
-    let loaded = slot_store(dir, slot).load(&is_save, &[]);
-    match loaded.data {
-        Some(bytes) => match serde_json::from_slice::<SaveGame>(&bytes) {
-            Ok(save) => SlotRead::Loaded(save),
-            Err(_) => SlotRead::Corrupt,
+    let file = slot_file(dir, slot);
+    match file.load::<SaveGame>() {
+        Ok(Some(save)) => SlotRead::Loaded(save),
+        // No document yet is a first run, or a build that predates this one,
+        // whose raw JSON sits beside it.
+        Ok(None) => match adopt_slot(dir, slot, &file) {
+            Legacy::Adopted(save) => SlotRead::Loaded(save),
+            // A legacy file is there and is not a save: the erase answer, not
+            // a first run.
+            Legacy::Present => SlotRead::Corrupt,
+            Legacy::Absent => SlotRead::Missing,
         },
-        None => match loaded.status {
-            LoadStatus::Missing => SlotRead::Missing,
-            LoadStatus::Unreadable => SlotRead::Unreadable,
-            _ => SlotRead::Corrupt,
-        },
+        // A corrupt document left no data behind: the legacy copy is the only
+        // progress left, so it is adopted rather than reset to a new file.
+        Err(error @ SaveError::Corrupt { .. }) => {
+            log::warn!("clearsleeper: {error}");
+            match adopt_slot(dir, slot, &file) {
+                Legacy::Adopted(save) => SlotRead::Loaded(save),
+                _ => SlotRead::Corrupt,
+            }
+        }
+        // Unreadable is a refusal: a file that may still be intact is never
+        // replaced by an older copy.
+        Err(error @ SaveError::Unreadable { .. }) => {
+            log::warn!("clearsleeper: {error}");
+            SlotRead::Unreadable
+        }
+        // A refusal the file layer reports outside those two (a document from a
+        // newer build, a payload that does not fit) is not a new file either.
+        Err(error) => {
+            log::warn!("clearsleeper: {error}");
+            SlotRead::Corrupt
+        }
     }
 }
 
@@ -420,8 +445,130 @@ pub fn read_slot_in(dir: &Path, slot: usize) -> Option<SaveGame> {
 }
 
 pub fn write_slot_in(dir: &Path, slot: usize, save: &SaveGame) -> anyhow::Result<()> {
-    let text = serde_json::to_string(save)?;
-    slot_store(dir, slot)
-        .write(text.as_bytes())
+    slot_file(dir, slot)
+        .save(save)
         .map_err(|error| anyhow::anyhow!("writing {}: {error}", slot_path_in(dir, slot).display()))
+}
+
+fn adopt_slot(dir: &Path, slot: usize, file: &SaveFile) -> Legacy<SaveGame> {
+    adopt_legacy(file, &format!("slot{slot}.json"), dir)
+}
+
+/// What a pre-`repame-save` file left behind.
+pub(crate) enum Legacy<T> {
+    /// A legacy file parsed and was written through the envelope.
+    Adopted(T),
+    /// A legacy file is there and none of the candidates parses.
+    Present,
+    /// No legacy file at any candidate path.
+    Absent,
+}
+
+/// Carry a document written before this build onto `repame-save`: the raw JSON
+/// of `file`'s old name, read from the live directory first and from the
+/// platform directories the game used before the data dir moved. The legacy
+/// file is read through the same storage the store writes with (`ropfs` on
+/// wasm), left in place, and the adopted copy goes through the envelope.
+pub(crate) fn adopt_legacy<T: DeserializeOwned + Serialize>(
+    store: &SaveFile,
+    file: &str,
+    dir: &Path,
+) -> Legacy<T> {
+    let mut present = false;
+    for path in legacy_file_paths(dir, file) {
+        let Some(bytes) = read_legacy(&path) else {
+            continue;
+        };
+        present = true;
+        match serde_json::from_slice::<T>(&bytes) {
+            Ok(value) => {
+                if let Err(error) = store.save(&value) {
+                    log::warn!("clearsleeper: adopting {}: {error}", path.display());
+                }
+                return Legacy::Adopted(value);
+            }
+            Err(error) => log::warn!(
+                "clearsleeper: {} is not the document it names ({error})",
+                path.display()
+            ),
+        }
+    }
+    if present {
+        Legacy::Present
+    } else {
+        Legacy::Absent
+    }
+}
+
+/// The places the same document may still sit under its old name: the live
+/// directory first (Linux never moved, and a build after the data-dir move
+/// wrote raw JSON there too), then, for the game's own data directory, the
+/// platform directories used before the move. A directory the game did not
+/// choose itself, such as a test's scratch dir or a `CS_SAVE_DIR` escape
+/// hatch, reads only itself.
+pub(crate) fn legacy_file_paths(dir: &Path, file: &str) -> Vec<PathBuf> {
+    let mut paths = vec![dir.join(file)];
+    if is_default_app_dir(dir) {
+        paths.extend(legacy_dirs().into_iter().map(|legacy| legacy.join(file)));
+    }
+    paths
+}
+
+/// Whether `dir` is the app's own data directory, the one `CS_SAVE_DIR` did
+/// not redirect. Only then does adoption reach into the pre-move platform
+/// directories, so an explicit save dir stays isolated.
+fn is_default_app_dir(dir: &Path) -> bool {
+    if std::env::var("CS_SAVE_DIR").is_ok_and(|value| !value.is_empty()) {
+        return false;
+    }
+    dir == APP.data_dir().as_path()
+}
+
+/// The directories a pre-`repame-save` build wrote into. Windows used
+/// `%APPDATA%\clearsleeper`, macOS and the rest of the unix-like platforms
+/// `~/.local/share/clearsleeper` (or `$XDG_DATA_HOME/clearsleeper`), and where
+/// no home was visible, Android included, `temp_dir()/clearsleeper`, the
+/// app's cache directory.
+#[cfg(not(target_arch = "wasm32"))]
+fn legacy_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    #[cfg(target_os = "windows")]
+    if let Some(appdata) = non_empty_env("APPDATA") {
+        dirs.push(appdata.join(LEGACY_APP));
+    }
+    if let Some(data) = non_empty_env("XDG_DATA_HOME") {
+        dirs.push(data.join(LEGACY_APP));
+    }
+    if let Some(home) = non_empty_env("HOME") {
+        dirs.push(home.join(".local/share").join(LEGACY_APP));
+    }
+    dirs.push(std::env::temp_dir().join(LEGACY_APP));
+    dirs
+}
+
+/// wasm kept no persistent file before the current `ropfs` path, so there is
+/// no legacy directory to read and `temp_dir` stays off the boot path.
+#[cfg(target_arch = "wasm32")]
+fn legacy_dirs() -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn non_empty_env(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Read a raw JSON document a pre-`repame-save` build left behind, without
+/// touching it: a missing or unreadable file is skipped, never quarantined,
+/// renamed, or deleted.
+fn read_legacy(path: &Path) -> Option<Vec<u8>> {
+    match FsStorage.read(path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            log::warn!("clearsleeper: reading {} ({error})", path.display());
+            None
+        }
+    }
 }
