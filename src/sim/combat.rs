@@ -46,6 +46,14 @@ const SWORD_OFFSET: f32 = 20.0;
 /// the swing puts `SWORD_OFFSET` ahead of the player.
 const SWORD_RADIUS: f32 = 20.0;
 const FLINCH_TICKS: u32 = 10;
+/// The frames an actor's own TG bodies stay out of reach after a blow lands on it.
+///
+/// `d_a_bk.cpp:3569` writes `m030E = REG0_S(7) + 5`, and the register starts at zero for a
+/// retail build (`d_s_play.cpp:78-86` zeroes every short register and only a debug HIO can move
+/// it), so a Bokoblin drops its TG for five frames; `d_a_bb.cpp:2072` (`unk_340`),
+/// `d_a_mo2.cpp:3099` (`m05B4`) and `d_a_st.cpp:1579` (`m02F6`) all carry the same five. It is
+/// what makes a swing that walks its AT over an actor for several frames charge it once.
+pub const HIT_GATE_TICKS: u32 = 5;
 /// `dCcG_SE_UNK1` (`d_cc_d.h:66`), the `SrcGObjAt Se` every sword cut's AT object carries: the
 /// hit-sound ladder reads it as neither wood, nor metal, nor arrow, nor hookshot.
 const AT_SE_SWORD: u8 = 1;
@@ -173,6 +181,55 @@ impl Default for HitPoints {
     }
 }
 
+/// One actor's hit gate: the port's `m030E` / `unk_340` / `m05B4` / `m02F6`, the timer a foe
+/// starts the moment it processes a hit and runs down once a frame.
+///
+/// While it runs the actor's own TG bodies are dropped, which is what keeps one swing from
+/// charging the same actor on every frame its AT overlaps. The reference does the drop by moving
+/// the TG objects: `d_a_bk.cpp:4434-4437` parks both Bokoblin spheres at `y - 20000.0f` before
+/// `SetC` / `Set`, and `d_a_mo2.cpp:3605-3607` and `d_a_tn.cpp:3626-3628` do the same. A TG the
+/// pass never registers is the same thing as one the AT cannot reach, so [`reachable`] answers
+/// for the actors whose reference body drops the volume and for the ones it only refuses in
+/// `damage_check` (`d_a_bb.cpp:2071`, `d_a_st.cpp:1565`), which gates the same damage.
+///
+/// It is per actor: each one carries its own timer, started by the blow that reaches it, so two
+/// foes struck by the same swing each take that swing once.
+#[derive(Component, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct HitGate(u32);
+
+impl HitGate {
+    /// Whether the actor's TG bodies register as reachable this frame: `m030E == 0`
+    /// (`d_a_bk.cpp:3567`).
+    pub fn reachable(&self) -> bool {
+        self.0 == 0
+    }
+
+    /// Drop this actor's TG bodies for [`HIT_GATE_TICKS`] frames, the write the reference makes
+    /// as it processes a hit (`d_a_bk.cpp:3569`).
+    pub fn close(&mut self) {
+        self.0 = HIT_GATE_TICKS;
+    }
+
+    /// One frame off the timer (`d_a_bk.cpp:4206-4207`, `d_a_bb.cpp:2265-2266`).
+    pub fn tick(&mut self) {
+        self.0 = self.0.saturating_sub(1);
+    }
+}
+
+/// Whether a damage site may reach this candidate: an actor whose own gate is running has its TG
+/// bodies dropped. An actor with no [`HitGate`] is one the port has not given the reference's
+/// timer, and stays reachable.
+pub fn reachable(gate: Option<&HitGate>) -> bool {
+    gate.map_or(true, HitGate::reachable)
+}
+
+/// The gate runs down once a frame, before anything can be struck again.
+pub fn tick_gates(mut gates: Query<&mut HitGate>) {
+    for mut gate in &mut gates {
+        gate.tick();
+    }
+}
+
 fn start(
     combat: &mut Combat,
     player: &mut Player,
@@ -270,6 +327,7 @@ pub fn control(
             Option<&ContactBodies>,
             Option<&mut HitPoints>,
             Option<&mut enemy::Hurt>,
+            Option<&mut HitGate>,
         ),
         Without<Ship>,
     >,
@@ -392,8 +450,8 @@ pub fn control(
             let crossings = {
                 let tg: Vec<TgObj<'_>> = actors
                     .iter()
-                    .filter_map(|(entity, actor, bodies, hp, _)| {
-                        if hp.is_none() {
+                    .filter_map(|(entity, actor, bodies, hp, _, gate)| {
+                        if hp.is_none() || !reachable(gate) {
                             return None;
                         }
                         Some(TgObj::new(
@@ -408,7 +466,8 @@ pub fn control(
             };
             let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
             for crossing in crossings {
-                let Ok((entity, actor, _, hp, mut hurt)) = actors.get_mut(crossing.target) else {
+                let Ok((entity, actor, _, hp, mut hurt, gate)) = actors.get_mut(crossing.target)
+                else {
                     continue;
                 };
                 let Some(mut hp) = hp else {
@@ -436,6 +495,9 @@ pub fn control(
                     &mut fx.items,
                 );
                 hp.0 = target.health.0;
+                if let Some(mut gate) = gate {
+                    gate.close();
+                }
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = FLINCH_TICKS;
                 }

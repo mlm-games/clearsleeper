@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::collision::Collision;
-use super::combat::{Combat, CutKind, HitPoints};
+use super::combat::{Combat, CutKind, HitGate, HitPoints};
 use super::events::{SimEvent, SimEvents};
 use super::flags::{Switches, ZoneActors};
 use super::ground;
@@ -1663,6 +1663,7 @@ impl Stalfos {
                         },
                         Stalfos::spawn(u32::from(BEHAVIOR_UPPER_BODY_ONLY)),
                         HitPoints(HEAD_HEALTH),
+                        HitGate::default(),
                         UpperBody::default(),
                     ))
                     .id(),

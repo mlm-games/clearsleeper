@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::balloon::{self, Balloon, Payload};
-use clearsleeper::sim::combat::HitPoints;
+use clearsleeper::sim::combat::{HitGate, HitPoints};
 use clearsleeper::sim::enemy::{Enemy, Hurt};
 use clearsleeper::sim::flags::Collect;
 use clearsleeper::sim::inventory::{SWORD_COLLECT_BYTE, SWORD_COLLECT_LEVEL};
@@ -72,6 +72,7 @@ fn spawn_balloon(app: &mut App, pos: Vec3, parameters: u32) -> bevy_ecs::entity:
             state,
             hit_points,
             Hurt::default(),
+            HitGate::default(),
         ))
         .id()
 }
@@ -98,7 +99,19 @@ fn golden_balloon_carries_its_rider_and_holds_two_hits() {
         1,
         "the first cut only dents it: the blade reaches {BLADE_REACH}"
     );
-    swing(&mut app);
+    // A balloon holds two (`d_a_bb.cpp:2766-2767`) and the Hero's Sword cut carries one
+    // (`setNormalCutAtParam`, `d_a_player_sword.inc:297-309`), so the second hit has to be a
+    // second cut. It cannot be a later frame of the first: the frame the AT reaches a TG sets the
+    // balloon's own hit timer to five (`d_a_bb.cpp:2071-2072`), and the cut walks its AT over the
+    // balloon for five frames. Twelve frames carry the cut out and well past the gate.
+    for _ in 0..14 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        count::<Balloon>(&app),
+        1,
+        "one cut, one hit: the gate holds the rest of the window off"
+    );
     swing(&mut app);
     tick(&mut app);
     assert_eq!(count::<Balloon>(&app), 0, "the second cut pops it");

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy_ecs::prelude::Entity;
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::combat::HitPoints;
+use clearsleeper::sim::combat::{HitGate, HitPoints};
 use clearsleeper::sim::enemy::{self, Enemy, EnemyState, Hurt, Spear};
 use clearsleeper::sim::health::Health;
 use clearsleeper::sim::player::Player;
@@ -46,6 +46,7 @@ fn spawn_enemy(app: &mut App, pos: Vec3, yaw: i16, parameters: u32) -> Entity {
             },
             state,
             hit_points,
+            HitGate::default(),
         ))
         .id()
 }
@@ -88,6 +89,7 @@ fn spawn_lance(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
             },
             state,
             hit_points,
+            HitGate::default(),
         ))
         .id()
 }
@@ -129,6 +131,7 @@ fn spawn_lance_with_hurt(app: &mut App, pos: Vec3, yaw: i16) -> Entity {
             state,
             hit_points,
             Hurt::default(),
+            HitGate::default(),
         ))
         .id()
 }
@@ -275,6 +278,16 @@ fn golden_chase_gives_up_once_it_has_closed() {
     );
 }
 
+/// A strong Boko carries seven health (`d_a_bk.cpp:5109-5113`: the `& 0x20` parameter bit the
+/// port's `STRONG_BIT` mirrors, read at `:4763`, picks seven over the base five) and a normal cut
+/// without the Hero's Sword equipped carries two (`setNormalCutAtParam`,
+/// `d_a_player_sword.inc:297-309`, which `combat::sword_at_power` mirrors), so the foe takes four
+/// cuts.
+///
+/// One of those cuts only lands once. The frame its AT reaches a TG the foe sets its hit timer to
+/// `REG0_S(7) + 5` (`d_a_bk.cpp:3567-3569`), and while that runs the foe parks both TG spheres
+/// 20 000 units down (`d_a_bk.cpp:4434-4437`), so the same cut cannot charge it again on the next
+/// four frames. The counts below are what that gate leaves: 7 - 2 = 5 and not a dead foe.
 #[test]
 fn golden_sword_breaks_the_foe() {
     let mut app = App::new();
@@ -285,17 +298,34 @@ fn golden_sword_breaks_the_foe() {
         Some(7),
         "the strong bit carries seven, the base five"
     );
-    app.stage_item(true);
-    tick(&mut app);
-    app.stage_item(false);
-    for _ in 0..6 {
+    swing(&mut app);
+    assert_eq!(
+        hp(&app, foe),
+        Some(5),
+        "the first cut takes its power once, not on every frame of the window"
+    );
+    // A standing cut runs twelve frames (`combat::cut`'s `CutKind::L`), so the fourteen ticks
+    // below carry the press past the end of the cut and past the five-frame gate.
+    for expected in [Some(3), Some(1)] {
+        for _ in 0..14 {
+            tick(&mut app);
+        }
+        swing(&mut app);
+        assert_eq!(
+            hp(&app, foe),
+            expected,
+            "the gate opens after five frames, so the next cut lands"
+        );
+    }
+    for _ in 0..14 {
         tick(&mut app);
     }
-    assert_eq!(hp(&app, foe), None, "one slash breaks the foe");
+    swing(&mut app);
+    assert_eq!(hp(&app, foe), None, "the fourth cut breaks the strong foe");
     assert_eq!(
         hearts(&app),
         12,
-        "the surprised foe never gets its own swing in"
+        "the stagger keeps the foe from ever swinging back"
     );
 }
 

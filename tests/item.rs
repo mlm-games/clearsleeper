@@ -4,7 +4,7 @@ use clearsleeper::App;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::arrow::{self, Arrow};
 use clearsleeper::sim::boomerang::Boomerang;
-use clearsleeper::sim::combat::HitPoints;
+use clearsleeper::sim::combat::{HitGate, HitPoints};
 use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::item::{self, Bomb, Held, Kind};
 use clearsleeper::sim::player::Player;
@@ -91,6 +91,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
             state,
             hit_points,
             Hurt::default(),
+            HitGate::default(),
         ))
         .id()
 }

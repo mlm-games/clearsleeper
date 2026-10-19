@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::actor::Actor;
-use super::combat::HitPoints;
+use super::combat::{HitGate, HitPoints, reachable};
 use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
 use super::flags::ZoneActors;
@@ -30,7 +30,13 @@ pub fn control(
     hammers: Query<&Hammer>,
     players: Query<&Player>,
     mut actors: Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (
+            Entity,
+            &Actor,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+            Option<&mut HitGate>,
+        ),
         (Without<Player>, Without<Ship>),
     >,
     mut zones: ResMut<ZoneActors>,
@@ -50,11 +56,17 @@ pub fn control(
     let head = hammer::strike_origin(player);
     let power = hammer::AT_POWER;
     let mut dead: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, mut hp, mut hurt) in &mut actors {
+    for (entity, actor, mut hp, mut hurt, mut gate) in &mut actors {
         if !reaches(hand, actor.pos) && !reaches(head, actor.pos) {
             continue;
         }
+        if !reachable(gate.as_deref()) {
+            continue;
+        }
         hp.0 -= power;
+        if let Some(gate) = gate.as_deref_mut() {
+            gate.close();
+        }
         if let Some(hurt) = hurt.as_deref_mut() {
             hurt.0 = FLINCH_TICKS;
         }

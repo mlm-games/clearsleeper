@@ -120,7 +120,13 @@ pub fn control(
     water: Option<Res<Water>>,
     mut bombs: Query<(Entity, &mut Actor, &mut Bomb)>,
     mut foes: Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (
+            Entity,
+            &Actor,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+            Option<&mut super::combat::HitGate>,
+        ),
         (
             Without<super::bombflower::Bombflower>,
             Without<super::bombflower::Crawler>,

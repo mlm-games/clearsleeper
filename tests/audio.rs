@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use clearsleeper::sim::actor::Actor;
+use clearsleeper::sim::combat::HitGate;
 use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::events::SimEvent;
 use clearsleeper::sim::player::Player;
@@ -54,6 +55,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
             state,
             hit_points,
             Hurt::default(),
+            HitGate::default(),
         ))
         .id()
 }

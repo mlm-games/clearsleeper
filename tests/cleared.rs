@@ -4,6 +4,7 @@ use clearsleeper::App;
 use clearsleeper::SIM_HZ;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::cleared;
+use clearsleeper::sim::combat::HitGate;
 use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::flags::Switches;
 use glam::Vec3;
@@ -48,6 +49,7 @@ fn foe(app: &mut App, pos: Vec3) -> bevy_ecs::entity::Entity {
             state,
             hit_points,
             Hurt::default(),
+            HitGate::default(),
         ))
         .id()
 }

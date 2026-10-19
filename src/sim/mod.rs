@@ -488,12 +488,24 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == enemy::ENEMY_ACTOR {
         let (state, hit_points) = enemy::spawn(source.parameters, source.angle[1]);
         world
-            .spawn((actor, state, hit_points, enemy::Hurt::default()))
+            .spawn((
+                actor,
+                state,
+                hit_points,
+                enemy::Hurt::default(),
+                combat::HitGate::default(),
+            ))
             .id()
     } else if source.name == enemy::LANCE_ACTOR {
         if let Some((state, hit_points)) = enemy::spawn_lance(source.parameters, source.angle[1]) {
             world
-                .spawn((actor, state, hit_points, enemy::Hurt::default()))
+                .spawn((
+                    actor,
+                    state,
+                    hit_points,
+                    enemy::Hurt::default(),
+                    combat::HitGate::default(),
+                ))
                 .id()
         } else {
             world.spawn(actor).id()
@@ -524,6 +536,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
                 state,
                 hit_points,
                 enemy::Hurt::default(),
+                combat::HitGate::default(),
                 carry::Carryable::Boss,
             ))
             .id()
@@ -1231,7 +1244,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         let foe = stalfos::Stalfos::spawn(source.parameters);
         let points = combat::HitPoints(stalfos::Stalfos::hit_points(&foe));
         world
-            .spawn((actor, foe, points, enemy::Hurt::default()))
+            .spawn((
+                actor,
+                foe,
+                points,
+                enemy::Hurt::default(),
+                combat::HitGate::default(),
+            ))
             .id()
     } else if boko::is_boko(&source.name) {
         match boko::Boko::spawn(source.parameters) {
@@ -2243,6 +2262,7 @@ pub fn build(
                         ff::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
+                    (combat::tick_gates.in_set(WwSimSet::Execute),).chain(),
                     (
                         combat::control.in_set(WwSimSet::Execute),
                         hfuck1::control.in_set(WwSimSet::Execute),

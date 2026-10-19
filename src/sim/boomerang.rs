@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use glam::Vec3;
 
 use super::bodies::AtMeta;
-use super::combat::{HitPoints, actor_status};
+use super::combat::{HitGate, HitPoints, actor_status, reachable};
 use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
@@ -211,6 +211,7 @@ pub fn control(
         Option<&ContactBodies>,
         &mut HitPoints,
         Option<&mut Hurt>,
+        Option<&mut HitGate>,
     )>,
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
@@ -263,7 +264,10 @@ pub fn control(
             let crossings = {
                 let tg: Vec<TgObj<'_>> = foes
                     .iter()
-                    .filter_map(|(foe, actor, bodies, _, _)| {
+                    .filter_map(|(foe, actor, bodies, _, _, gate)| {
+                        if !reachable(gate) {
+                            return None;
+                        }
                         Some(TgObj::new(
                             foe,
                             bodies?,
@@ -279,7 +283,7 @@ pub fn control(
                 if boom.struck.contains(&foe) {
                     continue;
                 }
-                let Ok((_, actor, _, mut hp, mut hurt)) = foes.get_mut(foe) else {
+                let Ok((_, actor, _, mut hp, mut hurt, mut gate)) = foes.get_mut(foe) else {
                     continue;
                 };
                 let mut target = Target {
@@ -301,6 +305,9 @@ pub fn control(
                     &mut fx.items,
                 );
                 hp.0 = target.health.0;
+                if let Some(gate) = gate.as_deref_mut() {
+                    gate.close();
+                }
                 if let Some(hurt) = hurt.as_deref_mut() {
                     hurt.0 = FLINCH;
                 }
@@ -321,7 +328,7 @@ pub fn control(
         }
     }
     for foe in slain {
-        let Ok((_, actor, _, _, _)) = foes.get(foe) else {
+        let Ok((_, actor, _, _, _, _)) = foes.get(foe) else {
             continue;
         };
         zones.mark_done(actor.room, actor.set_id);

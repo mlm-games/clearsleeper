@@ -4,7 +4,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::collision::Collision;
-use super::combat::{HitPoints, actor_status};
+use super::combat::{HitGate, HitPoints, actor_status, reachable};
 use super::damage_fx::DamageFxQueue;
 use super::damage_resolve::{
     AT_SE_NONE, AT_SPL_UNK1, AT_TYPE_BOMB, Atk, Attacker, CUT_TYPE_NONE, CcAtInfo, HitAudio,
@@ -207,7 +207,13 @@ pub fn crawler_control(
     mut crawlers: Query<(Entity, &mut Actor, &mut Crawler), With<Crawler>>,
     players: Query<&Player>,
     mut foes: Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (
+            Entity,
+            &Actor,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+            Option<&mut HitGate>,
+        ),
         (
             Without<Bombflower>,
             Without<Crawler>,
@@ -350,7 +356,13 @@ pub fn blast(
     atk: &Atk,
     published: &mut ResMut<Blasts>,
     foes: &mut Query<
-        (Entity, &Actor, &mut HitPoints, Option<&mut Hurt>),
+        (
+            Entity,
+            &Actor,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+            Option<&mut HitGate>,
+        ),
         (
             Without<Bombflower>,
             Without<Crawler>,
@@ -402,8 +414,8 @@ pub fn blast(
         pos: owner.unwrap_or(Vec3::ZERO),
     };
     let mut slain: Vec<(Entity, i8, u16)> = Vec::new();
-    for (entity, actor, mut hp, mut hurt) in foes.iter_mut() {
-        if !within(origin, actor.pos, BLAST_RADIUS) {
+    for (entity, actor, mut hp, mut hurt, mut gate) in foes.iter_mut() {
+        if !within(origin, actor.pos, BLAST_RADIUS) || !reachable(gate.as_deref()) {
             continue;
         }
         let mut target = Target {
@@ -432,6 +444,9 @@ pub fn blast(
             &mut fx.items,
         );
         hp.0 = target.health.0;
+        if let Some(gate) = gate.as_deref_mut() {
+            gate.close();
+        }
         if let Some(hurt) = hurt.as_deref_mut() {
             hurt.0 = FLINCH;
         }

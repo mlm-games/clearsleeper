@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy_ecs::prelude::Entity;
 use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::bodies;
-use clearsleeper::sim::combat::{Combat, CutKind, HitPoints};
+use clearsleeper::sim::combat::{Combat, CutKind, HitGate, HitPoints};
 use clearsleeper::sim::contact_run::ContactBodies;
 use clearsleeper::sim::lock::Lock;
 use clearsleeper::sim::player::Player;
@@ -59,6 +59,7 @@ fn spawn_target(app: &mut App, pos: Vec3) -> Entity {
                 ..Default::default()
             },
             HitPoints::default(),
+            HitGate::default(),
             bodies,
         ))
         .id();

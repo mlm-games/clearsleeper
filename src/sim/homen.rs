@@ -321,6 +321,7 @@ impl Homen {
                     state,
                     hit_points,
                     Hurt::default(),
+                    super::combat::HitGate::default(),
                 ))
                 .id(),
         );

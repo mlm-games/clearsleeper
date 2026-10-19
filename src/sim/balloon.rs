@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
-use super::combat::HitPoints;
+use super::combat::{HitGate, HitPoints};
 use super::enemy::{self, Hurt};
 
 pub const BALLOON_ACTOR: &str = "Bb";
@@ -49,12 +49,24 @@ fn drop(actor: &Actor, payload: Payload, commands: &mut Commands) {
     match payload {
         Payload::Lance => {
             if let Some((state, hit_points)) = enemy::spawn_lance(PAYLOAD_PARAM, yaw) {
-                commands.spawn((child, state, hit_points, Hurt::default()));
+                commands.spawn((
+                    child,
+                    state,
+                    hit_points,
+                    Hurt::default(),
+                    HitGate::default(),
+                ));
             }
         }
         Payload::Small => {
             let (state, hit_points) = enemy::spawn(PAYLOAD_PARAM, yaw);
-            commands.spawn((child, state, hit_points, Hurt::default()));
+            commands.spawn((
+                child,
+                state,
+                hit_points,
+                Hurt::default(),
+                HitGate::default(),
+            ));
         }
     }
 }

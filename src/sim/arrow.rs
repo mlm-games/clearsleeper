@@ -4,7 +4,7 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::bodies::AtMeta;
-use super::combat::{HitPoints, actor_status};
+use super::combat::{HitGate, HitPoints, actor_status, reachable};
 use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
@@ -170,6 +170,7 @@ pub fn control(
             Option<&ContactBodies>,
             &mut HitPoints,
             Option<&mut Hurt>,
+            Option<&mut HitGate>,
         ),
         Without<Ship>,
     >,
@@ -228,7 +229,10 @@ pub fn control(
                 let crossings = {
                     let tg: Vec<TgObj<'_>> = foes
                         .iter()
-                        .filter_map(|(foe, actor, _, bodies, _, _)| {
+                        .filter_map(|(foe, actor, _, bodies, _, _, gate)| {
+                            if !reachable(gate) {
+                                return None;
+                            }
                             Some(TgObj::new(
                                 foe,
                                 bodies?,
@@ -242,7 +246,7 @@ pub fn control(
                 let mut struck: Option<(Entity, Option<i32>, Vec3, i8, u16)> = None;
                 let mut nearest = f32::INFINITY;
                 for crossing in crossings {
-                    let Ok((foe, actor, colliders, _, _, _)) = foes.get(crossing.target) else {
+                    let Ok((foe, actor, colliders, _, _, _, _)) = foes.get(crossing.target) else {
                         continue;
                     };
                     let distance = (crossing.cross - arrow.pos).length();
@@ -274,7 +278,7 @@ pub fn control(
                     }
                     continue;
                 };
-                if let Ok((_, actor, _, _, mut hp, mut hurt)) = foes.get_mut(foe) {
+                if let Ok((_, actor, _, _, mut hp, mut hurt, mut gate)) = foes.get_mut(foe) {
                     let mut target = Target {
                         name: actor.name.clone(),
                         pos: actor.pos,
@@ -297,6 +301,9 @@ pub fn control(
                         &mut fx.items,
                     );
                     hp.0 = target.health.0;
+                    if let Some(gate) = gate.as_deref_mut() {
+                        gate.close();
+                    }
                     if let Some(hurt) = hurt.as_deref_mut() {
                         hurt.0 = FLINCH;
                     }

@@ -6,7 +6,7 @@ use super::actor::Actor;
 use super::arrow;
 use super::boomerang;
 use super::collision::Collision;
-use super::combat::{Combat, HitPoints};
+use super::combat::{Combat, HitGate, HitPoints, reachable};
 use super::damage;
 use super::enemy::Hurt;
 use super::events::{SimEvent, SimEvents};
@@ -212,7 +212,16 @@ pub fn control(
     players: Query<&Player>,
     gates: Gates,
     mut shots: Shots,
-    mut foes: Query<(Entity, &Actor, &mut HitPoints, Option<&mut Hurt>), Without<Ship>>,
+    mut foes: Query<
+        (
+            Entity,
+            &Actor,
+            &mut HitPoints,
+            Option<&mut Hurt>,
+            Option<&mut HitGate>,
+        ),
+        Without<Ship>,
+    >,
     mut events: ResMut<SimEvents>,
     mut blasts: ResMut<super::bombflower::Blasts>,
     mut commands: Commands,
@@ -278,15 +287,19 @@ pub fn control(
                 chain.push(other);
             }
         }
-        for (foe_entity, foe, mut hp, mut hurt) in &mut foes {
-            if within(blast, foe.pos, BOMB_RADIUS) {
-                hp.0 -= BOMB_POWER;
-                if let Some(hurt) = hurt.as_deref_mut() {
-                    hurt.0 = BOMB_FLINCH;
-                }
-                if hp.0 <= 0 {
-                    dead.push((foe_entity, foe.room, foe.set_id));
-                }
+        for (foe_entity, foe, mut hp, mut hurt, mut gate) in &mut foes {
+            if !within(blast, foe.pos, BOMB_RADIUS) || !reachable(gate.as_deref()) {
+                continue;
+            }
+            hp.0 -= BOMB_POWER;
+            if let Some(gate) = gate.as_deref_mut() {
+                gate.close();
+            }
+            if let Some(hurt) = hurt.as_deref_mut() {
+                hurt.0 = BOMB_FLINCH;
+            }
+            if hp.0 <= 0 {
+                dead.push((foe_entity, foe.room, foe.set_id));
             }
         }
         blasts.list.push(blast);
