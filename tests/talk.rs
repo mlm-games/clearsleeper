@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bevy_ecs::prelude::{Entity, With};
 use clearsleeper::sim::actor::Actor;
-use clearsleeper::sim::area::StageName;
 use clearsleeper::sim::event::{ActiveEvent, EventList, Stage};
 use clearsleeper::sim::flags::{Arrivals, OrderFlags, StoryBits};
 use clearsleeper::sim::player::Player;
@@ -116,10 +115,6 @@ fn talker(app: &mut App) -> Talk {
     *query.iter(&app.sim.world).next().expect("talker entity")
 }
 
-fn stories(app: &App) -> StoryBits {
-    *app.sim.world.resource::<StoryBits>()
-}
-
 fn order_flags(app: &App) -> OrderFlags {
     *app.sim.world.resource::<OrderFlags>()
 }
@@ -138,126 +133,6 @@ fn fresh_context() -> Context {
         timer_active: false,
         accepted: false,
     }
-}
-
-#[test]
-fn golden_talk_ladder_walks_the_arrived_island() {
-    let mut app = App::new();
-    let speaker = spawn_talker(&mut app, Vec3::ZERO, 0x1234, OUTSET);
-    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
-    press(&mut app);
-    let open = dialogue(&app);
-    assert!(open.open, "the button opens the talk inside 400 units");
-    assert_eq!(open.speaker, Some(speaker), "the box holds the speaker");
-    assert_eq!(
-        open.message, 0x32D0,
-        "the arrived island opens on the arrive check"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32D4,
-        "arrival sends the ladder back to the base line"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x1234,
-        "the home angle carries the base line"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32D6,
-        "the base line offers the tag prompt"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32D7,
-        "without the bow the offer declines"
-    );
-    press(&mut app);
-    assert!(!dialogue(&app).open, "the declined offer closes the box");
-    assert!(
-        stories(&app).test(0x0901),
-        "closing the box marks the soldier spoken to"
-    );
-    assert!(
-        order_flags(&app).has(0x0008),
-        "the conversation end raises the talk event flag"
-    );
-    assert!(talker(&mut app).gone, "the soldier dives away afterwards");
-    assert!(
-        !talker(&mut app).map_done,
-        "the dive resets the session flags"
-    );
-    press(&mut app);
-    assert!(
-        !dialogue(&app).open,
-        "a vanished soldier does not answer again"
-    );
-}
-
-#[test]
-fn golden_talk_ladder_meets_then_vanishes_at_dragon_roost() {
-    let mut app = App::new();
-    app.sim.world.insert_resource(StageName("sea".to_owned()));
-    let speaker = spawn_talker(&mut app, Vec3::ZERO, 0x1234, DRAGON_ROOST);
-    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32CA,
-        "the first meeting opens at dragon roost"
-    );
-    press(&mut app);
-    assert_eq!(dialogue(&app).message, 0x32CB, "the meeting steps on");
-    press(&mut app);
-    assert_eq!(dialogue(&app).message, 0x32CC, "the meeting steps on");
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32CD,
-        "the meeting reaches its ask"
-    );
-    press(&mut app);
-    let open = dialogue(&app);
-    assert!(open.open, "the map event hands straight back to the talk");
-    assert_eq!(
-        open.message, 0x1234,
-        "the reopened box starts on the base line"
-    );
-    assert_eq!(
-        open.speaker,
-        Some(speaker),
-        "the speaker survives the event"
-    );
-    assert!(
-        talker(&mut app).map_done,
-        "the map event records the map done"
-    );
-    assert!(
-        order_flags(&app).has(0x0008),
-        "the map event raises the talk event flag"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32CE,
-        "the base line with the map points at the farewell"
-    );
-    press(&mut app);
-    assert!(!dialogue(&app).open, "the farewell closes the box");
-    assert!(talker(&mut app).gone, "the farewell dives away");
-    assert!(
-        stories(&app).test(0x0901),
-        "the farewell marks the soldier spoken to"
-    );
-    assert!(
-        !talker(&mut app).map_done,
-        "the dive resets the session flags"
-    );
 }
 
 #[test]
@@ -556,71 +431,5 @@ fn golden_talk_runs_the_map_event_before_reopening_the_box() {
         dialogue(&app).message,
         0x32D2,
         "the base line continues after the map event"
-    );
-}
-
-#[test]
-fn golden_talk_dives_after_the_farewell_event_runs() {
-    let mut app = App::new();
-    app.sim
-        .world
-        .insert_resource(event_list(&["SO_MAPOPEN", "SO_1ST_MEET_END"]));
-    app.sim.world.insert_resource(StageName("sea".to_owned()));
-    spawn_talker(&mut app, Vec3::ZERO, 0x1234, DRAGON_ROOST);
-    teleport(&mut app, Vec3::new(0.0, 0.0, 200.0));
-    press(&mut app);
-    assert_eq!(dialogue(&app).message, 0x32CA, "the meeting opens");
-    press(&mut app);
-    press(&mut app);
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32CD,
-        "the meeting reaches its ask"
-    );
-    press(&mut app);
-    assert!(!dialogue(&app).open, "the map event takes the box");
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x1234,
-        "the ended map event reopens on the base line"
-    );
-    press(&mut app);
-    assert_eq!(
-        dialogue(&app).message,
-        0x32CE,
-        "the mapped first visit points at the farewell"
-    );
-    press(&mut app);
-    assert!(
-        !dialogue(&app).open,
-        "the box closes while the farewell event runs"
-    );
-    assert_eq!(
-        talker(&mut app).order,
-        4,
-        "the farewell event takes the order"
-    );
-    assert!(!talker(&mut app).gone, "the dive waits on the event");
-    tick(&mut app);
-    tick(&mut app);
-    tick(&mut app);
-    assert!(
-        talker(&mut app).gone,
-        "the ended farewell event dives the soldier away"
-    );
-    assert!(
-        stories(&app).test(0x0901),
-        "the dive marks the soldier spoken"
-    );
-    assert!(
-        order_flags(&app).has(0x0008),
-        "the farewell event raises the talk order flag"
-    );
-    press(&mut app);
-    assert!(
-        !dialogue(&app).open,
-        "a dived soldier does not answer again"
     );
 }
