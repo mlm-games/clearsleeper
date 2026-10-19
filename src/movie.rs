@@ -32,8 +32,31 @@ struct Frame {
     audio: usize,
 }
 
+enum Source {
+    File(File),
+    Bytes(Cursor<Vec<u8>>),
+}
+
+impl Read for Source {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::File(file) => file.read(buf),
+            Self::Bytes(bytes) => bytes.read(buf),
+        }
+    }
+}
+
+impl Seek for Source {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        match self {
+            Self::File(file) => file.seek(pos),
+            Self::Bytes(bytes) => bytes.seek(pos),
+        }
+    }
+}
+
 pub struct Movie {
-    file: File,
+    source: Source,
     frames: Vec<Frame>,
     rate: f32,
     declared: usize,
@@ -62,9 +85,18 @@ fn find(data: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
 
 impl Movie {
     pub fn open(path: &Path) -> Result<Self, MovieError> {
-        let mut file = File::open(path).map_err(|_| MovieError)?;
+        let source = Source::File(File::open(path).map_err(|_| MovieError)?);
+        Self::parse(source)
+    }
+
+    /// A movie over bytes already in memory, which a disc image has and a file path does not.
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, MovieError> {
+        Self::parse(Source::Bytes(Cursor::new(bytes)))
+    }
+
+    fn parse(mut source: Source) -> Result<Self, MovieError> {
         let mut header = [0_u8; HEADER_LEN];
-        file.read_exact(&mut header).map_err(|_| MovieError)?;
+        source.read_exact(&mut header).map_err(|_| MovieError)?;
         if &header[..4] != b"THP\0" {
             return Err(MovieError);
         }
@@ -72,12 +104,12 @@ impl Movie {
         let declared = be32(&header, FRAME_COUNT) as usize;
         let first = be32(&header, FIRST_OFFSET) as usize;
         let last = be32(&header, LAST_OFFSET) as usize;
-        let frames = index(&mut file, first, last, declared)?;
+        let frames = index(&mut source, first, last, declared)?;
         if frames.is_empty() {
             return Err(MovieError);
         }
         Ok(Self {
-            file,
+            source,
             frames,
             rate,
             declared,
@@ -157,10 +189,10 @@ impl Movie {
 
     fn read(&mut self, at: u64, len: usize) -> Result<Vec<u8>, MovieError> {
         let mut buf = vec![0_u8; len];
-        self.file
+        self.source
             .seek(SeekFrom::Start(at))
             .map_err(|_| MovieError)?;
-        self.file.read_exact(&mut buf).map_err(|_| MovieError)?;
+        self.source.read_exact(&mut buf).map_err(|_| MovieError)?;
         Ok(buf)
     }
 }
@@ -322,8 +354,8 @@ fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) 
     }
 }
 
-fn index(
-    file: &mut File,
+fn index<R: Read + Seek>(
+    file: &mut R,
     first: usize,
     last: usize,
     declared: usize,
@@ -380,14 +412,16 @@ fn index(
 
 /// The title movie's path under an extracted `CS_ASSETS` tree.
 ///
-/// `Movie::open` streams from a file handle, so an in-memory disc image has no path to hand it:
-/// a web session plays without the title loop, the way it did before the image could be dropped.
+/// A disc image has no path to hand a file handle, so the app reads the same entry through
+/// [`crate::assets::AssetRoot::read`] and builds the movie with [`Movie::from_bytes`].
+pub const TITLE_PATH: &str = "files/thpdemo/title_loop.thp";
+
 pub fn title_path() -> Option<PathBuf> {
     Some(
         crate::assets::AssetRoot::from_env()
             .ok()?
             .fs_root()?
-            .join("files/thpdemo/title_loop.thp"),
+            .join(TITLE_PATH),
     )
 }
 

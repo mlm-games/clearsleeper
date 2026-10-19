@@ -44,6 +44,7 @@ pub mod shot;
 pub mod sim;
 pub mod source;
 pub mod text;
+pub mod title_screen;
 pub mod trace;
 pub mod ui_file_select;
 pub mod ui_menu_collect;
@@ -99,6 +100,8 @@ pub struct App {
     movie_sound: bool,
     movie_done: bool,
     pub intro: Option<IntroStage>,
+    title_stage: Option<TitleStage>,
+    title_actor: Option<Entity>,
     pending_slot: Option<usize>,
     dialogue_canvas: text::raster::Canvas,
     dialogue_live: bool,
@@ -120,11 +123,20 @@ pub struct IntroStage {
     revision: u64,
 }
 
+struct TitleStage {
+    assets: title_screen::TitleAssets,
+    canvas: text::raster::Canvas,
+    image: Cell<Option<repose_core::ImageHandle>>,
+    uploaded: Cell<u64>,
+    revision: u64,
+}
+
 impl App {
     /// Headless construction: silent audio, no device. Tests and tools.
     pub fn new() -> Self {
         let mut app = Self::with_audio(repame_audio::Audio::noop());
         app.menu.screen = menus::Screen::Playing;
+        app.sync_title_actor();
         app
     }
 
@@ -167,6 +179,8 @@ impl App {
             movie_sound: false,
             movie_done: false,
             intro: None,
+            title_stage: None,
+            title_actor: None,
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,
@@ -180,16 +194,35 @@ impl App {
             app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
         }
         app.movie = movie::title_path().and_then(|path| movie::Movie::open(&path).ok());
+        if app.movie.is_none() {
+            // A disc image has no path for the file handle, so the same entry is read as bytes.
+            app.movie = assets::AssetRoot::from_env()
+                .ok()
+                .and_then(|root| root.read(movie::TITLE_PATH).ok())
+                .and_then(|bytes| movie::Movie::from_bytes(bytes).ok());
+        }
+        app.title_stage = assets::AssetRoot::from_env()
+            .ok()
+            .and_then(|root| title_screen::TitleAssets::load(&root))
+            .map(|assets| TitleStage {
+                assets,
+                canvas: text::raster::Canvas::new(640, 480),
+                image: Cell::new(None),
+                uploaded: Cell::new(0),
+                revision: 0,
+            });
         app.actor_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
         if app.actor_model.is_none() {
             log::warn!("clearsleeper: actor model unavailable");
         }
         app.reset_world();
+        app.sync_title_actor();
         app
     }
 
     fn reset_world(&mut self) {
+        self.title_actor = None;
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         self.stage = assets::load_stage_tables(assets::SEA_STAGE);
         sim::build(
@@ -281,6 +314,9 @@ impl App {
             self.stage_item(false);
             self.stage_use(false);
             self.stage_pad_menu();
+            if self.menu.screen == menus::Screen::Title && self.intro.is_none() {
+                self.stage_pad_title(held, window_focused);
+            }
         }
         if self.intro.is_some() {
             self.menu_prev.clone_from(held);
@@ -292,6 +328,9 @@ impl App {
             Vec::new()
         };
         self.menu_prev.clone_from(held);
+        if self.menu.screen == menus::Screen::Title && self.title_stage.is_some() {
+            return;
+        }
         if self.menu.screen == menus::Screen::Playing
             || (cmds.is_empty() && !self.menu.has_pending_click())
         {
@@ -449,6 +488,87 @@ impl App {
                 return;
             }
         }
+        self.decode_movie_frame();
+    }
+
+    fn movie_interval(&self) -> f32 {
+        self.movie
+            .as_ref()
+            .map_or(1.0 / 30.0, movie::Movie::interval)
+    }
+
+    /// `daTitle_c::execute` owns the title actor while the scene is up; a request for
+    /// `fpcNm_NAME_SCENE_e` (`d_a_title.cpp:657`) is the transition to the file select.
+    fn handle_title_request(&mut self) {
+        if self.menu.screen != menus::Screen::Title {
+            return;
+        }
+        let request = self.sim.world.resource::<sim::title::TitleScene>().request;
+        let Some(request) = request else {
+            return;
+        };
+        if request.scene_proc != sim::title::FPC_NM_NAME_SCENE {
+            return;
+        }
+        self.sim
+            .world
+            .resource_mut::<sim::title::TitleScene>()
+            .request = None;
+        self.menu.screen = menus::Screen::FileSelect;
+        let slots = (0..save::SLOTS)
+            .map(|slot| match self.read_slot(slot) {
+                Some(saved) => menus::SlotInfo::from_save(&saved),
+                None => menus::SlotInfo::Empty,
+            })
+            .collect();
+        self.menu.slots = slots;
+        self.menu.open_file_select();
+        self.menu.sync_file_select_cursor();
+    }
+
+    /// The actor and its scene request are rebuilt on every entry, as the title scene is
+    /// recreated after `dComIfG_resetToOpening` (`d_s_title.cpp:48`, `d_s_play.cpp:305`).
+    fn sync_title_actor(&mut self) {
+        let wanted = self.menu.screen == menus::Screen::Title
+            && self.intro.is_none()
+            && self.title_stage.is_some();
+        if !wanted {
+            if let Some(entity) = self.title_actor.take() {
+                self.sim.world.despawn(entity);
+            }
+            return;
+        }
+        if self.title_actor.is_some() {
+            return;
+        }
+        let actor = sim::actor::Actor {
+            name: sim::title::TITLE_ACTOR.to_string(),
+            ..Default::default()
+        };
+        self.title_actor = Some(
+            self.sim
+                .world
+                .spawn((actor, sim::title::Title::spawn(0)))
+                .id(),
+        );
+        *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::title::TitleScene::default) =
+            sim::title::TitleScene::default();
+        *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::title::TitleKirakira::default) =
+            sim::title::TitleKirakira::default();
+        self.movie_frame = 0;
+        self.movie_clock = 0.0;
+        self.movie_done = false;
+        self.movie_pixels.clear();
+        self.decode_movie_frame();
+    }
+
+    fn decode_movie_frame(&mut self) {
         if let Some((w, h, pixels)) = self
             .movie
             .as_mut()
@@ -459,10 +579,31 @@ impl App {
         }
     }
 
-    fn movie_interval(&self) -> f32 {
-        self.movie
-            .as_ref()
-            .map_or(1.0 / 30.0, movie::Movie::interval)
+    fn step_title(&mut self) {
+        if self.menu.screen != menus::Screen::Title {
+            return;
+        }
+        let title = {
+            let mut query = self.sim.world.query::<&sim::title::Title>();
+            query.iter(&self.sim.world).next().copied()
+        };
+        let Some(title) = title else {
+            return;
+        };
+        let Some(stage) = self.title_stage.as_mut() else {
+            return;
+        };
+        let movie = if self.movie_pixels.is_empty() {
+            None
+        } else {
+            Some((
+                self.movie_pixels.as_slice(),
+                self.movie_size.0,
+                self.movie_size.1,
+            ))
+        };
+        title_screen::render(&mut stage.canvas, &stage.assets, &title, movie);
+        stage.revision = stage.revision.wrapping_add(1);
     }
 
     fn start_movie_sound(&mut self) {
@@ -538,6 +679,25 @@ impl App {
             .world
             .get_resource_or_insert_with(sim::intent::CStick::default)
             .poll(glam::Vec2::ZERO);
+    }
+
+    /// The retail title checks pad A, B and START (`d_a_title.cpp:638-659`): the menu's
+    /// Space/Enter confirm keys read as A for one frame, and Escape is already `PAD_START`.
+    fn stage_pad_title(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
+        if self.title_actor.is_none() {
+            return;
+        }
+        let pressed = window_focused
+            && (held.contains(&PhysicalKey::Space) || held.contains(&PhysicalKey::Enter));
+        let previous = window_focused
+            && (self.menu_prev.contains(&PhysicalKey::Space)
+                || self.menu_prev.contains(&PhysicalKey::Enter));
+        let mut pad = self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::PadButtons::default);
+        pad.hold.a |= pressed;
+        pad.trig.a |= pressed && !previous;
     }
 
     pub fn health(&self) -> sim::health::Health {
@@ -2203,6 +2363,9 @@ impl App {
         self.apply_exit();
         self.sync_rooms();
         self.pump_dialogue();
+        self.handle_title_request();
+        self.sync_title_actor();
+        self.step_title();
         steps
     }
 
@@ -2696,6 +2859,12 @@ pub fn root_view(
     if app.quit.latched() {
         return quit::Quit::parked();
     }
+    if app.intro.is_some() {
+        return intro_view(app, ctx);
+    }
+    if app.menu.screen == menus::Screen::Title && app.title_stage.is_some() {
+        return title_screen_view(app, ctx);
+    }
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, app.cam.get()),
         None => view::build_frame_with_actor(
@@ -2726,24 +2895,43 @@ pub fn root_view(
                 held.kind().is_some().then_some(held),
             )
         }
-        menus::Screen::Title => match app.intro.as_ref() {
-            Some(_) => intro_view(app, ctx),
-            None => ZStack(Modifier::new().fill_max_size())
-                .child([title_movie(app, ctx), menus::title_view(&app.menu)]),
-        },
+        menus::Screen::Title => {
+            // No title assets: this is the pre-boot session, so the shell menu stands in.
+            ZStack(Modifier::new().fill_max_size())
+                .child([title_movie(app, ctx), menus::title_view(&app.menu)])
+        }
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => menus::game_over_view(&app.menu),
         menus::Screen::Settings => menus::settings_view(&app.menu),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
     };
-    if app.intro.is_some() {
-        return intro_view(app, ctx);
-    }
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay, dialogue_view(app, ctx)])
 }
 
 fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     let Some(stage) = app.intro.as_ref() else {
+        return Spacer();
+    };
+    if stage.canvas.pixels.is_empty() {
+        return Spacer();
+    }
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        ctx.set_image_rgba8(handle, 640, 480, stage.canvas.pixels.clone(), true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+fn title_screen_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.title_stage.as_ref() else {
         return Spacer();
     };
     if stage.canvas.pixels.is_empty() {

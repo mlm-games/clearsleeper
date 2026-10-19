@@ -11,7 +11,7 @@ pub fn is_title(name: &str) -> bool {
     TITLE_ACTORS.contains(&name)
 }
 
-pub const TITLE_ACTORS: [&str; 0] = [];
+pub const TITLE_ACTORS: [&str; 1] = [TITLE_ACTOR];
 
 pub const ARCHIVE: &str = "TlogoE";
 pub const SCREEN_FILE: &str = "title_logo_e.blo";
