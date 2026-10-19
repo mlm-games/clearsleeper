@@ -125,7 +125,6 @@ pub struct StageCameras {
 pub struct StageHeader {
     pub time_h: i8,
     pub stage_type: u32,
-    pub schbit_start: u8,
     pub schbit_sec: u8,
     pub schbit_enable: u8,
     pub far_plane: f32,
@@ -533,7 +532,6 @@ fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
     Ok(StageHeader {
         time_h: ((type_and_schbit >> 8) & 0xFF) as u8 as i8,
         stage_type: (type_and_schbit >> 16) & 7,
-        schbit_start: ((type_and_schbit >> 8) & 0xFF) as u8,
         schbit_sec: (type_and_schbit & 0xFF) as u8,
         schbit_enable: (enable_and_far >> 16) as u8,
         far_plane: (enable_and_far & 0xFFFF) as u16 as f32,
