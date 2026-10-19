@@ -37,7 +37,6 @@ pub const BODY: (f32, f32) = (BODY_HEIGHT, BODY_HALF);
 pub struct Warship {
     pub home_yaw: i16,
     pub aim: i16,
-    pub pitch: f32,
     pub timer: u32,
 }
 
@@ -65,7 +64,6 @@ pub fn spawn(home_yaw: i16) -> Warship {
     Warship {
         home_yaw,
         aim: home_yaw,
-        pitch: 0.0,
         timer: 0,
     }
 }
@@ -109,8 +107,6 @@ pub fn control(
         if dist < FAR_RANGE {
             warship.aim =
                 add_calc_angle_s(warship.aim, to_s16(dx.atan2(dz)), AIM_SCALE, AIM_MAX, 0);
-            let range = dist.max(1.0);
-            warship.pitch = (player.pos.y + 60.0 - ship.pos.y).atan2(range);
         }
         let yaw = from_s16(ship.angle[1]);
         ship.pos.x += SAIL_SPEED * SAIL_SCALE * yaw.sin();
