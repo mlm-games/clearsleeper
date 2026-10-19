@@ -5,7 +5,7 @@ use clearsleeper::sim::enemy::{self, Hurt};
 use clearsleeper::sim::events::SimEvent;
 use clearsleeper::sim::player::Player;
 use clearsleeper::{App, SIM_HZ};
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 use repose_core::input::PhysicalKey;
 use repose_core::runtime::Scheduler;
 
@@ -76,9 +76,8 @@ fn golden_walk_stride_emits_footsteps() {
     }
     assert!(app.drain_events().is_empty());
 
-    app.stage_axis(Vec2::new(0.0, 1.0));
     for _ in 0..30 {
-        tick(&mut app);
+        frame(&mut app, &[PhysicalKey::KeyW]);
     }
     // 30 full-speed ticks travel 477 units: two 200-unit strides, not three.
     assert_eq!(
@@ -94,9 +93,8 @@ fn audio_bank_loads_and_pumps_headless() {
     clearsleeper::audio::load_cues(&mut audio).expect("footstep cue decodes without a device");
 
     let mut app = App::new();
-    app.stage_axis(Vec2::new(0.0, 1.0));
     for _ in 0..30 {
-        tick(&mut app);
+        frame(&mut app, &[PhysicalKey::KeyW]);
     }
     app.pump_audio(Duration::from_millis(16));
     assert!(app.drain_events().is_empty());
@@ -106,7 +104,8 @@ fn audio_bank_loads_and_pumps_headless() {
 fn golden_swinging_whooshes_and_landing_one_clangs() {
     let mut app = App::new();
     place_player(&mut app, Vec3::new(0.0, 0.0, 120.0));
-    let _ = foe(&mut app, Vec3::ZERO);
+    // The blade reaches 40 units ahead of the player, so the foe stands inside it.
+    let _ = foe(&mut app, Vec3::new(0.0, 0.0, 150.0));
     let _ = drain(&mut app);
     tap(&mut app, PhysicalKey::KeyB);
     let seen = drain(&mut app);

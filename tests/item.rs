@@ -241,8 +241,8 @@ fn golden_projectiles_do_not_survive_a_stage_change() {
     held(&mut app, BOMB_BAG);
     use_item(&mut app);
     assert_eq!(bombs(&app).len(), 1);
-    let tables = clearsleeper::assets::load_stage_tables(clearsleeper::assets::SEA_STAGE)
-        .expect("the home stage loads");
+    // An empty stage stands in for the destination room; the swap clears what is in flight.
+    let tables = clearsleeper::dzs::parse(&0_u32.to_be_bytes()).expect("an empty stage parses");
     app.swap_stage(
         tables,
         Vec::new(),
