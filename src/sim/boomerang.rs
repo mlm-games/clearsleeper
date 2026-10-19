@@ -242,6 +242,16 @@ pub fn control(
         if boom.returning {
             boom.home(player);
         } else {
+            // The aim point is reached (`dist < speedF`, `d_a_boomerang.cpp:620-626`): the lock
+            // cursor advances and the free fly-out is spent, and once no aim is left the boomerang
+            // turns home (`:629-635`). The fly-out aim it flies to is set at the throw, `:503-526`.
+            if boom.distance() < boom.speed {
+                boom.lock += 1;
+                boom.free = false;
+            }
+            if !boom.free && boom.locks <= boom.lock {
+                boom.returning();
+            }
             let at = AtObj::new(
                 Shape::sphere(boom.pos, CAPSULE_RADIUS + HIT_REACH),
                 AT_SPRM_NO_TG_HIT_INF,

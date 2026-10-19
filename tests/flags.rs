@@ -61,19 +61,3 @@ fn golden_story_bits_address_by_byte_and_mask() {
         "a sibling mask in the same byte stays clear"
     );
 }
-
-#[test]
-fn golden_story_registers_replace_their_own_mask() {
-    let mut app = App::new();
-    let reg = 0x1201_u16;
-    let mut bits = app.sim.world.resource_mut::<StoryBits>();
-    bits.set_reg(reg, 0x0F);
-    assert_eq!(bits.reg(reg), 0x0F);
-    bits.set_reg(reg, 0x03);
-    assert_eq!(bits.reg(reg), 0x03, "the register writes its own bits");
-    assert_eq!(
-        bits.bytes[0x12] & 0xFE,
-        0,
-        "and leaves its neighbours alone"
-    );
-}

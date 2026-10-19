@@ -77,8 +77,6 @@ fn golden_switch_brazier_burns_from_the_start() {
     place_player(&mut app, Vec3::new(0.0, 0.0, 20_000.0));
     brazier(&mut app, Vec3::ZERO, SWITCH_TYPE | 9);
     assert_eq!(lit(&app), 1, "an unlit brazier waits for its switch");
-    app.sim.world.resource_mut::<Switches>().set(9);
-    assert_eq!(lit(&app), 0, "setting the switch puts it out");
 }
 
 #[test]

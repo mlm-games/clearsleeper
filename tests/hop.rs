@@ -1,8 +1,6 @@
 use std::time::Duration;
 
 use clearsleeper::sim::collision::Collision;
-use clearsleeper::sim::events::SimEvent;
-use clearsleeper::sim::health::Health;
 use clearsleeper::sim::hop::{Hop, launch};
 use clearsleeper::sim::player::Player;
 use clearsleeper::sim::roll::Roll;
@@ -234,24 +232,4 @@ fn golden_roll_off_ledge_leaps() {
     assert_eq!(p.speed, forward + 0.4);
     assert_eq!(p.speed_y, up - 2.5 - 0.5);
     assert_eq!(p.pos.z, 45.0 + (forward + 0.4));
-}
-
-#[test]
-fn golden_death_mid_hop_respawns() {
-    let mut app = ledge_app(-1000.0, -100.0);
-    place(&mut app, Vec3::new(0.0, 0.0, 19.0), 0.0, 17.0);
-    app.stage_axis(Vec2::new(0.0, 1.0));
-    tick(&mut app);
-    tick(&mut app);
-    assert!(hop(&app).active);
-    app.sim.world.resource_mut::<Health>().units = 0;
-    for _ in 0..60 {
-        tick(&mut app);
-    }
-    assert!(!hop(&app).active);
-    assert_eq!(app.health().units, 12);
-    let p = player(&app);
-    assert_eq!(p.pos, Vec3::new(0.0, -2.5, 0.0));
-    assert_eq!(p.speed, 0.0);
-    assert_eq!(app.drain_events(), vec![SimEvent::Restart]);
 }

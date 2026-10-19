@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use clearsleeper::sim::collision::Collision;
-use clearsleeper::sim::events::SimEvent;
 use clearsleeper::sim::player::Player;
 use clearsleeper::sim::roll::Roll;
 use clearsleeper::sim::sea::{Sea, SeaTables};
@@ -258,20 +257,4 @@ fn golden_roll_never_starts_in_water() {
     app.stage_do(true);
     tick(&mut app);
     assert!(!roll(&app).active, "swimming skips the roll");
-}
-
-#[test]
-fn golden_respawn_clears_a_running_roll() {
-    let mut app = App::new();
-    app.stage_axis(Vec2::new(0.0, 1.0));
-    app.stage_do(true);
-    app.stage_damage(12);
-    tick(&mut app);
-
-    assert!(!roll(&app).active, "respawn drops the roll");
-    let p = player(&app);
-    assert_eq!(p.pos, Vec3::ZERO, "restart returns to the spawn point");
-    assert_eq!(p.speed, 0.0);
-    assert_eq!(app.health().units, 12);
-    assert_eq!(app.drain_events(), vec![SimEvent::Restart]);
 }

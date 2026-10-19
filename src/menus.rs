@@ -195,7 +195,7 @@ impl Menu {
                 }
                 (Screen::FileSelect, Cmd::Back) => self.screen = Screen::Title,
                 (Screen::GameOver, Cmd::Up) => self.slot = self.slot.saturating_sub(1),
-                (Screen::GameOver, Cmd::Down) => self.slot = self.slot.min(1),
+                (Screen::GameOver, Cmd::Down) => self.slot = (self.slot + 1).min(1),
                 (Screen::GameOver, Cmd::Confirm) => {
                     let choice = if self.slot == 0 {
                         GameOverChoice::Continue

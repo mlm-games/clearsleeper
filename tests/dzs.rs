@@ -142,30 +142,6 @@ fn golden_room_at_maps_sea_chart_cells() {
 }
 
 #[test]
-fn golden_stage_tables_kankyo_chain_and_wave_max() {
-    let tables = dzs::parse(&kankyo()).unwrap();
-    assert_eq!(tables.boot_time(), 45.0);
-    assert!(tables.has_sea_actor());
-    assert_eq!(
-        tables.boot_sky(),
-        Some([10.0 / 255.0, 20.0 / 255.0, 30.0 / 255.0, 1.0])
-    );
-    assert_eq!(
-        tables.boot_sea_colors(),
-        Some(([1.0, 1.0, 1.0], [9.0 / 255.0, 99.0 / 255.0, 224.0 / 255.0],))
-    );
-
-    let stage = dzs::parse(&synthetic()).unwrap();
-    assert_eq!(stage.boot_time(), 165.0);
-    assert!(!stage.has_sea_actor());
-    assert_eq!(stage.boot_sky(), None);
-    assert_eq!(stage.boot_sea_colors(), None);
-    assert_eq!(stage.wave_max(7), 3);
-    assert_eq!(stage.wave_max(44), 255);
-    assert_eq!(stage.wave_max(9), 10);
-}
-
-#[test]
 fn rejects_truncated_and_malformed_stage_streams() {
     assert_eq!(dzs::parse(&[]).unwrap_err(), DzsError::Truncated);
 

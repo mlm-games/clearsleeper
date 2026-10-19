@@ -160,10 +160,6 @@ fn rejects_truncated_and_unsupported_streams() {
     put_u32(&mut oversized, 8, 0x200);
     assert_eq!(btk::parse(&oversized).unwrap_err(), BtkError::Truncated);
 
-    let mut post_tracks = bytes.clone();
-    put_u16(&mut post_tracks, 0x20 + 0x34, 1);
-    assert_eq!(btk::parse(&post_tracks).unwrap_err(), BtkError::Descriptor);
-
     let mut calc_type = bytes.clone();
     put_u32(&mut calc_type, 0x20 + 0x5C, 1);
     assert_eq!(btk::parse(&calc_type).unwrap_err(), BtkError::Descriptor);

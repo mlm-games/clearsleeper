@@ -23,8 +23,11 @@ pub fn control(
     mut intent: ResMut<MoveIntent>,
     mut players: Query<&mut Player>,
 ) {
+    // The ENDING scene is entered by the one-shot request `d_s_play.cpp:325-326` makes when the
+    // next stage is named "ENDING", and the completion switch stays set after it, so a roll that
+    // has finished never starts again.
     if !ending.running {
-        if !switches.test(COMPLETE_SWITCH) {
+        if ending.finished || !switches.test(COMPLETE_SWITCH) {
             return;
         }
         ending.running = true;

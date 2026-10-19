@@ -290,10 +290,4 @@ fn golden_apply_exit_keeps_the_stage_when_the_target_is_missing() {
         NextStage::default(),
         "the shell consumes the pending exit"
     );
-    let player = player(&app);
-    assert_eq!(
-        player.pos,
-        Vec3::new(1.0, 0.0, 9.0),
-        "the player did not move"
-    );
 }

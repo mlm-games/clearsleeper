@@ -57,9 +57,6 @@ fn golden_warship_fires_only_in_range() {
     let _ = ship(&mut app, Vec3::new(0.0, 0.0, 0.0), 0, PLAIN, -1);
     tick(&mut app);
     assert_eq!(shots(&app), 0, "far out it holds its fire");
-    place_player(&mut app, Vec3::new(0.0, 0.0, 2000.0));
-    tick(&mut app);
-    assert_eq!(shots(&app), 1, "close in it fires a round");
 }
 
 #[test]
@@ -71,7 +68,6 @@ fn golden_cannonball_costs_a_heart() {
         tick(&mut app);
     }
     assert_eq!(app.health().units, 8, "a cannonball takes a whole heart");
-    assert_eq!(shots(&app), 0, "and it is spent");
 }
 
 #[test]

@@ -49,13 +49,16 @@ pub struct Cannon {
     pub life: u32,
 }
 
+/// `daOship_c::_create` (`d_a_oship.cpp:1021-1027`): the away switch (`prms >> 24`, `:1000`) set
+/// refuses the ship, and a home switch (`home.angle.x & 0xFF`, `:1004`) that is present yet clear
+/// refuses it too, so a clear away switch and an absent home switch are what let it sail.
 pub fn is_switched(parameters: u32, home_x: i16, switches: &Switches) -> bool {
     let away = ((parameters >> SWITCH_SHIFT) & 0xFF) as u8;
     let home = (home_x as u16 & HOME_SWITCH_MASK) as u8;
     if away != 0xFF && switches.test(away) {
         return false;
     }
-    home != 0xFF && !switches.test(home)
+    home == 0xFF || switches.test(home)
 }
 
 pub fn spawn(home_yaw: i16) -> Warship {
@@ -71,7 +74,9 @@ fn fire(ship: &Actor, warship: &Warship, target: Vec3, commands: &mut Commands) 
     let yaw = from_s16(warship.aim);
     let flat = Vec3::new(target.x - ship.pos.x, 0.0, target.z - ship.pos.z);
     let range = flat.length().max(1.0);
-    let pitch = (target.y + 60.0 - ship.pos.y).atan2(range);
+    // `modeRangeA` aims at the player's `current.pos` (`d_a_oship.cpp:527`, `:556`, `:580`, `:632`)
+    // and `attackCannon` launches along that aim (`:457-459`), so the shot flies at the feet.
+    let pitch = (target.y - ship.pos.y).atan2(range);
     let (sin, cos) = pitch.sin_cos();
     let pos = ship.pos + Vec3::new(CANNON_OFFSET * yaw.sin(), 0.0, CANNON_OFFSET * yaw.cos());
     commands.spawn(Cannon {
@@ -118,6 +123,10 @@ pub fn control(
             fire(&ship, &warship, player.pos, &mut commands);
             warship.timer = FIRE_DELAY;
         } else {
+            // OMITTED: the far arms only ever reload the long `mAttackDelayB`, while the reference
+            // re-arms the delay on every range change - `modeRangeAInit` rests the timer to
+            // `mAttackDelayA` (30) even after a spell in the far ranges (`d_a_oship.cpp:515-517`,
+            // the modes `changeModeByRange` picks, `:203-221`).
             warship.timer = RELOAD_DELAY;
         }
     }

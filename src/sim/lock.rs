@@ -120,6 +120,13 @@ fn weight(player: &Player, pos: Vec3) -> f32 {
     (pos - player.pos).length() * (WEIGHT_RATIO + WEIGHT_RATIO * turns * turns) / WEIGHT_DIVISOR
 }
 
+/// The press picks the nearest weighted actor, not the nearest actor: `dAttention_c`'s lock-on
+/// list is built from the actors whose `attention_info.flags` meet the manager's mask and each
+/// entry's own distance table (`d_attention.cpp:467` `SelectAttention`, `:327` `calcWeight`,
+/// `:382` `setLList`, read back through `:131` `GetLockonList`). Everything else registers
+/// nothing and takes no part - a pot's own flags are zero (`d_a_ks.cpp:1624`) - and this port
+/// stands that registration in with [`super::combat::HitPoints`], which the ships do not carry:
+/// they register the action half instead.
 fn pick(
     player: &Player,
     actors: &Query<(Entity, &Actor), (Without<Ship>, With<HitPoints>)>,

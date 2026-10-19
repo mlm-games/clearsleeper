@@ -327,7 +327,13 @@ impl App {
         self.reset_world();
         self.pending_slot = Some(slot);
         self.begin_intro();
-        self.menu.screen = menus::Screen::Title;
+        // A new game resets into the opening scene, `d_s_play.cpp:305`'s `dComIfG_resetToOpening`
+        // (`:1237`, `fpcNm_OPENING_SCENE_e`), and the shell plays that over the title; when the
+        // opening cannot start there is nothing left to show and `enter_play` has already put the
+        // game in play and written the slot.
+        if self.intro.is_some() {
+            self.menu.screen = menus::Screen::Title;
+        }
     }
 
     fn begin_intro(&mut self) {
