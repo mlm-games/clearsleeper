@@ -140,7 +140,9 @@ const LANCE_BARE: Profile = Profile {
 const TURN_SCALE: i16 = 4;
 const THROW_FORWARD: f32 = 25.0;
 const THROW_LIFT: f32 = 25.0;
-const THROW_GRAVITY: f32 = -2.5;
+/// `fopAcM_SetGravity(this, -3.0f)` at the throw (`d_a_boko.cpp:355`) and the `gravity = -3.0f`
+/// the throw arms keep (`:379`).
+const THROW_GRAVITY: f32 = -3.0;
 const THROW_LIFE: u32 = 120;
 const THROW_REACH: f32 = 20.0;
 const THROW_POWER: u8 = 1;
