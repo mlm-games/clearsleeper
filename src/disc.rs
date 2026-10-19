@@ -2,10 +2,13 @@
 //!
 //! A disc image carries its whole directory tree in one table. The boot header names the table's
 //! offset at `0x424` and its size at `0x428`; the table is a depth first list of 12 byte entries
-//! whose names live in a string table after the last entry. [`DiscImage`] parses that table into
-//! the same relative paths an extracted `CS_ASSETS` tree holds, so the asset layer above reads
+//! whose names live in a string table after the last entry. [`DiscImage`] speaks the same
+//! relative paths an extracted `CS_ASSETS` tree holds, so the asset layer above reads
 //! `files/res/Stage/sea/Room44.arc` either way, and nothing above this module knows which of the
-//! two it is talking to.
+//! two it is talking to. A disc's table does not carry that `files/` component: its root is the
+//! data root the extraction nests under `files/`, and `fst_path` translates one onto the other.
+//! The extraction's `sys/` tree is the disc's preamble, which the table does not describe; the
+//! port reads no `sys/` path, so that boundary is stated in `read` rather than worked around.
 //!
 //! The layout, as Dolphin's `DiscIO/FileSystemGCWii.cpp` and `nod`'s `disc/fst.rs` read it (nod
 //! is the reader dusklight mounts discs with, and the one this module uses for RVZ containers):
@@ -315,9 +318,11 @@ impl Fst {
         Ok(Self { entries })
     }
 
-    /// The entry a relative path names, by splitting it the way the extracted tree does. Names
-    /// are matched exactly: the paths the port reads are the disc's own names, and the reference's
-    /// case insensitive lookup is a property of the game's DVD calls, not of the asset root.
+    /// The entry a disc-relative path names, by splitting it on `/` and walking the table, the
+    /// way the extracted tree does. The extraction's `files/` component is translated away by
+    /// `fst_path` before this is called. Names are matched exactly: the paths the port reads are
+    /// the disc's own names, and the reference's case insensitive lookup is a property of the
+    /// game's DVD calls, not of the asset root.
     fn find(&self, rel: &str) -> Option<usize> {
         let mut parts = rel
             .split('/')
@@ -558,12 +563,19 @@ impl DiscImage {
     }
 
     /// The bytes of one path, relative to the disc root the way an extracted dump is:
-    /// `files/res/Stage/sea/Room44.arc`, `sys/boot.bin`, and so on. A path the table does not
-    /// hold, or one that names a directory, is [`DiscError::MissingFile`].
+    /// `files/res/Stage/sea/Room44.arc`. The extraction's `files/` component names the FST root
+    /// the walk starts at, so it is translated away before the lookup; a path outside it,
+    /// `sys/boot.bin` included, is looked up as given, and the table holds no such entry because
+    /// the `sys/` files live in the disc preamble rather than in the table. A path the table
+    /// does not hold, or one that names a directory, is [`DiscError::MissingFile`], labelled in
+    /// the extraction style.
     pub fn read(&self, rel: &str) -> Result<Vec<u8>, DiscError> {
-        let index = self.fst.find(rel).ok_or_else(|| DiscError::MissingFile {
-            path: rel.to_owned(),
-        })?;
+        let index = self
+            .fst
+            .find(fst_path(rel))
+            .ok_or_else(|| DiscError::MissingFile {
+                path: rel.to_owned(),
+            })?;
         let (offset, size) = self.fst.file(index).ok_or_else(|| DiscError::MissingFile {
             path: rel.to_owned(),
         })?;
@@ -603,6 +615,31 @@ impl DiscImage {
                 stream.read_to_end(&mut out).map_err(container_error)?;
                 Ok(out)
             }
+        }
+    }
+}
+
+/// The path the file table is walked with, given one relative to the disc root the way an
+/// extracted dump lays it out.
+///
+/// An extraction (Dolphin's, and the virtual root Riivolution mounts a disc under) nests the
+/// disc's data root under `files/` and keeps the preamble's boot files beside it under `sys/`
+/// (`boot.bin`, `bi2.bin`, `apploader.img`, `fst.bin`). A GameCube FST has neither: the table's
+/// root is the data root itself, and the preamble files are not entries at all. A leading `files`
+/// component therefore names the root the walk already starts at and is dropped -
+/// `files/res/Stage/sea/Stage.arc` is the table's `res/Stage/sea/Stage.arc` - while anything else
+/// is looked up as given. Nothing in the port reads a `sys/` path, so the missing entries there
+/// are the boundary this states rather than a lookup that falls back to something on a guess.
+fn fst_path(rel: &str) -> &str {
+    let mut rest = rel;
+    loop {
+        let Some((head, tail)) = rest.split_once('/') else {
+            return rest;
+        };
+        match head {
+            "" | "." => rest = tail,
+            "files" => return tail,
+            _ => return rest,
         }
     }
 }

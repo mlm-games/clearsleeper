@@ -1,7 +1,9 @@
 //! The in-memory disc image: the boot header and the file table, against an image built here.
 //!
 //! A real dump is not in the repository, so the table is laid out the way the disc stores one
-//! (see `src/disc.rs`) and the walk that resolves the asset paths is checked through it.
+//! (see `src/disc.rs`) and the walk that resolves the asset paths is checked through it. Its
+//! root is the data root itself, the way the real GZLE01 table's is (`res`, `thpdemo`, ...),
+//! and the extraction's `files/` and `sys/` roots are not entries in it.
 
 use std::sync::Arc;
 
@@ -9,14 +11,18 @@ use clearsleeper::archive::AssetError;
 use clearsleeper::assets::AssetRoot;
 use clearsleeper::disc::{DiscError, DiscImage};
 
+/// The image twin of [`clearsleeper::assets::ASSETS_ENV`]: the real dump the one disc-backed
+/// check reads.
+const DISC_ENV: &str = "CS_DISC";
+
 const GAME_MAGIC_AT: usize = 0x1C;
 const FST_AT: usize = 0x1000;
 const ROOM_AT: usize = 0x2000;
-const SYS_AT: usize = 0x2100;
+const THP_AT: usize = 0x2400;
 const ROOM: &[u8] = b"room data";
-const SYS: &[u8] = b"sys data!";
+const THP: &[u8] = b"movie data";
 
-const NAMES: &[u8] = b"\0files\0res\0Stage\0sea\0Room44.arc\0sys\0boot.bin\0";
+const NAMES: &[u8] = b"\0res\0Stage\0sea\0Room44.arc\0thpdemo\0demo.thp\0";
 
 fn entry(name_at: u32, kind: u8, offset: u32, size: u32) -> [u8; 12] {
     let mut bytes = [0_u8; 12];
@@ -26,19 +32,18 @@ fn entry(name_at: u32, kind: u8, offset: u32, size: u32) -> [u8; 12] {
     bytes
 }
 
-/// The depth first table of the tree `files/res/Stage/sea/Room44.arc` plus `sys/boot.bin`,
-/// where a directory's third word is the index one past its subtree:
-/// root [1, 8), files [2, 6), res [3, 6), Stage [4, 6), sea [5, 6), sys [7, 8).
+/// The depth first table of the real GZLE01 shape, miniature: the root is the data root, so its
+/// children are `res` and `thpdemo` and there is no `files` node. A directory's third word is the
+/// index one past its subtree: root [1, 7), res [2, 5), Stage [3, 5), sea [4, 5), thpdemo [6, 7).
 fn table() -> Vec<u8> {
     let mut fst = Vec::new();
-    fst.extend_from_slice(&entry(0, 1, 0, 8));
-    fst.extend_from_slice(&entry(1, 1, 0, 6));
-    fst.extend_from_slice(&entry(7, 1, 1, 6));
-    fst.extend_from_slice(&entry(11, 1, 2, 6));
-    fst.extend_from_slice(&entry(17, 1, 3, 6));
-    fst.extend_from_slice(&entry(21, 0, ROOM_AT as u32, ROOM.len() as u32));
-    fst.extend_from_slice(&entry(32, 1, 0, 8));
-    fst.extend_from_slice(&entry(36, 0, SYS_AT as u32, SYS.len() as u32));
+    fst.extend_from_slice(&entry(0, 1, 0, 7));
+    fst.extend_from_slice(&entry(1, 1, 0, 5));
+    fst.extend_from_slice(&entry(5, 1, 1, 5));
+    fst.extend_from_slice(&entry(11, 1, 2, 5));
+    fst.extend_from_slice(&entry(15, 0, ROOM_AT as u32, ROOM.len() as u32));
+    fst.extend_from_slice(&entry(26, 1, 0, 7));
+    fst.extend_from_slice(&entry(34, 0, THP_AT as u32, THP.len() as u32));
     fst.extend_from_slice(NAMES);
     fst
 }
@@ -53,7 +58,7 @@ fn image(game_id: &[u8; 6]) -> Vec<u8> {
     bytes[0x428..0x42C].copy_from_slice(&(fst.len() as u32).to_be_bytes());
     bytes[FST_AT..FST_AT + fst.len()].copy_from_slice(&fst);
     bytes[ROOM_AT..ROOM_AT + ROOM.len()].copy_from_slice(ROOM);
-    bytes[SYS_AT..SYS_AT + SYS.len()].copy_from_slice(SYS);
+    bytes[THP_AT..THP_AT + THP.len()].copy_from_slice(THP);
     bytes
 }
 
@@ -62,7 +67,7 @@ fn image_reads_the_paths_an_extracted_tree_holds() {
     let image = DiscImage::open(image(b"GZLE01")).unwrap();
     assert_eq!(image.game_id(), "GZLE01");
     assert_eq!(image.read("files/res/Stage/sea/Room44.arc").unwrap(), ROOM);
-    assert_eq!(image.read("sys/boot.bin").unwrap(), SYS);
+    assert_eq!(image.read("files/thpdemo/demo.thp").unwrap(), THP);
     assert_eq!(image.read("/files/res/Stage/sea/Room44.arc").unwrap(), ROOM);
 
     let summary = image.summary();
@@ -82,6 +87,71 @@ fn image_reads_the_paths_an_extracted_tree_holds() {
         image.read("Files/res/Stage/sea/Room44.arc"),
         Err(DiscError::MissingFile { .. })
     ));
+}
+
+#[test]
+fn the_extraction_path_is_translated_onto_the_fst_root() {
+    let image = DiscImage::open(image(b"GZLE01")).unwrap();
+
+    // An extraction keeps the disc's data root under `files/`, and the table's root is that data
+    // root, so the extracted path and the table's own both name the one entry.
+    assert_eq!(
+        image.read("files/res/Stage/sea/Room44.arc").unwrap(),
+        image.read("res/Stage/sea/Room44.arc").unwrap()
+    );
+    assert_eq!(image.read("res/Stage/sea/Room44.arc").unwrap(), ROOM);
+
+    // Exactly the leading component translates: a second `files` names no entry, and nothing
+    // tries the path the other way around either.
+    assert!(matches!(
+        image.read("files/files/res/Stage/sea/Room44.arc"),
+        Err(DiscError::MissingFile { .. })
+    ));
+    assert!(matches!(
+        image.read("files"),
+        Err(DiscError::MissingFile { .. })
+    ));
+}
+
+#[test]
+fn the_preamble_is_not_in_the_file_table() {
+    let image = DiscImage::open(image(b"GZLE01")).unwrap();
+
+    // `sys/` is where an extraction keeps the disc's boot files. The table describes no such
+    // entry and nothing in the port reads one, so the miss is stated rather than papered over.
+    match image.read("sys/boot.bin") {
+        Err(DiscError::MissingFile { path }) => assert_eq!(path, "sys/boot.bin"),
+        other => panic!("sys/boot.bin is not a table entry: {other:?}"),
+    }
+
+    let root = AssetRoot::from_disc(Arc::new(image));
+    match root.read("sys/boot.bin") {
+        Err(AssetError::MissingFile { path }) => {
+            assert_eq!(path, std::path::PathBuf::from("GZLE01:sys/boot.bin"))
+        }
+        other => panic!("sys/boot.bin keeps its extraction label: {other:?}"),
+    }
+}
+
+/// The one check that needs a real dump: `CS_DISC` names it, and the path the whole port reads at
+/// boot is asked for out of it. Skipped when unset, the way the `CS_ASSETS` checks skip - CI has
+/// no image, so the end-to-end acceptance is the user dropping theirs on the deployed page.
+#[test]
+fn real_disc_image_answers_the_stage_archive_through_cs_disc() {
+    let Ok(path) = std::env::var(DISC_ENV) else {
+        eprintln!("{DISC_ENV} is not set; skipping real disc image check");
+        return;
+    };
+    let bytes = std::fs::read(&path).expect("the image CS_DISC names is readable");
+    let image = DiscImage::open(bytes).expect("the image opens");
+    let stage = image
+        .read("files/res/Stage/sea/Stage.arc")
+        .expect("the sea stage archive resolves through the extraction path");
+    assert!(
+        stage.starts_with(b"RARC") || stage.starts_with(b"Yaz0"),
+        "the sea stage archive is an arc container, packed or plain: {:?}",
+        &stage[..stage.len().min(4)]
+    );
 }
 
 #[test]
