@@ -11,8 +11,20 @@ use glam::Vec3;
 use repose_core::input::PhysicalKey;
 use repose_core::runtime::Scheduler;
 
+mod common;
+
 const STRONGER: u32 = 0x20;
 const GUARD: u32 = 0x1404;
+/// A Bokoblin whose sight band is zero: `d_a_bk.cpp:4770` reads the band out of
+/// the parameter's second byte and `d_a_bk.cpp:1397-1401` turns it into the
+/// distance the foe will notice the player at, so a band of zero leaves the
+/// distance at zero and `d_a_bk.cpp:1403` - "is the player nearer than that" -
+/// never answers yes. The foe holds its post.
+///
+/// The same foe with the strong bit (`d_a_bk.cpp:4763` reads it out of the
+/// parameter, `d_a_bk.cpp:5109-5113` turns it into seven health instead of
+/// five).
+const BLIND_STRONG: u32 = 0x24;
 
 fn tick(app: &mut App) {
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
@@ -112,6 +124,24 @@ fn spears(app: &App) -> Vec<Spear> {
         .iter_entities()
         .filter_map(|e| e.get::<Spear>().copied())
         .collect()
+}
+
+fn pos(app: &App, entity: Entity) -> Vec3 {
+    app.sim
+        .world
+        .get::<Actor>(entity)
+        .expect("the foe is placed")
+        .pos
+}
+
+/// Whether the foe's own bodies answer a blow right now: the port's
+/// `HitGate`, the timer `d_a_bk.cpp:3569` starts when a blow lands
+/// (`REG0_S(7) + 5`) and `d_a_bk.cpp:4206-4207` runs down once a frame.
+fn gate_open(app: &App, entity: Entity) -> bool {
+    app.sim
+        .world
+        .get::<HitGate>(entity)
+        .map_or(false, |gate| gate.reachable())
 }
 
 #[test]
@@ -220,4 +250,196 @@ fn golden_open_water_holds_enemies_where_they_stand() {
         "with no floor under it, it holds its post"
     );
     assert_eq!(state(&app, foe), EnemyState::Wait, "and stays alert-free");
+}
+
+/// The foe's own control runs where there is ground under it, and the
+/// reference's Bokoblin notices the player when the player is nearer than the
+/// sight band and inside the view cone the foe carries.
+///
+/// The band is the parameter's second byte (`d_a_bk.cpp:4770`), turned into a
+/// distance at `d_a_bk.cpp:1397-1401` - twenty for the band `0x14` this foe
+/// carries - and the check itself is `d_a_bk.cpp:1403-1405`. The cone and the
+/// box behind it are the reference's own numbers (`include/d/actor/d_a_bk.h`:
+/// the cone `0x6590` at `:162`, the box's side, height and reach at
+/// `:164-167`), read by `daBk_player_view_check` (`d_a_bk.cpp:883-922`).
+///
+/// The surprise that follows is the reference's own thirty frames
+/// (`d_a_bk.cpp:1413`, the timer the "found Link" branch arms).
+#[test]
+fn golden_foe_runs_its_control_where_there_is_a_floor() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_enemy(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0), 0, GUARD);
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, 150.0));
+    tick(&mut app);
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Alert,
+        "the foe notices the player 150 units away, inside its band of 200"
+    );
+    assert_eq!(
+        pos(&app, foe).y,
+        common::FLOOR_Y,
+        "and it stands on the floor it was put on"
+    );
+    for _ in 0..30 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Chase,
+        "a beat of surprise passes before the charge"
+    );
+}
+
+/// The sight check reads the box behind the foe as well as the cone in front
+/// of it, and the box reaches 125 units behind (`include/d/actor/d_a_bk.h:167`,
+/// the near edge `m048`; `d_a_bk.cpp:911-917` reads it). The player here is
+/// 150 units behind the foe - inside the band of 200 the foe would notice
+/// him at, but outside the box - so the foe never sees him and never swings.
+#[test]
+fn golden_foe_does_not_see_the_player_behind_it() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_enemy(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0), 0, GUARD);
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, -150.0));
+    for _ in 0..60 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        state(&app, foe),
+        EnemyState::Wait,
+        "the box behind the foe reaches 125 units, and the player is 150 away"
+    );
+    assert_eq!(
+        hearts(&app),
+        12,
+        "and it never swung at a player it cannot see"
+    );
+}
+
+/// The blow that lands starts the foe's own gate: the reference only takes a
+/// hit while its timer reads zero (`d_a_bk.cpp:3567`) and sets that timer to
+/// five on the blow (`d_a_bk.cpp:3569`, `REG0_S(7) + 5`, with the register at
+/// zero in a retail build). The timer runs down once a frame
+/// (`d_a_bk.cpp:4206-4207`) and while it runs the foe's bodies are parked
+/// 20 000 units down (`d_a_bk.cpp:4434-4437`), so the rest of the cut's
+/// window cannot charge it again.
+#[test]
+fn golden_the_hit_gate_holds_the_rest_of_the_cut_off() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_enemy(
+        &mut app,
+        Vec3::new(0.0, common::FLOOR_Y, 30.0),
+        0,
+        BLIND_STRONG,
+    );
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0));
+    assert!(gate_open(&app, foe), "the foe is reachable before the cut");
+    swing(&mut app);
+    assert_eq!(hp(&app, foe), Some(5), "the cut lands once");
+    assert!(!gate_open(&app, foe), "and the gate closes on the blow");
+    for _ in 0..3 {
+        tick(&mut app);
+    }
+    assert!(!gate_open(&app, foe), "the gate is still running");
+    for _ in 0..2 {
+        tick(&mut app);
+    }
+    assert!(gate_open(&app, foe), "and it opens again after five frames");
+}
+
+/// The foe's health and the cut's power between them give the chain the
+/// reference's own numbers give: a Bokoblin with the strong bit carries seven
+/// health (`d_a_bk.cpp:5109-5113`, the `& 0x20` parameter bit read at
+/// `:4763`), and a normal cut without the Hero's Sword equipped carries two
+/// (`setNormalCutAtParam`, `d_a_player_sword.inc:301-306`, which
+/// `combat::sword_at_power` mirrors). Four cuts therefore take it, and the
+/// gate above is what keeps each cut to one blow.
+///
+/// The foe here is blind, so it holds its post and never swings back.
+#[test]
+fn golden_the_sword_breaks_the_foe_one_cut_at_a_time() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_enemy(
+        &mut app,
+        Vec3::new(0.0, common::FLOOR_Y, 30.0),
+        0,
+        BLIND_STRONG,
+    );
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0));
+    assert_eq!(
+        hp(&app, foe),
+        Some(7),
+        "the strong bit carries seven health"
+    );
+    for expected in [Some(5), Some(3), Some(1)] {
+        swing(&mut app);
+        assert_eq!(
+            hp(&app, foe),
+            expected,
+            "one cut takes the power of the blade, once"
+        );
+        for _ in 0..14 {
+            tick(&mut app);
+        }
+    }
+    swing(&mut app);
+    assert_eq!(hp(&app, foe), None, "the fourth cut breaks the foe");
+    assert_eq!(hearts(&app), 12, "and the blind foe never swung back");
+}
+
+/// The Moblin throws its spear when the player is out of its melee reach and
+/// it is staggered: the reference's melee window runs from 375 - 62.5 units
+/// out (`include/d/actor/d_a_mo2.h:199` for the 375, `d_a_mo2.cpp:1657` for
+/// the window) and the throw is the branch that asks whether the player is
+/// further away than that (`d_a_mo2.cpp:1674-1675`). The spear itself is the
+/// weapon actor the reference hands over (`d_a_mo2.cpp:161-171`) and launches
+/// at 20 to 30 units a second, 20 to 30 up (`d_a_mo2.cpp:178-179`).
+#[test]
+fn golden_the_lance_throws_its_spear_at_range() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, 600.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    assert_eq!(spears(&app).len(), 1, "the lance throws its spear at range");
+    assert!(!armed(&app, foe), "and it is bare for it now");
+    let spear = spears(&app)[0];
+    assert!(
+        (20.0..=30.0).contains(&spear.vel.x.hypot(spear.vel.z)),
+        "the spear leaves at the reference's 20 to 30 a second"
+    );
+    assert!(
+        (20.0..=30.0).contains(&spear.vel.y),
+        "and with the reference's 20 to 30 of lift"
+    );
+}
+
+/// Inside the melee window the same Moblin keeps its spear: the throw is the
+/// branch that asks whether the player is further away than 375 - 62.5 units
+/// (`d_a_mo2.cpp:1674-1675`), and the window the reference fights in starts
+/// at that same distance (`d_a_mo2.cpp:1657`).
+#[test]
+fn golden_the_lance_keeps_its_spear_inside_the_melee_window() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0), 0);
+    teleport(&mut app, Vec3::new(0.0, common::FLOOR_Y, 200.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    assert!(
+        spears(&app).is_empty(),
+        "inside the melee window the lance keeps its spear"
+    );
+    assert!(armed(&app, foe), "and it is still armed");
 }
