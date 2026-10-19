@@ -1,13 +1,5 @@
-use std::time::Duration;
-
+use clearsleeper::App;
 use clearsleeper::sim::flags::{Arrivals, StoryBits, Switches};
-use clearsleeper::{App, SIM_HZ};
-
-const EVENT: u16 = 0x0203;
-
-fn tick(app: &mut App) {
-    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-}
 
 fn switches(app: &App) -> Switches {
     *app.sim.world.resource::<Switches>()
@@ -19,10 +11,6 @@ fn stories(app: &App) -> StoryBits {
 
 fn raise(app: &mut App, event: u16) {
     app.sim.world.resource_mut::<StoryBits>().set(event);
-}
-
-fn lower(app: &mut App, event: u16) {
-    app.sim.world.resource_mut::<StoryBits>().clear(event);
 }
 
 #[test]
