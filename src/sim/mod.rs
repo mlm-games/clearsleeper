@@ -513,7 +513,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == warship::SHIP_ACTOR
         && warship::is_switched(source.parameters, source.angle[0], world.resource())
     {
-        world.spawn((actor, warship::spawn(source.angle[1]))).id()
+        world
+            .spawn((actor, warship::spawn(source.angle[1], source.parameters)))
+            .id()
     } else if source.name == fire::FIRE_ACTOR {
         world
             .spawn((actor, fire::spawn(source.parameters, world.resource())))

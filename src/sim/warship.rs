@@ -11,10 +11,14 @@ pub const SHIP_ACTOR: &str = "Oship";
 
 const SWITCH_SHIFT: u32 = 24;
 const HOME_SWITCH_MASK: u16 = 0xFF;
-const NEAR_RANGE: f32 = 2500.0;
-const FAR_RANGE: f32 = 12000.0;
-const FIRE_DELAY: u32 = 30;
-const RELOAD_DELAY: u32 = 200;
+/// The three bands the ship's own table names (`d_a_oship.cpp:65-67`):
+/// `mDistRangeA`, `mDistRangeB` and `mDistRangeC`.
+const RANGE_A: f32 = 2500.0;
+const RANGE_B: f32 = 6000.0;
+const RANGE_C: f32 = 12000.0;
+/// `mAttackDelayA = 0x1e` (`d_a_oship.cpp:68`) and `mAttackDelayB = 200` (`:69`).
+const ATTACK_DELAY_A: u32 = 30;
+const ATTACK_DELAY_B: u32 = 200;
 const CANNON_OFFSET: f32 = 450.0;
 const CANNON_SPEED: f32 = 85.0;
 const CANNON_GRAVITY: f32 = -2.0;
@@ -33,11 +37,29 @@ const BODY_HALF: f32 = 300.0;
 
 pub const BODY: (f32, f32) = (BODY_HEIGHT, BODY_HALF);
 
+/// The four modes `changeModeByRange` picks between (`d_a_oship.cpp:204-221`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Band {
+    /// `MODE_RANGE_A` - inside `mDistRangeA`.
+    A,
+    /// `MODE_RANGE_B` - from `mDistRangeA` up to `mDistRangeB`.
+    B,
+    /// `MODE_RANGE_C` - from `mDistRangeB` up to `mDistRangeC`.
+    C,
+    /// `MODE_RANGE_D` - past `mDistRangeC`; the mode that never arms the cannon.
+    D,
+}
+
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Warship {
     pub home_yaw: i16,
     pub aim: i16,
     pub timer: u32,
+    /// The mode the ship is in, `None` until the first frame has read the distance to
+    /// the player.
+    pub band: Option<Band>,
+    /// `mSubMode = prms & 0xFF` (`d_a_oship.cpp:996`).
+    pub submode: u8,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -60,11 +82,46 @@ pub fn is_switched(parameters: u32, home_x: i16, switches: &Switches) -> bool {
     home == 0xFF || switches.test(home)
 }
 
-pub fn spawn(home_yaw: i16) -> Warship {
+pub fn spawn(home_yaw: i16, parameters: u32) -> Warship {
     Warship {
         home_yaw,
         aim: home_yaw,
         timer: 0,
+        band: None,
+        submode: (parameters & 0xFF) as u8,
+    }
+}
+
+/// The band the distance to the player falls in (`changeModeByRange`,
+/// `d_a_oship.cpp:204-221`), out of the three the ship's own table names
+/// (`d_a_oship.cpp:65-67`).
+fn band_for(dist: f32) -> Band {
+    if dist < RANGE_A {
+        Band::A
+    } else if dist < RANGE_B {
+        Band::B
+    } else if dist < RANGE_C {
+        Band::C
+    } else {
+        Band::D
+    }
+}
+
+/// The delay a band's init arms the attack timer to: `modeRangeAInit` rests it on
+/// `mAttackDelayA` (`d_a_oship.cpp:68`, `:516-518`), `modeRangeBInit` on the same
+/// when the ship's sub-mode is zero and on `mAttackDelayB` otherwise (`:540-547`),
+/// and `modeRangeCInit` on `mAttackDelayB` (`:569-571`). `modeRangeDInit`
+/// (`:592-595`) is empty, so the outer band arms nothing.
+fn arm(band: Band, submode: u8) -> Option<u32> {
+    match band {
+        Band::A => Some(ATTACK_DELAY_A),
+        Band::B => Some(if submode == 0 {
+            ATTACK_DELAY_A
+        } else {
+            ATTACK_DELAY_B
+        }),
+        Band::C => Some(ATTACK_DELAY_B),
+        Band::D => None,
     }
 }
 
@@ -104,27 +161,42 @@ pub fn control(
         let dz = player.pos.z - ship.pos.z;
         let dist = (dx * dx + dz * dz).sqrt();
         ship.angle[1] = add_calc_angle_s(ship.angle[1], warship.home_yaw, TURN_SCALE, TURN_MAX, 0);
-        if dist < FAR_RANGE {
+        if dist < RANGE_C {
             warship.aim =
                 add_calc_angle_s(warship.aim, to_s16(dx.atan2(dz)), AIM_SCALE, AIM_MAX, 0);
         }
         let yaw = from_s16(ship.angle[1]);
         ship.pos.x += SAIL_SPEED * SAIL_SCALE * yaw.sin();
         ship.pos.z += SAIL_SPEED * SAIL_SCALE * yaw.cos();
+        let band = band_for(dist);
+        let delay = arm(band, warship.submode);
+        match warship.band {
+            // The first frame only reads the band. The port's cannon starts loaded - the
+            // timer is zero - where the reference waits out `mAttackDelayA` in its first
+            // mode (`d_a_oship.cpp:516-518`).
+            None => warship.band = Some(band),
+            Some(current) if current != band => {
+                // `changeModeByRange` re-initialises the mode whenever the band changes
+                // (`d_a_oship.cpp:218-219`), and each band's init arms the attack timer
+                // (`:516-518`, `:540-547`, `:569-571`).
+                warship.band = Some(band);
+                if let Some(delay) = delay {
+                    warship.timer = delay;
+                }
+            }
+            Some(_) => {}
+        }
+        let Some(delay) = delay else {
+            // `modeRangeD` (`:598-607`) only watches the player: it neither counts the
+            // attack timer down nor arms the cannon.
+            continue;
+        };
         if warship.timer > 0 {
             warship.timer -= 1;
             continue;
         }
-        if dist < NEAR_RANGE {
-            fire(&ship, &warship, player.pos, &mut commands);
-            warship.timer = FIRE_DELAY;
-        } else {
-            // OMITTED: the far arms only ever reload the long `mAttackDelayB`, while the reference
-            // re-arms the delay on every range change - `modeRangeAInit` rests the timer to
-            // `mAttackDelayA` (30) even after a spell in the far ranges (`d_a_oship.cpp:515-517`,
-            // the modes `changeModeByRange` picks, `:203-221`).
-            warship.timer = RELOAD_DELAY;
-        }
+        fire(&ship, &warship, player.pos, &mut commands);
+        warship.timer = delay;
     }
     for (entity, mut shot) in &mut shots {
         if shot.free > 0 {

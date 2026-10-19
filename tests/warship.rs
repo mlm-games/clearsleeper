@@ -48,7 +48,7 @@ fn ship(app: &mut App, pos: Vec3, yaw: i16) {
             room: -1,
             ..Default::default()
         },
-        warship::spawn(yaw),
+        warship::spawn(yaw, PLAIN),
     ));
 }
 
@@ -127,5 +127,76 @@ fn golden_one_cannonball_costs_one_heart() {
         app.health().units,
         8,
         "and the thirty-frame delay has not let a second one land"
+    );
+}
+
+/// The warship fires from its far band as well. A player between
+/// `mDistRangeB` and `mDistRangeC` (6 000 and 12 000 units,
+/// `d_a_oship.cpp:66-67`) puts the ship in `MODE_RANGE_C`
+/// (`changeModeByRange`, `d_a_oship.cpp:212-213`), and that mode arms
+/// `MODE_ATTACK` when its timer runs out (`:583-586`) - the timer
+/// `modeRangeCInit` rests on the long `mAttackDelayB` of 200 frames
+/// (`:569-571`, `:69`).
+#[test]
+fn golden_the_warship_fires_from_its_far_band() {
+    let mut app = App::new();
+    app.sim.world.insert_resource(common::area(SEA_HALF));
+    place_player(&mut app, Vec3::new(0.0, 0.0, 9_000.0));
+    ship(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    tick(&mut app);
+    assert_eq!(shots(&app), 1, "it fires from its far band too");
+}
+
+/// The outermost band ends at 12 000 units (`d_a_oship.cpp:67`) and the
+/// comparison is a strict one (`:212`), so a player just inside it is still
+/// in `MODE_RANGE_C` and is answered with a cannonball, while a player at the
+/// edge itself falls to `MODE_RANGE_D` (`:598-607`), which only watches.
+#[test]
+fn golden_the_warship_fires_just_inside_its_outer_band() {
+    let mut app = App::new();
+    app.sim.world.insert_resource(common::area(SEA_HALF));
+    place_player(&mut app, Vec3::new(0.0, 0.0, 11_999.0));
+    ship(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    tick(&mut app);
+    assert_eq!(shots(&app), 1, "just inside the edge it fires");
+
+    let mut app = App::new();
+    app.sim.world.insert_resource(common::area(SEA_HALF));
+    place_player(&mut app, Vec3::new(0.0, 0.0, 12_000.0));
+    ship(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    tick(&mut app);
+    assert_eq!(shots(&app), 0, "and at the edge it holds its fire");
+}
+
+/// A band change re-arms the cannon on the new band's own delay: the reference
+/// re-initialises its mode whenever the distance crosses a band
+/// (`d_a_oship.cpp:218-219`), and each band's init rests the timer on that
+/// band's delay - thirty frames for the near one (`:516-518`, `:68`) and two
+/// hundred for the far one (`:569-571`, `:69`).
+///
+/// The ship here fires from the near band and the player then steps out to the
+/// far one. The near band's thirty frames would have let the next cannon go
+/// long before the thirtieth frame is up, so the cannon staying quiet is the
+/// far band's delay taking hold.
+#[test]
+fn golden_the_warship_re_arms_on_the_new_bands_delay() {
+    let mut app = App::new();
+    app.sim.world.insert_resource(common::area(SEA_HALF));
+    place_player(&mut app, Vec3::new(0.0, 0.0, 1_500.0));
+    ship(&mut app, Vec3::new(0.0, 0.0, 0.0), 0);
+    tick(&mut app);
+    assert_eq!(shots(&app), 1, "it fires from the near band");
+    for _ in 0..19 {
+        tick(&mut app);
+    }
+    assert_eq!(app.health().units, 8, "the cannonball takes a whole heart");
+    place_player(&mut app, Vec3::new(0.0, 0.0, 9_000.0));
+    for _ in 0..30 {
+        tick(&mut app);
+    }
+    assert_eq!(
+        shots(&app),
+        0,
+        "and the far band's two hundred frames hold the next one back"
     );
 }
