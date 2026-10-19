@@ -85,7 +85,8 @@ fn golden_switch_brazier_burns_from_the_start() {
 fn golden_cold_brazier_spares_the_player() {
     let mut app = App::new();
     place_player(&mut app, Vec3::new(0.0, 0.0, 0.0));
-    brazier(&mut app, Vec3::ZERO, BOMB_TYPE | NO_SWITCH);
+    brazier(&mut app, Vec3::ZERO, SWITCH_TYPE | 9);
+    app.sim.world.resource_mut::<Switches>().set(9);
     for _ in 0..30 {
         tick(&mut app);
     }

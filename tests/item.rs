@@ -103,10 +103,6 @@ fn foe_hp(app: &App, entity: bevy_ecs::entity::Entity) -> i32 {
         .map_or(0, |hp| hp.0)
 }
 
-fn alive(app: &App, entity: bevy_ecs::entity::Entity) -> bool {
-    app.sim.world.entity(entity).contains::<HitPoints>()
-}
-
 fn resting_bomb(app: &mut App, pos: Vec3, fuse: u32) {
     app.sim.world.spawn((
         Bomb {
@@ -168,18 +164,16 @@ fn golden_bomb_blast_only_hurts_what_it_is_next_to() {
     place_player(&mut app, Vec3::ZERO);
     let victim = foe(&mut app, Vec3::new(0.0, 0.0, 300.0));
     let bystander = foe(&mut app, Vec3::new(0.0, 0.0, 900.0));
-    held(&mut app, BOMB_BAG);
-    use_item(&mut app);
-    for _ in 0..100 {
+    // The throw carries a bomb some 1500 units downrange before its hundred-tick fuse runs out,
+    // so the blast under test is the one lit beside the near foe: four power
+    // (`d_a_bomb3.inc:1402`) off a five-health boko (`d_a_bk.cpp:5109-5111`).
+    resting_bomb(&mut app, Vec3::new(0.0, 0.0, 300.0), 10);
+    for _ in 0..12 {
         tick(&mut app);
     }
-    assert!(!alive(&app, victim), "two hundred power takes the near foe");
-    assert_eq!(foe_hp(&app, bystander), 2, "and the far one is untouched");
-    assert_eq!(
-        app.health().units,
-        12,
-        "the thrower stood clear of the blast"
-    );
+    assert_eq!(foe_hp(&app, victim), 1, "four power bites the near foe");
+    assert_eq!(foe_hp(&app, bystander), 5, "and the far one is untouched");
+    assert_eq!(app.health().units, 12, "the hero stood clear of the blast");
 }
 
 #[test]
@@ -203,7 +197,7 @@ fn golden_arrow_bites_and_then_sticks_for_three_hundred_frames() {
     use_item(&mut app);
     tick(&mut app);
     tick(&mut app);
-    assert!(!alive(&app, victim), "ten power takes the foe it passes");
+    assert_eq!(foe_hp(&app, victim), 3, "two power bites the foe it passes");
     assert_eq!(
         arrows(&app)[0].phase,
         arrow::Phase::StuckActor,

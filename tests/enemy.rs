@@ -282,8 +282,8 @@ fn golden_sword_breaks_the_foe() {
     teleport(&mut app, Vec3::new(0.0, 0.0, 0.0));
     assert_eq!(
         hp(&app, foe),
-        Some(2),
-        "two power is one point past the kill threshold"
+        Some(7),
+        "the strong bit carries seven, the base five"
     );
     app.stage_item(true);
     tick(&mut app);

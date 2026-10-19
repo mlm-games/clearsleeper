@@ -153,6 +153,26 @@ pub const ITEM_SONG_OF_PASSING: u8 = 0x72;
 pub const SWORD_COLLECT_BYTE: u8 = 0;
 pub const SWORD_COLLECT_LEVEL: u8 = 0;
 
+/// The sword `dComIfGs_getSelectEquip(0)` answers with, read off the same collect bits the sword
+/// item functions write: `item_func_sword` pairs bit 0 with `dItemNo_SWORD_e`, then the three
+/// master-sword functions pair bits 1 to 3 with `dItemNo_MASTER_SWORD_1_e` to
+/// `dItemNo_MASTER_SWORD_3_e` (`d_item.cpp:847-886`). A player who owns no sword has no bit, and
+/// `NO_ITEM` is the `0xFF` `dComIfGs_setSelectEquip` starts at (`d_com_inf_game.cpp:116`).
+pub fn sword(collect: &super::flags::Collect) -> u8 {
+    for level in (0..4u8).rev() {
+        if !collect.test(SWORD_COLLECT_BYTE, level) {
+            continue;
+        }
+        return match level {
+            0 => super::damage::ITEM_SWORD,
+            1 => super::damage::MASTER_SWORD_1,
+            2 => super::damage::MASTER_SWORD_2,
+            _ => super::damage::MASTER_SWORD_3,
+        };
+    }
+    NO_ITEM
+}
+
 pub fn check_get_item(equipped: &Equipped, collect: &super::flags::Collect, item: u8) -> bool {
     let tact = |no: u8| item == ITEM_WINDS_REQUIEM + no;
     if tact(0) {

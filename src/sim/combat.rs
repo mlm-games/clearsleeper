@@ -106,8 +106,9 @@ fn cut_proc(kind: CutKind) -> super::link_proc::Proc {
 }
 
 /// `setNormalCutAtParam` and `setFinishCutAtParam` both branch on `checkNormalSwordEquip`,
-/// which reads the C-button selection: one heart for Hero's Sword, two for the Master Sword,
-/// and the finisher doubles it.
+/// which reads `dComIfGs_getSelectEquip(0)`: one heart for Hero's Sword, two for the Master
+/// Sword, and the finisher doubles it. `inventory::sword` answers with the item the collect bit
+/// names, so `selected` is that sword's id.
 fn sword_at_power(selected: u8, finisher: bool) -> u8 {
     let normal = selected == damage::ITEM_SWORD;
     match (normal, finisher) {
@@ -227,6 +228,7 @@ pub struct Sword<'w, 's> {
     lock: Res<'w, Lock>,
     held: Res<'w, super::item::Held>,
     equipped: Res<'w, super::inventory::Equipped>,
+    collect: Res<'w, super::flags::Collect>,
     proc: Option<ResMut<'w, super::link_proc::LinkProc>>,
     ships: Query<'w, 's, &'static Ship>,
 }
@@ -238,6 +240,22 @@ pub struct Outcome<'w> {
     events: ResMut<'w, SimEvents>,
     stop: ResMut<'w, HitStop>,
     audio: ResMut<'w, HitAudio>,
+    slain: ResMut<'w, Slain>,
+}
+
+/// The actors a swing killed this step. The reference's actor plays its own pop and then deletes
+/// itself (`bb_fail_move`, `d_a_bb.cpp:1966-1970`, reached from the faint flag `damage_check` sets
+/// at `:2130`), so the module that owns the death gets the rest of the step to see
+/// `HitPoints <= 0`; [`reap`] removes what is left standing at its end.
+#[derive(Resource, Debug, Default)]
+pub struct Slain {
+    pub list: Vec<Entity>,
+}
+
+pub fn reap(mut slain: ResMut<Slain>, mut commands: Commands) {
+    for entity in slain.list.drain(..) {
+        commands.entity(entity).try_despawn();
+    }
 }
 
 pub fn control(
@@ -259,12 +277,11 @@ pub fn control(
     mut players: Query<(Entity, &mut Player)>,
     registry: Res<ActorRegistry>,
     mut fx: ResMut<super::damage_fx::DamageFxQueue>,
-    mut commands: Commands,
 ) {
     let pressed = item.0 && !out.combat.held;
     out.combat.held = item.0;
     let riding = gates.ships.iter().any(|ship| ship.riding);
-    let selected = gates.equipped.item(0);
+    let selected = super::inventory::sword(&gates.collect);
     let bare_hands =
         gates.equipped.item(super::inventory::HAMMER_SLOT) == super::inventory::ITEM_SKULL_HAMMER;
     for (player_entity, mut player) in &mut players {
@@ -429,7 +446,7 @@ pub fn control(
             }
             for (entity, room, set_id) in dead {
                 out.zones.mark_done(room, set_id);
-                let _ = commands.entity(entity).despawn();
+                out.slain.list.push(entity);
             }
         }
         out.combat.frame += 1;

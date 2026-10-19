@@ -1672,6 +1672,7 @@ pub fn build(
     sim.world.insert_resource(camera::Camera::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
+    sim.world.insert_resource(combat::Slain::default());
     sim.world
         .insert_resource(damage_resolve::HitStop::default());
     sim.world
@@ -2264,6 +2265,7 @@ pub fn build(
                         ks::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
+                    (combat::reap.in_set(WwSimSet::Execute),).chain(),
                     (bemos::control.in_set(WwSimSet::Execute),).chain(),
                     (
                         swhammer::control.in_set(WwSimSet::Execute),

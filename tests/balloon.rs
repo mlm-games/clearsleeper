@@ -4,6 +4,8 @@ use clearsleeper::sim::actor::Actor;
 use clearsleeper::sim::balloon::{self, Balloon, Payload};
 use clearsleeper::sim::combat::HitPoints;
 use clearsleeper::sim::enemy::{Enemy, Hurt};
+use clearsleeper::sim::flags::Collect;
+use clearsleeper::sim::inventory::{SWORD_COLLECT_BYTE, SWORD_COLLECT_LEVEL};
 use clearsleeper::sim::player::Player;
 use clearsleeper::{App, SIM_HZ};
 use glam::Vec3;
@@ -43,6 +45,16 @@ fn place_player(app: &mut App, pos: Vec3) {
     }
 }
 
+/// `item_func_sword` (`d_item.cpp:847-850`): the Hero's Sword is the collect bit
+/// `dComIfGs_getSelectEquip(0)` is set from, and `setNormalCutAtParam` (`d_a_player_sword.inc:297`)
+/// reads that selection to give a normal cut its atp of 1 rather than the master sword's 2.
+fn grant_sword(app: &mut App) {
+    app.sim
+        .world
+        .resource_mut::<Collect>()
+        .set(SWORD_COLLECT_BYTE, SWORD_COLLECT_LEVEL);
+}
+
 fn spawn_balloon(app: &mut App, pos: Vec3, parameters: u32) -> bevy_ecs::entity::Entity {
     let (state, hit_points) = balloon::spawn(parameters);
     app.sim
@@ -75,6 +87,7 @@ fn count<T: bevy_ecs::component::Component>(app: &App) -> usize {
 #[test]
 fn golden_balloon_carries_its_rider_and_holds_two_hits() {
     let mut app = App::new();
+    grant_sword(&mut app);
     place_player(&mut app, Vec3::new(0.0, 0.0, 30.0));
     spawn_balloon(&mut app, Vec3::new(0.0, 0.0, 35.0), BOKO_PARAM);
     assert_eq!(count::<Balloon>(&app), 1);
