@@ -30,7 +30,8 @@ pub const RETURN_REACH: f32 = SPEED * 2.0;
 pub const HIT_REACH: f32 = SPEED;
 pub const CAPSULE_RADIUS: f32 = 30.0;
 pub const SPIN: i16 = 0x1F00;
-pub const NOMINAL_TURN: f32 = 0.75;
+/// `0x3000` s16, the heading a free fly-out throw adds (`d_a_boomerang.cpp:519`).
+pub const NOMINAL_TURN: f32 = 0.1875;
 pub const TURN_BASE: f32 = 20.0;
 pub const TURN_SOFT: f32 = 18.0;
 pub const TURN_KICK: f32 = 40.0;
@@ -87,6 +88,15 @@ impl Boomerang {
         self.lock = 0;
         self.model_yaw = 0;
         self.aim_at(heading, pitch, locks);
+        // `procWait`: an unlocked throw travels to a point `getFlyMax()` out along the throw
+        // (`d_a_boomerang.cpp:503-510`), and only at that throw does the aim carry `+0x3000` and
+        // `mFreeFlyOut` open (`:517-524`); a locked throw aims straight at its target (`:525-528`).
+        if locks == 0 {
+            self.heading += NOMINAL_TURN * core::f32::consts::TAU;
+            self.free = true;
+        } else {
+            self.free = false;
+        }
     }
 
     pub fn reach(&self, riding: bool) -> f32 {
@@ -98,12 +108,6 @@ impl Boomerang {
         let flat = delta.x.hypot(delta.z);
         self.pitch = -(delta.y).atan2(flat);
         self.heading = delta.x.atan2(delta.z);
-        if self.locks == 0 {
-            self.heading += NOMINAL_TURN * core::f32::consts::TAU;
-            self.free = true;
-        } else {
-            self.free = false;
-        }
     }
 
     pub fn aim_at(&mut self, heading: f32, pitch: f32, locks: usize) {
@@ -162,8 +166,11 @@ impl Boomerang {
         let delta = player.pos - self.pos;
         let distance = delta.length();
         if distance > NOMINAL_RANGE {
-            let bearing = delta.x.atan2(delta.z);
-            self.aim_at(bearing, self.pitch, self.locks);
+            // `setAimPos` (`d_a_boomerang.cpp:445-448`): the return flight aims at the player's
+            // catch point, so the target is the player itself and never a fresh fly-out point.
+            let flat = delta.x.hypot(delta.z);
+            self.pitch = -(delta.y).atan2(flat);
+            self.target = player.pos;
         }
         distance
     }
