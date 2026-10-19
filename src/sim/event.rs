@@ -489,6 +489,11 @@ impl ActiveEvent {
             .map(|running| running.stage)
     }
 
+    pub fn running_front(&self) -> Option<(usize, Stage)> {
+        let run = self.running.first()?;
+        Some((run.index, run.stage))
+    }
+
     pub fn start_check(&self, index: usize) -> bool {
         self.stage_of(index) == Some(Stage::Play)
     }
