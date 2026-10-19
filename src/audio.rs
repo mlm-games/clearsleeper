@@ -1,6 +1,6 @@
 //! Output device staging: cue bootstrap plus sim-event playback.
 
-use repame_audio::{Audio, AudioChannel, CueDef, synth_sine_wav};
+use repame_audio::{AmplitudeEnvelope, Audio, AudioChannel, CueDef, CueSpec, Waveform};
 
 use crate::sim::{canon, damage_resolve as hit};
 
@@ -69,6 +69,21 @@ const BALL_HIT_SECS: f32 = 0.1;
 const BGM_HIT_HZ: f32 = 1040.0;
 const BGM_HIT_SECS: f32 = 0.05;
 const FALLBACK_RATE: u32 = 44100;
+
+/// The bank cue as `synth_sine_wav` wrote it: a sine with a `1/30` s
+/// exponential decay time constant at half gain, at [`FALLBACK_RATE`]; a bank
+/// with a device open renders it at the device rate.
+fn cue_spec(hz: f32, secs: f32) -> CueSpec {
+    CueSpec::new(Waveform::Sine, hz, secs)
+        .with_amplitude(AmplitudeEnvelope::Adsr {
+            attack_s: 0.0,
+            decay_s: 1.0 / 30.0,
+            sustain: 0.0,
+            release_s: 0.0,
+        })
+        .with_gain(0.5)
+        .with_sample_rate(FALLBACK_RATE)
+}
 
 pub fn footstep_cue() -> CueDef {
     CueDef {
@@ -193,13 +208,8 @@ pub fn open() -> Audio {
 
 /// Register every game cue on the bank; works with or without a device.
 pub fn load_cues(audio: &mut Audio) -> anyhow::Result<()> {
-    let rate = match audio.sample_rate() {
-        0 => FALLBACK_RATE,
-        r => r,
-    };
     for (name, (def, hz, secs)) in CUE_NAMES.iter().zip(boot_cues()) {
-        let wave = synth_sine_wav(hz, secs, rate);
-        audio.load_cue(name, def, &[&wave])?;
+        audio.load_synth(name, def, &[cue_spec(hz, secs)])?;
     }
     Ok(())
 }
