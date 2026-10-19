@@ -1972,6 +1972,7 @@ pub fn build(
                     (
                         (
                             flags::clear_order_flags.in_set(WwSimSet::Execute),
+                            event::begin.in_set(WwSimSet::Execute),
                             registry::control.in_set(WwSimSet::Execute),
                             actor::snapshot.in_set(WwSimSet::Execute),
                             snap::control.in_set(WwSimSet::Execute),

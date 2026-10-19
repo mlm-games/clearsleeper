@@ -326,6 +326,14 @@ pub struct EventError;
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct ActiveEvent {
     running: Vec<Running>,
+    /// `dComIfGp_evmng_execute` (`d_s_play.cpp:1104`) runs in the scene phase, ahead of the
+    /// actor pass that orders (`f_ap_game.cpp:79` `fapGm_Execute` then `f_pc_manager.cpp:267`
+    /// `fpcM_Management`), so an order the actors of a frame place only reaches `mainProc`
+    /// (`d_event_manager.cpp:304-330`) through the next frame's `dComIfGp_event_check`
+    /// (`:340-355`). [`begin`] opens that window at the tick's start and the interpreter's own
+    /// call closes it; a call from outside the tick - a world built by hand - reads it shut and
+    /// orders the way a direct `dEvent_manager_c::order` (`:367-374`) does.
+    ordering: bool,
     /// `dEvent_manager_c::mGoal` (`d_event_manager.h:76`): the point
     /// `dComIfGp_evmng_setGoal` (`d_com_inf_game.h:3739`) last wrote. Retail holds it as a plain
     /// `cXyz` in the game-info's static storage, so a goal no writer has run for reads as the
@@ -362,6 +370,11 @@ struct Running {
     stage: Stage,
     staffs: Vec<StaffRun>,
     actor: Entity,
+    /// [`ActiveEvent::order`] read [`ActiveEvent::ordering`] when it ran, i.e. this is the
+    /// actor pass's request: `dComIfGp_event_check` converts it in the next frame, and the
+    /// start pass holds a run back for that frame. `false` is an order the manager already
+    /// saw, or one placed outside the tick.
+    requested: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -463,6 +476,7 @@ impl ActiveEvent {
                 stage: Stage::Order,
                 staffs: Vec::new(),
                 actor,
+                requested: self.ordering,
             },
         );
         true
@@ -899,6 +913,16 @@ pub struct StageActors<'w, 's> {
     pub commands: Commands<'w, 's>,
 }
 
+/// The managers' first word of the tick: with `dComIfGp_evmng_execute` in the scene phase
+/// (`d_s_play.cpp:1104`) and the actors putting their orders in afterwards
+/// (`f_ap_game.cpp:79`), the frames' `dComIfGp_event_check` (`d_event_manager.cpp:340-355`) is
+/// what turns those orders into an event state `mainProc` can start. The port's chain has the
+/// actors in the same tick as the interpreter, so this marks the window the actor systems'
+/// `order` calls read instead: whatever they order waits for the next tick's start pass.
+pub fn begin(mut active: ResMut<ActiveEvent>) {
+    active.ordering = true;
+}
+
 pub fn control(
     data: (Res<EventList>, Res<MsgTable>),
     mut active: ResMut<ActiveEvent>,
@@ -915,6 +939,7 @@ pub fn control(
     let (list, table) = data;
     let stay = io.stay.0;
     let goal = active.goal();
+    active.ordering = false;
     partner.demo_stick = None;
     partner.demo_fall = false;
     partner.demo_backjump = false;
@@ -930,11 +955,16 @@ pub fn control(
     }
     let mut started = false;
     for running in active.running.iter_mut() {
-        if running.stage == Stage::Order {
-            if let Some(event) = list.event(running.index) {
-                start_proc(running, event, &list);
-                started = true;
-            }
+        if running.stage != Stage::Order {
+            continue;
+        }
+        if running.requested {
+            running.requested = false;
+            continue;
+        }
+        if let Some(event) = list.event(running.index) {
+            start_proc(running, event, &list);
+            started = true;
         }
     }
     if started {
