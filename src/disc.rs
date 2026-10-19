@@ -562,6 +562,34 @@ impl DiscImage {
         }
     }
 
+    /// Every file the table holds, in the table's own paths: `res/Stage/sea/Room44.arc`.
+    ///
+    /// The table's root is the data root, so these carry no `files/` component; the extraction's
+    /// prefix is the caller's to add. The paths are sorted, so a walk over them is in the same
+    /// order whatever the table's own order is.
+    pub fn paths(&self) -> Vec<String> {
+        let mut files = Vec::new();
+        let mut stack = vec![(0_usize, String::new())];
+        while let Some((index, prefix)) = stack.pop() {
+            let end = self.fst.entries[index].size as usize;
+            let mut cursor = index + 1;
+            while cursor < end {
+                let entry = &self.fst.entries[cursor];
+                let name = String::from_utf8_lossy(&entry.name).into_owned();
+                if entry.directory {
+                    let next = entry.size as usize;
+                    stack.push((cursor, format!("{prefix}{name}/")));
+                    cursor = next;
+                } else {
+                    files.push(format!("{prefix}{name}"));
+                    cursor += 1;
+                }
+            }
+        }
+        files.sort();
+        files
+    }
+
     /// The bytes of one path, relative to the disc root the way an extracted dump is:
     /// `files/res/Stage/sea/Room44.arc`. The extraction's `files/` component names the FST root
     /// the walk starts at, so it is translated away before the lookup; a path outside it,

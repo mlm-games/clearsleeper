@@ -233,3 +233,102 @@ fn the_image_limit_leaves_room_inside_the_wasm_memory_ceiling() {
         Err(DiscError::TooLarge { .. })
     ));
 }
+
+/// The corpus the real image holds: every file its table names, read and decoded.
+///
+/// `CS_DISC` names the image, so this runs where an image is; CI has none, and the end-to-end
+/// acceptance is the user dropping theirs on the deployed page.
+#[test]
+fn the_real_image_decodes_every_archive_it_holds() {
+    let Ok(path) = std::env::var(DISC_ENV) else {
+        eprintln!("{DISC_ENV} is not set; skipping the corpus walk");
+        return;
+    };
+    let bytes = std::fs::read(&path).expect("the image CS_DISC names is readable");
+    let image = DiscImage::open(bytes).expect("the image opens");
+    let paths = image.paths();
+    assert!(
+        paths.len() > 1000,
+        "the table holds the disc's files: {}",
+        paths.len()
+    );
+
+    let mut yaz0 = 0_usize;
+    let mut archives = 0_usize;
+    let mut entries = 0_usize;
+    for rel in &paths {
+        let bytes = image
+            .read(rel)
+            .unwrap_or_else(|error| panic!("{rel} reads: {error}"));
+        let plain = if bytes.starts_with(b"Yaz0") {
+            yaz0 += 1;
+            let size = u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
+            let plain = clearsleeper::archive::yaz0_decode(&bytes, rel)
+                .unwrap_or_else(|error| panic!("{rel} decodes: {error}"));
+            assert_eq!(
+                plain.len(),
+                size,
+                "{rel} decodes to the size its header names"
+            );
+            plain
+        } else {
+            bytes
+        };
+        if plain.starts_with(b"RARC") {
+            archives += 1;
+            let archive = clearsleeper::archive::Archive::parse(plain, rel)
+                .unwrap_or_else(|error| panic!("{rel} parses: {error}"));
+            for entry in archive.entries() {
+                archive
+                    .read(entry)
+                    .unwrap_or_else(|error| panic!("{rel}:{entry} reads: {error}"));
+                entries += 1;
+            }
+        }
+    }
+    eprintln!(
+        "corpus: {} files, {yaz0} yaz0, {archives} archives, {entries} entries",
+        paths.len()
+    );
+    assert!(
+        yaz0 > 100 && archives > 100 && entries > 1000,
+        "the corpus really was walked"
+    );
+}
+
+/// The image against the extraction: every file the table names is the same bytes the extraction
+/// holds, and the table's walk is the extraction's layout.
+#[test]
+fn the_real_image_answers_the_whole_extracted_corpus() {
+    let Ok(path) = std::env::var(DISC_ENV) else {
+        eprintln!("{DISC_ENV} is not set; skipping the corpus comparison");
+        return;
+    };
+    let Ok(root) = std::env::var(clearsleeper::assets::ASSETS_ENV) else {
+        eprintln!(
+            "{} is not set; skipping the corpus comparison",
+            clearsleeper::assets::ASSETS_ENV
+        );
+        return;
+    };
+    let bytes = std::fs::read(&path).expect("the image CS_DISC names is readable");
+    let image = DiscImage::open(bytes).expect("the image opens");
+    let dump = AssetRoot::at(&root);
+
+    let mut compared = 0_usize;
+    for rel in image.paths() {
+        let from_image = image
+            .read(&rel)
+            .unwrap_or_else(|error| panic!("{rel} reads: {error}"));
+        let from_dump = dump
+            .read(&format!("files/{rel}"))
+            .unwrap_or_else(|error| panic!("files/{rel} reads: {error}"));
+        assert_eq!(
+            from_image, from_dump,
+            "{rel} is one file in the image and in the extraction"
+        );
+        compared += 1;
+    }
+    eprintln!("compared {compared} files against the extraction");
+    assert!(compared > 1000, "the corpus really was compared");
+}
