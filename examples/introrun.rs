@@ -18,6 +18,7 @@ fn main() {
     };
     let blo = arc.read("opening.blo").unwrap_or_default();
     let screen = j2d::parse(&blo).expect("blo");
+    let images = intro::PaneImages::load(&arc);
     let mut fonts = FontBank::new();
     driver::load_fonts(&mut fonts);
     let mut intro = Intro::default();
@@ -34,13 +35,9 @@ fn main() {
         messages.insert(intro.text.msg_no);
         max_state = max_state.max(intro.state);
         let mut canvas = Canvas::new(640, 480);
-        clearsleeper::intro::render(
-            &mut canvas,
-            &screen,
-            &intro,
-            &mut fonts,
-            &|_c, _n, _b, _a| {},
-        );
+        intro::render(&mut canvas, &screen, &intro, &mut fonts, &|c, n, b, a| {
+            intro::draw_pane(c, &screen, &images, n, b, a);
+        });
         if canvas.pixels.chunks_exact(4).any(|p| p[3] > 0) {
             text_frames += 1;
         }

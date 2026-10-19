@@ -1,5 +1,7 @@
 use bevy_ecs::prelude::*;
 
+use crate::archive::Archive;
+use crate::bti::{self, Image};
 use crate::j2d::Screen;
 use crate::text::font::FontBank;
 use crate::text::msgbox::TextPrint;
@@ -38,7 +40,78 @@ const NAMES: [&str; PANE_COUNT] = [
     "d1", "d2", "d3", "d4", "d42", "d5", "d6", "mak1", "mak2", "tx1", "tx2",
 ];
 
-const BLACK: [u8; 4] = [0, 0, 0, 255];
+/// The order `J2DScreen` draws its hierarchy in: `J2DPane::draw` walks children
+/// first to last and a later sibling blends over an earlier one
+/// (`J2DPane.cpp:200-202`). Opening.blo stores them BACK, d6, d5, d4, d42,
+/// d3, d2, d1, mak1, mak2, tx1, tx2; `dScnOpen_proc_c` draws the screen once
+/// (`d_s_open_sub.cpp:562`).
+const DRAW_ORDER: [usize; PANE_COUNT] = [D6, D5, D4, D42, D3, D2, D1, MAK1, MAK2, TX1, TX2];
+
+/// The Opening.arc `.bti` entries, decoded once. A pane's texture is the TIMG
+/// reference inside its own `PIC1` stream (`J2DPicture.cpp:38`), which
+/// `j2d::parse` keeps in `ScreenPane::texture`; `dScnOpen_proc_c` binds the
+/// panes by tag (`d_s_open_sub.cpp:233-243`). Opening.blo's references are
+/// d1 demo_1.bti, d2 demo_2.bti, d3 demo_3.bti, d4 demo_4.bti,
+/// d42 demo_4_2.bti, d5 demo_5.bti, d6 demo_6.bti, mak1/mak2 black.bti;
+/// tx1/tx2 are text boxes and have no TIMG.
+#[derive(Default)]
+pub struct PaneImages {
+    entries: Vec<(String, Image)>,
+}
+
+impl PaneImages {
+    pub fn load(archive: &Archive) -> Self {
+        let mut images = Self::default();
+        for name in archive.entries() {
+            if !name.ends_with(".bti") {
+                continue;
+            }
+            if let Ok(bytes) = archive.read(name) {
+                images.add(name, bytes);
+            }
+        }
+        images
+    }
+
+    /// Decode one named entry; `false` when the bytes are not a BTI this port reads.
+    pub fn add(&mut self, name: &str, bytes: &[u8]) -> bool {
+        let Some(image) = bti::decode(bytes) else {
+            return false;
+        };
+        self.entries.push((name.to_string(), image));
+        true
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Image> {
+        self.entries
+            .iter()
+            .find(|(entry, _)| entry == name)
+            .map(|(_, image)| image)
+    }
+}
+
+/// One opening pane's `J2DPicture`, at the rect and opacity the state machine
+/// gives it: the texture the blo entry names, the pane's uv window and corner
+/// colours, and `alpha` for `fopMsgM_setAlpha` (`f_op_msg_mng.cpp:9900-9902`).
+pub fn draw_pane(
+    canvas: &mut Canvas,
+    screen: &Screen,
+    images: &PaneImages,
+    name: &str,
+    bounds: &[f32; 4],
+    alpha: f32,
+) {
+    let Some(node) = screen.find(name) else {
+        return;
+    };
+    let Some(texture) = node.texture.as_deref() else {
+        return;
+    };
+    let Some(image) = images.get(texture) else {
+        return;
+    };
+    crate::panes::draw_picture_image(canvas, image, node, *bounds, node.rotation, alpha);
+}
 
 #[derive(Resource, Clone, Copy, Debug, Default)]
 pub struct Pane {
@@ -508,7 +581,8 @@ pub fn render(
     fonts: &mut FontBank,
     draw_image: &dyn Fn(&mut Canvas, &str, &[f32; 4], f32),
 ) {
-    for (index, name) in NAMES.iter().enumerate() {
+    for index in DRAW_ORDER {
+        let name = NAMES[index];
         let pane = &intro.panes[index];
         if pane.alpha <= 0.0 {
             continue;
@@ -516,12 +590,9 @@ pub fn render(
         let Some(layout) = screen.find(name) else {
             continue;
         };
-        let bounds = [
-            layout.bounds.x + pane.offset_x,
-            layout.bounds.y + pane.offset_y,
-            layout.bounds.w * pane.scale,
-            layout.bounds.h * pane.scale,
-        ];
+        let Some(bounds) = pane_bounds(screen, intro, name) else {
+            continue;
+        };
         if index == TX1 || index == TX2 {
             let text = intro.text.data.out[0].clone().unwrap_or_default();
             if text.is_empty() {
@@ -566,16 +637,48 @@ pub fn render(
             continue;
         }
         draw_image(canvas, name, &bounds, pane.alpha);
-        if *name == "mak1" || *name == "mak2" {
-            canvas.fill_rect(
-                bounds,
-                [
-                    BLACK[0],
-                    BLACK[1],
-                    BLACK[2],
-                    (255.0 * pane.alpha.clamp(0.0, 1.0)) as u8,
-                ],
-            );
+    }
+}
+
+/// A child is drawn at its parent's global origin plus its own local bounds
+/// (`J2DPane.cpp:167-168`). Opening.blo nests d42 under d4, so the slide that
+/// translates d4 in states 23-27 carries d42 in from the right; every other
+/// opening pane hangs off ROOT at (0, 0).
+pub fn pane_bounds(screen: &Screen, intro: &Intro, name: &str) -> Option<[f32; 4]> {
+    let index = NAMES.iter().position(|entry| *entry == name)?;
+    let layout = screen.find(name)?;
+    let pane = &intro.panes[index];
+    let origin = pane_origin(screen, intro, index, layout);
+    Some([
+        origin[0],
+        origin[1],
+        layout.bounds.w * pane.scale,
+        layout.bounds.h * pane.scale,
+    ])
+}
+
+fn pane_origin(
+    screen: &Screen,
+    intro: &Intro,
+    index: usize,
+    layout: &crate::j2d::ScreenPane,
+) -> [f32; 2] {
+    let pane = &intro.panes[index];
+    let local = [
+        layout.bounds.x + pane.offset_x,
+        layout.bounds.y + pane.offset_y,
+    ];
+    let Some(parent_index) = layout.parent else {
+        return local;
+    };
+    let Some(parent) = screen.panes.get(parent_index) else {
+        return local;
+    };
+    match NAMES.iter().position(|name| *name == parent.name) {
+        Some(parent) => {
+            let parent_origin = pane_origin(screen, intro, parent, &screen.panes[parent_index]);
+            [parent_origin[0] + local[0], parent_origin[1] + local[1]]
         }
+        None => [parent.bounds.x + local[0], parent.bounds.y + local[1]],
     }
 }

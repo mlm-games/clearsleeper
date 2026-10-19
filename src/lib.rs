@@ -111,6 +111,7 @@ pub struct App {
 pub struct IntroStage {
     pub intro: intro::Intro,
     screen: j2d::Screen,
+    images: intro::PaneImages,
     fonts: text::font::FontBank,
     archives: assets::MsgArchives,
     canvas: text::raster::Canvas,
@@ -365,6 +366,7 @@ impl App {
             self.enter_play();
             return;
         };
+        let images = intro::PaneImages::load(&arc);
         let archives = assets::MsgArchives::load(&root);
         let mut fonts = text::font::FontBank::new();
         text::driver::load_fonts(&mut fonts);
@@ -373,6 +375,7 @@ impl App {
         self.intro = Some(IntroStage {
             intro: machine,
             screen,
+            images,
             fonts,
             archives,
             canvas: text::raster::Canvas::new(640, 480),
@@ -411,11 +414,15 @@ impl App {
         let IntroStage {
             intro,
             screen,
+            images,
             fonts,
             canvas,
             ..
         } = stage;
-        intro::render(canvas, screen, intro, fonts, &|_c, _n, _b, _a| {});
+        let layout: &j2d::Screen = screen;
+        intro::render(canvas, layout, intro, fonts, &|c, n, b, a| {
+            intro::draw_pane(c, layout, images, n, b, a);
+        });
         stage.revision = stage.revision.wrapping_add(1);
     }
 

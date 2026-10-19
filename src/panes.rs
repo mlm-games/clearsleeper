@@ -255,13 +255,27 @@ fn draw_picture(
     let Some(image) = assets.textures.get(name) else {
         return;
     };
-    let rotation = f32::from(pane.map_or(node.rotation, |p| p.rotation));
+    let rotation = pane.map_or(node.rotation, |p| p.rotation);
+    draw_picture_image(canvas, image, node, rect, rotation, alpha);
+}
+
+/// One `J2DPicture` draw: [`blit`] with the pane's uv window and corner tint.
+/// `rotation` is in J2D angle units (1/65536 turn), the live pane's in the file
+/// select screen and the blo's in the opening's.
+pub fn draw_picture_image(
+    canvas: &mut Canvas,
+    image: &Image,
+    node: &ScreenPane,
+    rect: [f32; 4],
+    rotation: u16,
+    alpha: f32,
+) {
     let uv = tex_coord(node.pic_binding, node.pic_mirror, rect, image);
     blit(
         canvas,
         image,
         rect,
-        rotation * TAU / 65536.0,
+        f32::from(rotation) * TAU / 65536.0,
         node.corner_color.map(unpack_color),
         alpha,
         uv,
