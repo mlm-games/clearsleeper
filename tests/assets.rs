@@ -776,14 +776,12 @@ fn inside_xz(a: [f32; 3], b: [f32; 3], c: [f32; 3], point: [f32; 2]) -> bool {
 
 #[test]
 fn golden_dzr_spawn_selects_entry_by_point() {
+    let chunk_count = 2_usize;
+    let entries_at = 4 + chunk_count * 12;
     let mut data = Vec::new();
-    data.extend_from_slice(&2_u32.to_be_bytes());
-    data.extend_from_slice(b"PLYR");
-    data.extend_from_slice(&2_u32.to_be_bytes());
-    data.extend_from_slice(&16_u32.to_be_bytes());
-    data.extend_from_slice(b"OOOO");
-    data.extend_from_slice(&0_u32.to_be_bytes());
-    data.extend_from_slice(&64_u32.to_be_bytes());
+    data.extend_from_slice(&(chunk_count as u32).to_be_bytes());
+    push_chunk_node(&mut data, b"PLYR", 2, Some(entries_at));
+    push_chunk_node(&mut data, b"OOOO", 0, None);
 
     push_spawn_entry(&mut data, 100.0, 200.0, 300.0, 0, 0);
     push_spawn_entry(&mut data, -194_845.4, 145.0, 314_242.8, 4187, -128);
@@ -803,11 +801,11 @@ fn golden_dzr_spawn_selects_entry_by_point() {
         "expected corrupt without spawn chunk"
     );
 
+    let chunk_count = 1_usize;
+    let entries_at = 4 + chunk_count * 12;
     let mut wrong_point = Vec::new();
-    wrong_point.extend_from_slice(&1_u32.to_be_bytes());
-    wrong_point.extend_from_slice(b"PLYR");
-    wrong_point.extend_from_slice(&1_u32.to_be_bytes());
-    wrong_point.extend_from_slice(&16_u32.to_be_bytes());
+    wrong_point.extend_from_slice(&(chunk_count as u32).to_be_bytes());
+    push_chunk_node(&mut wrong_point, b"PLYR", 1, Some(entries_at));
     push_spawn_entry(&mut wrong_point, 1.0, 2.0, 3.0, 7, 0);
     assert!(
         matches!(
@@ -817,6 +815,24 @@ fn golden_dzr_spawn_selects_entry_by_point() {
         ),
         "expected missing spawn point"
     );
+
+    let mut absent = Vec::new();
+    absent.extend_from_slice(&1_u32.to_be_bytes());
+    push_chunk_node(&mut absent, b"PLYR", 2, None);
+    assert!(
+        matches!(
+            stage_spawn(&absent, "golden.dzr".into(), STAGE_SPAWN_POINT),
+            Err(AssetError::Corrupt { detail, .. })
+                if detail == "dzr has no spawn chunk"
+        ),
+        "a zero node offset is the absent sentinel and must not be dereferenced"
+    );
+}
+
+fn push_chunk_node(data: &mut Vec<u8>, tag: &[u8; 4], count: u32, entries_at: Option<usize>) {
+    data.extend_from_slice(tag);
+    data.extend_from_slice(&count.to_be_bytes());
+    data.extend_from_slice(&(entries_at.unwrap_or(0) as u32).to_be_bytes());
 }
 
 fn push_spawn_entry(out: &mut Vec<u8>, x: f32, y: f32, z: f32, angle_y: i16, angle_z: i16) {

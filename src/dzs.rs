@@ -185,11 +185,14 @@ fn chunk_nodes(data: &[u8]) -> Result<Vec<ChunkNode>, DzsError> {
     Ok(nodes)
 }
 
+/// `dStage_dt_c_offsetToPtr` (`d_stage.cpp:2052-2055`) leaves a zero node offset as the null
+/// pointer, so a node that carries one addresses no chunk and a later node of the same tag is not
+/// consulted - the decoder breaks on the first tag match (`:2035-2039`).
 fn chunk_locate(nodes: &[ChunkNode], tag: &[u8; 4]) -> Option<(u32, u32)> {
     nodes
         .iter()
         .find(|(name, ..)| name == tag)
-        .map(|(_, count, offset)| (*count, *offset))
+        .and_then(|(_, count, offset)| (*offset != 0).then_some((*count, *offset)))
 }
 
 fn layer_chunk(layer: u8) -> Option<[u8; 4]> {

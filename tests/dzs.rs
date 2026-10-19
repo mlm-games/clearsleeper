@@ -242,6 +242,32 @@ fn golden_scls_exit_table_parses_destinations() {
     assert_eq!(tables.with_name("House01").name(), "House01");
 }
 
+#[test]
+fn zero_offset_chunks_read_as_absent() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1_u32.to_be_bytes());
+    data.extend_from_slice(b"SCLS");
+    data.extend_from_slice(&2_u32.to_be_bytes());
+    data.extend_from_slice(&0_u32.to_be_bytes());
+    data.extend_from_slice(b"House01\0");
+    data.push(3);
+    data.push(0);
+    data.push(1);
+    data.push(0);
+    data.extend_from_slice(b"sea\0\0\0\0\0");
+    data.push(128);
+    data.push(5);
+    data.push(15);
+    data.push(0);
+
+    let tables = dzs::parse(&data).unwrap();
+    assert!(
+        tables.exit(0).is_none(),
+        "a zero offset is the absent sentinel, not a table at the start of the blob"
+    );
+    assert!(dzs::room_exits(&data).unwrap().is_empty());
+}
+
 fn room_layer() -> Vec<u8> {
     let actr_at = 4 + 4 * 12;
     let tgob_at = actr_at + 2 * 0x20;

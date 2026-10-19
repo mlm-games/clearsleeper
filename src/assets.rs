@@ -1053,6 +1053,11 @@ pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<(glam::Vec3,
         }
     }
     let (count, offset) = plyr.ok_or_else(|| corrupt("dzr has no spawn chunk"))?;
+    // `dStage_dt_c_offsetToPtr` (`d_stage.cpp:2052-2055`) keeps a zero node offset as the null
+    // pointer, leaving the chunk absent instead of pointing at the start of the blob.
+    if offset == 0 {
+        return Err(corrupt("dzr has no spawn chunk"));
+    }
     let entries_end = (count as usize)
         .checked_mul(0x20)
         .and_then(|bytes| bytes.checked_add(offset as usize))
