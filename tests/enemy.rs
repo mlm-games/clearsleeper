@@ -443,3 +443,44 @@ fn golden_the_lance_keeps_its_spear_inside_the_melee_window() {
     );
     assert!(armed(&app, foe), "and it is still armed");
 }
+
+/// The Moblin's spear leaves over its shoulder, not at the player: the
+/// reference launches it at the Moblin's own shape angle plus a half turn
+/// (`d_a_mo2.cpp:176`), and that shape angle is the way the Moblin faces -
+/// `execute` copies `current.angle` into it every frame
+/// (`d_a_mo2.cpp:3527-3529`) and the Moblin turns that way towards the player
+/// (`:2931-2934`, `:2261-2262`). The half turn of `0x8000` therefore puts the
+/// spear behind the Moblin.
+///
+/// The spread of up to 8 000 either side of that half turn
+/// (`(s16)cM_rndFX(8000.0f)`, `d_a_mo2.cpp:176`, the draw `c_math.h:28`) is the
+/// random part of the launch, and this sim carries no global generator to draw
+/// it from, so the spear leaves on the half turn alone.
+///
+/// The Moblin here stands where it was placed - facing along +Z - with the
+/// player off to its side, so the two readings of the launch are not the same
+/// line.
+#[test]
+fn golden_the_lance_throws_its_spear_over_its_shoulder() {
+    let mut app = common::floored(2000.0);
+    let foe = spawn_lance_with_hurt(&mut app, Vec3::new(0.0, common::FLOOR_Y, 0.0), 0);
+    teleport(&mut app, Vec3::new(600.0, common::FLOOR_Y, 0.0));
+    tick(&mut app);
+    app.sim
+        .world
+        .entity_mut(foe)
+        .get_mut::<Hurt>()
+        .expect("foes flinch")
+        .0 = 1;
+    tick(&mut app);
+    assert_eq!(spears(&app).len(), 1, "the lance throws its spear");
+    let spear = spears(&app)[0];
+    assert!(
+        spear.vel.x.abs() < 0.01,
+        "the spear leaves along the Moblin's own line, not towards the player"
+    );
+    assert!(
+        spear.vel.z < 0.0,
+        "and behind the Moblin, which faces the other way"
+    );
+}

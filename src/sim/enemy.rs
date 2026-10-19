@@ -140,6 +140,9 @@ const LANCE_BARE: Profile = Profile {
 const TURN_SCALE: i16 = 4;
 const THROW_FORWARD: f32 = 25.0;
 const THROW_LIFT: f32 = 25.0;
+/// The half turn the reference adds to the Moblin's shape angle when it launches the
+/// spear (`d_a_mo2.cpp:176`): `0x8000`.
+const THROW_HALF_TURN: i16 = -0x8000;
 /// `fopAcM_SetGravity(this, -3.0f)` at the throw (`d_a_boko.cpp:355`) and the `gravity = -3.0f`
 /// the throw arms keep (`:379`).
 const THROW_GRAVITY: f32 = -3.0;
@@ -449,13 +452,23 @@ pub fn control(
             if dist > enemy.profile.attack_range {
                 enemy.armed = false;
                 enemy.profile = LANCE_BARE;
-                let length = dist.max(1.0);
+                // `yari_off_check` launches the spear at the Moblin's own shape angle plus a
+                // half turn (`d_a_mo2.cpp:176`), and the Moblin's shape angle is the way it
+                // faces: `execute` copies `current.angle` into it every frame
+                // (`d_a_mo2.cpp:3527-3529`) and the Moblin turns that way towards the player
+                // (`:2931-2934`, `:2261-2262`). The spear therefore leaves over the Moblin's
+                // shoulder, not at the player.
+                //
+                // OMITTED: the spread of up to 8 000 either side of that
+                // (`(s16)cM_rndFX(8000.0f)`, `d_a_mo2.cpp:176`, the draw `c_math.h:28`) is the
+                // global `cM_rndFX` channel, which this sim does not carry.
+                let yaw = from_s16(actor.angle[1].wrapping_add(THROW_HALF_TURN));
                 commands.spawn(Spear {
                     pos: actor.pos,
                     vel: Vec3::new(
-                        THROW_FORWARD * dx / length,
+                        THROW_FORWARD * yaw.sin(),
                         THROW_LIFT,
-                        THROW_FORWARD * dz / length,
+                        THROW_FORWARD * yaw.cos(),
                     ),
                     life: THROW_LIFE,
                 });
