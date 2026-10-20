@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use clearsleeper::hud::{HeartState, heart_states};
 use clearsleeper::sim::health::Health;
 use clearsleeper::{App, SIM_HZ};
 use repose_core::input::PhysicalKey;
@@ -12,31 +11,6 @@ fn frame(app: &mut App, keys: &[PhysicalKey], focused: bool) {
     sched.held_keys = keys.iter().cloned().collect();
     app.stage_polled(&sched);
     app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-}
-
-#[test]
-fn golden_hearts_follow_health_units() {
-    let at = |units| heart_states(&Health { units, max: 12 });
-    assert_eq!(
-        at(12),
-        vec![HeartState::Full, HeartState::Full, HeartState::Full]
-    );
-    assert_eq!(
-        at(10),
-        vec![HeartState::Full, HeartState::Full, HeartState::Half]
-    );
-    assert_eq!(
-        at(9),
-        vec![HeartState::Full, HeartState::Full, HeartState::Quarter]
-    );
-    assert_eq!(
-        at(1),
-        vec![HeartState::Quarter, HeartState::Empty, HeartState::Empty]
-    );
-    assert_eq!(
-        at(0),
-        vec![HeartState::Empty, HeartState::Empty, HeartState::Empty]
-    );
 }
 
 #[test]

@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clearsleeper::menus::{Action, Cmd, Menu, Screen, SlotInfo, play_time};
+use clearsleeper::menus::{Action, Cmd, Menu, Screen, SlotInfo};
 use clearsleeper::save::{self, SaveGame, SavedArea, SavedHealth, SavedPlayer};
-use clearsleeper::sim::death::GameOver;
-use clearsleeper::sim::intent::{DamageIntent, GameOverChoice, MoveIntent};
+use clearsleeper::sim::intent::{DamageIntent, MoveIntent};
 use clearsleeper::{App, SIM_HZ};
 use glam::Vec2;
 use repose_core::input::PhysicalKey;
@@ -61,109 +60,6 @@ fn sample_save(name: &str, tick: u64) -> SaveGame {
 }
 
 #[test]
-fn golden_title_confirm_opens_file_select() {
-    let dir = temp_dir("title");
-    let mut app = App::new();
-    app.set_save_dir(dir.clone());
-    app.menu.screen = Screen::Title;
-    stage(&mut app, &[]);
-    assert_eq!(app.menu.screen, Screen::Title);
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.screen, Screen::FileSelect);
-    assert!(app.menu.slots.iter().all(|slot| *slot == SlotInfo::Empty));
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn golden_cursor_clamps_at_ends() {
-    let dir = temp_dir("cursor");
-    let mut app = App::new();
-    app.set_save_dir(dir.clone());
-    app.menu.screen = Screen::Title;
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.slot, 0);
-    tap(&mut app, PhysicalKey::ArrowUp);
-    assert_eq!(app.menu.slot, 0);
-    tap(&mut app, PhysicalKey::ArrowDown);
-    assert_eq!(app.menu.slot, 1);
-    tap(&mut app, PhysicalKey::ArrowDown);
-    tap(&mut app, PhysicalKey::ArrowDown);
-    assert_eq!(app.menu.slot, 2);
-    tap(&mut app, PhysicalKey::ArrowDown);
-    assert_eq!(app.menu.slot, 2);
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn golden_new_game_enters_play_and_writes_slot() {
-    let dir = temp_dir("new");
-    let mut app = App::new();
-    app.set_save_dir(dir.clone());
-    app.menu.screen = Screen::Title;
-    tap(&mut app, PhysicalKey::Space);
-    for _ in 0..5 {
-        app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    }
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.screen, Screen::Playing);
-    let written = save::read_slot_in(&dir, 0).expect("new game writes slot zero");
-    assert_eq!(written.tick, 0);
-    assert_eq!(written.name, save::DEFAULT_NAME);
-    assert_eq!(written.health.units, 12);
-    assert_eq!(written.health.max, 12);
-    assert_eq!(app.save(), written);
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn golden_continue_loads_slot() {
-    let dir = temp_dir("load");
-    let mut source = App::new();
-    for _ in 0..10 {
-        stage(&mut source, &[PhysicalKey::KeyW]);
-        source.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    }
-    let prepared = source.save();
-    save::write_slot_in(&dir, 1, &prepared).unwrap();
-
-    let mut app = App::new();
-    app.set_save_dir(dir.clone());
-    app.menu.screen = Screen::Title;
-    tap(&mut app, PhysicalKey::Space);
-    tap(&mut app, PhysicalKey::ArrowDown);
-    assert_eq!(app.menu.slots[1], SlotInfo::from_save(&prepared));
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.screen, Screen::Playing);
-    assert_eq!(app.save(), prepared);
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn golden_menu_gates_game_input() {
-    let mut app = App::new();
-    app.menu.screen = Screen::Title;
-    stage(&mut app, &[PhysicalKey::KeyW, PhysicalKey::KeyK]);
-    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::ZERO);
-    assert_eq!(app.sim.world.resource::<DamageIntent>().0, 0);
-    app.menu.screen = Screen::Playing;
-    stage(&mut app, &[PhysicalKey::KeyW]);
-    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::Y);
-}
-
-#[test]
-fn golden_back_returns_to_title() {
-    let dir = temp_dir("back");
-    let mut app = App::new();
-    app.set_save_dir(dir.clone());
-    app.menu.screen = Screen::Title;
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.screen, Screen::FileSelect);
-    tap(&mut app, PhysicalKey::Escape);
-    assert_eq!(app.menu.screen, Screen::Title);
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn golden_step_confirm_reports_slot_action() {
     let mut menu = Menu::new();
     assert_eq!(menu.step(&[Cmd::Confirm]), None);
@@ -201,82 +97,86 @@ fn golden_slot_info_reads_save_fields() {
 }
 
 #[test]
-fn golden_play_time_formats_hours_and_minutes() {
-    assert_eq!(play_time(0), "0:00");
-    assert_eq!(play_time(89), "0:00");
-    assert_eq!(play_time(SIM_HZ as u64 * 60), "0:01");
-    assert_eq!(play_time(SIM_HZ as u64 * 3600), "1:00");
-    assert_eq!(play_time(SIM_HZ as u64 * 3900), "1:05");
-}
-
-#[test]
-fn golden_game_over_menu_reports_choice() {
-    let mut menu = Menu::new();
-    menu.screen = Screen::GameOver;
-    assert_eq!(menu.step(&[Cmd::Up]), None);
-    assert_eq!(menu.slot, 0);
-    assert_eq!(menu.step(&[Cmd::Down]), None);
-    assert_eq!(menu.slot, 1);
-    assert_eq!(menu.step(&[Cmd::Down]), None);
-    assert_eq!(menu.slot, 1, "the cursor clamps at the last choice");
-    assert_eq!(
-        menu.step(&[Cmd::Confirm]),
-        Some(Action::GameOver(GameOverChoice::Quit))
-    );
-    assert_eq!(
-        menu.screen,
-        Screen::GameOver,
-        "the app switches after the choice applies"
-    );
-    menu.slot = 0;
-    assert_eq!(
-        menu.step(&[Cmd::Confirm]),
-        Some(Action::GameOver(GameOverChoice::Continue))
-    );
-}
-
-#[test]
-fn golden_death_opens_game_over_and_continue_restores_play() {
+fn golden_file_select_starts_a_new_game() {
+    let dir = temp_dir("new");
     let mut app = App::new();
-    app.stage_damage(12);
-    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    assert_eq!(app.menu.screen, Screen::GameOver, "death opens the menu");
-    assert_eq!(app.menu.slot, 0, "continue is the default choice");
+    app.set_save_dir(dir.clone());
+    app.menu.screen = Screen::FileSelect;
+    tap(&mut app, PhysicalKey::Space);
+    for _ in 0..5 {
+        app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+    }
+    assert_eq!(app.menu.screen, Screen::Playing);
+    let written = save::read_slot_in(&dir, 0).expect("new game writes slot zero");
+    assert_eq!(written.tick, 0);
+    assert_eq!(written.name, save::DEFAULT_NAME);
+    assert_eq!(written.health.units, 12);
+    assert_eq!(written.health.max, 12);
+    assert_eq!(app.save(), written);
+    let _ = std::fs::remove_dir_all(&dir);
+}
 
+#[test]
+fn golden_file_select_loads_its_slot() {
+    let dir = temp_dir("load");
+    let mut source = App::new();
+    for _ in 0..10 {
+        stage(&mut source, &[PhysicalKey::KeyW]);
+        source.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+    }
+    let prepared = source.save();
+    save::write_slot_in(&dir, 1, &prepared).unwrap();
+
+    let mut app = App::new();
+    app.set_save_dir(dir.clone());
+    app.menu.screen = Screen::FileSelect;
+    app.menu.slot = 1;
     tap(&mut app, PhysicalKey::Space);
     assert_eq!(app.menu.screen, Screen::Playing);
-    assert_eq!(
-        *app.sim.world.resource::<GameOverChoice>(),
-        GameOverChoice::Continue
-    );
-
-    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    assert_eq!(app.health().units, 12, "continue restores the hearts");
-    assert!(!app.sim.world.resource::<GameOver>().active);
-    assert_eq!(app.menu.screen, Screen::Playing);
+    assert_eq!(app.save(), prepared);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn golden_game_over_quit_returns_to_title() {
+fn golden_file_select_cursor_clamps_at_ends() {
     let mut app = App::new();
-    app.stage_damage(12);
-    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    assert_eq!(app.menu.screen, Screen::GameOver);
-
+    app.menu.screen = Screen::FileSelect;
+    tap(&mut app, PhysicalKey::ArrowUp);
+    assert_eq!(app.menu.slot, 0);
     tap(&mut app, PhysicalKey::ArrowDown);
     assert_eq!(app.menu.slot, 1);
-    tap(&mut app, PhysicalKey::Space);
-    assert_eq!(app.menu.screen, Screen::Title);
-    assert_eq!(
-        *app.sim.world.resource::<GameOverChoice>(),
-        GameOverChoice::Quit
-    );
+    tap(&mut app, PhysicalKey::ArrowDown);
+    tap(&mut app, PhysicalKey::ArrowDown);
+    assert_eq!(app.menu.slot, 2);
+    tap(&mut app, PhysicalKey::ArrowDown);
+    assert_eq!(app.menu.slot, 2);
+}
 
-    app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    assert!(
-        !app.sim.world.resource::<GameOver>().active,
-        "the sim resets behind the title"
-    );
-    assert_eq!(app.health().units, 12, "the reset restores the hearts");
+#[test]
+fn golden_file_select_back_returns_to_title() {
+    let mut app = App::new();
+    app.menu.screen = Screen::FileSelect;
+    tap(&mut app, PhysicalKey::Escape);
     assert_eq!(app.menu.screen, Screen::Title);
+}
+
+#[test]
+fn golden_menu_gates_game_input() {
+    let mut app = App::new();
+    app.menu.screen = Screen::Title;
+    stage(&mut app, &[PhysicalKey::KeyW, PhysicalKey::KeyK]);
+    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::ZERO);
+    assert_eq!(app.sim.world.resource::<DamageIntent>().0, 0);
+    app.menu.screen = Screen::Playing;
+    stage(&mut app, &[PhysicalKey::KeyW]);
+    assert_eq!(app.sim.world.resource::<MoveIntent>().axis, Vec2::Y);
+}
+
+#[test]
+fn golden_pre_boot_shell_cannot_start_a_game() {
+    let mut app = App::new_pre_boot();
+    app.menu.screen = Screen::FileSelect;
+    tap(&mut app, PhysicalKey::Space);
+    assert_eq!(app.menu.screen, Screen::Title, "no disc, no session");
+    assert!(app.intro.is_none());
 }

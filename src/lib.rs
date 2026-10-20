@@ -29,7 +29,6 @@ pub mod disc;
 pub mod dzs;
 pub mod game_over_screen;
 pub mod gx_decode;
-pub mod hud;
 pub mod input;
 pub mod input_tape;
 pub mod intro;
@@ -164,10 +163,22 @@ struct GameOverStage {
 
 impl App {
     /// Headless construction: silent audio, no device. Tests and tools.
+    /// The headless session: what the tests and headless runs drive. A session exists only with
+    /// an asset source, so the source counts as installed; [`new_live`] reads the real one.
     pub fn new() -> Self {
         let mut app = Self::with_audio(repame_audio::Audio::noop());
+        app.assets_installed = true;
         app.menu.screen = menus::Screen::Playing;
         app.sync_title_actor();
+        app
+    }
+
+    /// The shell without a source: the screens a launch shows when no disc is found, held up
+    /// until one is installed. `new` is the session because it needs a source.
+    pub fn new_pre_boot() -> Self {
+        let mut app = Self::with_audio(repame_audio::Audio::noop());
+        app.assets_installed = false;
+        app.menu.screen = menus::Screen::Title;
         app
     }
 
@@ -352,6 +363,10 @@ impl App {
             .poll(c_stick);
     }
 
+    /// Stage the pad for whichever screen owns the frame. The shell's screens take the pad only
+    /// while no asset source is installed; from then on the retail screens read it themselves
+    /// (the title actor, the game-over sequence) or through the ported menu state machine
+    /// behind the file select panes.
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
         if self.intro.is_some() || self.menu.screen != menus::Screen::Playing {
             self.stage_axis(glam::Vec2::ZERO);
@@ -363,15 +378,14 @@ impl App {
             if self.menu.screen != menus::Screen::GameOver {
                 self.stage_pad_menu();
             }
-            if self.menu.screen == menus::Screen::Title && self.intro.is_none() {
+            if self.menu.screen == menus::Screen::Title
+                && self.assets_installed
+                && self.intro.is_none()
+            {
                 self.stage_pad_title(held, window_focused);
             }
         }
         if self.intro.is_some() {
-            self.menu_prev.clone_from(held);
-            return;
-        }
-        if self.menu.screen == menus::Screen::GameOver && self.assets_installed {
             self.menu_prev.clone_from(held);
             return;
         }
@@ -381,29 +395,57 @@ impl App {
             Vec::new()
         };
         self.menu_prev.clone_from(held);
-        if self.menu.screen == menus::Screen::Title && self.assets_installed {
+        if !self.assets_installed {
+            self.stage_host_screens(&cmds);
             return;
         }
-        if self.menu.screen == menus::Screen::Playing
-            || (cmds.is_empty() && !self.menu.has_pending_click())
-        {
+        match self.menu.screen {
+            menus::Screen::FileSelect => self.stage_file_select(&cmds),
+            menus::Screen::Settings | menus::Screen::QuitConfirm => {
+                // Only the pre-boot shell enters these; return to the retail title instead of
+                // drawing the shell over a session that has the disc.
+                self.menu.screen = menus::Screen::Title;
+            }
+            _ => {}
+        }
+    }
+
+    /// The shell's own screens, pre-boot only: the title menu, options and quit. No action here
+    /// starts a session - the retail game needs an asset source (`start_new`).
+    fn stage_host_screens(&mut self, cmds: &[menus::Cmd]) {
+        if cmds.is_empty() && !self.menu.has_pending_click() {
             return;
         }
         let before = self.menu.screen;
-        let action = self.menu.step(&cmds);
+        let action = self.menu.step(cmds);
         if before == menus::Screen::Title && self.menu.screen == menus::Screen::FileSelect {
-            let slots = (0..save::SLOTS)
-                .map(|slot| match self.read_slot(slot) {
-                    Some(saved) => menus::SlotInfo::from_save(&saved),
-                    None => menus::SlotInfo::Empty,
-                })
-                .collect();
-            self.menu.slots = slots;
-            self.menu.open_file_select();
+            // The retail file select needs the disc's panes; without a source it is not a
+            // screen the shell can show.
+            self.menu.screen = menus::Screen::Title;
         }
+        match action {
+            Some(menus::Action::Quit) => self.quit.request(),
+            Some(menus::Action::Load(_) | menus::Action::New(_)) => {
+                self.menu.screen = menus::Screen::Title;
+            }
+            None => {}
+        }
+    }
+
+    /// The ported menu state machine that drives the retail file select panes: choosing a slot
+    /// loads its save or starts a new game.
+    fn stage_file_select(&mut self, cmds: &[menus::Cmd]) {
+        if cmds.is_empty() && !self.menu.has_pending_click() {
+            return;
+        }
+        let action = self.menu.step(cmds);
         if self.menu.screen == menus::Screen::FileSelect {
             self.menu.sync_file_select_cursor();
         }
+        self.apply_menu_action(action);
+    }
+
+    fn apply_menu_action(&mut self, action: Option<menus::Action>) {
         match action {
             Some(menus::Action::Load(slot)) => match self.read_slot(slot) {
                 Some(saved) => match self.load(&saved) {
@@ -416,19 +458,16 @@ impl App {
                 None => self.start_new(slot),
             },
             Some(menus::Action::New(slot)) => self.start_new(slot),
-            Some(menus::Action::GameOver(choice)) => {
-                *self.sim.world.resource_mut::<sim::intent::GameOverChoice>() = choice;
-                self.menu.screen = match choice {
-                    sim::intent::GameOverChoice::Quit => menus::Screen::Title,
-                    _ => menus::Screen::Playing,
-                };
-            }
             Some(menus::Action::Quit) => self.quit.request(),
             None => {}
         }
     }
 
     fn start_new(&mut self, slot: usize) {
+        if !self.assets_installed {
+            self.menu.screen = menus::Screen::Title;
+            return;
+        }
         self.reset_world();
         self.pending_slot = Some(slot);
         self.begin_intro();
@@ -479,6 +518,11 @@ impl App {
 
     fn enter_play(&mut self) {
         self.intro = None;
+        if !self.assets_installed {
+            // No disc, no session: the shell stays up until a source is installed.
+            self.menu.screen = menus::Screen::Title;
+            return;
+        }
         self.menu.screen = menus::Screen::Playing;
         if let Some(slot) = self.pending_slot.take() {
             if let Err(e) = self.write_slot(slot) {
@@ -553,7 +597,7 @@ impl App {
     /// `daTitle_c::execute` owns the title actor while the scene is up; a request for
     /// `fpcNm_NAME_SCENE_e` (`d_a_title.cpp:657`) is the transition to the file select.
     fn handle_title_request(&mut self) {
-        if self.menu.screen != menus::Screen::Title {
+        if self.menu.screen != menus::Screen::Title || !self.assets_installed {
             return;
         }
         let request = self.sim.world.resource::<sim::title::TitleScene>().request;
@@ -3043,14 +3087,14 @@ pub fn root_view(
     if app.quit.latched() {
         return quit::Quit::parked();
     }
+    if !app.assets_installed {
+        return pre_boot_view(app, ctx);
+    }
     if app.intro.is_some() {
         return intro_view(app, ctx);
     }
-    if app.menu.screen == menus::Screen::Title && app.assets_installed {
-        if app.title_stage.is_some() {
-            return title_screen_view(app, ctx);
-        }
-        return Spacer();
+    if app.menu.screen == menus::Screen::Title {
+        return title_screen_view(app, ctx);
     }
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, app.cam.get()),
@@ -3075,28 +3119,34 @@ pub fn root_view(
     );
     let overlay = match app.menu.screen {
         menus::Screen::Playing => meter_hud_view(app, ctx),
-        menus::Screen::Title => {
-            // No title assets: this is the pre-boot session, so the shell menu stands in.
-            ZStack(Modifier::new().fill_max_size())
-                .child([title_movie(app, ctx), menus::title_view(&app.menu)])
-        }
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
-        menus::Screen::Settings => menus::settings_view(&app.menu),
-        menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
+        // The shell's own screens belong to the pre-boot session; a session that somehow
+        // lands on one of them draws the retail frame alone rather than the shell over it.
+        menus::Screen::Title | menus::Screen::Settings | menus::Screen::QuitConfirm => Spacer(),
     };
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay, dialogue_view(app, ctx)])
 }
 
+/// The host shell, and the only place it exists: with no asset source installed there is no
+/// retail screen to draw, so the shell's title, options and quit stand in - the boundary
+/// Dusklight's own launcher keeps. Once a disc is installed [`root_view`] never reaches here.
+fn pre_boot_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    match app.menu.screen {
+        menus::Screen::Title => ZStack(Modifier::new().fill_max_size())
+            .child([title_movie(app, ctx), menus::title_view(&app.menu)]),
+        menus::Screen::Settings => menus::settings_view(&app.menu),
+        menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
+        // A session only starts with an asset source (`start_new`), and the retail file
+        // select needs the disc's panes, so neither belongs to the pre-boot shell.
+        menus::Screen::FileSelect | menus::Screen::Playing | menus::Screen::GameOver => Spacer(),
+    }
+}
+
 /// `dGameover_c::_draw` (`d_gameover.cpp:168-175`): the letters screen, then the
-/// save menu's `_draw2`, composited over the live view. `menus::game_over_view`
-/// is only the pre-boot fallback for sessions with no asset root.
+/// save menu's `_draw2`, composited over the live view.
 fn game_over_overlay(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     let Some(stage) = app.game_over.as_ref() else {
-        // No Gover/saveres: the shell panel stands in only before an asset source is installed.
-        if !app.assets_installed {
-            return menus::game_over_view(&app.menu);
-        }
         return Spacer();
     };
     let handle = match stage.image.get() {

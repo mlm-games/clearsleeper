@@ -7,7 +7,7 @@ step; world rendering goes through `repame-view3d` (glTF meshes, skinned
 animation, cascaded shadows); UI stays repose views.
 
 Layout: `src/` grows `sim/` (components, resources, systems), `view.rs`
-(snapshot producers), `hud.rs`, `audio.rs`, `save.rs`, `input.rs`,
+(snapshot producers), `meter_hud.rs`, `audio.rs`, `save.rs`, `input.rs`,
 `assets.rs` as strangler slices land. Nothing here depends on bevy, ever.
 
 ## Build & run
