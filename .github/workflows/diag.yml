@@ -17,8 +17,12 @@ jobs:
       - name: Test
         run: |
           set -o pipefail
-          cargo test --workspace --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/test.log"
+          cargo test --workspace --no-fail-fast -- --test-threads=4 2>&1 | tee "$RUNNER_TEMP/test.log"
       - name: Report failures
         if: failure()
         run: |
-          grep -E "^test .*FAILED$|^---- .* stdout ----$" "$RUNNER_TEMP/test.log" | sed 's/^/::error::/' | head -60
+          awk '
+            /^---- .* stdout ----$/ { block = $0; n = 0; next }
+            block != "" && n < 8 { print "::error::" block " " $0; n++; next }
+            block != "" && n >= 8 { block = ""; n = 0 }
+          ' "$RUNNER_TEMP/test.log" | head -80
