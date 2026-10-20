@@ -1,7 +1,6 @@
 use glam::{Mat4, Vec2, Vec3};
 use repame_view3d::{
-    BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload, SkinnedDraw,
-    SkinnedMesh,
+    BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload, SkinnedMesh,
 };
 
 use crate::j3d::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
@@ -244,9 +243,9 @@ pub fn build_frame_with_actor(
             None => mesh.joint_matrices.clone(),
         };
         let placed = place_actor(pose.clone(), snapshot);
-        frame
-            .skinned
-            .extend(skinned_draws(mesh, page_base, &pages, &placed));
+        for group in skinned_groups(mesh, page_base, &pages, &placed) {
+            frame.push(group);
+        }
         for group in static_actor_groups(mesh, snapshot, page_base, &pages, &pose) {
             frame.push(group);
         }
@@ -254,12 +253,12 @@ pub fn build_frame_with_actor(
     frame
 }
 
-fn skinned_draws(
+fn skinned_groups(
     actor: &RoomMesh,
     page_base: u32,
     pages: &[u32],
     placed: &[Mat4],
-) -> Vec<SkinnedDraw> {
+) -> Vec<MeshGroup> {
     if actor.joint_matrices.len() != actor.joints.len() {
         return Vec::new();
     }
@@ -274,7 +273,7 @@ fn skinned_draws(
         .filter(|group| {
             !group.joint_indices.is_empty() && group.joint_indices.len() == group.positions.len()
         })
-        .filter_map(|group| {
+        .map(|group| {
             let mut mesh = SkinnedMesh {
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),
@@ -290,7 +289,7 @@ fn skinned_draws(
                 ..SkinnedMesh::default()
             };
             mesh.name = "cl".to_string();
-            SkinnedDraw::from_matrices(&mesh, placed)
+            mesh.pose(placed)
         })
         .collect()
 }
@@ -363,7 +362,7 @@ fn static_actor_groups(
 ///
 /// `pose` holds one animated **world** matrix per joint: the bind chain from
 /// `RoomMesh::joint_matrices` with the animated locals applied on the right of
-/// each one. `SkinnedDraw::from_matrices` then multiplies each by that joint's
+/// each one. `SkinnedMesh::pose` then multiplies each by that joint's
 /// `inverse_bind`, so the bind chain cancels and what survives is the animated
 /// delta — which is the identity at rest, and therefore the bind pose on screen.
 ///
