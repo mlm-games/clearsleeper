@@ -71,6 +71,8 @@ pub struct App {
     pub audio: repame_audio::Audio,
     pub room: Option<j3d::bdl::RoomMesh>,
     pub actor_model: Option<j3d::bdl::RoomMesh>,
+    /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
+    pub player_anim: Option<assets::PlayerIdle>,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
     /// are its own, so it is presented alone rather than mixed into a room.
     dff: Option<j3d::present::Presented>,
@@ -197,6 +199,7 @@ impl App {
             audio,
             room: None,
             actor_model: None,
+            player_anim: None,
             dff: None,
             menu: menus::Menu::new(),
             stage: None,
@@ -271,6 +274,10 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
         if app.actor_model.is_none() {
             log::warn!("clearsleeper: actor model unavailable");
+        }
+        app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
+        if app.player_anim.is_none() {
+            log::warn!("clearsleeper: player idle animation unavailable");
         }
         app.reset_world();
         app.sync_title_actor();
@@ -3124,21 +3131,27 @@ pub fn root_view(
     if app.menu.screen == menus::Screen::Title {
         return title_screen_view(app, ctx);
     }
+    let snapshot = app.snapshot();
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, app.cam.get()),
         None => view::build_frame_with_actor(
-            &app.snapshot(),
+            &snapshot,
             app.cam.get(),
             app.room.as_ref(),
             app.actor_model.as_ref(),
+            app.player_anim.as_ref(),
         ),
+    };
+    let desc = match &app.dff {
+        Some(_) => view::batch_desc(app.room.as_ref()),
+        None => view::batch_desc_with_actor(app.room.as_ref(), app.actor_model.as_ref()),
     };
     let cam = app.cam.clone();
     let viewport = Viewport3d(
         frame,
         GeomHandle::new(),
         "scene.main",
-        view::batch_desc(app.room.as_ref()),
+        desc,
         move |ev| match ev {
             View3dEvent::Orbit { dx, dy } => cam.update(|c| c.orbit(dx, dy)),
             View3dEvent::Zoom { factor } => cam.update(|c| c.zoom(factor)),

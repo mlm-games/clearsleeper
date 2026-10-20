@@ -230,6 +230,10 @@ pub struct RoomGroup {
     pub indices: Vec<u32>,
     pub joint_indices: Vec<[u16; SKIN_INFLUENCES]>,
     pub joint_weights: Vec<[f32; SKIN_INFLUENCES]>,
+    /// The joint a direct-matrix shape hangs off (`layout.matrix_field == None`,
+    /// `J3DShapeMtx`'s `mUseMtxIndex`); the shape's positions already carry that joint's bind
+    /// translation, so an animated pose applies `pose[joint] * inverse(bind[joint])`.
+    pub direct_joint: Option<u16>,
     pub texture_page: Option<u32>,
     pub lit: bool,
     pub anim: Option<AnimBinding>,
@@ -1698,9 +1702,14 @@ fn read_shapes(
             let (world, bindings) = match layout.matrix_field {
                 Some(_) => {
                     let count = usize::from(read_u16(data, at(matrix, SHAPE_INIT_MATRIX_SLOTS)?)?);
+                    // `mFirstUseMtxIndex` indexes the `mpMtxTable` **u16** array
+                    // (`J3DShapeFactory.cpp:105`, `&mpMtxTable[mtxInitData.mFirstUseMtxIndex]`),
+                    // so its byte offset is twice the stored value.
                     let first =
                         usize::try_from(read_u32(data, at(matrix, SHAPE_INIT_MATRIX_FIRST)?)?)
-                            .map_err(|_| BdlError::Range)?;
+                            .ok()
+                            .and_then(|first| first.checked_mul(2))
+                            .ok_or(BdlError::Range)?;
                     if slots.len() < count {
                         slots.resize(count, None);
                     }
@@ -1728,6 +1737,7 @@ fn read_shapes(
                     if joint >= worlds.len() {
                         return Err(BdlError::Range);
                     }
+                    group.direct_joint = Some(u16::try_from(joint).map_err(|_| BdlError::Range)?);
                     (worlds[joint], Vec::new())
                 }
             };

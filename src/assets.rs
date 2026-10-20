@@ -345,6 +345,100 @@ pub fn load_event_list(stage: &str) -> Option<crate::sim::event::EventList> {
 }
 
 const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
+/// `mAnmDataTable[ANM_WAITS]` (`d_a_player_main_data.inc:1031-1037`): the standing pose is the
+/// `WAITS` lower body under the `WAIT` upper body. [`PlayerIdle`] applies the second one only to
+/// the `BODY_CHN` subtree, which is the calc split at `d_a_player_main.cpp:11574-11576`.
+const LINK_IDLE_UNDER: &str = "bcks/waits.bck";
+const LINK_IDLE_UPPER: &str = "bcks/wait.bck";
+const LINK_UPPER_ROOT: &str = "body_chn";
+
+/// The standing animation pair, sampled with the player model's joint order. A missing pair
+/// leaves the player on the bind pose rather than substituting a made-up motion.
+pub struct PlayerIdle {
+    under: crate::j3d::bck::Morph,
+    upper: crate::j3d::bck::Morph,
+    upper_mask: Vec<bool>,
+    parents: Vec<u16>,
+}
+
+impl PlayerIdle {
+    /// The blended world matrix per joint: the `WAITS` pose everywhere, with the `WAIT` locals
+    /// composed on the `BODY_CHN` branch under the already posed parent, which is what the
+    /// upper `J3DMtxCalcAnm` runs over (`mDoExt_MtxCalcAnmBlendTbl::calc`, `m_Do_ext.h:1129`).
+    pub fn pose(&self, frame: f32) -> Vec<glam::Mat4> {
+        let under_frame = frame % self.under.frame_max().max(1.0);
+        let upper_frame = frame % self.upper.frame_max().max(1.0);
+        let mut world = self.under.joint_matrices(under_frame);
+        let upper = self.upper.joint_matrices(upper_frame);
+        for joint in 0..world.len() {
+            if !self.upper_mask.get(joint).copied().unwrap_or(false) {
+                continue;
+            }
+            let Some(parent) = self
+                .parents
+                .get(joint)
+                .copied()
+                .and_then(|parent| usize::try_from(parent).ok())
+            else {
+                continue;
+            };
+            let (Some(upper_parent), Some(posed_parent)) = (upper.get(parent), world.get(parent))
+            else {
+                continue;
+            };
+            let Some(inverse) = upper_parent.try_inverse() else {
+                continue;
+            };
+            world[joint] = *posed_parent * inverse * upper[joint];
+        }
+        world
+    }
+}
+
+pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
+    let root = AssetRoot::from_env().ok()?;
+    let archive = root.read_archive(LINK_ANM_ARCHIVE).ok()?;
+    let path = root.path(LINK_ANM_ARCHIVE);
+    let under = link_morph(&archive, &path, LINK_IDLE_UNDER, mesh)?;
+    let upper = link_morph(&archive, &path, LINK_IDLE_UPPER, mesh)?;
+    let upper_root = mesh
+        .joint_names
+        .iter()
+        .position(|name| name.eq_ignore_ascii_case(LINK_UPPER_ROOT))?;
+    let mut upper_mask = vec![false; mesh.joint_parents.len()];
+    upper_mask[upper_root] = true;
+    for joint in upper_root + 1..upper_mask.len() {
+        let parent = mesh
+            .joint_parents
+            .get(joint)
+            .copied()
+            .and_then(|parent| usize::try_from(parent).ok());
+        if parent.is_some_and(|parent| parent < joint && upper_mask[parent]) {
+            upper_mask[joint] = true;
+        }
+    }
+    Some(PlayerIdle {
+        under,
+        upper,
+        upper_mask,
+        parents: mesh.joint_parents.clone(),
+    })
+}
+
+fn link_morph(
+    archive: &Archive,
+    path: &Path,
+    entry: &str,
+    mesh: &crate::j3d::bdl::RoomMesh,
+) -> Option<crate::j3d::bck::Morph> {
+    let data = archive.read(entry).ok()?;
+    let raw = if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
+        yaz0_decode(data, path).ok()?
+    } else {
+        data.to_vec()
+    };
+    crate::j3d::bck::Morph::parse(&raw, &mesh.joint_parents).ok()
+}
 
 pub fn load_link_anms() -> Option<crate::sim::event::LinkAnms> {
     match link_anms_from_assets() {

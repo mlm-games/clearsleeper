@@ -118,8 +118,26 @@ pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
     }
 }
 
+/// The batch's page count when the player model's textures share the frame with the room's:
+/// the actor's pages sit after the room's, the same order [`build_frame_with_actor`] uploads
+/// them in.
+pub fn batch_desc_with_actor(room: Option<&RoomMesh>, actor: Option<&RoomMesh>) -> BatchDesc {
+    match (room, actor) {
+        (None, None) => BatchDesc::default(),
+        _ => BatchDesc {
+            layer_size: LAYER_SIZE,
+            layers: array_layers(
+                room.map_or(0, |room| room.textures.len())
+                    + actor.map_or(0, |actor| actor.textures.len()),
+            ),
+            filter: SceneFilter::Linear,
+            mips: 1,
+        },
+    }
+}
+
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
-    build_frame_with_actor(snapshot, cam, room, None)
+    build_frame_with_actor(snapshot, cam, room, None, None)
 }
 
 pub fn build_frame_with_actor(
@@ -127,6 +145,7 @@ pub fn build_frame_with_actor(
     cam: OrbitCamera,
     room: Option<&RoomMesh>,
     actor: Option<&RoomMesh>,
+    actor_anim: Option<&crate::assets::PlayerIdle>,
 ) -> Frame3d {
     let cam = OrbitCamera {
         target: Vec3::new(
@@ -139,7 +158,7 @@ pub fn build_frame_with_actor(
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc(room),
+        desc: batch_desc_with_actor(room, actor),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -183,41 +202,133 @@ pub fn build_frame_with_actor(
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
     }
-    if let Some(mesh) = actor.and_then(|mesh| skinned_draw(mesh, snapshot)) {
-        frame.skinned.push(mesh);
+    if let Some(mesh) = actor {
+        let page_base = room.map_or(0, |room| room.textures.len() as u32);
+        frame.uploads.extend(
+            mesh.textures
+                .iter()
+                .enumerate()
+                .map(|(page, texture)| SceneUpload {
+                    page: page as u32 + page_base,
+                    x: 0,
+                    y: 0,
+                    w: texture.width,
+                    h: texture.height,
+                    rgba: texture.rgba.clone(),
+                }),
+        );
+        let pose = match actor_anim {
+            Some(anim) => anim.pose(snapshot.tick as f32),
+            None => mesh.joint_matrices.clone(),
+        };
+        let placed = place_actor(pose.clone(), snapshot);
+        frame
+            .skinned
+            .extend(skinned_draws(mesh, page_base, &placed));
+        for group in static_actor_groups(mesh, snapshot, page_base, &pose) {
+            frame.push(group);
+        }
     }
     frame
 }
 
-pub fn skinned_draw(actor: &RoomMesh, snapshot: &SceneSnapshot) -> Option<SkinnedDraw> {
-    let group = actor.groups.iter().find(|group| {
-        group.joint_indices.len() == group.positions.len() && !group.joint_indices.is_empty()
-    })?;
+fn skinned_draws(actor: &RoomMesh, page_base: u32, placed: &[Mat4]) -> Vec<SkinnedDraw> {
     if actor.joint_matrices.len() != actor.joints.len() {
-        return None;
+        return Vec::new();
     }
     let inverse_bind: Vec<Mat4> = actor
         .joint_matrices
         .iter()
         .map(|matrix| matrix.try_inverse().unwrap_or(Mat4::IDENTITY))
         .collect();
-    let mut mesh = SkinnedMesh {
-        positions: group.positions.clone(),
-        normals: group.normals.clone(),
-        uvs: group.uvs.clone(),
-        colors: group.colors.clone(),
-        indices: group.indices.clone(),
-        joints: group.joint_indices.clone(),
-        weights: group.joint_weights.clone(),
-        inverse_bind,
-        joint_nodes: (0..actor.joints.len()).collect(),
-        texture_page: group.texture_page.unwrap_or(0),
-        depth_test: true,
-        ..SkinnedMesh::default()
-    };
-    mesh.name = "cl".to_string();
-    let placed = place_actor(idle_pose(actor), snapshot);
-    SkinnedDraw::from_matrices(&mesh, &placed)
+    actor
+        .groups
+        .iter()
+        .filter(|group| {
+            !group.joint_indices.is_empty() && group.joint_indices.len() == group.positions.len()
+        })
+        .filter_map(|group| {
+            let mut mesh = SkinnedMesh {
+                positions: group.positions.clone(),
+                normals: group.normals.clone(),
+                uvs: group.uvs.clone(),
+                colors: group.colors.clone(),
+                indices: group.indices.clone(),
+                joints: group.joint_indices.clone(),
+                weights: group.joint_weights.clone(),
+                inverse_bind: inverse_bind.clone(),
+                joint_nodes: (0..actor.joints.len()).collect(),
+                texture_page: group.texture_page.unwrap_or(0) + page_base,
+                depth_test: true,
+                ..SkinnedMesh::default()
+            };
+            mesh.name = "cl".to_string();
+            SkinnedDraw::from_matrices(&mesh, placed)
+        })
+        .collect()
+}
+
+/// Direct-matrix shapes: the BDL draw has no skin weights, so its vertices are the joint's bind
+/// world (`read_shapes` adds `worlds[joint]`). The joint's animated delta carries the whole shape.
+fn static_actor_groups(
+    actor: &RoomMesh,
+    snapshot: &SceneSnapshot,
+    page_base: u32,
+    pose: &[Mat4],
+) -> Vec<MeshGroup> {
+    let origin = Vec3::new(
+        snapshot.player_pos.x,
+        snapshot.ground_y,
+        snapshot.player_pos.z,
+    );
+    let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
+    actor
+        .groups
+        .iter()
+        .filter(|group| group.joint_indices.is_empty())
+        .filter_map(|group| {
+            let transform = match group.direct_joint {
+                Some(joint) => {
+                    let bind = actor.joint_matrices.get(joint as usize)?;
+                    let animated = pose.get(joint as usize)?;
+                    to_world * *animated * bind.try_inverse()?
+                }
+                None => to_world,
+            };
+            let positions = group
+                .positions
+                .iter()
+                .map(|position| {
+                    let point = transform.transform_point3(Vec3::from(*position));
+                    [point.x, point.y, point.z]
+                })
+                .collect();
+            let normals = if group.lit {
+                group
+                    .normals
+                    .iter()
+                    .map(|normal| {
+                        let normal = transform
+                            .transform_vector3(Vec3::from(*normal))
+                            .normalize_or_zero();
+                        [normal.x, normal.y, normal.z]
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            Some(MeshGroup {
+                positions,
+                colors: group.colors.clone(),
+                normals,
+                uvs: group.uvs.clone(),
+                indices: group.indices.clone(),
+                texture_page: group.texture_page.unwrap_or(0) + page_base,
+                depth_test: true,
+                ..MeshGroup::default()
+            })
+        })
+        .collect()
 }
 
 /// Places a posed actor at the player, in world space.
@@ -239,41 +350,6 @@ fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot) -> Vec<Mat4> {
     );
     let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
     pose.into_iter().map(|joint| to_world * joint).collect()
-}
-
-/// World matrix per joint for the bind pose with a small idle swing layered on.
-///
-/// Starts from the bind chain and applies each swing as a **local** delta
-/// composed onto the joint's own parent world, which is how J3D builds an
-/// animated world matrix: `world = parentWorld * bindLocal * animDelta`.
-fn idle_pose(actor: &RoomMesh) -> Vec<Mat4> {
-    const SWING: [usize; 6] = [5, 6, 9, 10, 22, 23];
-    let locals = actor.joint_locals();
-    let bind = &actor.joint_matrices;
-    let parents = &actor.joint_parents;
-    let mut world = vec![Mat4::IDENTITY; bind.len()];
-    let mut resolved = vec![false; bind.len()];
-    for joint in 0..bind.len() {
-        let swing = SWING
-            .iter()
-            .position(|slot| *slot == joint)
-            .map(|index| {
-                let angle = 0.12 * (index + 1) as f32;
-                Mat4::from_rotation_z(angle) * Mat4::from_rotation_x(angle * 0.5)
-            })
-            .unwrap_or(Mat4::IDENTITY);
-        let local = locals.get(joint).copied().unwrap_or(Mat4::IDENTITY);
-        let animated = local * swing;
-        let parent = parents
-            .get(joint)
-            .copied()
-            .filter(|parent| *parent < joint as u16 && resolved[*parent as usize])
-            .map(|parent| world[parent as usize])
-            .unwrap_or(Mat4::IDENTITY);
-        world[joint] = parent * animated;
-        resolved[joint] = true;
-    }
-    world
 }
 
 pub fn skinned_influences() -> usize {
