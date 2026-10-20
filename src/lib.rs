@@ -317,10 +317,24 @@ impl App {
         self.sim.world.insert_resource(sim::door::StayRoom(-1));
         self.room_tick = 0;
         self.room_actors.clear();
-        let spawn = self.sim.world.resource::<sim::area::Area>().spawn;
+        let area = self.sim.world.resource::<sim::area::Area>();
+        let spawn = area.spawn;
+        let spawn_yaw = area.yaw;
+        let default = OrbitCamera::default();
+        // The shell's orbit default looks from the sea, which puts the prologue camera on the
+        // wrong side of the island. A new game starts behind the player (`eye = -forward`), so
+        // the first frame shows Outset rather than open water.
+        let prologue = stage == assets::PROLOGUE_STAGE;
         self.cam.set(OrbitCamera {
             target: spawn,
-            ..OrbitCamera::default()
+            yaw: if prologue {
+                -spawn_yaw - std::f32::consts::FRAC_PI_2
+            } else {
+                default.yaw
+            },
+            pitch: if prologue { 0.55 } else { default.pitch },
+            dist: if prologue { 300.0 } else { default.dist },
+            ..default
         });
         if let Some(set) = set {
             self.install_room_set(set, 0);
