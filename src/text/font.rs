@@ -82,6 +82,9 @@ pub struct CharQuad {
     pub pos: [[f32; 2]; 4],
     pub color: [u32; 4],
     pub uv: [[i32; 2]; 4],
+    /// The glyph's own page: a font spreads its cells over several GLY1 pages, and a run
+    /// that mixes pages must sample each quad from the page it was measured on.
+    pub tex: TexObj,
 }
 
 #[derive(Clone, Debug)]
@@ -508,6 +511,7 @@ impl ResFont {
             pos: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
             color: [self.color1, self.color2, self.color4, self.color3],
             uv: [[u1, v1], [u2, v1], [u2, v2], [u1, v2]],
+            tex: self.tex,
         }
     }
 

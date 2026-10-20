@@ -181,6 +181,7 @@ impl QuadFont for FontBank {
             pos: [[0.0f32; 2]; 4],
             color: [0u32; 4],
             uv: [[0i32; 2]; 4],
+            tex: crate::text::font::TexObj::default(),
         };
         self.get_mut(slot).map_or(fallback, |font| {
             font.char_quad(pos_x, pos_y, scale_x, scale_y, chr, visible)

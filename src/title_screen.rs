@@ -1,7 +1,7 @@
 use crate::assets::AssetRoot;
 use crate::intro::{self, PaneImages};
 use crate::j2d::{self, Bounds, Screen};
-use crate::sim::title::{self, PANE_COUNT, PANE_TAG, Title};
+use crate::sim::title::{self, PANE_COUNT, PANE_PRES, PANE_TAG, Title};
 use crate::text::raster::Canvas;
 
 /// `TlogoE` holds `title_logo_e.blo` and the textures its panes name
@@ -21,9 +21,11 @@ impl TitleAssets {
     }
 }
 
-/// The J2D screen is drawn over the movie at the origin (`d_a_title.cpp:566-572`). Retail also
-/// draws the title ship, subtitle and kirari models first (`d_a_title.cpp:533-563`); those
-/// models are not ported, so this composition carries only the movie and the six panes.
+/// The J2D screen is drawn over the title scene at the origin (`d_a_title.cpp:566-572`).
+/// Retail also draws the title ship, subtitle and kirari models first (`d_a_title.cpp:533-563`);
+/// those models are not ported, so this composition carries the movie and the six panes. The
+/// USA `title_loop.thp` title card already carries the logo and the copyright, so only `pres`
+/// is drawn over it; without the movie every pane is the composition.
 pub fn render(
     canvas: &mut Canvas,
     assets: &TitleAssets,
@@ -38,6 +40,9 @@ pub fn render(
         blit_fullscreen(canvas, rgba, width, height);
     }
     for index in 0..PANE_COUNT {
+        if movie.is_some() && index != PANE_PRES {
+            continue;
+        }
         if title.pane[index].alpha == 0 {
             continue;
         }

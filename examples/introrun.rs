@@ -17,7 +17,8 @@ fn main() {
         return;
     };
     let blo = arc.read("opening.blo").unwrap_or_default();
-    let screen = j2d::parse(&blo).expect("blo");
+    let mut screen = j2d::parse(&blo).expect("blo");
+    intro::usa_text_box(&mut screen);
     let images = intro::PaneImages::load(&arc);
     let mut fonts = FontBank::new();
     driver::load_fonts(&mut fonts);

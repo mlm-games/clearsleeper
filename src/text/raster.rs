@@ -56,22 +56,29 @@ impl Canvas {
         origin: [f32; 2],
         alpha: u8,
     ) {
-        let glyph = &font.glyph;
-        let cells = u32::from(glyph.texture_width) * u32::from(glyph.texture_height);
-        if cells == 0 || font.tex_page().len() * 2 != cells as usize {
-            return;
-        }
-        let texels = unswizzle(
-            font.tex_page(),
-            usize::from(glyph.texture_width),
-            usize::from(glyph.texture_height),
-        );
-        let (tex_w, tex_h) = (
-            f32::from(u16::from(glyph.texture_width).max(1)),
-            f32::from(u16::from(glyph.texture_height).max(1)),
-        );
+        let mut pages: std::collections::HashMap<usize, Vec<u8>> = std::collections::HashMap::new();
         for run in &layout.quads {
             let quad = &run.quad;
+            let (page_w, page_h) = (quad.tex.width, quad.tex.height);
+            let cells = u32::from(page_w) * u32::from(page_h);
+            if cells == 0 {
+                continue;
+            }
+            let texels = pages.entry(quad.tex.data_at).or_insert_with(|| {
+                let at = quad.tex.data_at;
+                let end = at.saturating_add(quad.tex.data_size as usize);
+                match font.data.get(at..end) {
+                    Some(bytes) if bytes.len() * 2 == cells as usize => {
+                        unswizzle(bytes, usize::from(page_w), usize::from(page_h))
+                    }
+                    _ => Vec::new(),
+                }
+            });
+            if texels.len() != cells as usize {
+                continue;
+            }
+            let tex_w = f32::from(page_w.max(1));
+            let tex_h = f32::from(page_h.max(1));
             let min_x = quad.pos[0][0].min(quad.pos[2][0]) + origin[0];
             let max_x = quad.pos[0][0].max(quad.pos[2][0]) + origin[0];
             let min_y = quad.pos[0][1].min(quad.pos[2][1]) + origin[1];
@@ -91,7 +98,7 @@ impl Canvas {
                     let fy = (y as f32 + 0.5 - min_y) / span_y;
                     let (u, v) = sample_uv(quad, fx, fy, tex_w, tex_h);
                     let Some(&index) = texels.get(
-                        usize::try_from(v).unwrap_or(usize::MAX) * usize::from(glyph.texture_width)
+                        usize::try_from(v).unwrap_or(usize::MAX) * usize::from(page_w)
                             + usize::try_from(u).unwrap_or(usize::MAX),
                     ) else {
                         continue;

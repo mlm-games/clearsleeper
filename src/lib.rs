@@ -94,10 +94,9 @@ pub struct App {
     movie: Option<movie::Movie>,
     movie_frame: usize,
     movie_clock: f32,
+    intro_clock: f32,
     movie_pixels: Vec<u8>,
     movie_size: (u32, u32),
-    movie_image: Cell<Option<repose_core::ImageHandle>>,
-    movie_uploaded: Cell<usize>,
     movie_sound: bool,
     movie_done: bool,
     pub intro: Option<IntroStage>,
@@ -214,10 +213,9 @@ impl App {
             movie: None,
             movie_frame: 0,
             movie_clock: 0.0,
+            intro_clock: 0.0,
             movie_pixels: Vec::new(),
             movie_size: (0, 0),
-            movie_image: Cell::new(None),
-            movie_uploaded: Cell::new(usize::MAX),
             movie_sound: false,
             movie_done: false,
             intro: None,
@@ -493,16 +491,18 @@ impl App {
             self.enter_play();
             return;
         };
-        let Some(screen) = j2d::parse(blo) else {
+        let Some(mut screen) = j2d::parse(blo) else {
             self.enter_play();
             return;
         };
+        intro::usa_text_box(&mut screen);
         let images = intro::PaneImages::load(&arc);
         let archives = assets::MsgArchives::load(&root);
         let mut fonts = text::font::FontBank::new();
         text::driver::load_fonts(&mut fonts);
         let mut machine = intro::Intro::default();
         machine.start(&mut fonts, &archives);
+        self.intro_clock = 0.0;
         self.intro = Some(IntroStage {
             intro: machine,
             screen,
@@ -531,16 +531,33 @@ impl App {
         }
     }
 
-    fn step_intro(&mut self) {
-        let done = {
-            let Some(stage) = self.intro.as_mut() else {
-                return;
+    /// The opening scene's `execute` runs once a 30 Hz frame (`d_s_open.cpp:67-72`), so its
+    /// slides step with the sim clock, not with the display's refresh rate.
+    fn step_intro(&mut self, dt: Duration) {
+        self.intro_clock += dt.as_secs_f32();
+        let step = 1.0 / SIM_HZ as f32;
+        let mut budget = 4;
+        let mut stepped = false;
+        while self.intro_clock >= step && budget > 0 {
+            self.intro_clock -= step;
+            budget -= 1;
+            stepped = true;
+            let done = {
+                let Some(stage) = self.intro.as_mut() else {
+                    return;
+                };
+                stage.intro.step(&mut stage.fonts, &stage.archives);
+                stage.intro.done
             };
-            stage.intro.step(&mut stage.fonts, &stage.archives);
-            stage.intro.done
-        };
-        if done {
-            self.enter_play();
+            if done {
+                self.enter_play();
+                return;
+            }
+        }
+        if budget == 0 {
+            self.intro_clock = 0.0;
+        }
+        if !stepped {
             return;
         }
         let Some(stage) = self.intro.as_mut() else {
@@ -820,8 +837,8 @@ impl App {
 
     /// Load the game over sequence's assets: `Gover.arc` for the letters and
     /// `saveres.arc` for the save screen, the two resources `dGameover_c::_create`
-    /// pulls (`d_gameover.cpp:68`, `:82`, `:84-92`). Without them the shell panel
-    /// (`menus::game_over_view`) stays in charge.
+    /// pulls (`d_gameover.cpp:68`, `:82`, `:84-92`). Without them the frame is the only
+    /// thing on screen: the shell has no screen once a disc exists.
     fn open_game_over(&mut self) -> bool {
         if self.game_over.is_some() {
             return true;
@@ -2568,8 +2585,8 @@ impl App {
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
         if self.intro.is_some() {
-            self.step_intro();
-        } else if self.menu.screen == menus::Screen::Title {
+            self.step_intro(dt);
+        } else if self.menu.screen == menus::Screen::Title && self.assets_installed {
             self.step_movie(dt);
         } else if self.movie_sound {
             self.audio.stop_cue(audio::MOVIE_CUE);
@@ -3131,10 +3148,9 @@ pub fn root_view(
 /// The host shell, and the only place it exists: with no asset source installed there is no
 /// retail screen to draw, so the shell's title, options and quit stand in - the boundary
 /// Dusklight's own launcher keeps. Once a disc is installed [`root_view`] never reaches here.
-fn pre_boot_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::View {
     match app.menu.screen {
-        menus::Screen::Title => ZStack(Modifier::new().fill_max_size())
-            .child([title_movie(app, ctx), menus::title_view(&app.menu)]),
+        menus::Screen::Title => menus::title_view(&app.menu),
         menus::Screen::Settings => menus::settings_view(&app.menu),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
         // A session only starts with an asset source (`start_new`), and the retail file
@@ -3252,26 +3268,6 @@ fn dialogue_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::Vi
         app.dialogue_uploaded.set(app.dialogue_revision);
     }
     Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
-}
-
-fn title_movie(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
-    if app.movie_pixels.is_empty() {
-        return Spacer();
-    }
-    let handle = match app.movie_image.get() {
-        Some(handle) => handle,
-        None => {
-            let handle = ctx.alloc_image_handle();
-            app.movie_image.set(Some(handle));
-            handle
-        }
-    };
-    if app.movie_uploaded.get() != app.movie_frame {
-        let (w, h) = app.movie_size;
-        ctx.set_image_rgba8(handle, w, h, app.movie_pixels.clone(), true);
-        app.movie_uploaded.set(app.movie_frame);
-    }
-    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Cover)
 }
 
 /// Android entry (`cargo rapk`): the lib target owns `android_main` — a bin

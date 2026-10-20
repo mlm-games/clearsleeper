@@ -96,22 +96,24 @@ fn rgb5a3(texel: u16) -> [u8; 4] {
 
 struct Layout {
     frac: usize,
+    texel_bytes: usize,
     block_width: usize,
     block_height: usize,
 }
 
 fn layout(format: TexFmt) -> Option<Layout> {
-    let layout = match format {
-        TexFmt::I4 | TexFmt::C4 => (2, 8, 8),
-        TexFmt::I8 | TexFmt::C8 | TexFmt::Ia4 => (1, 8, 4),
-        TexFmt::Ia8 | TexFmt::Rgb565 | TexFmt::Rgb5a3 => (1, 4, 4),
-        TexFmt::Rgba8 => (1, 1, 1),
+    let (frac, texel_bytes, block_width, block_height) = match format {
+        TexFmt::I4 | TexFmt::C4 => (2, 1, 8, 8),
+        TexFmt::I8 | TexFmt::C8 | TexFmt::Ia4 => (1, 1, 8, 4),
+        TexFmt::Ia8 | TexFmt::Rgb565 | TexFmt::Rgb5a3 => (1, 2, 4, 4),
+        TexFmt::Rgba8 => (1, 4, 1, 1),
         _ => return None,
     };
     Some(Layout {
-        frac: layout.0,
-        block_width: layout.1,
-        block_height: layout.2,
+        frac,
+        texel_bytes,
+        block_width,
+        block_height,
     })
 }
 
@@ -270,9 +272,10 @@ pub fn decode(src: &[u8]) -> Option<Image> {
                             pixels[target * 4..target * 4 + 4].copy_from_slice(&px);
                         }
                     }
-                    at += blocks.block_width / blocks.frac;
+                    at += blocks.block_width * blocks.texel_bytes / blocks.frac;
                 }
-                at += blocks.block_width * (blocks.block_height - rows) / blocks.frac;
+                at += blocks.block_width * blocks.texel_bytes * (blocks.block_height - rows)
+                    / blocks.frac;
             }
         }
         width = (width / 2).max(1);

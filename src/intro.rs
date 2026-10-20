@@ -34,6 +34,8 @@ const D6: usize = 6;
 const MAK1: usize = 7;
 const MAK2: usize = 8;
 const TX1: usize = 9;
+const MESSAGE_FONT_SIZE: i32 = 23;
+const MESSAGE_LINE_SPACE: i32 = 28;
 const TX2: usize = 10;
 
 const NAMES: [&str; PANE_COUNT] = [
@@ -192,11 +194,17 @@ impl Intro {
 impl Text {
     fn set(&mut self, msg_no: u32, repeat: u32, fonts: &mut FontBank, archive: &dyn MsgArchive) {
         let resolved = if msg_no == 0 { MSG_FIRST } else { msg_no };
-        self.phase = 0;
+        // `set_message(0, 0)` leaves the machine idle (`mProc = 4`, `d_s_open_sub.cpp:26-31`):
+        // message 0x579 is only shown when state 8 asks for it.
+        self.phase = if msg_no == 0 { 3 } else { 0 };
         self.msg_no = resolved;
         self.alpha = 0.0;
         self.timer = 0;
-        self.repeat = if msg_no != 0 { repeat as i32 } else { 0 };
+        self.repeat = if msg_no != 0 {
+            i32::try_from(repeat.saturating_sub(1)).unwrap_or(i32::MAX)
+        } else {
+            0
+        };
         self.next = false;
         let index = (resolved - MSG_FIRST) as usize;
         self.timer_max = i32::from(TIMER_TABLE.get(index).copied().unwrap_or(7)) * 30;
@@ -214,12 +222,17 @@ impl Text {
                 let entry: MesgEntry = get.get_mesg_entry(head).unwrap_or_default();
                 data.set_bmg(bytes.to_vec());
                 data.entry = entry;
-                data.line_width = 486;
+                // `setLineWidth(tTextBox->getWidth())` is the USA box's 503, and
+                // `setCenterLineWidth(486)` (`d_s_open_sub.cpp:89-90`).
+                data.line_width = 503;
                 data.center_line_width = 486;
-                data.font_size = 29;
+                // `g_msgHIO.field_0x70` is 23 on USA (`d_meter.cpp:430`), the box's line
+                // space is overridden to 28 (`d_s_open_sub.cpp:56-57`) and its char space is
+                // the box's 0 (`:79`).
+                data.font_size = MESSAGE_FONT_SIZE;
                 data.ruby_font_size = 16;
-                data.char_space = 10;
-                data.line_space = 28;
+                data.char_space = 0;
+                data.line_space = MESSAGE_LINE_SPACE;
                 data.send_speed = 2;
                 data.space_timer = 0;
                 data.string_length(fonts, MsgLenState::default());
@@ -229,8 +242,11 @@ impl Text {
         self.data = data;
     }
 
-    fn exec(&mut self, fonts: &mut FontBank) {
+    /// One frame of the message machine (`d_s_open_sub.cpp:117-168`); `true` when the delay
+    /// before the next message has run out and the caller should load `msg_no + 1`.
+    fn exec(&mut self, fonts: &mut FontBank) -> bool {
         self.data.string_set(fonts, &MsgLayoutState::default());
+        let mut advance = false;
         match self.phase {
             0 => {
                 if self.alpha >= 1.0 {
@@ -267,21 +283,14 @@ impl Text {
             3 => {}
             _ => {
                 if self.timer >= 45 {
-                    self.msg_no += 1;
-                    self.phase = 0;
                     self.timer = 0;
-                    self.data = MsgData::new_data_proc();
-                    self.data.out = [
-                        Some(String::new()),
-                        Some(String::new()),
-                        Some(String::new()),
-                        Some(String::new()),
-                    ];
+                    advance = true;
                 } else {
                     self.timer += 1;
                 }
             }
         }
+        advance
     }
 }
 
@@ -291,7 +300,9 @@ impl Intro {
         if self.done {
             return;
         }
-        self.text.exec(fonts);
+        if self.text.exec(fonts) {
+            self.text.set(self.text.msg_no + 1, 0, fonts, archive);
+        }
         let message_alpha = self.text.alpha;
         let next = self.text.next;
         self.panes[TX1].alpha = message_alpha;
@@ -574,6 +585,14 @@ impl Intro {
     }
 }
 
+/// `pane2d[PANE_tx1]->move(..., 376.0f)` on USA (`d_s_open_sub.cpp:250-252`): the
+/// opening's text sits in the lower letterbox bar, not at the blo's y = 392.
+pub fn usa_text_box(screen: &mut Screen) {
+    if let Some(pane) = screen.panes.iter_mut().find(|pane| pane.name == "tx1") {
+        pane.bounds.y = 376.0;
+    }
+}
+
 pub fn render(
     canvas: &mut Canvas,
     screen: &Screen,
@@ -593,7 +612,12 @@ pub fn render(
         let Some(bounds) = pane_bounds(screen, intro, name) else {
             continue;
         };
-        if index == TX1 || index == TX2 {
+        // The ruby box is hidden on USA (`rTextBox->hide()`, `d_s_open_sub.cpp:117`), and
+        // both boxes carry the same `msg1`, so drawing it would strike the line twice.
+        if index == TX2 {
+            continue;
+        }
+        if index == TX1 {
             let text = intro.text.data.out[0].clone().unwrap_or_default();
             if text.is_empty() {
                 continue;
@@ -603,15 +627,22 @@ pub fn render(
                 fonts,
                 Some(0),
                 0.0,
-                0.0,
+                MESSAGE_LINE_SPACE as f32,
                 0xFFFF_FFFF,
                 0xFFFF_FFFF,
                 0,
                 0xFFFF_FFFF,
                 false,
             );
-            print.set_font_size(layout.font_size_x as f32, layout.font_size_y as f32);
-            print.locate(0.0, layout.bounds.h);
+            print.set_font_size(MESSAGE_FONT_SIZE as f32, MESSAGE_FONT_SIZE as f32);
+            // `shiftSet(0, ((mTextLines - lineCount) - 1) * lineSpace / 2)` centers a short
+            // message in the box (`d_s_open_sub.cpp:96-101`); the first line starts at the
+            // font's ascent below the box top, as `J2DTextBox::draw` does.
+            let entry = intro.text.data.entry;
+            let shift = ((i32::from(entry.field_0x16) - intro.text.data.line_count) - 1)
+                * (MESSAGE_LINE_SPACE / 2);
+            let ascent = fonts.get(0).map_or(0.0, |font| font.ascent() as f32);
+            print.locate(0.0, ascent + shift as f32);
             let text_layout = print.print_return(
                 fonts,
                 text.as_bytes(),

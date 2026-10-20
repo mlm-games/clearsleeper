@@ -179,7 +179,9 @@ fn open_archive(bytes: Vec<u8>, path: PathBuf) -> Result<Archive, AssetError> {
 }
 
 pub fn load_font() -> Option<Vec<u8>> {
-    AssetRoot::from_env().ok()?.read(FONT_FILE).ok()
+    let root = AssetRoot::from_env().ok()?;
+    let archive = root.read_archive(FONT_FILE).ok()?;
+    archive.read(MESSAGE_FONT).ok().map(<[u8]>::to_vec)
 }
 
 pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
@@ -487,7 +489,11 @@ impl crate::text::msgget::MsgArchive for MsgArchives {
     }
 }
 
-const FONT_FILE: &str = "files/res/Menu/kanfont_fix16.bfn";
+/// `mDoExt_getMesgFont`'s mount, `/res/Msg/fontres.arc` (`d_s_logo.cpp:926`).
+const FONT_FILE: &str = "files/res/Msg/fontres.arc";
+/// The USA message font (`m_Do_ext.cpp:3148-3151`), the one `d_s_open_sub.cpp:177` hands the
+/// opening's text boxes. The menu's `kanfont` is a kanji sheet and leaves Latin text blank.
+const MESSAGE_FONT: &str = "rock_24_20_4i_usa.bfn";
 /// `dComIfGp_getMsgDtArchive()`'s mount - `/res/Msg/bmgres.arc` (`d_s_logo.cpp:911-917`).
 const MSG_ARCHIVE: &str = "files/res/Msg/bmgres.arc";
 /// `dComIfGp_getMsgDt2Archive()`'s mount - `/res/Msg/bmgresh.arc` (`:919-921`).
