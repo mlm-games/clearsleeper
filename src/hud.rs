@@ -2,15 +2,12 @@
 
 use std::f32::consts::{FRAC_PI_4, SQRT_2};
 
-use repose_core::{Color, Modifier, Sp, Transform, UnitExt, View};
-use repose_ui::{Box as UiBox, Row, Text, TextStyle, ViewExt, ZStack};
+use repose_core::{Color, Modifier, Transform, UnitExt, View};
+use repose_ui::{Box as UiBox, Row, ViewExt, ZStack};
 
 use crate::sim::health::Health;
-use crate::sim::item::{Held, Kind};
 
-const HEART_SIZE: f32 = 24.0;
 const HEART_GAP: f32 = 5.0;
-const HUD_PAD: f32 = 18.0;
 /// Placeholder red until user-supplied art lands.
 const FULL_HEX: &str = "#E8453C";
 /// Placeholder empty-container tone (dark warm grey).
@@ -101,94 +98,8 @@ fn heart(state: HeartState, size: f32) -> View {
     }
 }
 
-/// Top-left heart row; passthrough keeps orbit drags alive underneath.
-pub fn hearts_view(health: Health) -> View {
-    Row(Modifier::new()
-        .absolute()
-        .offset(Some(HUD_PAD.dp()), Some(HUD_PAD.dp()), None, None)
-        .gap(HEART_GAP.dp())
-        .hit_passthrough())
-    .child(heart_cells(health, HEART_SIZE))
-}
-
 pub fn hearts_strip(health: Health, size: f32) -> View {
     Row(Modifier::new().gap(HEART_GAP.dp()).hit_passthrough()).child(heart_cells(health, size))
-}
-
-const PURSE_HEX: &str = "#3FA94B";
-const PURSE_ROW: f32 = 28.0;
-
-pub fn status_view(health: Health, rupees: u32, held: Option<Held>) -> View {
-    let mut stack = vec![hearts_view(health), purse_view(rupees)];
-    if let Some(held) = held {
-        stack.push(held_view(held));
-    }
-    ZStack(Modifier::new().fill_max_size().hit_passthrough()).child(stack)
-}
-
-fn purse_view(rupees: u32) -> View {
-    Row(Modifier::new()
-        .absolute()
-        .offset(
-            Some(HUD_PAD.dp()),
-            Some((HUD_PAD + HEART_SIZE + HEART_GAP).dp()),
-            None,
-            None,
-        )
-        .gap(4.0.dp())
-        .hit_passthrough())
-    .child([
-        rupee_gem(HEART_SIZE * 0.75),
-        Text(format!("{rupees}"))
-            .size(Sp(20.0))
-            .color(Color::from_hex("#F2EDE3")),
-    ])
-}
-
-fn held_view(held: Held) -> View {
-    let hex = match held.kind() {
-        Some(kind) => crate::view::item_hex(kind),
-        None => "#2E3138",
-    };
-    let label = match held.kind() {
-        Some(Kind::Bomb) => "bomb",
-        Some(Kind::Arrow) => "arrow",
-        Some(Kind::Boomerang) => "boomerang",
-        Some(Kind::Hookshot) => "hookshot",
-        None => "none",
-    };
-    Row(Modifier::new()
-        .absolute()
-        .offset(
-            Some(HUD_PAD.dp()),
-            Some((HUD_PAD + HEART_SIZE + HEART_GAP + PURSE_ROW).dp()),
-            None,
-            None,
-        )
-        .gap(4.0.dp())
-        .hit_passthrough())
-    .child([
-        UiBox(
-            Modifier::new()
-                .size(14.0.dp(), 14.0.dp())
-                .background(Color::from_hex(hex)),
-        ),
-        Text(format!("{label} {}", held.count))
-            .size(Sp(16.0))
-            .color(Color::from_hex("#F2EDE3")),
-    ])
-}
-
-fn rupee_gem(size: f32) -> View {
-    UiBox(
-        Modifier::new()
-            .size(size.dp(), size.dp())
-            .background(Color::from_hex(PURSE_HEX))
-            .transform(Transform {
-                rotate: FRAC_PI_4,
-                ..Transform::identity()
-            }),
-    )
 }
 
 fn heart_cells(health: Health, size: f32) -> Vec<View> {

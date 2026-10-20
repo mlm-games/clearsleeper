@@ -326,6 +326,26 @@ fn draw_picture(
 /// One `J2DPicture` draw: [`blit`] with the pane's uv window and corner tint.
 /// `rotation` is in J2D angle units (1/65536 turn), the live pane's in the file
 /// select screen and the blo's in the opening's.
+/// Blit a decoded texture with the pane's own white tint and no uv window, the case the meter
+/// panes use when they carry their own texture (`d_meter.cpp`'s `fopMsgM_setPaneData` path).
+pub fn blit_texture(
+    canvas: &mut Canvas,
+    image: &Image,
+    rect: [f32; 4],
+    tint: [u8; 4],
+    opacity: f32,
+) {
+    blit(
+        canvas,
+        image,
+        rect,
+        0.0,
+        [tint; 4],
+        opacity,
+        [0.0, 0.0, 1.0, 1.0],
+    );
+}
+
 pub fn draw_picture_image(
     canvas: &mut Canvas,
     image: &Image,

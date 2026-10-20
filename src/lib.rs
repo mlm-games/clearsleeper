@@ -36,6 +36,7 @@ pub mod intro;
 pub mod j2d;
 pub mod j3d;
 pub mod menus;
+pub mod meter_hud;
 pub mod movie;
 pub mod panes;
 pub mod quit;
@@ -105,6 +106,7 @@ pub struct App {
     /// own screens are pre-boot only: from here on every frame is the game's own rendering.
     assets_installed: bool,
     title_stage: Option<TitleStage>,
+    meter: Option<MeterStage>,
     game_over: Option<GameOverStage>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
@@ -135,6 +137,16 @@ struct TitleStage {
     image: Cell<Option<repose_core::ImageHandle>>,
     uploaded: Cell<u64>,
     revision: u64,
+}
+
+struct MeterStage {
+    assets: meter_hud::MeterAssets,
+    meter: meter_hud::Meter,
+    canvas: text::raster::Canvas,
+    image: Cell<Option<repose_core::ImageHandle>>,
+    uploaded: Cell<u64>,
+    revision: u64,
+    painted: Option<Vec<(String, [u32; 4], u32)>>,
 }
 
 struct GameOverStage {
@@ -200,6 +212,7 @@ impl App {
             intro: None,
             assets_installed: assets::AssetRoot::from_env().is_ok(),
             title_stage: None,
+            meter: None,
             game_over: None,
             game_over_failed: false,
             title_actor: None,
@@ -232,6 +245,18 @@ impl App {
                 image: Cell::new(None),
                 uploaded: Cell::new(0),
                 revision: 0,
+            });
+        app.meter = assets::AssetRoot::from_env()
+            .ok()
+            .and_then(|root| meter_hud::MeterAssets::load(&root))
+            .map(|assets| MeterStage {
+                assets,
+                meter: meter_hud::Meter::default(),
+                canvas: text::raster::Canvas::new(640, 480),
+                image: Cell::new(None),
+                uploaded: Cell::new(0),
+                revision: 0,
+                painted: None,
             });
         app.actor_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MODEL_ENTRY);
@@ -631,6 +656,27 @@ impl App {
             ))
         };
         title_screen::render(&mut stage.canvas, &stage.assets, &title, movie);
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
+    /// `dMeter_heartMove`/`dMeter_heartDraw` (`d_meter.cpp:1581-1605`) once per tick while the
+    /// game is on screen; the canvas is repainted only when the row it draws changed.
+    fn step_meter(&mut self) {
+        if self.menu.screen != menus::Screen::Playing || self.intro.is_some() {
+            return;
+        }
+        let health = *self.sim.world.resource::<sim::health::Health>();
+        let Some(stage) = self.meter.as_mut() else {
+            return;
+        };
+        stage.meter.update(health, &stage.assets);
+        let key = stage.meter.row_key();
+        if stage.painted.as_ref() == Some(&key) {
+            return;
+        }
+        stage.painted = Some(key);
+        stage.canvas.clear();
+        stage.meter.render(&mut stage.canvas, &stage.assets);
         stage.revision = stage.revision.wrapping_add(1);
     }
 
@@ -2503,6 +2549,7 @@ impl App {
         self.handle_title_request();
         self.sync_title_actor();
         self.step_title();
+        self.step_meter();
         steps
     }
 
@@ -3027,14 +3074,7 @@ pub fn root_view(
         },
     );
     let overlay = match app.menu.screen {
-        menus::Screen::Playing => {
-            let held = app.held();
-            hud::status_view(
-                app.health(),
-                app.rupees(),
-                held.kind().is_some().then_some(held),
-            )
-        }
+        menus::Screen::Playing => meter_hud_view(app, ctx),
         menus::Screen::Title => {
             // No title assets: this is the pre-boot session, so the shell menu stands in.
             ZStack(Modifier::new().fill_max_size())
@@ -3101,6 +3141,30 @@ fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View 
 
 fn title_screen_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     let Some(stage) = app.title_stage.as_ref() else {
+        return Spacer();
+    };
+    if stage.canvas.pixels.is_empty() {
+        return Spacer();
+    }
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        ctx.set_image_rgba8(handle, 640, 480, stage.canvas.pixels.clone(), true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+/// The retail meter's heart row over the 3D view (`d_meter.cpp`'s `meter1_draw` layers build
+/// the same screen; this composes the hearts it already ports).
+fn meter_hud_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.meter.as_ref() else {
         return Spacer();
     };
     if stage.canvas.pixels.is_empty() {

@@ -298,6 +298,15 @@ impl TColor {
     }
 }
 
+fn unpack_color(value: u32) -> TColor {
+    TColor::new(
+        (value >> 24) as u8,
+        (value >> 16) as u8,
+        (value >> 8) as u8,
+        value as u8,
+    )
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct F2 {
     pub x: f32,
@@ -388,8 +397,8 @@ impl PaneNode {
             w: pane.bounds.w,
             h: pane.bounds.h,
             rotation: pane.rotation as f32,
-            white: TColor::all(0xFF),
-            black: TColor::all(0x00),
+            white: unpack_color(pane.color_white),
+            black: unpack_color(pane.color_black),
             texture: pane.texture.clone().unwrap_or_default(),
             ..Default::default()
         }
@@ -3182,6 +3191,20 @@ impl Vitals {
             }
         }
         self.heart_alpha = value_increase(5, self.heart_alpha_frame as i32, 0);
+    }
+
+    /// The heart half of `dMeter_gaugeAlpha` (`d_meter.cpp:4592-4602`): the row's panes take the
+    /// alpha `heart_alpha` produced, then `heart_draw` copies it to the pane
+    /// (`d_meter.cpp:1600-1605`), and the flash keeps the squared alpha the decomp gives it.
+    pub fn heart_gauge_alpha(&mut self) {
+        let alpha = self.heart_alpha;
+        for index in 0..HEART_COUNT {
+            set_now_alpha(&mut self.heart[index], alpha);
+            set_now_alpha(&mut self.heart_shadow[index], alpha);
+        }
+        let now = f32::from(self.heart_flash.now_alpha) * alpha;
+        self.heart_flash.now_alpha = now as u8;
+        self.heart_flash.node.set_alpha((now * alpha) as u8);
     }
 
     pub fn heart_init(&mut self, env: &mut VitalsEnv) {
