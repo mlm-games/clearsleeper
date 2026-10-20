@@ -167,14 +167,6 @@ pub fn build_frame_with_actor(
     actor: Option<&RoomMesh>,
     actor_anim: Option<&crate::assets::PlayerIdle>,
 ) -> Frame3d {
-    let cam = OrbitCamera {
-        target: Vec3::new(
-            snapshot.player_pos.x,
-            snapshot.ground_y,
-            snapshot.player_pos.z,
-        ),
-        ..cam
-    };
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
@@ -253,6 +245,11 @@ pub fn build_frame_with_actor(
     frame
 }
 
+/// `cl.bdl`'s hair shape. Retail draws hair as the separate `katsura.bdl` model attached to
+/// `CL_JNT_HEAD_JNT` (`d_a_player_main.cpp:11598`, `:11934`); this shape is the unused rest
+/// geometry that fans out around the head.
+const CL_HAIR_GROUP: usize = 4;
+
 fn skinned_groups(
     actor: &RoomMesh,
     page_base: u32,
@@ -274,10 +271,13 @@ fn skinned_groups(
     actor
         .groups
         .iter()
-        .filter(|group| {
-            !group.joint_indices.is_empty() && group.joint_indices.len() == group.positions.len()
+        .enumerate()
+        .filter(|(index, group)| {
+            *index != CL_HAIR_GROUP
+                && !group.joint_indices.is_empty()
+                && group.joint_indices.len() == group.positions.len()
         })
-        .map(|group| {
+        .map(|(_, group)| {
             let mut mesh = SkinnedMesh {
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),

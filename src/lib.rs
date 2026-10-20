@@ -288,20 +288,21 @@ impl App {
         self.reset_world_at(assets::SEA_STAGE, assets::STAGE_SPAWN_POINT);
     }
 
-    /// The shell's orbit default looks from the sea, which puts the prologue camera on the
-    /// wrong side of the island. A new game starts behind the player (`eye = -forward`), so
-    /// the first frame shows Outset rather than open water.
+    /// The orbit is the frame before `camera::track` has published a view. Point it at the
+    /// player's torso rather than the shell default's feet; the retail camera takes over on the
+    /// next tick.
     pub(crate) fn place_camera(&mut self, spawn: glam::Vec3, yaw: f32, prologue: bool) {
         let default = OrbitCamera::default();
         self.cam.set(OrbitCamera {
-            target: spawn,
+            target: spawn + glam::Vec3::Y * 70.0,
             yaw: if prologue {
-                -yaw - std::f32::consts::FRAC_PI_2
+                yaw + std::f32::consts::PI
             } else {
                 default.yaw
             },
-            pitch: if prologue { 0.55 } else { default.pitch },
-            dist: if prologue { 300.0 } else { default.dist },
+            pitch: if prologue { 0.3 } else { default.pitch },
+            dist: if prologue { 420.0 } else { default.dist },
+            fov_y_deg: if prologue { 55.0 } else { default.fov_y_deg },
             ..default
         });
     }
@@ -1144,6 +1145,51 @@ impl App {
         let mut events = self.sim.world.resource_mut::<sim::events::SimEvents>();
         for steal in steals {
             events.list.push(sim::events::SimEvent::StealItem(steal));
+        }
+    }
+
+    /// The retail field camera `camera::track` publishes each tick. The orbit is only a debug
+    /// fallback: it has no room collision and cannot frame an interior, which is why the prologue
+    /// starts with the eye inside the lookout's wall.
+    pub(crate) fn game_camera(&self) -> Option<OrbitCamera> {
+        let camera = self.sim.world.get_resource::<sim::camera::Camera>()?;
+        let view = camera.view()?;
+        let eye = view.lookat.eye;
+        let target = view.lookat.center;
+        let offset = eye - target;
+        let dist = offset.length();
+        if !(dist > 0.001) {
+            return None;
+        }
+        Some(OrbitCamera {
+            target,
+            yaw: offset.z.atan2(offset.x),
+            pitch: (offset.y / dist).clamp(-1.0, 1.0).asin(),
+            dist,
+            fov_y_deg: view.fovy.to_degrees().clamp(20.0, 100.0),
+        })
+    }
+
+    fn camera_underground(&self, camera: &OrbitCamera) -> bool {
+        let Some(collision) = self.sim.world.get_resource::<sim::collision::Collision>() else {
+            return false;
+        };
+        let eye = camera.eye();
+        collision
+            .ground_at(eye.x, eye.z)
+            .is_some_and(|ground| eye.y < ground + 8.0)
+    }
+
+    /// The lookout's roof sits between the field camera's desired eye and the player, so the
+    /// retail follow camera pulls almost into the player. The fixed side view clears the roof and
+    /// still shows the island behind it.
+    fn fallback_camera(&self, snapshot: &view::SceneSnapshot) -> OrbitCamera {
+        OrbitCamera {
+            target: snapshot.player_pos + glam::Vec3::Y * 70.0,
+            yaw: 1.5708,
+            pitch: 0.28,
+            dist: 440.0,
+            fov_y_deg: 55.0,
         }
     }
 
@@ -3149,11 +3195,15 @@ pub fn root_view(
         return title_screen_view(app, ctx);
     }
     let snapshot = app.snapshot();
+    let mut camera = app.game_camera().unwrap_or_else(|| app.cam.get());
+    if app.camera_underground(&camera) || camera.dist < 140.0 {
+        camera = app.fallback_camera(&snapshot);
+    }
     let frame = match &app.dff {
-        Some(presented) => j3d::present::frame(presented, app.cam.get()),
+        Some(presented) => j3d::present::frame(presented, camera),
         None => view::build_frame_with_actor(
             &snapshot,
-            app.cam.get(),
+            camera,
             app.room.as_ref(),
             app.actor_model.as_ref(),
             app.player_anim.as_ref(),
