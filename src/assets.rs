@@ -14,6 +14,11 @@ const STAGE_ROOT: &str = "files/res/Stage";
 pub const STAGE_SPAWN_POINT: u8 = 128;
 pub const STAGE_START_ROOM: u8 = 44;
 pub const SEA_STAGE: &str = "sea";
+/// The opening demo's next stage: `dComIfGp_setNextStage("sea_T", 0, 44, 0)`
+/// (`d_com_inf_game.cpp:496`). Its start point 0 is the one on Outset; the `sea` stage's
+/// point 128 puts the player on the water and is not the prologue's spawn.
+pub const PROLOGUE_STAGE: &str = "sea_T";
+pub const PROLOGUE_SPAWN_POINT: u8 = 0;
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
     "bdl/model1.bdl",
@@ -185,7 +190,13 @@ pub fn load_font() -> Option<Vec<u8>> {
 }
 
 pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
-    match stage_from_assets(stage) {
+    load_stage_at(stage, STAGE_SPAWN_POINT)
+}
+
+/// Load a stage's collision and the start point `spawn_point` on its first room. `sea_T` uses
+/// point 0 while `sea` uses [`STAGE_SPAWN_POINT`], so the spawn is part of the stage choice.
+pub fn load_stage_at(stage: &str, spawn_point: u8) -> Option<crate::sim::collision::StageData> {
+    match stage_from_assets(stage, spawn_point) {
         Ok(stage) => Some(stage),
         Err(error) => {
             log::warn!("clearsleeper: stage assets unavailable ({error})");
@@ -820,7 +831,10 @@ fn fresh_layer(tables: &crate::dzs::StageTables) -> impl Fn(u8) -> u8 + '_ {
     move |room| crate::sim::layer::no(tables.name(), room, &stories)
 }
 
-fn stage_from_assets(stage: &str) -> Result<crate::sim::collision::StageData, AssetError> {
+fn stage_from_assets(
+    stage: &str,
+    spawn_point: u8,
+) -> Result<crate::sim::collision::StageData, AssetError> {
     let root = AssetRoot::from_env()?;
     let tables = stage_tables(&root, stage)?;
     let rooms = start_set(&tables);
@@ -832,7 +846,7 @@ fn stage_from_assets(stage: &str) -> Result<crate::sim::collision::StageData, As
     let relative = room_path(stage, STAGE_START_ROOM);
     let path = root.path(&relative);
     let room = root.read_archive(&relative)?;
-    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path, STAGE_SPAWN_POINT)?;
+    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path, spawn_point)?;
     Ok(crate::sim::collision::StageData {
         spawn,
         yaw,

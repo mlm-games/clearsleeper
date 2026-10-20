@@ -278,12 +278,16 @@ impl App {
     }
 
     fn reset_world(&mut self) {
+        self.reset_world_at(assets::SEA_STAGE, assets::STAGE_SPAWN_POINT);
+    }
+
+    fn reset_world_at(&mut self, stage: &str, spawn_point: u8) {
         self.title_actor = None;
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        self.stage = assets::load_stage_tables(assets::SEA_STAGE);
+        self.stage = assets::load_stage_tables(stage);
         sim::build(
             &mut self.sim,
-            assets::load_stage(assets::SEA_STAGE),
+            assets::load_stage_at(stage, spawn_point),
             self.stage.as_ref(),
         );
         self.rooms = self
@@ -466,7 +470,7 @@ impl App {
             self.menu.screen = menus::Screen::Title;
             return;
         }
-        self.reset_world();
+        self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
         self.pending_slot = Some(slot);
         self.begin_intro();
         // A new game resets into the opening scene, `d_s_play.cpp:305`'s `dComIfG_resetToOpening`
@@ -2584,7 +2588,8 @@ impl App {
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
-        if self.intro.is_some() {
+        let intro_running = self.intro.is_some();
+        if intro_running {
             self.step_intro(dt);
         } else if self.menu.screen == menus::Screen::Title && self.assets_installed {
             self.step_movie(dt);
@@ -2593,7 +2598,13 @@ impl App {
         }
         let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
             && self.menu.screen == menus::Screen::Playing;
-        let steps = if held { 0 } else { self.sim.step(dt) };
+        // The opening demo is its own scene, `d_s_open`; the prologue stage is loaded for the
+        // handoff but does not run a tick until `enter_play` hands it to the player.
+        let steps = if held || intro_running {
+            0
+        } else {
+            self.sim.step(dt)
+        };
         self.drain_demo_creates();
         self.drain_demo_gaps();
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
