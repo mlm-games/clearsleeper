@@ -288,6 +288,24 @@ impl App {
         self.reset_world_at(assets::SEA_STAGE, assets::STAGE_SPAWN_POINT);
     }
 
+    /// The shell's orbit default looks from the sea, which puts the prologue camera on the
+    /// wrong side of the island. A new game starts behind the player (`eye = -forward`), so
+    /// the first frame shows Outset rather than open water.
+    pub(crate) fn place_camera(&mut self, spawn: glam::Vec3, yaw: f32, prologue: bool) {
+        let default = OrbitCamera::default();
+        self.cam.set(OrbitCamera {
+            target: spawn,
+            yaw: if prologue {
+                -yaw - std::f32::consts::FRAC_PI_2
+            } else {
+                default.yaw
+            },
+            pitch: if prologue { 0.55 } else { default.pitch },
+            dist: if prologue { 300.0 } else { default.dist },
+            ..default
+        });
+    }
+
     fn reset_world_at(&mut self, stage: &str, spawn_point: u8) {
         self.title_actor = None;
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
@@ -320,22 +338,7 @@ impl App {
         let area = self.sim.world.resource::<sim::area::Area>();
         let spawn = area.spawn;
         let spawn_yaw = area.yaw;
-        let default = OrbitCamera::default();
-        // The shell's orbit default looks from the sea, which puts the prologue camera on the
-        // wrong side of the island. A new game starts behind the player (`eye = -forward`), so
-        // the first frame shows Outset rather than open water.
-        let prologue = stage == assets::PROLOGUE_STAGE;
-        self.cam.set(OrbitCamera {
-            target: spawn,
-            yaw: if prologue {
-                -spawn_yaw - std::f32::consts::FRAC_PI_2
-            } else {
-                default.yaw
-            },
-            pitch: if prologue { 0.55 } else { default.pitch },
-            dist: if prologue { 300.0 } else { default.dist },
-            ..default
-        });
+        self.place_camera(spawn, spawn_yaw, stage == assets::PROLOGUE_STAGE);
         if let Some(set) = set {
             self.install_room_set(set, 0);
         }

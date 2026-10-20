@@ -332,6 +332,9 @@ impl App {
         let mut query = world.query::<&mut Player>();
         let mut player = query.iter_mut(world).next().expect("player exists at boot");
         *player = save.player.clone().into();
+        if save.stage == assets::PROLOGUE_STAGE {
+            self.place_camera(save.area.spawn.into(), save.area.yaw, true);
+        }
         Ok(())
     }
 
