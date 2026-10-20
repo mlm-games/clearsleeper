@@ -128,12 +128,33 @@ pub fn batch_desc_with_actor(room: Option<&RoomMesh>, actor: Option<&RoomMesh>) 
             layer_size: LAYER_SIZE,
             layers: array_layers(
                 room.map_or(0, |room| room.textures.len())
-                    + actor.map_or(0, |actor| actor.textures.len()),
+                    + actor.map_or(0, |actor| used_pages(actor).len()),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
         },
     }
+}
+
+/// The actor pages its groups actually name, packed in page order. A BDL archive carries one
+/// texture per part (`cl.bdl` has 41, the body uses five), and uploading the unused ones would
+/// cost a page each in the frame's texture array.
+fn used_pages(actor: &RoomMesh) -> Vec<u32> {
+    let mut pages: Vec<u32> = actor
+        .groups
+        .iter()
+        .filter_map(|group| group.texture_page)
+        .collect();
+    pages.sort_unstable();
+    pages.dedup();
+    pages
+}
+
+fn actor_page(group: &crate::j3d::bdl::RoomGroup, pages: &[u32], page_base: u32) -> u32 {
+    group
+        .texture_page
+        .and_then(|page| pages.iter().position(|candidate| *candidate == page))
+        .map_or(page_base, |slot| page_base + slot as u32)
 }
 
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
@@ -204,19 +225,20 @@ pub fn build_frame_with_actor(
     }
     if let Some(mesh) = actor {
         let page_base = room.map_or(0, |room| room.textures.len() as u32);
-        frame.uploads.extend(
-            mesh.textures
-                .iter()
-                .enumerate()
-                .map(|(page, texture)| SceneUpload {
-                    page: page as u32 + page_base,
-                    x: 0,
-                    y: 0,
-                    w: texture.width,
-                    h: texture.height,
-                    rgba: texture.rgba.clone(),
-                }),
-        );
+        let pages = used_pages(mesh);
+        for (slot, page) in pages.iter().enumerate() {
+            let Some(texture) = mesh.textures.get(*page as usize) else {
+                continue;
+            };
+            frame.uploads.push(SceneUpload {
+                page: page_base + slot as u32,
+                x: 0,
+                y: 0,
+                w: texture.width,
+                h: texture.height,
+                rgba: texture.rgba.clone(),
+            });
+        }
         let pose = match actor_anim {
             Some(anim) => anim.pose(snapshot.tick as f32),
             None => mesh.joint_matrices.clone(),
@@ -224,15 +246,20 @@ pub fn build_frame_with_actor(
         let placed = place_actor(pose.clone(), snapshot);
         frame
             .skinned
-            .extend(skinned_draws(mesh, page_base, &placed));
-        for group in static_actor_groups(mesh, snapshot, page_base, &pose) {
+            .extend(skinned_draws(mesh, page_base, &pages, &placed));
+        for group in static_actor_groups(mesh, snapshot, page_base, &pages, &pose) {
             frame.push(group);
         }
     }
     frame
 }
 
-fn skinned_draws(actor: &RoomMesh, page_base: u32, placed: &[Mat4]) -> Vec<SkinnedDraw> {
+fn skinned_draws(
+    actor: &RoomMesh,
+    page_base: u32,
+    pages: &[u32],
+    placed: &[Mat4],
+) -> Vec<SkinnedDraw> {
     if actor.joint_matrices.len() != actor.joints.len() {
         return Vec::new();
     }
@@ -258,7 +285,7 @@ fn skinned_draws(actor: &RoomMesh, page_base: u32, placed: &[Mat4]) -> Vec<Skinn
                 weights: group.joint_weights.clone(),
                 inverse_bind: inverse_bind.clone(),
                 joint_nodes: (0..actor.joints.len()).collect(),
-                texture_page: group.texture_page.unwrap_or(0) + page_base,
+                texture_page: actor_page(group, pages, page_base),
                 depth_test: true,
                 ..SkinnedMesh::default()
             };
@@ -274,6 +301,7 @@ fn static_actor_groups(
     actor: &RoomMesh,
     snapshot: &SceneSnapshot,
     page_base: u32,
+    pages: &[u32],
     pose: &[Mat4],
 ) -> Vec<MeshGroup> {
     let origin = Vec3::new(
@@ -323,7 +351,7 @@ fn static_actor_groups(
                 normals,
                 uvs: group.uvs.clone(),
                 indices: group.indices.clone(),
-                texture_page: group.texture_page.unwrap_or(0) + page_base,
+                texture_page: actor_page(group, pages, page_base),
                 depth_test: true,
                 ..MeshGroup::default()
             })
