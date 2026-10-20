@@ -102,6 +102,7 @@ const ENVELOPE_TABLE_COUNT: usize = 0x08;
 const ENVELOPE_TABLE_MIXES: usize = 0x0C;
 const ENVELOPE_TABLE_INDEX: usize = 0x10;
 const ENVELOPE_TABLE_WEIGHT: usize = 0x14;
+const EVP1_INVERSE_TABLE: usize = 0x18;
 pub const SKIN_INFLUENCES: usize = 4;
 const COMMAND_NOP: u8 = 0x00;
 const COMMAND_QUADS: u8 = 0x80;
@@ -167,6 +168,10 @@ pub struct RoomMesh {
     /// locals. [`RoomMesh::joint_locals`] recovers the per-joint factor these
     /// were composed from, which is what an animation delta multiplies against.
     pub joint_matrices: Vec<Mat4>,
+    /// `EVP1`'s `mpInvJointMtx` (`J3DEnvelopBlock`, `J3DModelLoader.h:32`), the inverse bind
+    /// matrix the vertex shader concatenates with the animated joint world. It is not always the
+    /// inverse of the `JNT1` bind world: the joint init rotations are not the skin bind rotations.
+    pub inverse_bind: Vec<Mat4>,
     pub joint_parents: Vec<u16>,
     /// `J3DModelData::getJointName()` (`J3DModelData.h:59`), the `JNT1` block's `ResNTAB`
     /// (`J3DJointFactory.h:33`, `JUTNameTab.h:6-17`) in joint order: entry `i` is joint `i`'s
@@ -286,6 +291,7 @@ pub fn parse(
     let worlds = joints.worlds;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
     let envelopes = read_envelopes(data, &blocks, worlds.len())?;
+    let inverse_bind = read_inverse_bind(data, &blocks, worlds.len())?;
     let vertices = read_vertex_arrays(data, &blocks)?;
     let materials = read_materials(data, &blocks)?;
     let textures = read_textures(data, &blocks)?;
@@ -302,6 +308,7 @@ pub fn parse(
     let mut mesh = RoomMesh::default();
     mesh.joints = worlds.clone();
     mesh.joint_matrices = joints.matrices;
+    mesh.inverse_bind = inverse_bind;
     mesh.joint_parents = joints.parents;
     mesh.joint_names = joints.names;
     mesh.materials = materials.iter().map(MaterialBinding::slot).collect();
@@ -731,6 +738,36 @@ fn read_envelopes(
         bindings.push(binding);
     }
     Ok(bindings)
+}
+
+/// `EVP1`'s `mpInvJointMtx` rows, one 3x4 `Mtx` per joint (`J3DEnvelopBlock`). The vertex
+/// pipeline concatenates `worldMtx * invMtx` (`J3DModel.cpp:595`), so this is the bind the skin
+/// must cancel, not the inverse of the joint-init world.
+fn read_inverse_bind(
+    data: &[u8],
+    blocks: &Blocks,
+    joint_count: usize,
+) -> Result<Vec<Mat4>, BdlError> {
+    let Some((start, _)) = blocks.get(b"EVP1") else {
+        return Ok(Vec::new());
+    };
+    let table = at(
+        start,
+        read_u32(data, at(start, EVP1_INVERSE_TABLE)?)? as usize,
+    )?;
+    let mut out = Vec::with_capacity(joint_count);
+    for joint in 0..joint_count {
+        let base = at(table, joint * 0x30)?;
+        let mut m = [0.0_f32; 12];
+        for (slot, value) in m.iter_mut().enumerate() {
+            *value = read_f32(data, at(base, slot * 4)?)?;
+        }
+        out.push(Mat4::from_cols_array(&[
+            m[0], m[4], m[8], 0.0, m[1], m[5], m[9], 0.0, m[2], m[6], m[10], 0.0, m[3], m[7],
+            m[11], 1.0,
+        ]));
+    }
+    Ok(out)
 }
 
 fn skin_binding(

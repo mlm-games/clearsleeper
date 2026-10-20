@@ -262,11 +262,15 @@ fn skinned_groups(
     if actor.joint_matrices.len() != actor.joints.len() {
         return Vec::new();
     }
-    let inverse_bind: Vec<Mat4> = actor
-        .joint_matrices
-        .iter()
-        .map(|matrix| matrix.try_inverse().unwrap_or(Mat4::IDENTITY))
-        .collect();
+    let inverse_bind: Vec<Mat4> = if actor.inverse_bind.len() == actor.joint_matrices.len() {
+        actor.inverse_bind.clone()
+    } else {
+        actor
+            .joint_matrices
+            .iter()
+            .map(|matrix| matrix.try_inverse().unwrap_or(Mat4::IDENTITY))
+            .collect()
+    };
     actor
         .groups
         .iter()
