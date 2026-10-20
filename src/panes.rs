@@ -653,11 +653,10 @@ fn blit(
             };
             let shade = corner(tint, u, v);
             let alpha = if image.alpha_enabled {
-                f32::from(texel[3])
+                f32::from(texel[3]) / 255.0
             } else {
-                255.0
-            } * shade[3]
-                / 255.0
+                1.0
+            } * (shade[3] / 255.0)
                 * opacity;
             if alpha <= 0.0 {
                 continue;

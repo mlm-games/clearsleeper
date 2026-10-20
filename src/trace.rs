@@ -540,7 +540,7 @@ fn switches_bytes(world: &World) -> [u8; 16] {
     };
     let mut bytes = [0; 16];
     for (at, word) in switches.words().iter().enumerate() {
-        bytes[at * 4..at * 4 + 4].copy_from_slice(&word.to_le_bytes());
+        bytes[at * 4..at * 4 + 4].copy_from_slice(&word.to_be_bytes());
     }
     bytes
 }

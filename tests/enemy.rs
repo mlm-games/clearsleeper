@@ -34,6 +34,16 @@ fn tick(app: &mut App) {
     }
 }
 
+/// Exactly one sim frame, skipping the advances a hit's stop holds: the gate's five frames
+/// run on sim frames, and the blow's stop keeps the clock from reaching them.
+fn frame(app: &mut App) {
+    while app.advance(Duration::from_secs_f64(1.0 / SIM_HZ)) == 0 {}
+    let mut query = app.sim.world.query::<&mut Player>();
+    for mut player in query.iter_mut(&mut app.sim.world) {
+        player.pos.y = 0.0;
+    }
+}
+
 fn teleport(app: &mut App, pos: Vec3) {
     let mut query = app.sim.world.query::<&mut Player>();
     let mut player = query.iter_mut(&mut app.sim.world).next().unwrap();
@@ -338,11 +348,11 @@ fn golden_the_hit_gate_holds_the_rest_of_the_cut_off() {
     assert_eq!(hp(&app, foe), Some(5), "the cut lands once");
     assert!(!gate_open(&app, foe), "and the gate closes on the blow");
     for _ in 0..3 {
-        tick(&mut app);
+        frame(&mut app);
     }
     assert!(!gate_open(&app, foe), "the gate is still running");
     for _ in 0..2 {
-        tick(&mut app);
+        frame(&mut app);
     }
     assert!(gate_open(&app, foe), "and it opens again after five frames");
 }

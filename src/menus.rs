@@ -5,7 +5,7 @@ use std::rc::Rc;
 use repose_core::input::PhysicalKey;
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
 use repose_material::material3::{Button, ButtonConfig, TextButton};
-use repose_ui::{Center, Column, Image, ImageExt, Row, Spacer, Text, TextStyle, ViewExt};
+use repose_ui::{Center, Column, Image, ImageExt, Spacer, Text, TextStyle, ViewExt};
 
 use crate::config::Settings;
 use crate::save::{SLOTS, SaveGame};
