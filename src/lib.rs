@@ -101,6 +101,9 @@ pub struct App {
     movie_sound: bool,
     movie_done: bool,
     pub intro: Option<IntroStage>,
+    /// True once an asset source (disc image or the development tree) is installed. The shell's
+    /// own screens are pre-boot only: from here on every frame is the game's own rendering.
+    assets_installed: bool,
     title_stage: Option<TitleStage>,
     game_over: Option<GameOverStage>,
     game_over_failed: bool,
@@ -195,6 +198,7 @@ impl App {
             movie_sound: false,
             movie_done: false,
             intro: None,
+            assets_installed: assets::AssetRoot::from_env().is_ok(),
             title_stage: None,
             game_over: None,
             game_over_failed: false,
@@ -342,7 +346,7 @@ impl App {
             self.menu_prev.clone_from(held);
             return;
         }
-        if self.menu.screen == menus::Screen::GameOver && self.game_over.is_some() {
+        if self.menu.screen == menus::Screen::GameOver && self.assets_installed {
             self.menu_prev.clone_from(held);
             return;
         }
@@ -352,7 +356,7 @@ impl App {
             Vec::new()
         };
         self.menu_prev.clone_from(held);
-        if self.menu.screen == menus::Screen::Title && self.title_stage.is_some() {
+        if self.menu.screen == menus::Screen::Title && self.assets_installed {
             return;
         }
         if self.menu.screen == menus::Screen::Playing
@@ -2995,8 +2999,11 @@ pub fn root_view(
     if app.intro.is_some() {
         return intro_view(app, ctx);
     }
-    if app.menu.screen == menus::Screen::Title && app.title_stage.is_some() {
-        return title_screen_view(app, ctx);
+    if app.menu.screen == menus::Screen::Title && app.assets_installed {
+        if app.title_stage.is_some() {
+            return title_screen_view(app, ctx);
+        }
+        return Spacer();
     }
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, app.cam.get()),
@@ -3046,8 +3053,11 @@ pub fn root_view(
 /// is only the pre-boot fallback for sessions with no asset root.
 fn game_over_overlay(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     let Some(stage) = app.game_over.as_ref() else {
-        // No Gover/saveres (the pre-boot session): the shell panel stands in.
-        return menus::game_over_view(&app.menu);
+        // No Gover/saveres: the shell panel stands in only before an asset source is installed.
+        if !app.assets_installed {
+            return menus::game_over_view(&app.menu);
+        }
+        return Spacer();
     };
     let handle = match stage.image.get() {
         Some(handle) => handle,
