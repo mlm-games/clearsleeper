@@ -241,6 +241,8 @@ pub struct RoomGroup {
     pub direct_joint: Option<u16>,
     pub texture_page: Option<u32>,
     pub lit: bool,
+    /// `J3DColorBlock::getCullMode()` (`J3DMatBlock.h:1161`): 0 none, 1 back, 2 front, 3 all.
+    pub cull: Option<u8>,
     pub anim: Option<AnimBinding>,
 }
 
@@ -956,6 +958,7 @@ struct MaterialBinding {
     name: Option<String>,
     coord: Option<u8>,
     tex_gen: [Option<u8>; TEX_COORDS],
+    cull: u8,
 }
 
 impl MaterialBinding {
@@ -1231,6 +1234,7 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     let count = usize::from(read_u16(data, at(start, 8)?)?);
     let init_table = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
     let index_table = at(start, read_u32(data, at(start, 0x10)?)? as usize)?;
+    let cull_table = at(start, read_u32(data, at(start, 0x1C)?)? as usize)?;
     let texno_table = at(start, read_u32(data, at(start, 0x48)?)? as usize)?;
     let color_chan_num = read_u32(data, at(start, 0x24)?)?;
     let color_chan_info = read_u32(data, at(start, 0x28)?)?;
@@ -1264,6 +1268,12 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             *target = Some(read_u16(data, binding)?);
         }
         let lit = material_lit(data, start, end, init, color_chan_num, color_chan_info)?;
+        let cull_index = block_byte(data, init, 1, end)?;
+        let cull = if cull_index == 0xFF {
+            0xFF
+        } else {
+            block_byte(data, cull_table, usize::from(cull_index), end)?
+        };
         let (coord, tex_gen) = material_coord(
             data,
             start,
@@ -1280,6 +1290,7 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             name: names.get(material).cloned(),
             coord,
             tex_gen,
+            cull,
         });
     }
     Ok(materials)
@@ -1685,14 +1696,12 @@ fn read_shapes(
 
         let layout = PrimitiveLayout::parse(data, descriptor_table, descriptor_offset)?;
         let texcoord_field = layout.texcoord_field;
-        let lit = match shape_materials[shape] {
+        let (lit, cull) = match shape_materials[shape] {
             Some(index) if !materials.is_empty() => {
-                materials
-                    .get(usize::from(index))
-                    .ok_or(BdlError::Range)?
-                    .lit
+                let material = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
+                (material.lit, Some(material.cull))
             }
-            _ => false,
+            _ => (false, None),
         };
         let mut texture_page = if materials.is_empty() || texture_count == 0 {
             None
@@ -1729,6 +1738,7 @@ fn read_shapes(
         let mut group = RoomGroup {
             texture_page,
             lit,
+            cull,
             anim,
             ..RoomGroup::default()
         };

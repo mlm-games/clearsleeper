@@ -120,14 +120,19 @@ pub fn batch_desc(room: Option<&RoomMesh>) -> BatchDesc {
 /// The batch's page count when the player model's textures share the frame with the room's:
 /// the actor's pages sit after the room's, the same order [`build_frame_with_actor`] uploads
 /// them in.
-pub fn batch_desc_with_actor(room: Option<&RoomMesh>, actor: Option<&RoomMesh>) -> BatchDesc {
-    match (room, actor) {
-        (None, None) => BatchDesc::default(),
+pub fn batch_desc_with_actor(
+    room: Option<&RoomMesh>,
+    actor: Option<&RoomMesh>,
+    hair: Option<&RoomMesh>,
+) -> BatchDesc {
+    match (room, actor, hair) {
+        (None, None, None) => BatchDesc::default(),
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
                 room.map_or(0, |room| room.textures.len())
-                    + actor.map_or(0, |actor| used_pages(actor).len()),
+                    + actor.map_or(0, |actor| used_pages(actor).len())
+                    + hair.map_or(0, |hair| used_pages(hair).len()),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -149,6 +154,28 @@ fn used_pages(actor: &RoomMesh) -> Vec<u32> {
     pages
 }
 
+/// `J3DMaterial::load` sets the GX cull mode from the material (`J3DMaterial.cpp:194`);
+/// the viewport has one cull face (back), so a no-cull material is emitted twice with the
+/// opposite winding and a front-cull material once with the opposite winding.
+fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> Vec<u32> {
+    let reverse = |indices: &[u32]| {
+        indices
+            .chunks_exact(3)
+            .flat_map(|triangle| [triangle[0], triangle[2], triangle[1]])
+            .collect::<Vec<_>>()
+    };
+    match group.cull.unwrap_or(1) {
+        0 => {
+            let mut indices = group.indices.clone();
+            indices.extend(reverse(&group.indices));
+            indices
+        }
+        2 => reverse(&group.indices),
+        3 => Vec::new(),
+        _ => group.indices.clone(),
+    }
+}
+
 fn actor_page(group: &crate::j3d::bdl::RoomGroup, pages: &[u32], page_base: u32) -> u32 {
     group
         .texture_page
@@ -157,7 +184,7 @@ fn actor_page(group: &crate::j3d::bdl::RoomGroup, pages: &[u32], page_base: u32)
 }
 
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
-    build_frame_with_actor(snapshot, cam, room, None, None)
+    build_frame_with_actor(snapshot, cam, room, None, None, None)
 }
 
 pub fn build_frame_with_actor(
@@ -166,11 +193,12 @@ pub fn build_frame_with_actor(
     room: Option<&RoomMesh>,
     actor: Option<&RoomMesh>,
     actor_anim: Option<&crate::assets::PlayerIdle>,
+    hair: Option<&RoomMesh>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor),
+        desc: batch_desc_with_actor(room, actor, hair),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -241,6 +269,31 @@ pub fn build_frame_with_actor(
         for group in static_actor_groups(mesh, snapshot, page_base, &pages, &pose) {
             frame.push(group);
         }
+        if let Some(hair) = hair {
+            let hair_pages = used_pages(hair);
+            let hair_page_base = page_base + pages.len() as u32;
+            for (slot, page) in hair_pages.iter().enumerate() {
+                let Some(texture) = hair.textures.get(*page as usize) else {
+                    continue;
+                };
+                frame.uploads.push(SceneUpload {
+                    page: hair_page_base + slot as u32,
+                    x: 0,
+                    y: 0,
+                    w: texture.width,
+                    h: texture.height,
+                    rgba: texture.rgba.clone(),
+                });
+            }
+            let head = mesh
+                .joint_names
+                .iter()
+                .position(|name| name == "head_jnt")
+                .unwrap_or(15);
+            for group in hair_groups(hair, snapshot, hair_page_base, &hair_pages, &pose, head) {
+                frame.push(group);
+            }
+        }
     }
     frame
 }
@@ -249,6 +302,68 @@ pub fn build_frame_with_actor(
 /// `CL_JNT_HEAD_JNT` (`d_a_player_main.cpp:11598`, `:11934`); this shape is the unused rest
 /// geometry that fans out around the head.
 const CL_HAIR_GROUP: usize = 4;
+
+/// `mpKatsuraModel->setBaseTRMtx(mpCLModel->getAnmMtx(CL_JNT_HEAD_JNT_e))`
+/// (`d_a_player_main.cpp:11598`): the hair model's vertices are in head-local space, not in
+/// `katsura.bdl`'s own root, and the head's animated matrix places them.
+fn hair_groups(
+    hair: &RoomMesh,
+    snapshot: &SceneSnapshot,
+    page_base: u32,
+    pages: &[u32],
+    pose: &[Mat4],
+    head: usize,
+) -> Vec<MeshGroup> {
+    let Some(head) = pose.get(head) else {
+        return Vec::new();
+    };
+    let origin = Vec3::new(
+        snapshot.player_pos.x,
+        snapshot.ground_y,
+        snapshot.player_pos.z,
+    );
+    let transform =
+        Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw) * *head;
+    hair.groups
+        .iter()
+        .filter(|group| group.joint_indices.is_empty())
+        .map(|group| {
+            let positions = group
+                .positions
+                .iter()
+                .map(|position| {
+                    let point = transform.transform_point3(Vec3::from(*position));
+                    [point.x, point.y, point.z]
+                })
+                .collect();
+            let normals = if group.lit {
+                group
+                    .normals
+                    .iter()
+                    .map(|normal| {
+                        let normal = transform
+                            .transform_vector3(Vec3::from(*normal))
+                            .normalize_or_zero();
+                        [normal.x, normal.y, normal.z]
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            MeshGroup {
+                positions,
+                colors: group.colors.clone(),
+                normals,
+                uvs: group.uvs.clone(),
+                indices: group_indices(group),
+                texture_page: actor_page(group, pages, page_base),
+                alpha_cutoff: 0.5,
+                depth_test: true,
+                ..MeshGroup::default()
+            }
+        })
+        .collect()
+}
 
 fn skinned_groups(
     actor: &RoomMesh,
@@ -283,7 +398,7 @@ fn skinned_groups(
                 normals: group.normals.clone(),
                 uvs: group.uvs.clone(),
                 colors: group.colors.clone(),
-                indices: group.indices.clone(),
+                indices: group_indices(group),
                 joints: group.joint_indices.clone(),
                 weights: group.joint_weights.clone(),
                 inverse_bind: inverse_bind.clone(),
@@ -353,7 +468,7 @@ fn static_actor_groups(
                 colors: group.colors.clone(),
                 normals,
                 uvs: group.uvs.clone(),
-                indices: group.indices.clone(),
+                indices: group_indices(group),
                 texture_page: actor_page(group, pages, page_base),
                 depth_test: true,
                 ..MeshGroup::default()
@@ -514,7 +629,7 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
             Vec::new()
         },
         uvs: animated_uvs(room, group, tick),
-        indices: group.indices.clone(),
+        indices: group_indices(group),
         texture_page: group.texture_page.unwrap_or(0),
         depth_test: true,
         ..MeshGroup::default()

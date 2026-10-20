@@ -71,6 +71,9 @@ pub struct App {
     pub audio: repame_audio::Audio,
     pub room: Option<j3d::bdl::RoomMesh>,
     pub actor_model: Option<j3d::bdl::RoomMesh>,
+    /// `katsura.bdl`; retail attaches it to `CL_JNT_HEAD_JNT` rather than drawing the hair shape
+    /// in `cl.bdl` (`d_a_player_main.cpp:11598`, `:11934`).
+    pub hair_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
@@ -199,6 +202,7 @@ impl App {
             audio,
             room: None,
             actor_model: None,
+            hair_model: None,
             player_anim: None,
             dff: None,
             menu: menus::Menu::new(),
@@ -275,6 +279,8 @@ impl App {
         if app.actor_model.is_none() {
             log::warn!("clearsleeper: actor model unavailable");
         }
+        app.hair_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HAIR_ENTRY);
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -3207,11 +3213,16 @@ pub fn root_view(
             app.room.as_ref(),
             app.actor_model.as_ref(),
             app.player_anim.as_ref(),
+            app.hair_model.as_ref(),
         ),
     };
     let desc = match &app.dff {
         Some(_) => view::batch_desc(app.room.as_ref()),
-        None => view::batch_desc_with_actor(app.room.as_ref(), app.actor_model.as_ref()),
+        None => view::batch_desc_with_actor(
+            app.room.as_ref(),
+            app.actor_model.as_ref(),
+            app.hair_model.as_ref(),
+        ),
     };
     let cam = app.cam.clone();
     let viewport = Viewport3d(
