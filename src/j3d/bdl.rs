@@ -1234,7 +1234,12 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     let count = usize::from(read_u16(data, at(start, 8)?)?);
     let init_table = at(start, read_u32(data, at(start, 0x0C)?)? as usize)?;
     let index_table = at(start, read_u32(data, at(start, 0x10)?)? as usize)?;
-    let cull_table = at(start, read_u32(data, at(start, 0x1C)?)? as usize)?;
+    let cull_offset = read_u32(data, at(start, 0x1C)?)?;
+    let cull_table = if cull_offset == 0 {
+        None
+    } else {
+        Some(at(start, cull_offset as usize)?)
+    };
     let texno_table = at(start, read_u32(data, at(start, 0x48)?)? as usize)?;
     let color_chan_num = read_u32(data, at(start, 0x24)?)?;
     let color_chan_info = read_u32(data, at(start, 0x28)?)?;
@@ -1269,10 +1274,11 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
         }
         let lit = material_lit(data, start, end, init, color_chan_num, color_chan_info)?;
         let cull_index = block_byte(data, init, 1, end)?;
-        let cull = if cull_index == 0xFF {
-            0xFF
-        } else {
-            block_byte(data, cull_table, usize::from(cull_index), end)?
+        let cull = match cull_table {
+            Some(table) if cull_index != 0xFF => {
+                block_byte(data, table, usize::from(cull_index), end)?
+            }
+            _ => 0xFF,
         };
         let (coord, tex_gen) = material_coord(
             data,
