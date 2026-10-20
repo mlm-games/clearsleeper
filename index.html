@@ -87,8 +87,8 @@
       <p id="disc-hint">Drop a GameCube disc image to play: an ISO/GCM dump or an RVZ.</p>
       <label id="disc-pick">Choose a file<input id="disc-file" type="file" accept=".iso,.gcm,.rvz" /></label>
       <p id="disc-status" role="status"></p>
-      <p id="disc-note">The image is read in this tab. Nothing is uploaded. A full dump is over a
-        gigabyte, so a desktop browser is the realistic target.</p>
+      <p id="disc-note">The image is read in this tab and kept in this browser for next time.
+        Nothing is uploaded. Clear this site's data to choose a different image.</p>
     </div>
   </div>
 
@@ -115,7 +115,76 @@
       addEventListener("TrunkApplicationStarted", () => resolve(window.wasmBindings), { once: true });
     });
 
+    // A dropped image is kept here so a reload does not ask for the disc again. IndexedDB stores
+    // the File as a browser-managed blob, not a copy in the page's heap; the image is still read
+    // only by this origin and is never uploaded.
+    const DB_NAME = "clearsleeper";
+    const STORE = "disc";
+    const KEY = "image";
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains(STORE)) {
+            request.result.createObjectStore(STORE);
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function readCached() {
+      const db = await openDb();
+      try {
+        return await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readonly");
+          const request = tx.objectStore(STORE).get(KEY);
+          request.onsuccess = () => resolve(request.result ?? null);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    async function writeCached(blob) {
+      const db = await openDb();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(blob, KEY);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    async function clearCached() {
+      const db = await openDb();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).delete(KEY);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    const imageLimit = (bindings) =>
+      typeof bindings.discImageLimit === "function" ? bindings.discImageLimit() : Infinity;
+
+    const megabytes = (bytes) => (bytes / 1048576).toFixed(0);
+
     let installing = false;
+    let booted = false;
 
     // The Rust side reports a panic here before the wasm build aborts, so the status line keeps
     // the reason a bare trap would hide.
@@ -125,32 +194,9 @@
       say(text, "error");
     };
 
-    async function install(picked) {
-      if (installing) {
-        return;
-      }
-      installing = true;
+    async function startImage(bytes, label) {
       const bindings = await bindingsReady();
-      // A page the browser served from cache before this export existed reads as no limit.
-      const limit =
-        typeof bindings.discImageLimit === "function" ? bindings.discImageLimit() : Infinity;
-      if (picked.size > limit) {
-        const size = (picked.size / 1048576).toFixed(0);
-        const most = (limit / 1048576).toFixed(0);
-        say(`${picked.name} is ${size} MB; this build reads images up to ${most} MB`, "error");
-        installing = false;
-        return;
-      }
-      say(`Reading ${picked.name} (${(picked.size / 1048576).toFixed(0)} MB)…`);
-      let bytes;
-      try {
-        bytes = new Uint8Array(await picked.arrayBuffer());
-      } catch (error) {
-        say(`Could not read ${picked.name}: ${error}`, "error");
-        installing = false;
-        return;
-      }
-      say(`Checking ${picked.name}…`);
+      say(`Checking ${label}…`);
       let summary;
       panicReport = "";
       try {
@@ -158,20 +204,107 @@
       } catch (error) {
         // The Rust side answers with the typed failure for this image.
         say(panicReport || `${error}`, "error");
-        installing = false;
-        return;
+        return false;
       }
-      bytes = null;
       say(`Starting ClearSleeper on ${summary}…`);
       panicReport = "";
       try {
         bindings.boot();
       } catch (error) {
         say(`ClearSleeper failed to start: ${panicReport || error}`, "error");
-        installing = false;
+        return false;
+      }
+      booted = true;
+      drop.remove();
+      return true;
+    }
+
+    async function keepForNextVisit(picked) {
+      try {
+        if (navigator.storage && navigator.storage.persist) {
+          await navigator.storage.persist();
+        }
+        await writeCached(picked);
+      } catch (error) {
+        // A full disk or a browser without large IndexedDB blobs only costs the next upload.
+        console.warn("ClearSleeper: could not keep the disc image for next time", error);
+      }
+    }
+
+    async function install(picked) {
+      if (installing || booted) {
         return;
       }
-      drop.remove();
+      installing = true;
+      try {
+        const bindings = await bindingsReady();
+        const limit = imageLimit(bindings);
+        if (picked.size > limit) {
+          say(
+            `${picked.name} is ${megabytes(picked.size)} MB; this build reads images up to ` +
+              `${megabytes(limit)} MB`,
+            "error",
+          );
+          return;
+        }
+        say(`Reading ${picked.name} (${megabytes(picked.size)} MB)…`);
+        let bytes;
+        try {
+          bytes = new Uint8Array(await picked.arrayBuffer());
+        } catch (error) {
+          say(`Could not read ${picked.name}: ${error}`, "error");
+          return;
+        }
+        if (await startImage(bytes, picked.name)) {
+          keepForNextVisit(picked);
+        }
+      } finally {
+        installing = false;
+      }
+    }
+
+    async function restore() {
+      if (installing || booted) {
+        return;
+      }
+      installing = true;
+      try {
+        let cached;
+        try {
+          cached = await readCached();
+        } catch (error) {
+          console.warn("ClearSleeper: could not read the saved disc image", error);
+          return;
+        }
+        if (!cached) {
+          return;
+        }
+        const label = cached.name || "saved disc image";
+        const bindings = await bindingsReady();
+        const limit = imageLimit(bindings);
+        if (cached.size > limit) {
+          await clearCached();
+          say(`${label} is ${megabytes(cached.size)} MB; choose a smaller image`, "error");
+          return;
+        }
+        say(`Reading ${label} (${megabytes(cached.size)} MB)…`);
+        let bytes;
+        try {
+          bytes = new Uint8Array(await cached.arrayBuffer());
+        } catch (error) {
+          await clearCached();
+          say(`Could not read the saved image: ${error}. Choose the file again.`, "error");
+          return;
+        }
+        if (!(await startImage(bytes, label))) {
+          await clearCached();
+          say("The saved disc image could not be used. Choose the file again.", "error");
+        }
+      } finally {
+        if (!booted) {
+          installing = false;
+        }
+      }
     }
 
     addEventListener("dragenter", (event) => {
@@ -197,6 +330,8 @@
         install(picked);
       }
     });
+
+    restore();
   </script>
 </body>
 
