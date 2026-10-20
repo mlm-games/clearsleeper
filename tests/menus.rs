@@ -103,9 +103,6 @@ fn golden_file_select_starts_a_new_game() {
     app.set_save_dir(dir.clone());
     app.menu.screen = Screen::FileSelect;
     tap(&mut app, PhysicalKey::Space);
-    for _ in 0..5 {
-        app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
-    }
     assert_eq!(app.menu.screen, Screen::Playing);
     let written = save::read_slot_in(&dir, 0).expect("new game writes slot zero");
     assert_eq!(written.tick, 0);
@@ -113,6 +110,10 @@ fn golden_file_select_starts_a_new_game() {
     assert_eq!(written.health.units, 12);
     assert_eq!(written.health.max, 12);
     assert_eq!(app.save(), written);
+    for _ in 0..5 {
+        app.advance(Duration::from_secs_f64(1.0 / SIM_HZ));
+    }
+    assert_eq!(app.menu.screen, Screen::Playing);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

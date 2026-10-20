@@ -336,7 +336,14 @@ impl App {
     }
 
     pub fn set_save_dir(&mut self, dir: PathBuf) {
-        self.save_dir = dir;
+        self.save_dir = dir.clone();
+        self.menu.card.dir = dir.clone();
+        self.menu.slots = (0..SLOTS)
+            .map(|slot| match read_slot_in(&dir, slot) {
+                Some(saved) => crate::menus::SlotInfo::from_save(&saved),
+                None => crate::menus::SlotInfo::Empty,
+            })
+            .collect();
     }
 
     pub fn read_slot(&self, slot: usize) -> Option<SaveGame> {
