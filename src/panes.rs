@@ -11,7 +11,7 @@ use crate::text::font::{FontBank, ResFont};
 use crate::text::msgbox::TextBox;
 use crate::text::raster::Canvas;
 use crate::ui_file_select::{FileSelectPanes, SCREEN_ARCHIVE, SCREEN_LABEL};
-use crate::ui_menu_save::Pane;
+use crate::ui_menu_save::{Pane, SavePanes};
 
 const NESTED_ARCHIVE: &str = "dat/file_select.arc";
 const FONT_ARCHIVE: &str = "files/res/Msg/fontres.arc";
@@ -37,43 +37,87 @@ pub fn load() -> Option<&'static Assets> {
 
 fn build() -> Option<Assets> {
     let root = AssetRoot::from_env().ok()?;
-    let stage = root.read_archive(SCREEN_ARCHIVE).ok()?;
-    let nested = stage.read(NESTED_ARCHIVE).ok()?.to_vec();
-    let inner = Archive::parse(nested, PathBuf::from(NESTED_ARCHIVE)).ok()?;
-    let screen = crate::j2d::parse(inner.read(SCREEN_LABEL).ok()?)?;
-    let mut textures = HashMap::new();
-    for name in inner.entries() {
-        if !name.ends_with(".bti") {
-            continue;
-        }
-        let Some(bytes) = inner.read(name).ok() else {
-            continue;
-        };
-        if let Some(image) = bti::decode(bytes) {
-            textures.insert(name.to_string(), image);
+    Assets::load_from(&root, SCREEN_ARCHIVE, Some(NESTED_ARCHIVE), SCREEN_LABEL)
+}
+
+pub struct SaveAssets {
+    pub assets: Assets,
+}
+
+impl SaveAssets {
+    pub fn load(root: &AssetRoot) -> Option<Self> {
+        Assets::load_from(root, SCREEN_ARCHIVE, None, SCREEN_LABEL).map(|assets| Self { assets })
+    }
+
+    pub fn from_parts(screen: Screen, textures: HashMap<String, Image>) -> Self {
+        Self {
+            assets: Assets::from_parts(screen, textures),
         }
     }
-    let mut names = Vec::new();
-    let mut font_data = Vec::new();
-    for pane in &screen.panes {
-        let Some(name) = pane.font.as_deref() else {
-            continue;
+}
+
+impl Assets {
+    /// Load a top-level stage archive and, when the screen lives in a nested one,
+    /// that archive inside it. `file_select.blo` is under `dat/file_select.arc`
+    /// in `Stage.arc`; `menu_save.blo` and `gameover.blo` sit in their own archives.
+    pub fn load_from(
+        root: &AssetRoot,
+        archive: &str,
+        nested: Option<&str>,
+        label: &str,
+    ) -> Option<Assets> {
+        let stage = root.read_archive(archive).ok()?;
+        let inner = match nested {
+            Some(name) => {
+                let bytes = stage.read(name).ok()?.to_vec();
+                Archive::parse(bytes, PathBuf::from(name)).ok()?
+            }
+            None => stage,
         };
-        if names.iter().any(|entry| entry == name) {
-            continue;
+        let screen = crate::j2d::parse(inner.read(label).ok()?)?;
+        let mut textures = HashMap::new();
+        for name in inner.entries() {
+            if !name.ends_with(".bti") {
+                continue;
+            }
+            let Some(bytes) = inner.read(name).ok() else {
+                continue;
+            };
+            if let Some(image) = bti::decode(bytes) {
+                textures.insert(name.to_string(), image);
+            }
         }
-        let Some(bytes) = font_bytes(&root, &inner, name) else {
-            continue;
-        };
-        names.push(name.to_string());
-        font_data.push(bytes);
+        let mut names = Vec::new();
+        let mut font_data = Vec::new();
+        for pane in &screen.panes {
+            let Some(name) = pane.font.as_deref() else {
+                continue;
+            };
+            if names.iter().any(|entry| entry == name) {
+                continue;
+            }
+            let Some(bytes) = font_bytes(root, &inner, name) else {
+                continue;
+            };
+            names.push(name.to_string());
+            font_data.push(bytes);
+        }
+        Some(Assets {
+            screen,
+            textures,
+            names,
+            font_data,
+        })
     }
-    Some(Assets {
-        screen,
-        textures,
-        names,
-        font_data,
-    })
+
+    pub fn from_parts(screen: Screen, textures: HashMap<String, Image>) -> Assets {
+        Assets {
+            screen,
+            textures,
+            names: Vec::new(),
+            font_data: Vec::new(),
+        }
+    }
 }
 
 fn font_bytes(root: &AssetRoot, local: &Archive, name: &str) -> Option<Vec<u8>> {
@@ -131,7 +175,27 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
     // real one arrives via daCLOTH_ChildHIO_c, whose constructor is empty and
     // whose values come from HIO game data.
     canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [16, 18, 32, 255]);
-    let live = live_table(panes);
+    draw_screen_impl(canvas, assets, &live_table(panes), false);
+}
+
+pub fn draw_save_menu(canvas: &mut Canvas, panes: &SavePanes, assets: &SaveAssets) {
+    draw_screen_impl(canvas, &assets.assets, &save_live_table(panes), true);
+}
+
+/// The save and game over screens give `fopMsgM_setAlpha` a live `mNowAlpha`
+/// that is zero when hidden (`f_op_msg_mng.cpp:9900-9928`), while the file
+/// select's `parts_set` leaves zero meaning "not written yet" and falls back to
+/// the blo's alpha. `draw_screen` takes the live value unconditionally.
+pub fn draw_screen(canvas: &mut Canvas, assets: &Assets, live: &HashMap<&str, &Pane>) {
+    draw_screen_impl(canvas, assets, live, true);
+}
+
+fn draw_screen_impl(
+    canvas: &mut Canvas,
+    assets: &Assets,
+    live: &HashMap<&str, &Pane>,
+    zero_alpha_clear: bool,
+) {
     let nodes = &assets.screen.panes;
     let mut origin = vec![[0.0f32; 2]; nodes.len()];
     let mut shift = vec![[0.0f32; 2]; nodes.len()];
@@ -171,7 +235,7 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
                 parent_offset[0] + node.bounds.x + shift[index][0],
                 parent_offset[1] + node.bounds.y + shift[index][1],
             ];
-            alpha[index] = parent_alpha * own_alpha(node, pane);
+            alpha[index] = parent_alpha * own_alpha(node, pane, zero_alpha_clear);
             shown[index] = parent_shown && node.visible && own_visible(node, pane);
             let trace = std::env::var_os("FS_TRACE").is_some();
             let trace_slots = std::env::var_os("FS_SLOTS").is_some();
@@ -228,9 +292,9 @@ fn bound_to(pane: &Pane, node: &ScreenPane) -> bool {
         && pane.size_orig.y == node.bounds.h
 }
 
-fn own_alpha(node: &ScreenPane, pane: Option<&Pane>) -> f32 {
+fn own_alpha(node: &ScreenPane, pane: Option<&Pane>, zero_alpha_clear: bool) -> f32 {
     let value = match pane {
-        Some(entry) if entry.now_alpha != 0 => entry.now_alpha,
+        Some(entry) if zero_alpha_clear || entry.now_alpha != 0 => entry.now_alpha,
         Some(_) if node.kind == Kind::TextBox => return 0.0,
         _ => node.alpha,
     };
@@ -586,6 +650,24 @@ fn blit(
             canvas.blend(x, y, color, alpha);
         }
     }
+}
+
+fn save_live_table(panes: &SavePanes) -> HashMap<&'static str, &Pane> {
+    let mut table = HashMap::new();
+    for pane in &panes.wipe {
+        table.insert(pane.tag, pane);
+    }
+    table.insert(panes.mask.tag, &panes.mask);
+    for pane in &panes.base {
+        table.insert(pane.tag, pane);
+    }
+    table.insert(panes.title.tag, &panes.title);
+    table.insert(panes.title_label.tag, &panes.title_label);
+    table.insert(panes.cursor.tag, &panes.cursor);
+    for pane in panes.yes.iter().chain(panes.no.iter()) {
+        table.insert(pane.tag, pane);
+    }
+    table
 }
 
 fn live_table<'a>(panes: &'a FileSelectPanes) -> HashMap<&'static str, &'a Pane> {

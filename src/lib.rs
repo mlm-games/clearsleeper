@@ -27,6 +27,7 @@ pub mod config;
 pub mod dff;
 pub mod disc;
 pub mod dzs;
+pub mod game_over_screen;
 pub mod gx_decode;
 pub mod hud;
 pub mod input;
@@ -101,6 +102,8 @@ pub struct App {
     movie_done: bool,
     pub intro: Option<IntroStage>,
     title_stage: Option<TitleStage>,
+    game_over: Option<GameOverStage>,
+    game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
     dialogue_canvas: text::raster::Canvas,
@@ -126,6 +129,19 @@ pub struct IntroStage {
 struct TitleStage {
     assets: title_screen::TitleAssets,
     canvas: text::raster::Canvas,
+    image: Cell<Option<repose_core::ImageHandle>>,
+    uploaded: Cell<u64>,
+    revision: u64,
+}
+
+struct GameOverStage {
+    game: game_over_screen::GameOver,
+    assets: game_over_screen::GameOverAssets,
+    save_assets: panes::SaveAssets,
+    flags: ui_menu_save::MenuFlags,
+    system: ui_menu_save::SystemRequest,
+    particles: ui_menu_save::Particles,
+    fade: f32,
     image: Cell<Option<repose_core::ImageHandle>>,
     uploaded: Cell<u64>,
     revision: u64,
@@ -180,6 +196,8 @@ impl App {
             movie_done: false,
             intro: None,
             title_stage: None,
+            game_over: None,
+            game_over_failed: false,
             title_actor: None,
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
@@ -313,12 +331,18 @@ impl App {
             self.stage_target(false);
             self.stage_item(false);
             self.stage_use(false);
-            self.stage_pad_menu();
+            if self.menu.screen != menus::Screen::GameOver {
+                self.stage_pad_menu();
+            }
             if self.menu.screen == menus::Screen::Title && self.intro.is_none() {
                 self.stage_pad_title(held, window_focused);
             }
         }
         if self.intro.is_some() {
+            self.menu_prev.clone_from(held);
+            return;
+        }
+        if self.menu.screen == menus::Screen::GameOver && self.game_over.is_some() {
             self.menu_prev.clone_from(held);
             return;
         }
@@ -698,6 +722,112 @@ impl App {
             .get_resource_or_insert_with(sim::intent::PadButtons::default);
         pad.hold.a |= pressed;
         pad.trig.a |= pressed && !previous;
+    }
+
+    /// Load the game over sequence's assets: `Gover.arc` for the letters and
+    /// `saveres.arc` for the save screen, the two resources `dGameover_c::_create`
+    /// pulls (`d_gameover.cpp:68`, `:82`, `:84-92`). Without them the shell panel
+    /// (`menus::game_over_view`) stays in charge.
+    fn open_game_over(&mut self) -> bool {
+        if self.game_over.is_some() {
+            return true;
+        }
+        let Ok(root) = assets::AssetRoot::from_env() else {
+            return false;
+        };
+        let Some(assets) = game_over_screen::GameOverAssets::load(&root) else {
+            return false;
+        };
+        let Some(save_assets) = panes::SaveAssets::load(&root) else {
+            return false;
+        };
+        let mut game = game_over_screen::GameOver::default();
+        game.create(&assets.assets.screen);
+        game.create_save(save_assets.assets.screen.clone());
+        self.menu.card.dir = self.save_dir.clone();
+        self.menu.card.restore();
+        self.game_over = Some(GameOverStage {
+            game,
+            assets,
+            save_assets,
+            flags: ui_menu_save::MenuFlags::default(),
+            system: ui_menu_save::SystemRequest::default(),
+            particles: ui_menu_save::Particles::default(),
+            fade: 0.0,
+            image: Cell::new(None),
+            uploaded: Cell::new(0),
+            revision: 1,
+        });
+        true
+    }
+
+    /// One frame of `dGameover_c::_execute` (`d_gameover.cpp:109-166`), fed by
+    /// the pad the shell staged. The death fade is the player procedure's:
+    /// `m35A0` chases 0 by 0.01 a frame, the backdrop takes `1 - m35A0`, and
+    /// `animeStart` lands below 0.38 (`d_a_player_dproc.inc:1069-1085`).
+    fn step_game_over(&mut self) {
+        if self.menu.screen != menus::Screen::GameOver {
+            self.game_over = None;
+            return;
+        }
+        if self.game_over.is_none() && !self.game_over_failed && !self.open_game_over() {
+            self.game_over_failed = true;
+        }
+        let pad = {
+            let buttons = *self.sim.world.resource::<sim::intent::PadButtons>();
+            let stick = *self.sim.world.resource::<sim::intent::CStick>();
+            ui_menu_save::PadInput {
+                trig_a: buttons.trig.a,
+                trig_b: buttons.trig.b,
+                trig_x: buttons.trig.x,
+                trig_y: buttons.trig.y,
+                trig_z: buttons.trig.z,
+                trig_l: buttons.trig.l,
+                trig_r: buttons.trig.r,
+                trig_start: buttons.trig.start,
+                stick_value: stick.value(),
+                stick_angle: stick.angle,
+            }
+        };
+        let mut vibration = *self.sim.world.resource::<sim::vibration::Vibration>();
+        let mut health = *self.sim.world.resource::<sim::health::Health>();
+        let mut outcome = None;
+        if let Some(stage) = self.game_over.as_mut() {
+            stage.fade = (stage.fade + 0.01).min(1.0);
+            stage.game.letters.set_back_alpha(stage.fade);
+            if 1.0 - stage.fade < 0.38 {
+                stage.game.anime_start();
+            }
+            let life = u16::from(health.units);
+            let mut env = ui_menu_save::SaveEnv {
+                pad,
+                card: &mut self.menu.card,
+                menu: &mut stage.flags,
+                system: &mut stage.system,
+                particles: &mut stage.particles,
+                pending_save: None,
+                vibration: &mut vibration,
+                health: &mut health,
+                life_on_open: life,
+            };
+            outcome = stage.game.step(&mut env);
+            stage.revision = stage.revision.wrapping_add(1);
+        }
+        *self.sim.world.resource_mut::<sim::vibration::Vibration>() = vibration;
+        *self.sim.world.resource_mut::<sim::health::Health>() = health;
+        let Some(outcome) = outcome else {
+            return;
+        };
+        self.game_over = None;
+        let choice = match outcome {
+            game_over_screen::Outcome::Continue => sim::intent::GameOverChoice::Continue,
+            game_over_screen::Outcome::Title => sim::intent::GameOverChoice::Quit,
+        };
+        *self.sim.world.resource_mut::<sim::intent::GameOverChoice>() = choice;
+        self.menu.screen = match outcome {
+            game_over_screen::Outcome::Continue => menus::Screen::Playing,
+            game_over_screen::Outcome::Title => menus::Screen::Title,
+        };
     }
 
     pub fn health(&self) -> sim::health::Health {
@@ -2359,7 +2489,10 @@ impl App {
         if game_over && self.menu.screen == menus::Screen::Playing {
             self.menu.screen = menus::Screen::GameOver;
             self.menu.slot = 0;
+            self.game_over = None;
+            self.game_over_failed = false;
         }
+        self.step_game_over();
         self.apply_exit();
         self.sync_rooms();
         self.pump_dialogue();
@@ -2901,11 +3034,37 @@ pub fn root_view(
                 .child([title_movie(app, ctx), menus::title_view(&app.menu)])
         }
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
-        menus::Screen::GameOver => menus::game_over_view(&app.menu),
+        menus::Screen::GameOver => game_over_overlay(app, ctx),
         menus::Screen::Settings => menus::settings_view(&app.menu),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
     };
     ZStack(Modifier::new().fill_max_size()).child([viewport, overlay, dialogue_view(app, ctx)])
+}
+
+/// `dGameover_c::_draw` (`d_gameover.cpp:168-175`): the letters screen, then the
+/// save menu's `_draw2`, composited over the live view. `menus::game_over_view`
+/// is only the pre-boot fallback for sessions with no asset root.
+fn game_over_overlay(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.game_over.as_ref() else {
+        // No Gover/saveres (the pre-boot session): the shell panel stands in.
+        return menus::game_over_view(&app.menu);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        game_over_screen::render(&mut canvas, &stage.assets, &stage.game);
+        panes::draw_save_menu(&mut canvas, &stage.game.save.panes, &stage.save_assets);
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
 }
 
 fn intro_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
