@@ -19,7 +19,7 @@ pub fn file_select_rgba(frames: u32) -> anyhow::Result<Vec<u8>> {
 
     let mut settled = 0;
     while settled < frames {
-        menu.sync_file_select_cursor();
+        menu.tick_file_select();
         settled += 1;
     }
 

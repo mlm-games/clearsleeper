@@ -349,6 +349,16 @@ fn deg2s(deg: f32) -> i16 {
     (deg * 32768.0 / 180.0) as i16
 }
 
+/// `JUtility::TColor::toUInt32` (`TColor.h:20`) stores `{r, g, b, a}` as 0xAABBGGRR.
+fn color_from(value: u32) -> Color {
+    Color::new(
+        value as u8,
+        (value >> 8) as u8,
+        (value >> 16) as u8,
+        (value >> 24) as u8,
+    )
+}
+
 pub use crate::j2d::F2;
 
 #[derive(Clone, Debug)]
@@ -577,8 +587,8 @@ impl Pane {
 
     pub fn parts_set_file(&mut self, layout: &ScreenPane) {
         self.parts_set(layout);
-        self.black = Color::new(0x28, 0x6E, 0x1E, 0);
-        self.white = Color::new(0x8C, 0xB4, 0x50, 0xFF);
+        self.black = color_from(layout.color_black);
+        self.white = color_from(layout.color_white);
     }
 
     pub fn set_black_white(&mut self, black: Color, white: Color) {

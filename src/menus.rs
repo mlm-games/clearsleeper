@@ -81,6 +81,7 @@ pub struct Menu {
     pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
     pub uploaded: std::cell::Cell<u64>,
     pub revision: std::cell::Cell<u64>,
+    pub fs_open_done: Cell<bool>,
     pub title_click: Rc<Cell<Option<usize>>>,
 }
 
@@ -105,6 +106,7 @@ impl Menu {
             shot: std::cell::Cell::new(None),
             uploaded: std::cell::Cell::new(u64::MAX),
             revision: std::cell::Cell::new(0),
+            fs_open_done: Cell::new(false),
             title_click: Rc::new(Cell::new(None)),
         }
     }
@@ -121,14 +123,27 @@ impl Menu {
             self.card.slots[slot] = crate::save::read_slot_in(&self.card.dir, slot);
         }
         self.fs.set_save_data(&self.card);
+        self.fs.select_num = self.slot as u8;
+        self.fs_open_done.set(false);
     }
 
-    /// Follows the menu cursor so the highlighted slot matches the drawn pane,
-    /// and drives the slide-in transition that `create` left mid-flight.
+    /// Follows the menu cursor so the highlighted slot matches the drawn pane.
     pub fn sync_file_select_cursor(&mut self) {
         self.revision.set(self.revision.get().wrapping_add(1));
         self.fs.select_num = self.slot as u8;
-        self.fs.open();
+    }
+
+    /// `d_file_select.cpp` drives the opening through `open()`, one call per
+    /// frame. The port kept only the call made when the cursor moved, so the
+    /// panes froze at their off-screen starting positions.
+    pub fn tick_file_select(&mut self) -> bool {
+        if self.fs_open_done.get() {
+            return true;
+        }
+        let done = self.fs.open();
+        self.revision.set(self.revision.get().wrapping_add(1));
+        self.fs_open_done.set(done);
+        done
     }
 
     pub fn has_pending_click(&self) -> bool {

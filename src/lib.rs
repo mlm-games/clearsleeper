@@ -468,6 +468,7 @@ impl App {
     /// The ported menu state machine that drives the retail file select panes: choosing a slot
     /// loads its save or starts a new game.
     fn stage_file_select(&mut self, cmds: &[menus::Cmd]) {
+        self.menu.tick_file_select();
         if cmds.is_empty() && !self.menu.has_pending_click() {
             return;
         }
@@ -1214,9 +1215,8 @@ impl App {
         let water = self.sim.world.get_resource::<sim::water::Water>();
         let (ground_y, walls) = match collision {
             Some(collision) => {
-                let mut y = collision
-                    .ground_at(player_pos.x, player_pos.z)
-                    .unwrap_or(player_pos.y);
+                let mut y =
+                    sim::ground::surface(Some(collision), player_pos).unwrap_or(player_pos.y);
                 if let Some(water) = water.filter(|water| water.in_area) {
                     y = y.max(water.surface.min(player_pos.y));
                 }

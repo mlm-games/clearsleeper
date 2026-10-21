@@ -169,12 +169,11 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
     // The BACK pane binds `sky_cloth.bti`, which the retail game generates at
     // runtime: `dScnName_c::cloth_create` builds an 11x11 vertex grid from trig
     // (`d_menu_cloth.cpp:161`) and the J2D pane binds the mesh it registers. No
-    // such file exists on disc, so nothing here can supply it. Until that mesh
-    // is ported, paint the canvas opaque so the stage does not show through.
-    // The colour is a neutral placeholder, not a decomp-derived constant: the
-    // real one arrives via daCLOTH_ChildHIO_c, whose constructor is empty and
-    // whose values come from HIO game data.
-    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [16, 18, 32, 255]);
+    // such file exists on disc, so nothing here can supply it. The cloth the
+    // file select hangs is the `MENU_CLOTH_TYPE_FILE_SELECT` one, whose colour
+    // `d_menu_cloth.cpp:66` gives, and the backdrop is that colour until the
+    // cloth's own wave mesh is ported.
+    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [0xBE, 0xB4, 0x64, 0xFF]);
     draw_screen_impl(canvas, assets, &live_table(panes), false);
 }
 
@@ -320,7 +319,17 @@ fn draw_picture(
         return;
     };
     let rotation = pane.map_or(node.rotation, |p| p.rotation);
-    draw_picture_image(canvas, image, node, rect, rotation, alpha);
+    let (black, white) = match pane {
+        Some(pane) => (
+            [pane.black.r, pane.black.g, pane.black.b, pane.black.a],
+            [pane.white.r, pane.white.g, pane.white.b, pane.white.a],
+        ),
+        None => (
+            unpack_color(node.color_black),
+            unpack_color(node.color_white),
+        ),
+    };
+    draw_picture_image_tinted(canvas, image, node, rect, rotation, alpha, black, white);
 }
 
 /// One `J2DPicture` draw: [`blit`] with the pane's uv window and corner tint.
@@ -343,6 +352,8 @@ pub fn blit_texture(
         [tint; 4],
         opacity,
         [0.0, 0.0, 1.0, 1.0],
+        [0, 0, 0, 255],
+        [255, 255, 255, 255],
     );
 }
 
@@ -354,6 +365,31 @@ pub fn draw_picture_image(
     rotation: u16,
     alpha: f32,
 ) {
+    draw_picture_image_tinted(
+        canvas,
+        image,
+        node,
+        rect,
+        rotation,
+        alpha,
+        unpack_color(node.color_black),
+        unpack_color(node.color_white),
+    );
+}
+
+/// `J2DPicture::setBlackWhite` (`d_file_select.cpp:554` and `d_file_select.cpp:1709`) gives a
+/// picture its two colours, and `J2DPicture::setTevMode` (`J2DPicture.cpp:522`) turns an
+/// intensity texture into the ramp between them. The corner colours stay the vertex colours.
+pub fn draw_picture_image_tinted(
+    canvas: &mut Canvas,
+    image: &Image,
+    node: &ScreenPane,
+    rect: [f32; 4],
+    rotation: u16,
+    alpha: f32,
+    black: [u8; 4],
+    white: [u8; 4],
+) {
     let uv = tex_coord(node.pic_binding, node.pic_mirror, rect, image);
     blit(
         canvas,
@@ -363,6 +399,8 @@ pub fn draw_picture_image(
         node.corner_color.map(unpack_color),
         alpha,
         uv,
+        black,
+        white,
     );
 }
 
@@ -582,12 +620,14 @@ fn draw_text(
     }
 }
 
+/// `JUtility::TColor::toUInt32` (`TColor.h:20`) is the little-endian word of the
+/// `{r, g, b, a}` bytes, so a stored colour reads back as 0xAABBGGRR.
 fn unpack_color(value: u32) -> [u8; 4] {
     [
-        (value >> 24) as u8,
-        (value >> 16) as u8,
-        (value >> 8) as u8,
         value as u8,
+        (value >> 8) as u8,
+        (value >> 16) as u8,
+        (value >> 24) as u8,
     ]
 }
 
@@ -612,6 +652,8 @@ fn blit(
     tint: [[u8; 4]; 4],
     opacity: f32,
     uv: [f32; 4],
+    black: [u8; 4],
+    white: [u8; 4],
 ) {
     let opacity = opacity.clamp(0.0, 1.0);
     if opacity <= 0.0 || rect[2] <= 0.0 || rect[3] <= 0.0 {
@@ -663,7 +705,11 @@ fn blit(
             }
             let mut color = [0u8; 4];
             for channel in 0..3 {
-                color[channel] = (texel[channel] * shade[channel] / 255.0).round() as u8;
+                let tex = f32::from(texel[channel]);
+                let mix = tex / 255.0;
+                let base = f32::from(black[channel])
+                    + (f32::from(white[channel]) - f32::from(black[channel])) * mix;
+                color[channel] = (base * shade[channel] / 255.0).round().clamp(0.0, 255.0) as u8;
             }
             color[3] = 255;
             canvas.blend(x, y, color, alpha);
