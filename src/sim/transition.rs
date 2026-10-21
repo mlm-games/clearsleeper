@@ -1,7 +1,8 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use super::collision::{Collision, NO_EXIT};
-use super::ground::grounded;
+use super::ground::{GROUND_PROBE, grounded};
 use super::health::Health;
 use super::player::Player;
 
@@ -107,7 +108,7 @@ pub fn check(
             next.exit = None;
             continue;
         }
-        next.exit = match collision.exit_at(player.pos.x, player.pos.z) {
+        next.exit = match collision.exit_below(player.pos + Vec3::Y * GROUND_PROBE) {
             Some(exit) if exit != NO_EXIT => Some(exit),
             _ => None,
         };

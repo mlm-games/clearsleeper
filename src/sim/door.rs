@@ -1,9 +1,12 @@
 use bevy_ecs::prelude::*;
+use glam::Vec3;
 
 use super::actor::Actor;
 use super::combat::HitPoints;
 use super::enemy::Enemy;
 use super::flags::Switches;
+use super::player::Player;
+use super::walk::to_s16;
 
 /// Stage strings for `fpcNm_DOOR10_e` (`daDoor10_c`, `d_a_door10.cpp:894`). `d_stage.cpp:451-457`
 /// is the proof: every one of these seven names is registered against DOOR10, NOT DOOR12. They
@@ -48,14 +51,14 @@ pub const KEY_DOOR_ACTORS: [&str; 5] = [
 ];
 
 pub const ROCK_BARS: usize = 3; // <- d_a_kddoor.cpp:196 (dDoor_ssk_c::init, `for i < 3`)
-pub const ROCK_RISE_STEP: f32 = 0.25; // <- d_a_kddoor.cpp:398 (cLib_addCalc0 scale)
-pub const ROCK_RISE_MIN: f32 = 0.3; // <- d_a_kddoor.cpp:398 (maxStep)
-pub const ROCK_DUST_STEP: f32 = 0.5; // <- d_a_kddoor.cpp:408 (cLib_addCalc0 scale)
-pub const ROCK_DUST_MIN: f32 = 0.3; // <- d_a_kddoor.cpp:408 (maxStep)
-pub const ROCK_FALL_STEP: f32 = 0.3; // <- d_a_kddoor.cpp:462 (cLib_addCalc2 scale)
-pub const ROCK_FALL_MIN: f32 = 0.3; // <- d_a_kddoor.cpp:462 (maxStep)
-pub const ROCK_OPEN_GATE: f32 = 0.1; // <- d_a_kddoor.cpp:393, :407 (openProc `> 0.1f`)
-pub const ROCK_CLOSE_GATE: f32 = 0.9; // <- d_a_kddoor.cpp:438, :461 (closeProc `< 0.9f`)
+pub const ROCK_RISE_SCALE: f32 = 0.25; // <- d_a_kddoor.cpp:393 (cLib_addCalc0 scale)
+pub const ROCK_RISE_MAX: f32 = 0.3; // <- d_a_kddoor.cpp:393 (cLib_addCalc0 maxStep)
+pub const ROCK_DUST_SCALE: f32 = 0.5; // <- d_a_kddoor.cpp:401 (cLib_addCalc0 scale)
+pub const ROCK_DUST_MAX: f32 = 0.3; // <- d_a_kddoor.cpp:401 (cLib_addCalc0 maxStep)
+pub const ROCK_FALL_SCALE: f32 = 0.3; // <- d_a_kddoor.cpp:451 (cLib_addCalc2 scale)
+pub const ROCK_FALL_MAX: f32 = 0.3; // <- d_a_kddoor.cpp:451 (cLib_addCalc2 maxStep)
+pub const ROCK_OPEN_GATE: f32 = 0.1; // <- d_a_kddoor.cpp:388, :400 (openProc `> 0.1f`)
+pub const ROCK_CLOSE_GATE: f32 = 0.9; // <- d_a_kddoor.cpp:429, :450 (closeProc `< 0.9f`)
 
 pub const NO_SWITCH: u8 = 0xFF; // <- d_a_door12.cpp:61, :92 (the `0xFF` "no switch" arm)
 pub const BOSS_SWITCH_FLOOR: u8 = 0x80; // <- d_a_door12.cpp:66 (`getSwbit() >= 0x80`)
@@ -323,9 +326,21 @@ impl Door {
         }
     }
 
-    pub fn facing(&self, stay: i8) -> u8 {
+    /// `dDoor_info_c::frontCheck`, `d_door.cpp:104-111`: which side of the door the player is
+    /// on. A door whose two rooms are the same has no room to compare, and the reference asks
+    /// the angle instead, `dDoor_info_c::frontCheckOld` (`d_door.cpp:87-101`): the player is in
+    /// front while the turn from the door's own facing to the direction of the player is under
+    /// `0x4000`.
+    pub fn facing(&self, stay: i8, player: Option<Vec3>, door: Vec3, angle: i16) -> u8 {
         if self.front_room == self.back_room {
-            return self.front_check;
+            let Some(player) = player else {
+                return self.front_check;
+            };
+            let delta = player - door;
+            let turn = to_s16(delta.x.atan2(delta.z))
+                .wrapping_sub(angle)
+                .unsigned_abs();
+            return u8::from(turn >= 0x4000);
         }
         match stay {
             room if room == i16::from(self.front_room) as i8 => 0,
@@ -417,7 +432,15 @@ impl Door {
         if self.kind_bits == self.bare_type() {
             return false;
         }
-        if self.front_check == 0 && self.kind_bits == LATCH_FRONT {
+        // `daDoor10_c::chkStopClose` (`d_a_door10.cpp:198-210`) and `daDoor12_c::chkStopClose`
+        // (`d_a_door12.cpp:207-216`) refuse the front arm's type 2; the shutter alone also
+        // refuses the back arm's type 5. `daKddoor_c::chkStopClose` (`d_a_kddoor.cpp:177-188`)
+        // refuses neither - its front arm refuses the feeler types, which `feeler` covers.
+        if self.front_check == 0 {
+            if self.kind != Kind::Key && self.kind_bits == LATCH_FRONT {
+                return false;
+            }
+        } else if self.kind == Kind::Shutter && self.kind_bits == LATCH_BACK {
             return false;
         }
         let bit = self.bit();
@@ -442,15 +465,17 @@ impl Door {
 pub fn control(
     stay: Res<StayRoom>,
     mut switches: ResMut<Switches>,
-    mut doors: Query<(Entity, &mut Door)>,
+    mut doors: Query<(Entity, &mut Door, &Actor)>,
     actors: Query<(&Actor, Option<&HitPoints>)>,
+    players: Query<&Player>,
     mut cuts: Query<&mut DoorCut>,
     mut flags: ResMut<super::flags::EventFlags>,
 ) {
     let room = stay.0;
-    for (entity, mut door) in &mut doors {
+    let player = players.iter().next().map(|player| player.pos);
+    for (entity, mut door, actor) in &mut doors {
         door.set_key(&switches);
-        door.front_check = door.facing(room);
+        door.front_check = door.facing(room, player, actor.pos, actor.angle[1]);
         door.barrier = door.barrier_value(room >= 0, &switches);
         if let Ok(mut cut) = cuts.get_mut(entity) {
             drive_cut(&mut *door, &mut cut, &mut switches, &mut flags);
@@ -508,7 +533,7 @@ fn drive_cut(
         }
         match door.kind {
             Kind::Slide => door.slide >= open,
-            Kind::Key => door.rock[0] <= 0.0,
+            Kind::Key => door.rock[0] <= ROCK_OPEN_GATE,
             Kind::Shutter => door.bars_y >= BAR_HEIGHT,
         }
     } else {
@@ -521,7 +546,7 @@ fn drive_cut(
         }
         match door.kind {
             Kind::Slide => door.slide <= 0.0,
-            Kind::Key => door.rock[0] >= 1.0,
+            Kind::Key => door.rock[0] >= ROCK_CLOSE_GATE,
             Kind::Shutter => door.bars_y <= 0.0,
         }
     };
@@ -575,31 +600,30 @@ fn rocks(door: &mut Door) {
             continue;
         }
         if opening {
-            add_zero(&mut door.rock[bar], ROCK_RISE_STEP, ROCK_RISE_MIN);
-            add_zero(&mut door.dust[bar], ROCK_DUST_STEP, ROCK_DUST_MIN);
+            add_zero(&mut door.rock[bar], ROCK_RISE_SCALE, ROCK_RISE_MAX);
+            add_zero(&mut door.dust[bar], ROCK_DUST_SCALE, ROCK_DUST_MAX);
         } else {
-            add_target(&mut door.dust[bar], 1.0, ROCK_DUST_STEP, ROCK_DUST_MIN);
-            add_target(&mut door.rock[bar], 1.0, ROCK_FALL_STEP, ROCK_FALL_MIN);
+            add_target(&mut door.dust[bar], 1.0, ROCK_DUST_SCALE, ROCK_DUST_MAX);
+            add_target(&mut door.rock[bar], 1.0, ROCK_FALL_SCALE, ROCK_FALL_MAX);
         }
     }
 }
 
-fn add_zero(current: &mut f32, max_step: f32, min_step: f32) {
-    let gap = current.abs();
-    if gap <= min_step {
-        *current = 0.0;
-        return;
-    }
-    *current -= current.signum() * max_step.min(gap);
+/// `cLib_addCalc0`, `c_lib.cpp:69-77`: the value walks toward zero by `value * scale`, the
+/// step clamped to `max_step`.
+fn add_zero(current: &mut f32, scale: f32, max_step: f32) {
+    let step = ((*current) * scale).clamp(-max_step, max_step);
+    *current -= step;
 }
 
-fn add_target(current: &mut f32, target: f32, max_step: f32, min_step: f32) {
-    let gap = target - *current;
-    if gap.abs() <= min_step {
-        *current = target;
+/// `cLib_addCalc2`, `c_lib.cpp:56-66`: the value walks toward `target` by
+/// `scale * (target - value)`, the step clamped to `max_step`.
+fn add_target(current: &mut f32, target: f32, scale: f32, max_step: f32) {
+    if *current == target {
         return;
     }
-    *current += gap.signum() * max_step.min(gap.abs());
+    let step = (scale * (target - *current)).clamp(-max_step, max_step);
+    *current += step;
 }
 
 fn chase(current: &mut f32, target: f32, step: f32) -> bool {

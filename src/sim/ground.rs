@@ -4,7 +4,10 @@ use glam::Vec3;
 use super::collision::Collision;
 use super::player::Player;
 
-const GROUND_PROBE: f32 = 20.0;
+/// How far above the actor's feet the ground check looks. `dBgS_Acch::GroundCheck`
+/// (`d_bg_s_acch.cpp:157`) probes at `m_ground_check_offset - m_ground_up_h` above the position it
+/// was given; an accessor that never changes either carries `60` (`d_bg_s_acch.cpp:93`).
+pub const GROUND_PROBE: f32 = 20.0;
 
 fn floor_below(collision: &Collision, pos: Vec3) -> Option<f32> {
     collision

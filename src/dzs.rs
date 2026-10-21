@@ -393,6 +393,11 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_actors(data, count, offset, NO_ROOM, false)?,
         None => Vec::new(),
     };
+    // `dStage_dt_c_stageLoader`'s `TGOB` row, `d_stage.cpp:2161`: the stage file's own actors
+    // chunk, read through `dStage_actorInit` like `ACTR`.
+    if let Some((count, offset)) = locate(b"TGOB") {
+        actors.extend(parse_actors(data, count, offset, NO_ROOM, false)?);
+    }
     for tag in [b"TGSC", b"SCOB", b"DOOR", b"TGDR"] {
         if let Some((count, offset)) = locate(tag) {
             actors.extend(parse_actors(data, count, offset, NO_ROOM, true)?);
@@ -664,10 +669,13 @@ fn parse_actors(
             set_id: read_u16(data, at + 0x1E)?,
             room,
             scale: if scaled {
+                // `fopAc_ac_c::create`'s scale, `f_op_actor.cpp:278`:
+                // `actor->scale.set(prm->scale.x * 0.1f, ...)`, so the table's byte is a tenth
+                // of the actor's scale.
                 [
-                    f32::from(data[at + 0x20]) * 0.01,
-                    f32::from(data[at + 0x21]) * 0.01,
-                    f32::from(data[at + 0x22]) * 0.01,
+                    f32::from(data[at + 0x20]) * 0.1,
+                    f32::from(data[at + 0x21]) * 0.1,
+                    f32::from(data[at + 0x22]) * 0.1,
                 ]
             } else {
                 [1.0, 1.0, 1.0]

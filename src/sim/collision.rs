@@ -15,6 +15,11 @@ const TREE_STRIDE: usize = 0x14;
 const GROUP_STRIDE: usize = 0x34;
 const INFO_STRIDE: usize = 16;
 const GROUND_NY: f32 = 0.5;
+/// `cBgW::RwgGroundCheckWall`, `c_bg_w.cpp:505`: the wall list's own floor. `cBgS::GroundCross`
+/// (`c_bg_s.cpp:130-144`) reads the ground list and the wall list of every block
+/// (`c_bg_w.cpp:519-522`), and the wall list keeps the faces this level or steeper, so a slope
+/// past 60 degrees still carries the player.
+const GROUND_WALL_NY: f32 = 0.014;
 const ROOF_NY: f32 = -0.8;
 const ACTOR_HEIGHT: f32 = 60.0;
 const PLANE_MIN_MAGNITUDE: f32 = 0.02;
@@ -376,9 +381,10 @@ fn crosses(from: Vec3, to: Vec3, p: Vec3, q: Vec3) -> bool {
     u >= 0.0 && u <= 1.0
 }
 
-/// `cM3d_Cross_LinTri`, called from `cBgW::RwgLineCheck` at `c_bg_w.cpp:385` with both
-/// sidedness flags clear, so the segment meets a triangle from either side. The parameter along
-/// `dir` at which that happens, and `None` when the segment misses or lies in the triangle.
+/// `cM3d_Cross_LinTri`, called from `cBgW::RwgLineCheck` at `c_bg_w.cpp:385`: the segment meets
+/// a triangle where the barycentric coordinates say so. The parameter along `dir` at which that
+/// happens, and `None` when the segment misses or lies in the triangle. Which side of the face
+/// the segment comes from is the caller's business, `cM3d_Cross_LinPla` at `c_m3d.cpp:249`.
 fn segment_triangle(from: Vec3, dir: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<f32> {
     let edge1 = b - a;
     let edge2 = c - a;
@@ -656,11 +662,16 @@ impl Collision {
     /// passes through the point and whose height is under `top`. The reference's ground check
     /// takes its ceiling from the point it was handed, `main.cpp:4629` and `main.cpp:4731`, while
     /// the ground the player stands on is asked for with no ceiling at all.
-    fn ground_hit_below(&self, x: f32, top: f32, z: f32) -> Option<(f32, usize)> {
+    ///
+    /// `min_ny` is the classification the reference's own query applies to a face: the ground
+    /// list is the faces at `cBgW_CheckBGround` (`c_bg_w.h:276`) and steeper, and the wall list
+    /// the faces between the roof and the ground, of which `cBgW::RwgGroundCheckWall`
+    /// (`c_bg_w.cpp:505`) keeps the ones at `0.014f` and steeper.
+    fn ground_hit_filtered(&self, x: f32, top: f32, z: f32, min_ny: f32) -> Option<(f32, usize)> {
         let mut highest: Option<(f32, usize)> = None;
         for (index, tri) in self.tris.iter().enumerate() {
             let surface = self.planes[index];
-            if surface.normal.y < GROUND_NY {
+            if surface.normal.y < min_ny {
                 continue;
             }
             let [a, b, c] = self.corners(tri);
@@ -682,8 +693,17 @@ impl Collision {
         highest
     }
 
+    /// `dBgS::GroundCross`, `c_bg_s.cpp:130-144`, as `cBgW::RwgGroundCheckCommon` at
+    /// `c_bg_w.cpp:470` runs it: the ground list and the wall list of every block, the highest
+    /// of them under the ceiling.
+    fn ground_hit_below(&self, x: f32, top: f32, z: f32) -> Option<(f32, usize)> {
+        self.ground_hit_filtered(x, top, z, GROUND_WALL_NY)
+    }
+
+    /// The floor under a point, which is the ground list alone: `cBgW_CheckBGround`,
+    /// `c_bg_w.h:276`.
     fn ground_hit(&self, x: f32, z: f32) -> Option<(f32, usize)> {
-        self.ground_hit_below(x, f32::INFINITY, z)
+        self.ground_hit_filtered(x, f32::INFINITY, z, GROUND_NY)
     }
 
     pub fn ground_at(&self, x: f32, z: f32) -> Option<f32> {
@@ -695,8 +715,18 @@ impl Collision {
             .map(|(_, index)| self.planes[index].normal)
     }
 
+    /// The exit id of the floor under a point.
     pub fn exit_at(&self, x: f32, z: f32) -> Option<u8> {
         let (_, index) = self.ground_hit(x, z)?;
+        self.codes.get(index).map(|codes| codes.exit)
+    }
+
+    /// `dBgS::GetExitId`, `bg_s.cpp:107`, on the polygon the ground check settles on: the fall
+    /// checker reads it off `mAcch.m_gnd` (`main.cpp:10756`), the very triangle the player's own
+    /// ground check found, so the exit belongs to the ground the player is on and not to the
+    /// highest surface above it. `pos` is the ceiling the ground check is handed.
+    pub fn exit_below(&self, pos: Vec3) -> Option<u8> {
+        let (_, index) = self.ground_hit_below(pos.x, pos.y, pos.z)?;
         self.codes.get(index).map(|codes| codes.exit)
     }
 
@@ -788,11 +818,15 @@ impl Collision {
         self.tris.get(tri).map(|corners| self.corners(corners))
     }
 
-    /// `dBgS::LineCross`, `bg_s.h:117`, as `cBgW::RwgLineCheck` runs it at `c_bg_w.cpp:385` with
-    /// both sidedness flags clear, so the segment meets a triangle from either side: the nearest
-    /// triangle `from` to `to` runs into, and where. `cBgW_LinChk::SetEnd` writes the cross back
-    /// onto the line, so each further triangle is only offered what is still ahead of it and the
-    /// hit that survives is the nearest one.
+    /// `dBgS::LineCross`, `bg_s.h:117`, as `cBgW::RwgLineCheck` runs it at `c_bg_w.cpp:385`:
+    /// the nearest triangle `from` to `to` runs into, and where. `cBgW_LinChk::SetEnd` writes the
+    /// cross back onto the line, so each further triangle is only offered what is still ahead of it
+    /// and the hit that survives is the nearest one.
+    ///
+    /// `cM3d_Cross_LinPla`, `c_m3d.cpp:249-267`, only counts a segment that runs from a face's
+    /// front side to its back side: the line check is built with its front flag on and its back
+    /// flag off (`c_bg_s_lin_chk.cpp:9`), so a segment that meets the face from behind passes
+    /// through it.
     ///
     /// `dBgS::LineCrossNonMoveBG` at `bg_s.cpp:309` is the same test with the moving rooms left
     /// out. A [`Collision`] holds the static rooms of one room set, so there is nothing to
@@ -801,6 +835,10 @@ impl Collision {
         let dir = to - from;
         let mut nearest: Option<(f32, usize)> = None;
         for (index, tri) in self.tris.iter().enumerate() {
+            let surface = self.planes[index];
+            if signed_len(surface, from) < 0.0 || signed_len(surface, to) > 0.0 {
+                continue;
+            }
             let [a, b, c] = self.corners(tri);
             let Some(t) = segment_triangle(from, dir, a, b, c) else {
                 continue;
@@ -856,11 +894,15 @@ impl Collision {
     /// `dBgS::RoofChk`, `bg_s.h:119`, as `dBgW::RwgRoofChk` at `d_bg_w.cpp:432` runs it: the
     /// lowest surface above `pos`. `main.cpp:4703`, `crawl.inc:311` and `climb.inc:176` all take
     /// the answer back as a height and subtract the player's own feet from it.
+    ///
+    /// The roof is the roof list of the block, `dBgW::ClassifyPlane` at `c_bg_w.cpp:178-180`:
+    /// the faces `cBgW_CheckBRoof` (`c_bg_w.h:280`) calls a roof, which point downwards. A face
+    /// that points up is a ground, and the room's own floor is never a roof.
     pub fn roof_chk(&self, pos: Vec3) -> Option<RoofHit> {
         let mut lowest: Option<(f32, usize)> = None;
         for (index, tri) in self.tris.iter().enumerate() {
             let surface = self.planes[index];
-            if surface.normal.y.abs() < DET_EPSILON {
+            if surface.normal.y >= ROOF_NY {
                 continue;
             }
             let [a, b, c] = self.corners(tri);
@@ -1118,8 +1160,8 @@ impl Collision {
                     );
                     if let Some(ground) = self.ground_cross_below(probe_point) {
                         if ground.height >= probe.pos.y && ground.normal.y >= GROUND_NY {
-                            let across = Vec3::new(face.normal.z, face.normal.y, face.normal.x)
-                                .normalize_or_zero();
+                            let across =
+                                Vec3::new(face.normal.z, 0.0, face.normal.x).normalize_or_zero();
                             let slice = Plane {
                                 normal: across,
                                 d: -(across.x * ledge.x + across.z * ledge.z),
