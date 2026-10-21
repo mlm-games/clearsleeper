@@ -46,7 +46,7 @@ const MAX_FALL_SPEED: f32 = -100.0;
 const UNITS_PER_RAD: f32 = 65536.0 / TAU;
 pub(crate) const RAD_PER_UNIT: f32 = TAU / 65536.0;
 
-pub(super) fn to_s16(radians: f32) -> i16 {
+pub(crate) fn to_s16(radians: f32) -> i16 {
     (radians * UNITS_PER_RAD).round().rem_euclid(65536.0) as i32 as i16
 }
 

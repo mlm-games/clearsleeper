@@ -530,13 +530,20 @@ impl App {
         } else {
             Vec::new()
         };
+        let file_select_pad = if self.menu.screen == menus::Screen::FileSelect
+            && self.intro.is_none()
+        {
+            Some(self.file_select_pad(held, &self.menu_prev, window_focused))
+        } else {
+            None
+        };
         self.menu_prev.clone_from(held);
         if !self.assets_installed {
             self.stage_host_screens(&cmds);
             return;
         }
         match self.menu.screen {
-            menus::Screen::FileSelect => self.stage_file_select(&cmds),
+            menus::Screen::FileSelect => self.stage_file_select(file_select_pad),
             menus::Screen::Settings | menus::Screen::QuitConfirm => {
                 // Only the pre-boot shell enters these; return to the retail title instead of
                 // drawing the shell over a session that has the disc.
@@ -570,16 +577,57 @@ impl App {
 
     /// The ported menu state machine that drives the retail file select panes: choosing a slot
     /// loads its save or starts a new game.
-    fn stage_file_select(&mut self, cmds: &[menus::Cmd]) {
+    /// The retail file select is a pad-driven state machine (`d_file_select.cpp`), so the
+    /// shell's keys are folded into the pad it reads: Space and Enter are A, Escape is B and
+    /// the main stick is the cursor.
+    fn file_select_pad(
+        &self,
+        held: &HashSet<PhysicalKey>,
+        previous: &HashSet<PhysicalKey>,
+        window_focused: bool,
+    ) -> crate::ui_file_select::PadInput {
+        let buttons = *self.sim.world.resource::<sim::intent::PadButtons>();
+        let axis = self.sim.world.resource::<sim::intent::MoveIntent>().axis;
+        let down = |key: PhysicalKey| window_focused && held.contains(&key);
+        let pressed = |key: PhysicalKey| down(key) && !previous.contains(&key);
+        let confirm = pressed(PhysicalKey::Space) || pressed(PhysicalKey::Enter);
+        let cancel = pressed(PhysicalKey::Escape);
+        let save_pad = ui_menu_save::PadInput {
+            trig_a: confirm || buttons.trig.a,
+            trig_b: cancel || buttons.trig.b,
+            trig_x: buttons.trig.x,
+            trig_y: buttons.trig.y,
+            trig_z: buttons.trig.z,
+            trig_l: buttons.trig.l,
+            trig_r: buttons.trig.r,
+            trig_start: buttons.trig.start,
+            stick_value: axis.length(),
+            stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
+        };
+        let mut pad = crate::ui_file_select::PadInput::from(&save_pad);
+        pad.hold_a = down(PhysicalKey::Space) || down(PhysicalKey::Enter) || buttons.hold.a;
+        pad.hold_b = down(PhysicalKey::Escape) || buttons.hold.b;
+        pad
+    }
+
+    /// One frame of the retail file select: the ported state machine (`d_file_select.cpp`)
+    /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
+    /// save.
+    fn stage_file_select(&mut self, pad: Option<crate::ui_file_select::PadInput>) {
         self.menu.tick_file_select();
-        if cmds.is_empty() && !self.menu.has_pending_click() {
+        if let Some(pad) = pad {
+            let menus::Menu { fs, card, .. } = &mut self.menu;
+            fs.move_step(&pad, card, None);
+        }
+        if let Some(slot) = self.menu.fs.slot_picked.take() {
+            let action = self.menu.file_select_pick(slot);
+            self.apply_menu_action(Some(action));
             return;
         }
-        let action = self.menu.step(cmds);
-        if self.menu.screen == menus::Screen::FileSelect {
-            self.menu.sync_file_select_cursor();
+        if self.menu.fs.is_select_end() == crate::ui_file_select::SELECT_END_RETURN {
+            self.menu.screen = menus::Screen::Title;
         }
-        self.apply_menu_action(action);
+        self.menu.revision.set(self.menu.revision.get().wrapping_add(1));
     }
 
     fn apply_menu_action(&mut self, action: Option<menus::Action>) {
@@ -1041,6 +1089,9 @@ impl App {
         };
         let mut vibration = *self.sim.world.resource::<sim::vibration::Vibration>();
         let mut health = *self.sim.world.resource::<sim::health::Health>();
+        // The save the game-over screen writes is the state at the death, not the save the
+        // session loaded (`d_gameover.cpp:109-166` writes the current state).
+        let pending_save = Some(self.save());
         let mut outcome = None;
         if let Some(stage) = self.game_over.as_mut() {
             stage.fade = (stage.fade + 0.01).min(1.0);
@@ -1055,7 +1106,7 @@ impl App {
                 menu: &mut stage.flags,
                 system: &mut stage.system,
                 particles: &mut stage.particles,
-                pending_save: None,
+                pending_save,
                 vibration: &mut vibration,
                 health: &mut health,
                 life_on_open: life,

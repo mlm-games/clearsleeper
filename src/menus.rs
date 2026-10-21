@@ -200,34 +200,29 @@ impl Menu {
                     self.screen = Screen::Title;
                 }
                 (Screen::QuitConfirm, Cmd::Back) => self.screen = Screen::Title,
-                (Screen::FileSelect, Cmd::Up) => self.slot = self.slot.saturating_sub(1),
-                (Screen::FileSelect, Cmd::Down) => {
-                    self.slot = (self.slot + 1).min(SLOTS - 1);
-                }
-                (Screen::FileSelect, Cmd::Confirm) => {
-                    let slot = self.slot;
-                    // `menuSelect`, `d_file_select.cpp:904`: the slot the
-                    // player picked is the one the game saves into.
-                    self.card.set_data_num(slot as u8);
-                    return Some(match self.slots.get(slot) {
-                        Some(SlotInfo::File { .. }) => Action::Load(slot),
-                        _ => {
-                            // A slot with no file holds the card's init data
-                            // (`dComIfGs_setInitDataToCard`, `d_menu_save.cpp:840`),
-                            // which is what the save path's checksum test
-                            // reads.
-                            self.card
-                                .set_memory_to_card(slot, crate::ui_menu_save::blank_save());
-                            self.card.set_checksum_game_data(slot);
-                            Action::New(slot)
-                        }
-                    });
-                }
-                (Screen::FileSelect, Cmd::Back) => self.screen = Screen::Title,
+                // The file select's cursor, the detail panel and the Start/Copy/Erase/Return
+                // menu belong to the retail state machine (`d_file_select.cpp`), which the
+                // shell drives with the pad, so the keys do not move the slot here.
                 _ => {}
             }
         }
         None
+    }
+
+    /// The slot the retail state machine picked, with the card's data number and the init
+    /// data a new game leaves in the slot (`menuSelect`, `d_file_select.cpp:904` and
+    /// `dComIfGs_setInitDataToCard`, `d_menu_save.cpp:840`).
+    pub fn file_select_pick(&mut self, slot: usize) -> Action {
+        self.card.set_data_num(slot as u8);
+        match self.slots.get(slot) {
+            Some(SlotInfo::File { .. }) => Action::Load(slot),
+            _ => {
+                self.card
+                    .set_memory_to_card(slot, crate::ui_menu_save::blank_save());
+                self.card.set_checksum_game_data(slot);
+                Action::New(slot)
+            }
+        }
     }
 
     fn confirm_title(&mut self) -> Option<Action> {
