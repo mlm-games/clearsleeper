@@ -71,10 +71,14 @@ impl Pickup {
         Vec3::new(self.speed_f.sin(), self.speed_y, self.speed_f.cos())
     }
 
+    /// The pickup's own collision radius, `dItem_data::getR` (`d_item_data.cpp:8177-8250`): the
+    /// heart piece and container and the arrow bundles are `0x32` (50), the rupees `0x23` (35)
+    /// and everything else `0x1E` (30).
     fn radius(&self) -> f32 {
         match self.item {
             HEART_PIECE | HEART_CONTAINER => 50.0,
             FIRST_RUPEE..=LAST_RUPEE | SILVER_RUPEE => 35.0,
+            FIRST_ARROW..=LAST_ARROW => 50.0,
             _ => 30.0,
         }
     }
@@ -106,6 +110,9 @@ fn is_heart(item: u8) -> bool {
     matches!(item, HEART_ITEMS | TRIPLE_HEART)
 }
 
+/// `dMeter_LifeMove` (`d_meter.cpp:1444-1467`) writes the life a pickup leaves behind: a piece
+/// of heart or a heart container raises the ceiling and the life settles on the whole hearts
+/// under it.
 fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
     match item {
         HEART_ITEMS => health.heal(4),
@@ -117,19 +124,15 @@ fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
         SILVER_RUPEE => rupees.count = rupees.count.saturating_add(200),
         HEART_PIECE => {
             health.max = health.max.saturating_add(1).min(MAX_LIFE);
-            health.units = health.units.min(heart_floor(health.max));
+            health.units = health.ceiling();
         }
         HEART_CONTAINER => {
             health.max = health.max.saturating_add(4).min(MAX_LIFE);
-            health.units = health.max;
+            health.units = health.ceiling();
         }
         FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW | BOOMERANG => held.equip(item),
         _ => {}
     }
-}
-
-fn heart_floor(max: u8) -> u8 {
-    max / 4 * 4
 }
 
 pub fn control(

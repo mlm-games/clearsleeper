@@ -35,12 +35,17 @@ const ARROW_COUNTS: [u8; 3] = [10, 20, 30];
 const BOMB_CAP: u8 = 30;
 const ARROW_CAP: u8 = 30;
 
-const BOMB_FUSE: u32 = 100;
+/// `daBomb_c`'s fuse: `mRestTime` starts at `0x96` (`d_a_bomb3.inc:1454`).
+const BOMB_FUSE: u32 = 150;
+/// The fuse a bomb is left with once it has hit something: `d_a_bomb3.inc:274-275` cuts
+/// `mRestTime` down to thirty on the bomb's first collision.
+const BOMB_HIT_FUSE: u32 = 30;
 const BOMB_RADIUS: f32 = 200.0;
 const BOMB_POWER: i32 = damage::BOMB;
 const BOMB_THROW: f32 = 50.0;
 const BOMB_LIFT: f32 = 40.0;
-const BOMB_GRAVITY: f32 = -2.5;
+/// `daBomb_c`'s own gravity (`d_a_bomb3.inc:1452`).
+const BOMB_GRAVITY: f32 = -2.9;
 const THROW_OFFSET: f32 = 20.0;
 const BOMB_FLINCH: u32 = 10;
 
@@ -266,6 +271,7 @@ pub fn control(
                 bomb.pos.y = floor;
                 bomb.vel = Vec3::ZERO;
                 bomb.rest = true;
+                bomb.fuse = bomb.fuse.min(BOMB_HIT_FUSE);
             }
         }
         bomb.fuse = bomb.fuse.saturating_sub(1);

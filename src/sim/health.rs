@@ -17,12 +17,18 @@ impl Default for Health {
 }
 
 impl Health {
+    /// The life the meter can hold: the ceiling rounded down to a whole heart, the cap
+    /// `dMeter_LifeMove` puts on the life it writes (`d_meter.cpp:1465-1467`).
+    pub fn ceiling(&self) -> u8 {
+        self.max / 4 * 4
+    }
+
     pub fn damage(&mut self, amount: u8) {
         self.units = self.units.saturating_sub(amount);
     }
 
     pub fn heal(&mut self, amount: u8) {
-        self.units = self.units.saturating_add(amount).min(self.max);
+        self.units = self.units.saturating_add(amount).min(self.ceiling());
     }
 }
 

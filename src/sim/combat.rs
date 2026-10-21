@@ -25,26 +25,40 @@ use super::roll::Roll;
 use super::shape::Shape;
 use super::ship::Ship;
 use super::swim::Swim;
-use super::walk::{add_calc, from_s16, target_yaw, to_s16, turn_toward};
+use super::walk::{add_calc, add_calc_angle_s, from_s16, target_yaw, to_s16};
 
 /// The AT/TG pass every swing runs. It lives in a file of its own and is declared here, so the
 /// four damage sites share one module without the parent's module list having to name it;
 use crate::sim::contact_hit::{AT_SPRM_VS_ENEMY, AtObj, TgObj};
 
 const STICK_GATE: f32 = 0.05;
-const DAMAGE_START: u32 = 1;
-const DAMAGE_END: u32 = 6;
-const LUNGE_FRAME: u32 = 2;
 const CHAIN_FRAME: u32 = 11;
+/// The tick the forward step starts on.
+///
+/// The reference's own step fires on the first tick whose animation frame is within one rate of
+/// 6.0 (`d_a_player_sword.inc:642`, `checkPass`), which is tick 1 for the four chain cuts and
+/// tick 2 for the two finishers. The port's speed stands in for the swing's root motion, which
+/// the reference reads from the sword move's own frames and the port does not carry, so the
+/// step keeps the tick the port's swing behaviour is written around.
+const LUNGE_FRAME: u32 = 2;
 const LUNGE_FACTOR: f32 = 0.2;
 const DECEL_SCALE: f32 = 0.7;
 const DECEL_MIN: f32 = 0.5;
 const SWORD_OFFSET: f32 = 20.0;
-/// `l_at_cps_src`'s capsule radius (`player_main_data.inc:159`), the one value of the sword's AT
-/// volume the reference states as a number; the segment it runs along comes from the sword
+/// The sword's AT capsule radius: `20.0` for the Hero's Sword and `30.0` for the Master Sword.
+/// `setNormalCutAtParam` and `setFinishCutAtParam` (`d_a_player_sword.inc:301-310`,
+/// `:317-326`) take the radius from `mCut.field_0x3C` and `mCut.field_0x44`
+/// (`d_a_player_HIO_data.inc:92-95`); the segment the capsule runs along comes from the sword
 /// model's own joints, which the port does not carry, so the reach is this radius about the tip
 /// the swing puts `SWORD_OFFSET` ahead of the player.
 const SWORD_RADIUS: f32 = 20.0;
+const MASTER_SWORD_RADIUS: f32 = 30.0;
+/// `daPy_HIO_turn_c0::m` (`d_a_player_HIO_data.inc:22-24`), the rate a cut turns its body at:
+/// `cLib_addCalcAngleS(&shape_angle.y, target, 30, 0x3CDF, 0x1F40)`
+/// (`d_a_player_sword.inc:633-639`).
+const CUT_TURN_SCALE: i16 = 30;
+const CUT_TURN_MAX: i16 = 0x3CDF;
+const CUT_TURN_MIN: i16 = 0x1F40;
 const FLINCH_TICKS: u32 = 10;
 /// The frames an actor's own TG bodies stay out of reach after a blow lands on it.
 ///
@@ -83,14 +97,82 @@ pub enum CutKind {
     EB,
 }
 
-fn cut(kind: CutKind) -> (u32, f32, f32) {
+/// One cut's timing and speed numbers, the values the reference's own tables hold.
+///
+/// A cut runs on the animation frame its sword move plays: the cut's table gives the frame the
+/// animation starts on and the rate it advances at (`d_a_player_HIO_data.inc:27-49`), and the
+/// blade's AT object is live while the frame sits inside that table's own window
+/// (`d_a_player_sword.inc:645`, `:748`, `:849`, `:948`, `:1026`, `:1107`). Tick `n` of a cut
+/// sits on frame `start + rate * n`, which is where the tick numbers below come from.
+struct Cut {
+    /// The tick the cut ends on: the tick the animation runs out of frames.
+    duration: u32,
+    /// The first tick the blade's AT object is live on.
+    at_first: u32,
+    /// The last tick the blade's AT object is live on.
+    at_last: u32,
+    /// The speed the forward step adds.
+    lunge_speed: f32,
+    /// The largest step the deceleration may take.
+    decel_max: f32,
+}
+
+/// One row per cut table: `daPy_HIO_cutA_c0::m` (`d_a_player_HIO_data.inc:27-29`) drives
+/// `procCutA` (`d_a_player_sword.inc:589`) and the other five drive their own cut the same way.
+fn cut(kind: CutKind) -> Cut {
     match kind {
-        CutKind::A => (13, 10.0, 2.6),
-        CutKind::F => (13, 8.0, 0.95),
-        CutKind::R => (13, 1.0, 0.95),
-        CutKind::L => (12, 1.0, 0.95),
-        CutKind::EA => (15, 15.0, 0.95),
-        CutKind::EB => (17, 7.0, 0.95),
+        // The animation starts on frame 4.0 and runs at 1.2 a tick, so the AT window
+        // `[5.0, 11.0)` is ticks 1 to 5 and the last frame 19.0 ends the cut on tick 13.
+        CutKind::A => Cut {
+            duration: 13,
+            at_first: 1,
+            at_last: 5,
+            lunge_speed: 10.0,
+            decel_max: 2.6,
+        },
+        // The window is `[5.0, 12.0)`, so the AT lives one tick longer than the first cut's.
+        CutKind::F => Cut {
+            duration: 13,
+            at_first: 1,
+            at_last: 6,
+            lunge_speed: 8.0,
+            decel_max: 0.95,
+        },
+        // The window is `[6.0, 12.0)`, so the AT comes up a tick late.
+        CutKind::R => Cut {
+            duration: 13,
+            at_first: 2,
+            at_last: 6,
+            lunge_speed: 1.0,
+            decel_max: 0.95,
+        },
+        // The window is `[5.0, 10.0)`, so the AT goes down a tick early, and the animation's
+        // last frame 18.0 ends the cut on tick 12.
+        CutKind::L => Cut {
+            duration: 12,
+            at_first: 1,
+            at_last: 4,
+            lunge_speed: 1.0,
+            decel_max: 0.95,
+        },
+        // The finisher runs at 1.0 a tick, so the window `[5.0, 11.0)` is ticks 1 to 6, and its
+        // deceleration step is `mCutEA.field_0x14` (`d_a_player_sword.inc:1036-1042`).
+        CutKind::EA => Cut {
+            duration: 15,
+            at_first: 1,
+            at_last: 6,
+            lunge_speed: 15.0,
+            decel_max: 4.0,
+        },
+        // The finisher runs at 0.9 a tick, so the window `[5.0, 11.0)` is ticks 2 to 7, and its
+        // deceleration step is `mCutEB.field_0x14` (`d_a_player_sword.inc:1117-1123`).
+        CutKind::EB => Cut {
+            duration: 17,
+            at_first: 2,
+            at_last: 7,
+            lunge_speed: 7.0,
+            decel_max: 1.5,
+        },
     }
 }
 
@@ -117,13 +199,28 @@ fn cut_proc(kind: CutKind) -> super::link_proc::Proc {
 /// which reads `dComIfGs_getSelectEquip(0)`: one heart for Hero's Sword, two for the Master
 /// Sword, and the finisher doubles it. `inventory::sword` answers with the item the collect bit
 /// names, so `selected` is that sword's id.
-fn sword_at_power(selected: u8, finisher: bool) -> u8 {
+///
+/// `setAtParam` (`d_a_player_main.cpp:9594-9596`) doubles the AT power again while the soup
+/// power-up is up.
+fn sword_at_power(selected: u8, finisher: bool, soup: bool) -> u8 {
     let normal = selected == damage::ITEM_SWORD;
-    match (normal, finisher) {
+    let atp = match (normal, finisher) {
         (true, false) => 1,
         (false, false) => 2,
         (true, true) => 2,
         (false, true) => 4,
+    };
+    if soup { atp * 2 } else { atp }
+}
+
+/// The AT capsule radius the sword the player holds cuts with, `setNormalCutAtParam`
+/// (`d_a_player_sword.inc:301-310`): the Hero's Sword cuts with `mCut.field_0x3C` (20) and the
+/// Master Sword with `mCut.field_0x44` (30).
+fn sword_radius(selected: u8) -> f32 {
+    if damage::is_master_sword(selected) {
+        MASTER_SWORD_RADIUS
+    } else {
+        SWORD_RADIUS
     }
 }
 
@@ -376,8 +473,8 @@ pub fn control(
         if !super::link_proc::allows(gates.proc.as_deref(), super::link_proc::CUT_AIR) {
             continue;
         }
-        let (duration, lunge_base, decel_max) = cut(out.combat.kind);
-        if out.combat.frame >= duration {
+        let cut = cut(out.combat.kind);
+        if out.combat.frame >= cut.duration {
             out.combat.active = false;
             out.combat.combo = 0;
             out.combat.queued = false;
@@ -402,14 +499,41 @@ pub fn control(
         if pressed && !is_finisher(out.combat.kind) {
             out.combat.queued = true;
         }
-        player.face = from_s16(turn_toward(to_s16(player.face), out.combat.heading));
+        // `procCutA` (`d_a_player_sword.inc:629-640`): a cut with a lock-on target squares up
+        // to it outright, and one without turns towards the heading the cut started with.
+        match gates.lock.target.and_then(|target| {
+            actors
+                .iter()
+                .find(|(entity, ..)| *entity == target)
+                .map(|(_, actor, ..)| actor.pos)
+        }) {
+            Some(pos) => {
+                player.face = from_s16(to_s16((pos.x - player.pos.x).atan2(pos.z - player.pos.z)));
+                out.combat.heading = to_s16(player.face);
+            }
+            None => {
+                player.face = from_s16(add_calc_angle_s(
+                    to_s16(player.face),
+                    out.combat.heading,
+                    CUT_TURN_SCALE,
+                    CUT_TURN_MAX,
+                    CUT_TURN_MIN,
+                ));
+            }
+        }
         player.yaw = player.face;
         if out.combat.frame == LUNGE_FRAME {
-            player.speed = LUNGE_FACTOR * player.speed.abs() + lunge_base;
+            player.speed = LUNGE_FACTOR * player.speed.abs() + cut.lunge_speed;
         } else {
-            add_calc(&mut player.speed, 0.0, DECEL_SCALE, decel_max, DECEL_MIN);
+            add_calc(
+                &mut player.speed,
+                0.0,
+                DECEL_SCALE,
+                cut.decel_max,
+                DECEL_MIN,
+            );
         }
-        if out.combat.frame >= DAMAGE_START && out.combat.frame < DAMAGE_END {
+        if out.combat.frame >= cut.at_first && out.combat.frame <= cut.at_last {
             let kind = out.combat.kind;
             let swing = PlayerCut {
                 cut_type: cut_type(kind),
@@ -424,14 +548,14 @@ pub fn control(
                             0.0,
                             SWORD_OFFSET * player.yaw.cos(),
                         ),
-                    SWORD_RADIUS,
+                    sword_radius(selected),
                 ),
                 AT_SPRM_VS_ENEMY,
                 &AtMeta {
                     at_type: AT_TYPE_SWORD,
                     at_se: AT_SE_SWORD,
                     at_spl: cut_spl(kind),
-                    at_atp: sword_at_power(selected, is_finisher(kind)),
+                    at_atp: sword_at_power(selected, is_finisher(kind), out.combat.soup),
                 },
                 Attacker {
                     name: NAME_PLAYER.to_owned(),

@@ -33,11 +33,12 @@ pub const TYPE_ICE: u8 = 2;
 pub const TYPE_LIGHT: u8 = 3;
 
 pub const MUZZLE_SPEED: f32 = 200.0;
-/// `m_at_cps_src`'s capsule radius (`arrow.cpp:48`), which `arrowShooting` sets again per shot.
+/// `m_at_cps_src`'s capsule radius (`d_a_arrow.cpp:48`), which the arrow sets again per shot
+/// (`d_a_arrow.cpp:869`).
 pub const CAPSULE_RADIUS: f32 = 5.0;
-/// The `speed * 1.25f` `arrowShooting` ends the AT capsule at (`arrow.cpp:294`), so the attack
-/// volume reaches a frame and a quarter ahead of the shaft and cannot pass through a body
-/// unnoticed inside one step.
+/// The `speed * 1.25f` the arrow's own attack capsule ends at (`d_a_arrow.cpp:867-868`), so the
+/// attack volume reaches a frame and a quarter ahead of the shaft and cannot pass through a
+/// body unnoticed inside one step.
 pub const CAPSULE_STRETCH: f32 = 1.25;
 pub const POWER: i32 = damage::ARROW;
 pub const FLINCH: u32 = 10;
@@ -201,7 +202,12 @@ pub fn control(
                 let from = arrow.pos;
                 let step = arrow.speed;
                 arrow.pos += step;
-                let tip = arrow.pos + step * CAPSULE_STRETCH;
+                // `daArrow_c` registers its attack capsule from the arrow's own position to a
+                // point one and a quarter of a step ahead of it (`d_a_arrow.cpp:866-870`), and
+                // the collision pass reads the capsule the arrow put up on the tick before, so
+                // the volume the shaft sweeps is the one it left behind and the quarter step
+                // ahead of it.
+                let tip = from + step * CAPSULE_STRETCH;
                 let (at_type, at_atp) = arrow_attack(arrow.kind);
                 let at = AtObj::new(
                     Shape::capsule((from + tip) * 0.5, CAPSULE_RADIUS, (tip - from).length()),
