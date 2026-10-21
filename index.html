@@ -331,6 +331,10 @@
       }
     });
 
+    // The web build logs the frame's input to the console (the wasm side calls this), so a
+    // session can be read back or replayed the way the desktop build's log file is.
+    window.clearsleeperLog = (text) => console.log(text);
+
     restore();
   </script>
 </body>

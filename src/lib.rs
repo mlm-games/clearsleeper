@@ -96,6 +96,15 @@ pub struct App {
     name: String,
     menu_prev: HashSet<PhysicalKey>,
     pad_prev: input::ButtonBits,
+    /// The input log the session writes, when `CS_INPUT_LOG` names a file. Each line is a
+    /// tape line, so the session replays through `CS_INPUT`.
+    input_log: Option<std::fs::File>,
+    /// The keys the last poll held, as the log's bit mask.
+    input_keys: u64,
+    /// The frames the session has drawn, the retrace the input log numbers.
+    frame: u64,
+    /// The last input the web build logged, so the console gets a line per change.
+    input_state: u64,
     movie: Option<movie::Movie>,
     movie_frame: usize,
     movie_clock: f32,
@@ -165,6 +174,14 @@ struct GameOverStage {
     revision: u64,
 }
 
+/// The input log `CS_INPUT_LOG` names, emptied when the session opens it. A line is a tape
+/// line, so the session replays through `CS_INPUT` exactly as it was played.
+fn open_input_log() -> Option<std::fs::File> {
+    let path = std::env::var_os("CS_INPUT_LOG").filter(|value| !value.is_empty())?;
+    let file = std::fs::File::create(path).ok()?;
+    Some(file)
+}
+
 impl App {
     /// Headless construction: silent audio, no device. Tests and tools.
     /// The headless session: what the tests and headless runs drive. A session exists only with
@@ -217,6 +234,10 @@ impl App {
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
             pad_prev: input::ButtonBits::default(),
+            input_log: open_input_log(),
+            input_keys: 0,
+            frame: 0,
+            input_state: 0,
             movie: None,
             movie_frame: 0,
             movie_clock: 0.0,
@@ -355,17 +376,94 @@ impl App {
     /// Frame boundary: poll the shell into the sim's intent resources.
     pub fn stage_polled(&mut self, sched: &repose_core::runtime::Scheduler) {
         let held = &sched.held_keys;
-        self.stage_axis(input::axis_from_keys(held, sched.window_focused));
-        self.stage_damage(input::damage_from_keys(held, sched.window_focused));
-        self.stage_do(input::do_from_keys(held, sched.window_focused));
-        self.stage_target(input::target_from_keys(held, sched.window_focused));
-        self.stage_item(input::item_from_keys(held, sched.window_focused));
-        self.stage_use(input::use_from_keys(held, sched.window_focused));
+        self.stage_keys(held, sched.window_focused);
+    }
+
+    /// The shell's keys as the game reads them: the move axis, the debug and action keys, the
+    /// pad's face buttons and the menus' commands. The input log replays a session through
+    /// this path, so a logged frame and a live frame stage the same thing.
+    pub fn stage_keys(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
+        self.input_keys = input::key_mask(held);
+        self.stage_axis(input::axis_from_keys(held, window_focused));
+        self.stage_damage(input::damage_from_keys(held, window_focused));
+        self.stage_do(input::do_from_keys(held, window_focused));
+        self.stage_target(input::target_from_keys(held, window_focused));
+        self.stage_item(input::item_from_keys(held, window_focused));
+        self.stage_use(input::use_from_keys(held, window_focused));
         self.stage_pad(
-            input::pad_held_from_keys(held, sched.window_focused),
-            input::c_stick_from_keys(held, sched.window_focused),
+            input::pad_held_from_keys(held, window_focused),
+            input::c_stick_from_keys(held, window_focused),
         );
-        self.stage_menu(held, sched.window_focused);
+        self.stage_menu(held, window_focused);
+    }
+
+    /// One tape line for the frame's input, written to the log `CS_INPUT_LOG` names. The
+    /// line is the pad word, the stick and the key mask, which is what a replay needs to
+    /// stage the same frame again.
+    fn log_input(&mut self) {
+        use std::io::Write;
+        let tick = self.frame;
+        let hold = *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::PadButtons::default);
+        let stick = *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::CStick::default);
+        let mut word = 0_u16;
+        if hold.hold.a {
+            word |= input_tape::BUTTON_A;
+        }
+        if hold.hold.b {
+            word |= input_tape::BUTTON_B;
+        }
+        if hold.hold.x {
+            word |= input_tape::BUTTON_X;
+        }
+        if hold.hold.y {
+            word |= input_tape::BUTTON_Y;
+        }
+        if hold.hold.z {
+            word |= input_tape::BUTTON_Z;
+        }
+        if hold.hold.l {
+            word |= input_tape::BUTTON_L;
+        }
+        if hold.hold.r {
+            word |= input_tape::BUTTON_R;
+        }
+        if hold.hold.start {
+            word |= input_tape::BUTTON_START;
+        }
+        let axis = self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::MoveIntent::default)
+            .axis;
+        let stick_x = (axis.x * 127.0).round() as i8;
+        let stick_y = (axis.y * 127.0).round() as i8;
+        let c_x = (stick.axis.x * 127.0).round() as i8;
+        let c_y = (stick.axis.y * 127.0).round() as i8;
+        let line = format!(
+            "retrace={tick} button={word:#06x} stick={stick_x},{stick_y} c={c_x},{stick_y} l=0 r=0 keys={:#x}\n",
+            self.input_keys
+        );
+        #[cfg(target_arch = "wasm32")]
+        {
+            // The console gets the line when the input changes, so a session's log stays
+            // readable; the desktop's file gets every frame, so a replay is exact.
+            let state = (word as u64) << 32 | self.input_keys;
+            if state != self.input_state {
+                self.input_state = state;
+                crate::web::log_line(&line);
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(file) = self.input_log.as_mut() {
+            let _ = file.write_all(line.as_bytes());
+            let _ = file.flush();
+        }
     }
 
     /// Stage the pad state one tape line carries: the main stick as the move axis, the face
@@ -373,6 +471,11 @@ impl App {
     /// the edge against the previous poll, the way `mDoCPd_Convert` splits the pad's hold and
     /// trigger words (`m_Do/m_Do_controller_pad.cpp:20-45`).
     pub fn stage_pad_state(&mut self, state: &input_tape::PadState) {
+        if state.keys_given {
+            let held = input::keys_from_mask(state.keys);
+            self.stage_keys(&held, true);
+            return;
+        }
         self.stage_axis(state.move_axis());
         self.stage_pad(state.hold(), state.c_axis());
     }
@@ -2667,13 +2770,19 @@ impl App {
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
+        self.frame += 1;
+        self.log_input();
         let intro_running = self.intro.is_some();
         if intro_running {
             self.step_intro(dt);
         } else if self.menu.screen == menus::Screen::Title && self.assets_installed {
             self.step_movie(dt);
         } else if self.movie_sound {
+            // The movie player belongs to the title scene (`d_s_title.cpp:122`), so its
+            // soundtrack stops with it and a title that comes back plays it again
+            // (`d_a_movie_player.cpp:4080-4091`).
             self.audio.stop_cue(audio::MOVIE_CUE);
+            self.movie_sound = false;
         }
         let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
             && self.menu.screen == menus::Screen::Playing;

@@ -77,9 +77,8 @@ fn main() {
     }
 
     let step = Duration::from_secs_f64(1.0 / SIM_HZ);
-    for _ in 0..ticks {
-        let tick = app.sim.world.resource::<CurrentFrame>().0 + 1;
-        let state = tape.state_at(tick);
+    for frame in 0..ticks {
+        let state = tape.state_at(frame);
         app.stage_pad_state(&state);
         app.advance(step);
     }

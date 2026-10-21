@@ -14,6 +14,19 @@ use wasm_bindgen::prelude::*;
 use crate::assets;
 use crate::disc::MAX_IMAGE_BYTES;
 
+#[wasm_bindgen]
+extern "C" {
+    /// `index.html` binds this to the console, so the web build's input log lands in the
+    /// browser's console the way the desktop build writes it to its log file.
+    #[wasm_bindgen(js_name = clearsleeperLog)]
+    fn clearsleeper_log(text: &str);
+}
+
+/// One line of the input log, printed to the browser's console.
+pub fn log_line(text: &str) {
+    clearsleeper_log(text);
+}
+
 /// The largest image the page should hand over, which `index.html` checks the picked file
 /// against: `wasm-bindgen`'s glue copies the bytes into wasm memory before this entry runs, and
 /// an allocation there aborts the tab, so an image over the limit is refused in the page.
