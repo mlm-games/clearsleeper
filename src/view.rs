@@ -154,9 +154,10 @@ fn used_pages(actor: &RoomMesh) -> Vec<u32> {
     pages
 }
 
-/// `J3DMaterial::load` sets the GX cull mode from the material (`J3DMaterial.cpp:194`);
-/// the viewport has one cull face (back), so a no-cull material is emitted twice with the
-/// opposite winding and a front-cull material once with the opposite winding.
+/// `J3DMaterial::load` sets the GX cull mode from the material (`J3DMaterial.cpp:194`), and
+/// `GXCullMode` is {none 0, front 1, back 2, all 3} (`GXEnum.h:16-21`). The viewport has one
+/// cull face (back), so a no-cull material is emitted twice with the opposite winding, a
+/// front-cull material once with the opposite winding and an all-cull material not at all.
 fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> Vec<u32> {
     let reverse = |indices: &[u32]| {
         indices
@@ -164,15 +165,41 @@ fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> Vec<u32> {
             .flat_map(|triangle| [triangle[0], triangle[2], triangle[1]])
             .collect::<Vec<_>>()
     };
-    match group.cull.unwrap_or(1) {
+    match group.cull.unwrap_or(2) {
         0 => {
             let mut indices = group.indices.clone();
             indices.extend(reverse(&group.indices));
             indices
         }
-        2 => reverse(&group.indices),
+        1 => reverse(&group.indices),
         3 => Vec::new(),
         _ => group.indices.clone(),
+    }
+}
+
+/// The material's alpha test as the renderer's single cutoff. `J3DAlphaComp::load`
+/// (`J3DMatBlock.h:745-747`) compares the fragment's alpha against two references and
+/// combines them; the renderer discards below one cutoff (`render.rs:322`), so the tests
+/// that name a lower bound map onto it and the rest keep every fragment.
+fn alpha_cutoff(test: Option<&crate::j3d::bdl::AlphaTest>) -> f32 {
+    const NEVER: u8 = 0;
+    const LEQUAL: u8 = 3;
+    const GREATER: u8 = 4;
+    const GEQUAL: u8 = 6;
+    const ALWAYS: u8 = 7;
+    let Some(test) = test else {
+        return 0.0;
+    };
+    if test.comp0 == ALWAYS {
+        return 0.0;
+    }
+    match test.comp0 {
+        GEQUAL if test.comp1 == ALWAYS || (test.comp1 == LEQUAL && test.ref1 == u8::MAX) => {
+            f32::from(test.ref0) / 255.0
+        }
+        GREATER if test.comp1 == ALWAYS => (f32::from(test.ref0) + 1.0) / 255.0,
+        NEVER => 1.0,
+        _ => 0.0,
     }
 }
 
@@ -365,7 +392,7 @@ fn hair_groups(
                 uvs: group.uvs.clone(),
                 indices: group_indices(group),
                 texture_page: actor_page(group, pages, page_base),
-                alpha_cutoff: 0.5,
+                alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: true,
                 ..MeshGroup::default()
             }
@@ -412,6 +439,7 @@ fn skinned_groups(
                 inverse_bind: inverse_bind.clone(),
                 joint_nodes: (0..actor.joints.len()).collect(),
                 texture_page: actor_page(group, pages, page_base),
+                alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: true,
                 ..SkinnedMesh::default()
             };
@@ -478,6 +506,7 @@ fn static_actor_groups(
                 uvs: group.uvs.clone(),
                 indices: group_indices(group),
                 texture_page: actor_page(group, pages, page_base),
+                alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: true,
                 ..MeshGroup::default()
             })
@@ -639,6 +668,7 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
         uvs: animated_uvs(room, group, tick),
         indices: group_indices(group),
         texture_page: group.texture_page.unwrap_or(0),
+        alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
         depth_test: true,
         ..MeshGroup::default()
     }
