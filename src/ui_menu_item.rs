@@ -4204,9 +4204,10 @@ impl ItemMenu {
         let grow = if user < self.tuning.note_open_len {
             user as f32 * self.tuning.scale / self.tuning.note_open_len as f32
         } else {
+            // tww/src/d/d_menu_item.cpp:1428-1434 (ramp runs to the open threshold).
             let rest = value_increase(
                 i32::from(self.tuning.note_close_len),
-                i32::from(span - from),
+                i32::from(span - user),
                 0,
             );
             (1.0 - rest) * (1.0 - self.tuning.scale) + self.tuning.scale
@@ -4562,9 +4563,11 @@ impl ItemMenu {
     }
 
     pub fn bottle_fwater_check(&self) -> usize {
+        // tww/src/d/d_menu_item.cpp:1884-1893 (returns the bottle slot, 0 when absent).
         for index in 0..4u8 {
-            if self.slot_item(SLOT_BOTTLE0.wrapping_add(index)) == ITEM_FOREST_WATER {
-                return usize::from(index);
+            let slot = SLOT_BOTTLE0.wrapping_add(index);
+            if self.slot_item(slot) == ITEM_FOREST_WATER {
+                return usize::from(slot);
             }
         }
         0

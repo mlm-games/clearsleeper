@@ -879,6 +879,8 @@ impl OptionMenu {
         self.panes.backdrop.user_area = 0;
         self.panes.backing[0].user_area = 0;
         self.panes.backing[1].user_area = 0;
+        // tww/src/d/d_menu_option.cpp:855-856 (m7B0 is the 'nt00' note anchor).
+        self.panes.note_anchor.user_area = 0;
     }
 
     pub fn main_init(&mut self) {
@@ -1205,6 +1207,10 @@ impl OptionMenu {
             STICK_UP => {
                 if self.panes.cursor[1].user_area > 0 {
                     self.panes.cursor[1].user_area -= 1;
+                    // tww/src/d/d_menu_option.cpp:487-497 (USA build skips the ruby row).
+                    if self.panes.cursor[1].user_area == 1 {
+                        self.panes.cursor[1].user_area = 0;
+                    }
                     self.cursor_move();
                     self.note_set(msgs);
                     self.sound(SE_MENU_CURSOR);
@@ -1213,6 +1219,10 @@ impl OptionMenu {
             STICK_DOWN => {
                 if self.panes.cursor[1].user_area < 3 {
                     self.panes.cursor[1].user_area += 1;
+                    // tww/src/d/d_menu_option.cpp:503-518 (USA build skips the ruby row).
+                    if self.panes.cursor[1].user_area == 1 {
+                        self.panes.cursor[1].user_area = 2;
+                    }
                     self.cursor_move();
                     self.note_set(msgs);
                     self.sound(SE_MENU_CURSOR);

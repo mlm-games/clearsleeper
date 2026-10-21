@@ -2839,8 +2839,9 @@ impl CollectScreen {
     }
 
     pub fn collect_priority(&mut self) {
+        // tww/src/d/d_menu_collect.cpp:1893-1982 (the insertChild chain fixes the draw order).
         let mut chain: Vec<usize> = vec![P_CAR0, P_WDSV, P_WDOP];
-        for index in 0..4 {
+        for index in (0..4).rev() {
             chain.push(P_CORNER0 + index);
         }
         chain.extend([P_NUM1, P_NUM2, P_NUMC, P_CMAP, P_WK1, P_WK0, P_TRIM, P_TRIL]);
@@ -2850,6 +2851,8 @@ impl CollectScreen {
         chain.push(P_TRIB);
         for index in 0..3 {
             chain.push(P_SIT + index);
+        }
+        for index in 0..3 {
             chain.push(P_SIK + index);
         }
         for index in 0..11 {
@@ -2860,11 +2863,19 @@ impl CollectScreen {
         }
         chain.push(P_HTPB);
         for index in 0..SONG_COUNT {
-            for base in [P_TIT, P_TIK, P_CN, P_WN, P_I0, P_I1, P_BS, P_HMB] {
+            chain.push(P_TIT + index);
+        }
+        for index in 0..SONG_COUNT {
+            chain.push(P_TIK + index);
+        }
+        chain.push(P_I111);
+        chain.push(P_I122);
+        for base in [P_CN, P_WN, P_I0, P_I1, P_BS, P_HMB] {
+            for index in 0..SONG_COUNT {
                 chain.push(base + index);
             }
         }
-        chain.extend([P_I111, P_I122, P_CC21]);
+        chain.push(P_CC21);
         self.rebuild_order(&chain);
     }
 

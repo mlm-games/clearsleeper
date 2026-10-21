@@ -2582,8 +2582,8 @@ impl DungeonMap {
             x_trans = CURSOR_STEP_SIZE;
             y_trans = CURSOR_STEP_SIZE;
             if self.select_item == 3 {
-                self.panes.car[0].user_area =
-                    value_increase(10, i32::from(self.panes.car[0].user_area), 0) as i16;
+                // tww/src/d/d_menu_dmap.cpp:967-969 (the ramp result is discarded).
+                let _ = value_increase(10, i32::from(self.panes.car[0].user_area), 0);
             }
         } else if self.panes.car[0].user_area < CURSOR_STEP_MAX {
             for i in 0..CURSOR_SLOT_COUNT {
@@ -2592,8 +2592,8 @@ impl DungeonMap {
             x_trans = CURSOR_STEP_SIZE * 2;
             y_trans = CURSOR_STEP_SIZE * 2;
             if self.select_item == 3 {
-                self.panes.car[0].user_area =
-                    value_increase(10, 20 - i32::from(self.panes.car[0].user_area), 0) as i16;
+                // tww/src/d/d_menu_dmap.cpp:976-978 (the ramp result is discarded).
+                let _ = value_increase(10, 20 - i32::from(self.panes.car[0].user_area), 0);
             }
         }
         self.panes.car[0].pane_trans(-f32::from(x_trans), f32::from(y_trans));
