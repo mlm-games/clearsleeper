@@ -3,6 +3,81 @@ use std::collections::HashSet;
 use glam::Vec2;
 use repose_core::input::PhysicalKey;
 
+/// The keys the shell reads, in the order the input log numbers them. The log writes the
+/// held set as one bit per key, so a logged session replays through the same key path
+/// the live session took.
+pub const SHELL_KEYS: [PhysicalKey; 47] = [
+    PhysicalKey::KeyA,
+    PhysicalKey::KeyB,
+    PhysicalKey::KeyC,
+    PhysicalKey::KeyD,
+    PhysicalKey::KeyE,
+    PhysicalKey::KeyF,
+    PhysicalKey::KeyG,
+    PhysicalKey::KeyH,
+    PhysicalKey::KeyI,
+    PhysicalKey::KeyJ,
+    PhysicalKey::KeyK,
+    PhysicalKey::KeyL,
+    PhysicalKey::KeyM,
+    PhysicalKey::KeyN,
+    PhysicalKey::KeyO,
+    PhysicalKey::KeyP,
+    PhysicalKey::KeyQ,
+    PhysicalKey::KeyR,
+    PhysicalKey::KeyS,
+    PhysicalKey::KeyT,
+    PhysicalKey::KeyU,
+    PhysicalKey::KeyV,
+    PhysicalKey::KeyW,
+    PhysicalKey::KeyX,
+    PhysicalKey::KeyY,
+    PhysicalKey::KeyZ,
+    PhysicalKey::Space,
+    PhysicalKey::Enter,
+    PhysicalKey::Escape,
+    PhysicalKey::ArrowUp,
+    PhysicalKey::ArrowDown,
+    PhysicalKey::ArrowLeft,
+    PhysicalKey::ArrowRight,
+    PhysicalKey::Numpad0,
+    PhysicalKey::Numpad1,
+    PhysicalKey::Numpad2,
+    PhysicalKey::Numpad3,
+    PhysicalKey::Numpad4,
+    PhysicalKey::Numpad5,
+    PhysicalKey::Numpad6,
+    PhysicalKey::Numpad7,
+    PhysicalKey::Numpad8,
+    PhysicalKey::Numpad9,
+    PhysicalKey::ShiftLeft,
+    PhysicalKey::ControlLeft,
+    PhysicalKey::Tab,
+    PhysicalKey::Backspace,
+];
+
+/// The held keys as the log's bit mask.
+pub fn key_mask(held: &HashSet<PhysicalKey>) -> u64 {
+    let mut mask = 0_u64;
+    for (bit, key) in SHELL_KEYS.iter().enumerate() {
+        if held.contains(key) {
+            mask |= 1 << bit;
+        }
+    }
+    mask
+}
+
+/// The keys a log line's bit mask names.
+pub fn keys_from_mask(mask: u64) -> HashSet<PhysicalKey> {
+    let mut held = HashSet::new();
+    for (bit, key) in SHELL_KEYS.iter().enumerate() {
+        if mask & (1 << bit) != 0 {
+            held.insert(*key);
+        }
+    }
+    held
+}
+
 /// Held keys → normalized move axis (+x right, +y up). Focus loss zeroes it.
 pub fn axis_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> Vec2 {
     if !window_focused {

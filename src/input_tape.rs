@@ -100,6 +100,12 @@ const TRIGGER_FULL: f32 = 140.0;
 pub struct PadState {
     /// The pad word, the bits `dolphin/pad/Pad.h:33-45` names.
     pub buttons: u16,
+    /// The shell's held keys as the input log's bit mask (`input::SHELL_KEYS`). A line that
+    /// carries it replays through the key path the live session took.
+    pub keys: u64,
+    /// Whether the line carried the key mask at all, which separates a logged session from
+    /// a pad tape: a logged frame with no key held still names its empty mask.
+    pub keys_given: bool,
     /// The main stick's x, the centred byte the pad sent.
     pub stick_x: i8,
     /// The main stick's y, the centred byte the pad sent.
@@ -282,6 +288,7 @@ fn parse_line(line: &str, number: usize) -> Result<(u64, PadState), TapeError> {
     let mut c_stick = None;
     let mut trigger_left = None;
     let mut trigger_right = None;
+    let mut keys = None;
     for token in text.split(' ') {
         if token.is_empty() {
             continue;
@@ -299,6 +306,7 @@ fn parse_line(line: &str, number: usize) -> Result<(u64, PadState), TapeError> {
             "c" => c_stick = Some(parse_pair(value, number, key)?),
             "l" => trigger_left = Some(parse_byte(value, number, key)?),
             "r" => trigger_right = Some(parse_byte(value, number, key)?),
+            "keys" => keys = Some(parse_word64(value, number, key)?),
             _ => {}
         }
     }
@@ -336,12 +344,26 @@ fn parse_line(line: &str, number: usize) -> Result<(u64, PadState), TapeError> {
             c_stick_y,
             trigger_left,
             trigger_right,
+            keys: keys.unwrap_or(0),
+            keys_given: keys.is_some(),
         },
     ))
 }
 
 fn parse_number(value: &str, line: usize, key: &str) -> Result<u64, TapeError> {
     value.parse::<u64>().map_err(|_| TapeError::BadValue {
+        line,
+        key: key.to_string(),
+        text: value.to_string(),
+    })
+}
+
+fn parse_word64(value: &str, line: usize, key: &str) -> Result<u64, TapeError> {
+    let digits = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+        .unwrap_or(value);
+    u64::from_str_radix(digits, 16).map_err(|_| TapeError::BadValue {
         line,
         key: key.to_string(),
         text: value.to_string(),
