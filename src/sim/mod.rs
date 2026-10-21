@@ -427,7 +427,25 @@ pub enum WwSimSet {
 pub(crate) fn spawn_actors(world: &mut World, tables: &crate::dzs::StageTables) {
     let stage = tables.name().to_owned();
     let mut spawned: Vec<Entity> = Vec::new();
+    let zones = *world.resource::<flags::ZoneActors>();
+    let collect = *world.resource::<flags::Collect>();
+    let stories = *world.resource::<flags::StoryBits>();
+    let day = world.resource::<daynight::DayNight>().is_day();
     for source in tables.actors() {
+        // `dStage_actorInit` skips an actor whose `(setID, room)` bit is already on
+        // (`d_stage.cpp:1695`, `dComIfGs_isActor` -> `d_save.cpp:1685-1700`), so an actor that
+        // already ran its course - a defeated Chuchu, a burnt barrel - does not come back.
+        if zones.is_done(source.room, source.set_id) {
+            continue;
+        }
+        // `daNpc_Bm1_c::_create` fails with `cPhs_ERROR_e` for a type byte out of range, for a
+        // spawn condition that refuses and for a per-type init that refuses
+        // (`d_a_npc_bm1.cpp:4060-4104`), and a failed `_create` leaves no actor behind.
+        if bird::is_bird(&source.name)
+            && !bird::spawn_ok(source.parameters, &collect, &stories, day)
+        {
+            continue;
+        }
         if medli::is_medli(&source.name)
             && !medli::create_ok(
                 world.resource::<flags::StoryBits>(),
@@ -1021,8 +1039,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if source.name == carry::PIG_ACTOR {
         world.spawn((actor, carry::Carryable::Pig)).id()
     } else if source.name == bird::BIRD_ACTOR {
-        let (state, hit_points) = bird::spawn();
-        world.spawn((actor, state, hit_points)).id()
+        world
+            .spawn((actor, bird::Bird::spawn(source.parameters)))
+            .id()
     } else if source.name == marlon::MARLON_ACTOR {
         let friend = marlon::Marlon::spawn(source.parameters);
         world.spawn((actor, friend)).id()
@@ -1141,7 +1160,7 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if shmrgrd::is_guard(&source.name) {
         let set = world
             .resource::<flags::Switches>()
-            .test(((source.parameters >> 8) & 0xFF) as u8);
+            .test(shmrgrd::switch_no(source.parameters));
         let guard = shmrgrd::Shmrgrd::spawn(source.parameters, set);
         world.spawn((actor, guard)).id()
     } else if statue::is_statue(&source.name) {
