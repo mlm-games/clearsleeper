@@ -1,130 +1,104 @@
 use bevy_ecs::prelude::*;
-use glam::Vec3;
 
-use super::actor::Actor;
-use super::combat::HitPoints;
-use super::health::Health;
-use super::intent::MoveIntent;
-use super::player::Player;
+use super::flags::{Collect, SYMBOL_DIN, StoryBits};
 
+/// The stage string is `Bm1` (`d_stage.cpp:716`, `fpcNm_NPC_BM1_e`). `daNpc_Bm1_c` is the Rito
+/// NPC family - Quill, Skett, Akoot, Basht, Bisht, Hoskit, Ilari, Pashli, Namali and Kogoli
+/// (`d_a_npc_bm1.cpp:2340-2473`).
 pub const BIRD_ACTOR: &str = "Bm1";
-pub const MAX_ALTITUDE: f32 = 600.0;
-pub const HOVER_STEP: f32 = 0.25;
-pub const CLIMB_ACCEL: f32 = 3.0;
-pub const CRUISE_SPEED: f32 = 18.0;
-pub const PLUNGE_RANGE: f32 = 90.0;
-pub const PLUNGE_SPEED: f32 = 55.0;
-pub const SIGHT: f32 = 260.0;
-pub const HOVER_HEIGHT: f32 = 120.0;
-pub const TURN_RATE: i16 = 0x400;
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Flight {
-    Perch,
-    Launch,
-    Cruise,
-    Plunge,
-    Recover,
+/// `decideType` (`d_a_npc_bm1.cpp:2343-2361`) accepts the parameter's low byte for
+/// `fpcNm_NPC_BM1_e` only for 0..=4; every other value returns false, and `_create`
+/// (`:4075-4079`) then answers `cPhs_ERROR_e`, so retail never creates the actor.
+const TYPE_MASK: u32 = 0xFF;
+const TYPE_MAX: u8 = 4;
+
+/// `decideType`'s condition byte (`d_a_npc_bm1.cpp:2435-2448`) is `(param >> 8) & 0xFF`.
+const COND_SHIFT: u32 = 8;
+const COND_MASK: u32 = 0xFF;
+
+/// `dSv_event_flag_c::UNK_0001` (`d_save_event_flag.inc:13`), read by `init_PST_0`
+/// (`d_a_npc_bm1.cpp:548`).
+const EVENT_BIT_0001: u16 = 0x0001;
+/// `dSv_event_flag_c::UNK_1102` (`d_save_event_flag.inc:132`), read by `init_PST_3`
+/// (`d_a_npc_bm1.cpp:577`).
+const EVENT_BIT_1102: u16 = 0x1102;
+/// `dSv_event_flag_c::UNK_1A80` (`d_save_event_flag.inc:197`), read by `chk_appCnd`
+/// (`d_a_npc_bm1.cpp:522`, `:529`, `:537`).
+const EVENT_BIT_1A80: u16 = 0x1A80;
+/// `dSv_event_flag_c::UNK_1E80` (`d_save_event_flag.inc:225`), read by `init_PST_4`
+/// (`d_a_npc_bm1.cpp:587`).
+const EVENT_BIT_1E80: u16 = 0x1E80;
+/// `dSv_event_flag_c::UNK_1F40` (`d_save_event_flag.inc:234`), read by `init_PST_2`
+/// (`d_a_npc_bm1.cpp:566`).
+const EVENT_BIT_1F40: u16 = 0x1F40;
+
+/// `init_PST_0` .. `init_PST_4` (`d_a_npc_bm1.cpp:546-596`) - the per-type creation gate. A
+/// false result fails `createInit` (`:684-686`), and `_create` (`:4099-4101`) then answers
+/// `cPhs_ERROR_e`.
+fn type_ok(kind: u8, collect: &Collect, stories: &StoryBits) -> bool {
+    match kind {
+        0 => !stories.test(EVENT_BIT_0001),
+        1 => true,
+        2 => !stories.test(EVENT_BIT_1F40),
+        3 => !collect.is_symbol(SYMBOL_DIN) && stories.test(EVENT_BIT_1102),
+        4 => !stories.test(EVENT_BIT_1E80),
+        _ => false,
+    }
 }
 
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
+/// `chk_appCnd` (`d_a_npc_bm1.cpp:511-545`) - the gate the condition byte selects. `mSpawnCondition`
+/// is 1, 2, 3 or 4 for the condition bytes 0, 1, 2 and 3 (`d_a_npc_bm1.cpp:2435-2448`) and 0 for
+/// every other byte, and `mSpawnCondition` 0 always spawns.
+fn cond_ok(cond: u8, collect: &Collect, stories: &StoryBits, day: bool) -> bool {
+    match cond {
+        0 => !collect.is_symbol(SYMBOL_DIN),
+        1 => collect.is_symbol(SYMBOL_DIN) && !stories.test(EVENT_BIT_1A80),
+        2 => collect.is_symbol(SYMBOL_DIN) && stories.test(EVENT_BIT_1A80) && day,
+        3 => collect.is_symbol(SYMBOL_DIN) && stories.test(EVENT_BIT_1A80) && !day,
+        _ => true,
+    }
+}
+
+/// Whether retail creates this `Bm1` at all. `_create` (`d_a_npc_bm1.cpp:4060-4104`) fails with
+/// `cPhs_ERROR_e` when the type byte is out of range (`:4077`), when `chk_appCnd` refuses
+/// (`:684-686`), or when the per-type init refuses (`:4099-4101`), and a failed `_create` leaves
+/// no actor behind.
+///
+/// Not modelled: the path byte `(param >> 16) & 0xFF` (`:696-704`), which makes retail fail the
+/// creation when the named path does not exist, and the flight and idle actions, which are driven
+/// by the HIO table this port does not carry.
+pub fn spawn_ok(parameters: u32, collect: &Collect, stories: &StoryBits, day: bool) -> bool {
+    let kind = (parameters & TYPE_MASK) as u8;
+    if kind > TYPE_MAX {
+        return false;
+    }
+    let cond = ((parameters >> COND_SHIFT) & COND_MASK) as u8;
+    type_ok(kind, collect, stories) && cond_ok(cond, collect, stories, day)
+}
+
+/// `daNpc_Bm1_c` is an NPC, not an enemy. It creates `dNpc_cyl_src` (`d_a_npc_bm1.cpp:774`),
+/// whose `SrcObjAt Type` is `0` and whose radius and height are both `0`
+/// (`d_npc.cpp:956-984`), so a Rito has no attack collider and can never hurt the player. No NPC
+/// in the reference sets `health` or `max_health`, so neither [`super::combat::HitPoints`] nor
+/// [`super::enemy::Hurt`] belongs on one either - a Rito cannot be locked on to and cannot be
+/// killed.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bird {
-    pub flight: Flight,
-    pub altitude: f32,
-    pub speed_y: f32,
-    pub timer: u32,
+    /// `mSpecificType` (`d_a_npc_bm1.h:341`), the parameter's low byte.
+    pub kind: u8,
 }
 
 impl Bird {
-    pub fn spawn() -> Self {
+    pub fn spawn(parameters: u32) -> Self {
         Self {
-            flight: Flight::Perch,
-            altitude: 0.0,
-            speed_y: 0.0,
-            timer: 0,
+            kind: (parameters & TYPE_MASK) as u8,
         }
     }
 }
 
-pub fn spawn() -> (Bird, HitPoints) {
-    (Bird::spawn(), HitPoints(super::damage::KILL_POWER))
+pub fn is_bird(name: &str) -> bool {
+    name == BIRD_ACTOR
 }
 
-fn chase(current: f32, target: f32, step: f32) -> f32 {
-    let diff = target - current;
-    if diff.abs() <= step {
-        target
-    } else {
-        current + diff.signum() * step
-    }
-}
-
-pub fn control(
-    intent: Res<MoveIntent>,
-    mut health: ResMut<Health>,
-    mut birds: Query<(Entity, &Actor, &mut Bird)>,
-    players: Query<&Player>,
-    mut commands: Commands,
-) {
-    let Some(player) = players.iter().next() else {
-        return;
-    };
-    let swing = intent.axis.x != 0.0 || intent.axis.y != 0.0;
-    for (entity, actor, mut bird) in &mut birds {
-        let dx = player.pos.x - actor.pos.x;
-        let dz = player.pos.z - actor.pos.z;
-        let flat = (dx * dx + dz * dz).sqrt();
-        match bird.flight {
-            Flight::Perch => {
-                if flat < SIGHT && !swing {
-                    bird.flight = Flight::Launch;
-                    bird.timer = 0;
-                }
-            }
-            Flight::Launch => {
-                bird.speed_y = chase(bird.speed_y, CRUISE_SPEED, CLIMB_ACCEL);
-                bird.altitude += bird.speed_y;
-                bird.timer += 1;
-                if bird.altitude >= HOVER_HEIGHT {
-                    bird.flight = Flight::Cruise;
-                    bird.speed_y = 0.0;
-                }
-            }
-            Flight::Cruise => {
-                if flat < PLUNGE_RANGE {
-                    bird.flight = Flight::Plunge;
-                    bird.speed_y = -PLUNGE_SPEED;
-                    continue;
-                }
-                if flat > SIGHT * 2.0 {
-                    bird.flight = Flight::Recover;
-                    continue;
-                }
-                bird.speed_y = chase(bird.speed_y, 0.0, HOVER_STEP);
-                bird.altitude += bird.speed_y;
-            }
-            Flight::Plunge => {
-                if flat <= PLUNGE_RANGE {
-                    health.damage(1);
-                    bird.flight = Flight::Recover;
-                    bird.timer = 0;
-                    let _ = commands.entity(entity).despawn();
-                    continue;
-                }
-                bird.altitude += bird.speed_y;
-                if bird.altitude <= 0.0 {
-                    bird.flight = Flight::Recover;
-                }
-            }
-            Flight::Recover => {
-                bird.timer += 1;
-                if bird.timer > 60 {
-                    bird.flight = Flight::Perch;
-                    bird.altitude = 0.0;
-                    bird.timer = 0;
-                }
-            }
-        }
-        bird.altitude = bird.altitude.clamp(0.0, MAX_ALTITUDE);
-    }
-}
+pub fn control(_birds: Query<&Bird>) {}

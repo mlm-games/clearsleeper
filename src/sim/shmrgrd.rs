@@ -41,8 +41,17 @@ pub const CRUSH_HELD: u8 = 2;
 pub const CRUSH_SCALE: f32 = 0.2;
 pub const CRUSH_DURATION: i16 = 18;
 
-const SWITCH_SHIFT: u32 = 8;
+/// `prm_get_swSave()` (`d_a_obj_shmrgrd.h:38`) is
+/// `daObj::PrmAbstract(this, PRM_SWSAVE_W = 0x8, PRM_SWSAVE_S = 0x0)`
+/// (`include/d/d_a_obj.h:12-15`), i.e. `((1 << 8) - 1) & (param >> 0)` - the switch number is the
+/// low byte of the parameter.
+const SWITCH_SHIFT: u32 = 0x00;
 const SWITCH_MASK: u32 = 0xFF;
+
+/// `prm_get_swSave()` (`d_a_obj_shmrgrd.h:38`) - the switch this guard reads and writes.
+pub fn switch_no(parameters: u32) -> u8 {
+    ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8
+}
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Shmrgrd {
@@ -65,7 +74,7 @@ pub struct Shmrgrd {
 
 impl Shmrgrd {
     pub fn spawn(parameters: u32, set: bool) -> Self {
-        let switch_no = ((parameters >> SWITCH_SHIFT) & SWITCH_MASK) as u8;
+        let switch_no = switch_no(parameters);
         let (cur, top) = if set { (0.0, TOP_DROP) } else { (1.0, 0.0) };
         Self {
             mode: if set { MODE_LOWER } else { MODE_UPPER },
@@ -193,18 +202,20 @@ pub fn control(
                 let touched = player.is_some_and(|player| {
                     contact(&guard, actor.pos, &player) && facing(actor.pos, &player)
                 });
-                if touched {
-                    if cut.kind == CUT_HAMMER_FRONTSWING {
-                        guard.crush_start();
-                        events.list.push(SimEvent::Se(hammer::SE_ON));
-                        guard.down();
-                    } else if cut.kind == CUT_HAMMER_SIDESWING {
-                        guard.vib_start(walk::to_s16(player.map_or(0.0, |player| player.yaw)), 1.0);
-                        events.list.push(SimEvent::Se(hammer::SE_SWING));
-                    } else if guard.switch_no != NO_SWITCH && switches.test(guard.switch_no) {
-                        events.list.push(SimEvent::Se(hammer::SE_ON));
-                        guard.down();
-                    }
+                // `mode_upper` (`d_a_obj_shmrgrd.cpp:522-531`) tests the damage before the
+                // switch and the switch before the side swing, and it runs every frame - the
+                // switch test is not tied to a hammer hit, so a guard whose switch another
+                // guard already set lowers on its own.
+                if touched && cut.kind == CUT_HAMMER_FRONTSWING {
+                    guard.crush_start();
+                    events.list.push(SimEvent::Se(hammer::SE_ON));
+                    guard.down();
+                } else if guard.switch_no != NO_SWITCH && switches.test(guard.switch_no) {
+                    events.list.push(SimEvent::Se(hammer::SE_ON));
+                    guard.down();
+                } else if touched && cut.kind == CUT_HAMMER_SIDESWING {
+                    guard.vib_start(walk::to_s16(player.map_or(0.0, |player| player.yaw)), 1.0);
+                    events.list.push(SimEvent::Se(hammer::SE_SWING));
                 }
             }
             MODE_U_L => {
