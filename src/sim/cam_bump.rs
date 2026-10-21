@@ -331,15 +331,20 @@ impl Camera {
     /// ground under its head. `footHeightOf` is not in the reference text, so the player's
     /// own position stands in for it.
     ///
-    /// `m388` is what gates the latitude convergence at `d_camera.cpp:3138` and the wall-up
-    /// at `d_camera.cpp:2949-2956`, and a fresh placement leaves it at `0x50`
-    /// (`d_camera.cpp:2783`), which is why a placement never converges on its own. Retail
+    /// `m388` is what gates the latitude convergence at `d_camera.cpp:3177` and the wall-up
+    /// at `d_camera.cpp:2462`, and a fresh placement leaves it at `0x50`
+    /// (`d_camera.cpp:3018`), which is why a placement never converges on its own. Retail
     /// clears it where `m360` holds, and that is the whole of what makes the camera tilt:
     /// `forwardCheckAngle` reaches the latitude target only through that branch. `follow`
-    /// reads `Follow::ramp` after incrementing it (`cam_follow.rs:995-999`, against
-    /// `d_camera.cpp:2910-2913`), so the reset is staged one tick early as `-1`: the
-    /// increment lands it back on zero for the frame the convergence tests.
-    pub fn ground_pass(&mut self, player: &Player, solid: Option<&Collision>, player_height: f32) {
+    /// reads `Follow::ramp` after incrementing it, so the reset is staged one tick early as
+    /// `-1`: the increment lands it back on zero for the frame the convergence tests.
+    pub fn ground_pass(
+        &mut self,
+        player: &Player,
+        solid: Option<&Collision>,
+        status: &PlayerStatus,
+        player_height: f32,
+    ) {
         let head = player.pos + Vec3::new(0.0, player_height, 0.0);
         let head_ground = ground_height(head, solid);
         let floor = ground_height(player.pos, solid);
@@ -352,34 +357,33 @@ impl Camera {
             self.follow.ramp = -1;
             self.follow.ramp_ratio = 0.0;
         }
+
+        self.update_forward_angle(player, solid, status, player_height);
     }
 
-    /// `dCamera_c::bumpCheck`, `d_camera.cpp:2065-2363`, with the two things `Run` wraps
-    /// around it: `m148` at `d_camera.cpp:775` and the placement probe that raises the
-    /// wall-up flag at `d_camera.cpp:3234-3241`.
+    /// `dCamera_c::bumpCheck`, `d_camera.cpp:2275-2593`, with the two things `Run` wraps
+    /// around it: `m148` at `d_camera.cpp:977-982` and the placement probe that raises the
+    /// wall-up flag at `d_camera.cpp:3513-3520`.
     ///
     /// `bumpCheck` writes `mDirection` and `mEye`, the pair `Run` publishes at
-    /// `d_camera.cpp:845-872`, and it tilts them: the corner case eases the latitude and the
-    /// longitude onto the corner at `d_camera.cpp:2211-2213`, the recovery arm eases the
-    /// radius and the latitude back onto the placement at `d_camera.cpp:2323-2325`, and the
-    /// wall-up at `d_camera.cpp:2257-2276` walks the eye up the wall plane by
+    /// `d_camera.cpp:1030-1052`, and it tilts them: the corner case eases the latitude and the
+    /// longitude onto the corner at `d_camera.cpp:2429-2431`, the recovery arm eases the
+    /// radius and the latitude back onto the placement at `d_camera.cpp:2549-2551`, and the
+    /// wall-up at `d_camera.cpp:2475-2502` walks the eye up the wall plane by
     /// `WallUpDistance` so the player stays visible over whatever the camera was pulled
     /// against.
     ///
-    /// The locked-on sight radius at `d_camera.cpp:2119-2139` and the mass-top tilt at
-    /// `:2141-2150` are left out: the first needs `mpLockonTarget` and the second needs
-    /// `m364`, which comes from the actor mass results at `d_camera.cpp:2594-2605`. The
-    /// grabbed-actor override of `wall_up_distance` at `d_camera.cpp:2078-2114` needs the
+    /// The locked-on sight radius at `d_camera.cpp:2329-2351` and the mass-top tilt at
+    /// `:2353-2368` are left out: the first needs `mpLockonTarget` and the second needs
+    /// `m364`, which comes from the actor mass results at `d_camera.cpp:2819-2830`. The
+    /// grabbed-actor override of `wall_up_distance` at `d_camera.cpp:2288-2324` needs the
     /// grab target the port does not carry.
     pub fn bump_check(
         &mut self,
         player: &Player,
         solid: Option<&Collision>,
         sea: Option<&Sea>,
-        status: &PlayerStatus,
-        player_height: f32,
     ) -> bool {
-        self.update_forward_angle(player, solid, status, player_height);
         self.probe_placement(solid);
         self.event_flags &= !0x0009_0080;
 
@@ -454,10 +458,10 @@ impl Camera {
     }
 
     /// `m148 += (forwardCheckAngle() - m148) * FwdCushion()` under a style's `UNK004` flag,
-    /// `d_camera.cpp:774-779`, and the `m148 *= 0.33f` an airborne player applies at
-    /// `d_camera.cpp:2677`, which needs the flight states this port does not publish.
+    /// `d_camera.cpp:977-982`, and the `m148 *= 0.33f` an airborne player applies at
+    /// `d_camera.cpp:2903`, which needs the flight states this port does not publish.
     /// `followCamera` reads the result as the latitude target's offset at
-    /// `d_camera.cpp:3147`, through `Follow::lean`.
+    /// `d_camera.cpp:3408`, through `Follow::lean`.
     fn update_forward_angle(
         &mut self,
         player: &Player,
@@ -465,16 +469,16 @@ impl Camera {
         status: &PlayerStatus,
         player_height: f32,
     ) {
-        let angle = if self.has_flag(cam_style::flag::UNK004)
+        if self.has_flag(cam_style::flag::UNK004)
             && !status.check0(player_status::STTS0_UNK4000000)
             && !status.check1(player_status::STTS1_UNK40000)
         {
-            forward_check_angle(self, player, solid, player_height)
+            let angle = forward_check_angle(self, player, solid, player_height);
+            let cushion = self.bump.chk.fwd_cushion;
+            self.follow.lean += (angle - self.follow.lean) * cushion;
         } else {
-            SAngle::ZERO
-        };
-        let cushion = self.bump.chk.fwd_cushion;
-        self.follow.lean += (angle - self.follow.lean) * cushion;
+            self.follow.lean = SAngle::ZERO;
+        }
     }
 
     /// `d_camera.cpp:3234-3241`: with a pull-in still flagged and the placement's radius
@@ -685,8 +689,12 @@ impl Camera {
         (eye, direction)
     }
 
-    /// `d_camera.cpp:845-872`: `Run` copies the field of view and the bank off the cache,
+    /// `d_camera.cpp:1030-1075`: `Run` copies the field of view and the bank off the cache,
     /// runs `bumpCheck`, and derives the aim and the free yaw from what came back.
+    ///
+    /// The shake rides on top of the aim: `d_camera.h:599-603` publishes `Fovy`, `Bank`,
+    /// `Center` and `Eye` as the placement's own value plus the shake's offset, and the
+    /// camera's preparation at `d_camera.cpp:7910-7913` reads those four.
     fn publish_bump(&mut self) {
         let bump = self.bump;
         let up = if bump.center.x == bump.eye.x && bump.center.z == bump.eye.z {
@@ -700,13 +708,14 @@ impl Camera {
         };
         self.angle_y = bump.direction.longitude().inv();
         let cache = self.view_cache;
+        let shake = self.shake;
         if let Some(view) = self.view_mut() {
             view.aim_rolled(
-                bump.eye,
-                bump.center,
+                bump.eye + shake.eye,
+                bump.center + shake.center,
                 up,
-                cache.fovy.to_radians(),
-                cache.bank.radian(),
+                (cache.fovy + shake.fovy).to_radians(),
+                (cache.bank + shake.bank).radian(),
             );
         }
     }

@@ -498,20 +498,21 @@ pub fn limitf(value: f32, min: f32, max: f32) -> f32 {
     }
 }
 
-/// `dCamSetup_c` from `d_cam_param.h:281`, narrowed to the members the follow engine reads.
+/// `dCamSetup_c` from `d_cam_param.h:308-392`, narrowed to the members the follow engine reads.
 /// Retail keeps it on `dCamera_c`, so it lives on [`Camera`] here. Every default is
-/// `dCamSetup_c::dCamSetup_c()`, `d_cam_param.cpp:303-364`.
+/// `dCamSetup_c::dCamSetup_c()`, `d_cam_param.cpp:305-358`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CamSetup {
     /// `m060`: the latitude a placement may not pass above.
     pub latitude_upper: f32,
     /// `m05C`: the latitude a placement may not pass below.
     pub latitude_lower: f32,
-    /// `mChargeLatitude`, in degrees.
+    /// `m0A4`, the charge latitude in degrees, `d_cam_param.cpp:339`.
     pub charge_latitude: f32,
-    /// `mChargeTimer`: the frames a charge pull-in is spread over.
+    /// `m0A8`, the frames a charge pull-in is spread over, `d_cam_param.cpp:340`.
     pub charge_timer: i32,
-    /// `mChargeBRatio`: the ease a charge pull-in runs on.
+    /// `mChargeLatitude`, the control distance the charge pull-in's curve runs on,
+    /// `d_cam_param.cpp:341`. `followCamera` reads it at `d_camera.cpp:3237` and `:3370`.
     pub charge_b_ratio: f32,
     /// `m080`: the bank a leaf fan's camera rolls to.
     pub fan_bank: f32,
@@ -540,7 +541,7 @@ impl Default for CamSetup {
 }
 
 impl CamSetup {
-    /// `dCamSetup_c::FanBank`, `d_cam_param.cpp:381`: the base plus a wind-driven wobble. The
+    /// `dCamSetup_c::FanBank`, `d_cam_param.cpp:399-402`: the base plus a wind-driven wobble. The
     /// port has no weather feed, so the caller supplies the power and zero leaves the base.
     pub fn bank(&self, wind_pow: f32) -> f32 {
         self.fan_bank + self.fan_bank_wind * wind_pow
@@ -630,9 +631,9 @@ pub struct Follow {
     pub lerp_vertical: f32,
     /// `m148`: the leaf fan's lean, which biases the latitude target.
     pub lean: SAngle,
-    /// `bVar3` from `d_camera.cpp:2945-2947`, the near half of the style's radius.
+    /// `bVar3` from `d_camera.cpp:3196-3198`, the near half of the style's radius.
     pub probe_near: bool,
-    /// `bVar4` from `d_camera.cpp:2949-2956`, whether the ground probe runs at all.
+    /// `bVar4` from `d_camera.cpp:3200-3202`, whether the ground probe runs at all.
     pub probe_allowed: bool,
 }
 
@@ -699,7 +700,16 @@ const RAMP_FRAMES: i32 = 0x50;
 /// `d_camera.cpp:2912`: the ease the ramp runs on.
 const RAMP_EASE: f32 = 1.25;
 
-/// `d_camera.cpp::relationalPos`, `d_camera.cpp:1594-1604`: the offset turned into the
+/// `daPyStts0_UNK2000000_e | daPyStts0_HANG_e | daPyStts0_UNK40_e | daPyStts0_UNK20_e |
+/// daPyStts0_UNK1_e`, the status mask the centre's horizontal lerp reads at
+/// `d_camera.cpp:3170` and the latitude's own convergence at `d_camera.cpp:3469`.
+const STIFF_MASK: u32 = player_status::STTS0_UNK2000000
+    | player_status::STTS0_HANG
+    | player_status::STTS0_UNK40
+    | player_status::STTS0_UNK20
+    | player_status::STTS0_UNK1;
+
+/// `d_camera.cpp::relationalPos`, `d_camera.cpp:1793-1804`: the offset turned into the
 /// actor's yaw frame and added to the attention position.
 ///
 /// The reference source spells the setter `V`, which its own `cSGlobe` setters would route to the
@@ -714,7 +724,7 @@ pub fn relational_pos(player: &Player, facing: SAngle, offset: Vec3) -> Vec3 {
     player.pos + globe.to_xyz()
 }
 
-/// `dCamera_c::initialize`'s aim, `d_camera.cpp:341-356`: the one place retail aims a camera
+/// `dCamera_c::initialize`'s aim, `d_camera.cpp:545-558`: the one place retail aims a camera
 /// that has never been aimed. The centre lands on the attention point lifted by the style's
 /// centre height and the globe straight back along the player's facing, at a fixed radius the
 /// style then pulls in over the placement ramp. `initialize` runs once, so this only ever fires
@@ -725,99 +735,99 @@ fn seed(cache: &mut ViewCache, player: &Player, center_height: f32, facing: SAng
     cache.eye = cache.center + cache.direction.to_xyz();
 }
 
-/// `dCamera_c::followCamera(s32 style)`, `d_camera.cpp:2618-3274`.
+/// `dCamera_c::followCamera(s32 style)`, `d_camera.cpp:2843-3553`.
 ///
 /// False for a style whose engine is not `Follow`, which is what dispatching through
-/// `engine_tbl[Algorythmn]` does at `d_camera.cpp:797`. This is the readable spine of the
+/// `engine_tbl[Algorythmn]` does at `d_camera.cpp:999`. This is the readable spine of the
 /// function: the style parameters, the placement ramp, the centre, radius, latitude and
 /// field-of-view smoothing, the yaw chase and the charge pull-in.
 ///
 /// The order below is the order the reference runs in, and each line names what this port
 /// does there and what it leaves out:
 ///
-/// - `d_camera.cpp:1211-1217`: `onModeChange` clears the placement flags and the frame
+/// - `d_camera.cpp:1415-1418`: `onModeChange` clears the placement flags and the frame
 ///   counter on a style change, which is what makes a style replay its placement. The port
 ///   notices the change against `Follow::style` rather than in `change_style`, which holds no
 ///   placement state of its own.
-/// - `d_camera.cpp:2633-2653`: the nineteen style parameters, read through `Camera::val`.
-/// - `d_camera.cpp:2661-2666`: a placement that has just started carries no offset yet.
-/// - `d_camera.cpp:2710-2718`: crawling or swimming drops the eye's floor and lifts the
+/// - `d_camera.cpp:2860-2880`: the nineteen style parameters, read through `Camera::val`.
+/// - `d_camera.cpp:2886-2892`: a placement that has just started carries no offset yet.
+/// - `d_camera.cpp:2936-2944`: crawling or swimming drops the eye's floor and lifts the
 ///   latitude's, both from the player's published status.
-/// - `d_camera.cpp:2720-2729`: hanging drops the eye under the attention point outright,
+/// - `d_camera.cpp:2946-2955`: hanging drops the eye under the attention point outright,
 ///   otherwise the drift eases onto the style's at six percent a frame.
-/// - `d_camera.cpp:2731-2738`: a leaf fan in flight forces a fixed placement, keyed on
+/// - `d_camera.cpp:2957-2964`: a leaf fan in flight forces a fixed placement, keyed on
 ///   `STTS1_UNK40000`. The flying overrides above it and the peep angle below it need actor
 ///   states the sim does not publish.
-/// - `d_camera.cpp:2749-2751`: the style's own flag pins the yaw to the player.
-/// - `d_camera.cpp:2773-2775`: the eye's yaw offset eases onto the style's at six percent a
-///   frame. The arms above it at `d_camera.cpp:2753-2772` lean the offset while aiming in
+/// - `d_camera.cpp:2982-2984`: the style's own flag pins the yaw to the player.
+/// - `d_camera.cpp:3004-3006`: the eye's yaw offset eases onto the style's at six percent a
+///   frame. The arms above it at `d_camera.cpp:2986-3003` lean the offset while aiming in
 ///   water or in flight, which need those states.
-/// - `d_camera.cpp:2778`: the eye's offset in the player's frame.
-/// - `d_camera.cpp:2779-2833`: the frame a placement starts on, which measures how far the
+/// - `d_camera.cpp:3010-3013`: the eye's offset in the player's frame.
+/// - `d_camera.cpp:3014-3080`: the frame a placement starts on, which measures how far the
 ///   camera has to come and spreads the move over a computed number of frames. The first arm
-///   at `d_camera.cpp:2802` is `chkFlag(0x8000) || !m110`, read off the camera's own flag word
+///   at `d_camera.cpp:3037-3042` is `chkFlag(0x8000) || !m110`, read off the camera's own flag word
 ///   and the mode-pair test `onModeChange` makes; neither is available here, so the placement
 ///   is always measured.
-/// - `d_camera.cpp:2835-2836`: the point the centre walks toward, and the player's facing.
-///   The water-surface clamp at `d_camera.cpp:2838` needs `getWaterSurfaceHeight`, which
+/// - `d_camera.cpp:3082-3085`: the point the centre walks toward, and the player's facing.
+///   The water-surface clamp at `d_camera.cpp:3085` needs `getWaterSurfaceHeight`, which
 ///   reads a roof and a sea plane this port has no feed for.
-/// - `d_camera.cpp:2840-2898`: the placement ramp itself, spent a frame at a time out of the
-///   budget the first frame measured. The background move at `d_camera.cpp:2841-2843` and the
-///   centre's line-check push-out at `d_camera.cpp:2854-2863` belong to the collision pass.
-/// - `d_camera.cpp:2906-2913`: the arm at `d_camera.cpp:2906-2909` cancels the ramp while
+/// - `d_camera.cpp:3087-3146`: the placement ramp itself, spent a frame at a time out of the
+///   budget the first frame measured. The background move at `d_camera.cpp:3088-3090` and the
+///   centre's line-check push-out at `d_camera.cpp:3099-3110` belong to the collision pass.
+/// - `d_camera.cpp:3153-3164`: the arm at `d_camera.cpp:3153-3160` cancels the ramp while
 ///   swimming, which needs that state; the ramp itself is ported.
-/// - `d_camera.cpp:2919-2924`: aiming from far off the player's back stiffens the centre's
-///   horizontal lerp to a tenth; the status mask behind that arm is not published here.
-/// - `d_camera.cpp:2926-2938`: the vertical lerp, which only relaxes once the ramp has begun.
+/// - `d_camera.cpp:3166-3175`: aiming from far off the player's back stiffens the centre's
+///   horizontal lerp to a tenth, on the status mask the port publishes.
+/// - `d_camera.cpp:3177-3189`: the vertical lerp, which only relaxes once the ramp has begun.
 ///   The lock-on override on the last two lines needs a mode this port does not track.
-/// - `d_camera.cpp:2945-2956`: the two flags that gate the ground probe, recorded on
+/// - `d_camera.cpp:3196-3202`: the two flags that gate the ground probe, recorded on
 ///   [`Follow::probe_near`] and [`Follow::probe_allowed`] for the collision pass.
-/// - `d_camera.cpp:2969`: the centre follows the target at the style's own per-axis lerp,
-///   `cStack_284` at `d_camera.cpp:2941`. The mode-one clamp above it at
-///   `d_camera.cpp:2958-2967` and the line check below it at `d_camera.cpp:2971-2986` are
+/// - `d_camera.cpp:3215`: the centre follows the target at the style's own per-axis lerp,
+///   `cStack_284` at `d_camera.cpp:3192`. The mode-one clamp above it at
+///   `d_camera.cpp:3204-3213` and the line check below it at `d_camera.cpp:3217-3232` are
 ///   lock-on and collision.
-/// - `d_camera.cpp:2988`: the placement as it stood before this frame moved it.
-/// - `d_camera.cpp:2990-2994`: the charge pull-in. The frames held are what spend the pull and
+/// - `d_camera.cpp:3234`: the placement as it stood before this frame moved it.
+/// - `d_camera.cpp:3236-3240`: the charge pull-in. The frames held are what spend the pull and
 ///   the ease is the setup's, so a charge drags the camera in over its own length rather than
 ///   snapping.
-/// - `d_camera.cpp:3014-3090`: with no charge running the pull follows the main stick, leaning
+/// - `d_camera.cpp:3262-3343`: with no charge running the pull follows the main stick, leaning
 ///   the camera off the player's back as the stick is pushed. The arms above it at
-///   `d_camera.cpp:2995-3013` release the pull in flight or on a leaf fan.
-/// - `d_camera.cpp:3069-3086`: a forced-yaw style settles onto the player's side first,
+///   `d_camera.cpp:3241-3261` release the pull in flight or on a leaf fan.
+/// - `d_camera.cpp:3321-3338`: a forced-yaw style settles onto the player's side first,
 ///   counting up out of the side lock before it will follow the stick. The peeping arm at
-///   `d_camera.cpp:3077-3079` needs a ground line check.
-/// - `d_camera.cpp:3093-3106`: where the yaw is pulled to. The first arm holds the yaw where it
+///   `d_camera.cpp:3329-3331` needs a ground line check.
+/// - `d_camera.cpp:3345-3365`: where the yaw is pulled to. The first arm holds the yaw where it
 ///   is while the style allows it and nothing aims, on a flag the collision pass sets.
 ///   [`Camera::yaw_trim`] is this port's own addition, folded into the placement's own
 ///   longitude at the chase: retail reaches its free yaw through `mAngleY`, which
-///   `d_camera.cpp:861` derives from the direction itself, so whatever steered it from outside
+///   `d_camera.cpp:1064` derives from the direction itself, so whatever steered it from outside
 ///   is not in the readable text.
-/// - `d_camera.cpp:3108-3109`: the chase, scaled by the pull and by the cosine of the latitude,
+/// - `d_camera.cpp:3365`: the chase, scaled by the pull and by the cosine of the latitude,
 ///   so a pull at the pole turns nothing.
-/// - `d_camera.cpp:3111-3186`: the latitude the placement eases toward.
-/// - `d_camera.cpp:3112-3123`: while a charge is held the latitude goes straight to the setup's,
+/// - `d_camera.cpp:3366-3488`: the latitude the placement eases toward.
+/// - `d_camera.cpp:3367-3382`: while a charge is held the latitude goes straight to the setup's,
 ///   eased on the charge's own curve, and the held count ticks up.
-/// - `d_camera.cpp:3138-3162`: a placement still being spent holds its latitude and eases
+/// - `d_camera.cpp:3400-3429`: a placement still being spent holds its latitude and eases
 ///   toward the style's, on a hundredth of a frame unless aiming replaces it with a quarter.
-///   The demote-cam arm at `d_camera.cpp:3156-3158` needs the monitoring distances
-///   `updateMonitor` keeps. The convergence at `d_camera.cpp:3139` reuses the one local the
-///   reference listing also reads at `d_camera.cpp:3216-3217`, so it takes the same style
+///   The demote-cam arm at `d_camera.cpp:3422-3424` needs the monitoring distances
+///   `updateMonitor` keeps. The convergence at `d_camera.cpp:3401` reuses the one local the
+///   reference listing also reads at `d_camera.cpp:3495-3496`, so it takes the same style
 ///   parameter here.
-/// - `d_camera.cpp:3180-3184`: once the ramp is running the placement holds its own latitude
+/// - `d_camera.cpp:3430-3463`: once the ramp is running the placement holds its own latitude
 ///   and eases onto the player at the style's flying ratio. The arms above it at
-///   `d_camera.cpp:3164-3179` need aiming or flight.
-/// - `d_camera.cpp:3188`: the player's height is recorded for the flying test.
-/// - `d_camera.cpp:3190-3195`: aiming and hanging hold the latitude. The status mask behind it
-///   is not published here, so the flag reads clear.
-/// - `d_camera.cpp:3197-3213`: the latitude clamped to the style's range and eased onto it.
-/// - `d_camera.cpp:3215-3231`: the radius. The style's near and far radii converge onto the
+///   `d_camera.cpp:3431-3454` need aiming or flight.
+/// - `d_camera.cpp:3467`: the player's height is recorded for the flying test.
+/// - `d_camera.cpp:3469-3474`: aiming and hanging hold the latitude, on the status mask the
+///   port publishes.
+/// - `d_camera.cpp:3476-3492`: the latitude clamped to the style's range and eased onto it.
+/// - `d_camera.cpp:3494-3510`: the radius. The style's near and far radii converge onto the
 ///   placement's, and the lerp is only slow while the placement sits outside them.
-/// - `d_camera.cpp:3243-3244`: the eye trails the placement's own eye at three quarters of a
+/// - `d_camera.cpp:3522-3523`: the eye trails the placement's own eye at three quarters of a
 ///   frame and the globe is read back off the result.
-/// - `d_camera.cpp:3250-3251`: the field of view, on a lerp that settles onto the style's. The
-///   leaf fan's jitter at `d_camera.cpp:3253-3255` and the flight sway at
-///   `d_camera.cpp:3257-3271` need states and a wind feed this port does not have.
-/// - `d_camera.cpp:3234-3241`: the ground probe along the placement, left to the collision pass.
+/// - `d_camera.cpp:3529-3530`: the field of view, on a lerp that settles onto the style's. The
+///   leaf fan's jitter at `d_camera.cpp:3532-3534` and the flight sway at
+///   `d_camera.cpp:3536-3550` need states and a wind feed this port does not have.
+/// - `d_camera.cpp:3513-3520`: the ground probe along the placement, left to the collision pass.
 pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool {
     if camera.engine() != Some(CamEngine::Follow) {
         return false;
@@ -831,8 +841,11 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
         camera.age = 0;
         camera.settled = false;
     }
-    let first = camera.age == 0;
-    camera.age = camera.age.wrapping_add(1);
+    // `m108` is the frame count `Run` keeps, and `Run` bumps it only after the engine returns
+    // (`d_camera.cpp:1003`), so the engine reads the count as it stood when it was called.
+    let frame = camera.age;
+    let first = frame == 0;
+    camera.age = frame.wrapping_add(1);
 
     if first {
         follow.yaw_deg = 0.0;
@@ -940,7 +953,10 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
         let to_eye = cache.eye - aim;
         let to_center = (cache.center - anchor).abs().length() * 4.0;
         let travel = to_eye.abs().length().max(to_center).abs();
-        follow.steps = ((PLAYER_HEIGHT / travel.max(10.0)).sqrt() * HEIGHT_SCALE) as i32 + 1;
+        // `d_camera.cpp:3065-3073`: the placement runs for the square root of the travel over
+        // the player's height, scaled by 3.8, plus the frame that starts it.
+        let height = PLAYER_HEIGHT.max(10.0);
+        follow.steps = ((travel / height).sqrt() * HEIGHT_SCALE) as i32 + 1;
 
         follow.radius_near = cache.direction.radius();
         follow.radius_far = cache.direction.radius();
@@ -951,9 +967,14 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
 
     let facing_diff = facing - cache.direction.longitude();
     let target = relational_pos(player, facing, offset);
+    // `daPyStts0_UNK2000000_e | daPyStts0_HANG_e | daPyStts0_UNK40_e | daPyStts0_UNK20_e |
+    // daPyStts0_UNK1_e` and `daPyStts1_UNK10000_e`, the mask the centre's lerp at
+    // `d_camera.cpp:3170` and the latitude's own at `d_camera.cpp:3469` both read.
+    let stiff =
+        input.status.check0(STIFF_MASK) || input.status.check1(player_status::STTS1_UNK10000);
 
     if !camera.settled {
-        follow.step_left = follow.steps as f32 - camera.age as f32;
+        follow.step_left = follow.steps as f32 - frame as f32;
         let share = follow.step_left / follow.step_budget;
         follow.target += (target - follow.target) * share;
         cache.center += (follow.target - cache.center) * lerp_horizontal;
@@ -966,24 +987,27 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
             .min(pitch_ceiling);
         let want = SGlobe::new(radius, latitude, camera.angle_y.inv());
         let current = cache.direction.radius();
+        // `d_camera.cpp:3126-3127`: the placement walks onto its target globe by the share of
+        // the budget this frame has left, not by the cushion the settled arm uses.
         cache
             .direction
-            .set_radius(current + CUSHION * (want.radius() - current));
+            .set_radius(current + share * (want.radius() - current));
         let current = cache.direction.latitude();
         cache
             .direction
-            .set_latitude(current + (want.latitude() - current) * CUSHION);
+            .set_latitude(current + (want.latitude() - current) * share);
         cache.eye = cache.center + cache.direction.to_xyz();
         follow.eye = cache.eye;
 
-        if camera.age >= (follow.steps - 1) as u32 {
+        if frame >= (follow.steps - 1) as u32 {
             camera.settled = true;
         }
 
         follow.pitch_deg = cache.direction.latitude().degree();
         follow.radius_near = cache.direction.radius();
         follow.radius_far = cache.direction.radius();
-        cache.fovy += CUSHION * (target_fovy - cache.fovy);
+        // `d_camera.cpp:3143`: the field of view walks on the same share.
+        cache.fovy += share * (target_fovy - cache.fovy);
         follow.step_budget -= follow.step_left;
 
         camera.follow = follow;
@@ -1001,7 +1025,14 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
             * rational_bezier_ratio(follow.ramp as f32 / 80.0, RAMP_EASE);
     }
 
-    follow.lerp_horizontal = lerp_horizontal;
+    follow.lerp_horizontal =
+        if stiff && !(facing_diff > SAngle::THREE_QUARTER && facing_diff < SAngle::QUARTER) {
+            // `d_camera.cpp:3170-3175`: the centre's horizontal lerp stiffens to a tenth while the
+            // player hangs or aims and the camera is not already behind them.
+            0.1
+        } else {
+            lerp_horizontal
+        };
 
     follow.lerp_vertical = if follow.ramp == 0 {
         lerp_vertical
@@ -1042,7 +1073,12 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
             1.0 - (SAngle::from_degrees(eased * 180.0).cos() * 0.25 + 0.75)
         };
         follow.pull *= stick_value;
-        follow.pull *= 0.1;
+        // `d_camera.cpp:3279-3288`: a corner pull-in takes the stick's pull at twice the rate.
+        follow.pull *= if camera.event_flags & super::cam_bump::evflag::CORNER != 0 {
+            0.5
+        } else {
+            0.1
+        };
 
         if forced {
             if follow.side_lock == 0
@@ -1052,6 +1088,12 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
             } else if follow.side_lock < 0xf {
                 follow.pull = follow.side_lock as f32 * 0.033333335;
                 follow.side_lock += 1;
+            } else if input
+                .status
+                .check0(player_status::STTS0_UNK40 | player_status::STTS0_UNK20)
+            {
+                // `d_camera.cpp:3329-3331`: peeing or aiming pins the pull at a sixth.
+                follow.pull = 0.15;
             } else if stick_value < 0.1 {
                 follow.pull = 0.05;
             } else {
@@ -1104,7 +1146,12 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
             follow.pitch_deg +=
                 pitch_weight * ((follow.pitch_target + follow.lean.degree()) - follow.pitch_deg);
             latitude = SAngle::from_degrees(follow.pitch_deg);
-            follow.pitch_lerp += lerp * (CUSHION - follow.pitch_lerp);
+            if camera.event_flags & super::cam_bump::evflag::CORNER != 0 {
+                // `d_camera.cpp:3416-3417`: a corner pull-in freezes the latitude's own lerp.
+                follow.pitch_lerp = 0.0;
+            } else {
+                follow.pitch_lerp += lerp * (CUSHION - follow.pitch_lerp);
+            }
         } else {
             latitude = before.latitude();
             follow.pitch_target = latitude.degree();
@@ -1115,7 +1162,9 @@ pub fn follow(camera: &mut Camera, player: &Player, input: &FollowInput) -> bool
 
     follow.player_y = player.pos.y;
 
-    follow.aiming = false;
+    // `d_camera.cpp:3469-3474`: the same mask that stiffens the centre's lerp stiffens the
+    // latitude's own convergence, and the next frame reads it back.
+    follow.aiming = stiff;
 
     if latitude < pitch_floor {
         latitude = pitch_floor;

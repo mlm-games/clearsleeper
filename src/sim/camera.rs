@@ -256,8 +256,16 @@ impl Camera {
             Some(style) => *style,
             None => return false,
         };
+        let changed = self.cam_type != cam_type || self.mode != mode;
         self.cam_type = cam_type;
         self.mode = mode;
+        if changed {
+            // `dCamera_c::onModeChange`, `d_camera.cpp:1415-1418`: a type or a mode change
+            // zeroes the frame counter and the three placement flags, so the placement plays
+            // again even when the style behind the new mode is the old one.
+            self.age = 0;
+            self.settled = false;
+        }
         self.change_style(style)
     }
 
@@ -437,7 +445,7 @@ pub fn track(
         0.0
     };
     camera.yaw_trim += SAngle::from_degrees(orbit_delta + turn);
-    camera.ground_pass(player, solid.as_deref(), PLAYER_HEIGHT);
+    camera.ground_pass(player, solid.as_deref(), &status, PLAYER_HEIGHT);
     camera.run_engine(
         player,
         room.as_deref(),
@@ -462,11 +470,5 @@ pub fn track(
         events.as_deref_mut(),
     );
     camera.shake_pass();
-    camera.bump_check(
-        player,
-        solid.as_deref(),
-        sea.as_deref(),
-        &status,
-        PLAYER_HEIGHT,
-    );
+    camera.bump_check(player, solid.as_deref(), sea.as_deref());
 }

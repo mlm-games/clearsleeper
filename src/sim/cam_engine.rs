@@ -12,19 +12,19 @@ use super::event_manager::EventManager;
 use super::player::Player;
 use super::player_status;
 
-/// The player's `mHeight`, which `getHeight` answers for a player at `d_camera.cpp:1988-1994`
+/// The player's `mHeight`, which `getHeight` answers for a player at `d_camera.cpp:1851-1859`
 /// and which the two fixed-placement engines divide their travel by.
 const PLAYER_HEIGHT: f32 = 125.0;
 
-/// `mWork.subject.m378 = 'SUBJ'`, `d_camera.cpp:3852`.
+/// `mWork.subject.m378 = 'SUBJ'`, `d_camera.cpp:4750`.
 const SUBJECT_TAG: i32 = i32::from_be_bytes(*b"SUBJ");
-/// `mWork.subject.m3A8 = 100`, `d_camera.cpp:3861`.
+/// `mWork.subject.m3A8 = 100`, `d_camera.cpp:4759`.
 const SUBJECT_COUNTER: i32 = 100;
-/// `at.y -= 25.0f`, `d_camera.cpp:4060`: how far below the target's attention point the settled
+/// `at.y -= 25.0f`, `d_camera.cpp:4965`: how far below the target's attention point the settled
 /// arm's aim sits.
 const SUBJECT_DROP: f32 = 25.0;
 /// `mCamSetup.m030`, `d_cam_param.cpp:316`: the scoped styles' zoom gain, which
-/// `CalcSubjectAngle` folds into the style's own gate at `d_camera.cpp:3791`.
+/// `CalcSubjectAngle` folds into the style's own gate at `d_camera.cpp:4696`.
 const SUBJECT_CUSHION: f32 = 0.75;
 /// `mCamSetup.mCurveWeight`, `d_cam_param.cpp:322`, the ease `CalcSubjectAngle` and the scope's
 /// zoom both run their stick through.
@@ -192,7 +192,7 @@ impl Default for FixedPos {
 }
 
 /// `dCamera_c::mWork.subject`, `d_camera.h:325-349`, narrowed to the members `subjectCamera` and
-/// `CalcSubjectAngle` read and write at `d_camera.cpp:3829-4176` and `:3692-3827`.
+/// `CalcSubjectAngle` read and write at `d_camera.cpp:4734-5086` and `:4584-4731`.
 ///
 /// `m390` and `m394` are written by the placement arm's last frame and read by no line of the
 /// readable text; `m398` is the scope's wipe target. `m3B8`, the pitch the angle source measures,
@@ -548,14 +548,14 @@ impl Default for Work {
     }
 }
 
-/// `dCamera_c::Run`'s engine call, `d_camera.cpp:796`: `engine_tbl[mCamParam.Algorythmn(style)]`,
+/// `dCamera_c::Run`'s engine call, `d_camera.cpp:999`: `engine_tbl[mCamParam.Algorythmn(style)]`,
 /// which is how `CamEngine` routes. False is retail's "the engine declined", which `Run` reads
 /// at `d_camera.cpp:804-806`.
 ///
-/// The counters `Run` bumps after the call at `d_camera.cpp:797-801` are bumped here: `m118`
+/// The counters `Run` bumps after the call at `d_camera.cpp:1000-1004` are bumped here: `m118`
 /// through [`Work::event`], `m11C` through [`Camera::setup_age`], and `m108` through
 /// [`Camera::age`] for every engine except the follow pair, which spends its own inside
-/// [`cam_follow::follow`] at `cam_follow.rs:834-835`.
+/// [`cam_follow::follow`] at `cam_follow.rs:843-847`.
 pub fn engine(
     camera: &mut Camera,
     player: &Player,
@@ -599,7 +599,7 @@ pub fn engine(
     result
 }
 
-/// `dCamera_c::crawlCamera`, `d_camera.cpp:4185-4337`. The player is the only actor in the text, so
+/// `dCamera_c::crawlCamera`, `d_camera.cpp:5385-5535`. The player is the only actor in the text, so
 /// `directionOf` is the player's own facing and `attentionPos` its position.
 ///
 /// Two reads the port cannot make. `mpPlayerActor->shape_angle.x`, the player's pitch, is not
@@ -654,7 +654,6 @@ fn crawl(
         work.behind = true;
     }
 
-    work.aiming = false;
     if behind && row.is_some_and(|row| row.field_0x12 != CAM_FIELD_UNSET) {
         if let Some(arrow) = room.and_then(CamRoom::arrow_entry) {
             turn = cache.direction.longitude() - SAngle::from(arrow.angle[1]);
@@ -664,6 +663,9 @@ fn crawl(
                 camera.settled = true;
             }
         }
+    } else {
+        // `d_camera.cpp:5450-5451`: with no arrow in play the snap arm is off.
+        work.aiming = false;
     }
 
     let anchor = cam_follow::relational_pos(player, facing, offset);
@@ -732,7 +734,7 @@ fn crawl(
     true
 }
 
-/// `dCamera_c::fixedFrameCamera`, `d_camera.cpp:4430-4517`. The arrow is the whole placement: the
+/// `dCamera_c::fixedFrameCamera`, `d_camera.cpp:6943-7026`. The arrow is the whole placement: the
 /// centre sits on it, the eye at a globe of radius 3000 built from the arrow's first two angles,
 /// and that eye is pulled onto the arrow when the player stands between it and the arrow.
 ///
@@ -762,10 +764,12 @@ fn fixed_frame(
             )
             .to_xyz();
         work.start_center = work.start_eye;
-        if let Some(nearest) = nearest_on_segment(work.start_eye, work.center, player.pos) {
-            work.start_eye = nearest;
+        // `d_camera.cpp:6964-6972`: the start centre slides onto the segment's nearest point
+        // when the player stands inside it, and the placement's globe is measured from there.
+        if let Some(nearest) = nearest_on_segment(work.start_center, work.center, player.pos) {
+            work.start_center = nearest;
         }
-        work.direction = SGlobe::from_xyz(work.center - work.start_eye);
+        work.direction = SGlobe::from_xyz(work.center - work.start_center);
         work.fovy = match row {
             Some(row) if row.field_0x12 != CAM_FIELD_UNSET => f32::from(row.field_0x12),
             _ => style_fovy,
@@ -806,7 +810,7 @@ fn fixed_frame(
     true
 }
 
-/// `dCamera_c::fixedPositionCamera`, `d_camera.cpp:4520-4676`. With no arrow the eye is where the
+/// `dCamera_c::fixedPositionCamera`, `d_camera.cpp:7029-7172`. With no arrow the eye is where the
 /// camera already is, which is retail's own fallback at `d_camera.cpp:4573-4577`.
 ///
 /// The `setDMCAngle` call at `d_camera.cpp:4554` is not ported: it needs the pad-driven DMC system
@@ -921,7 +925,7 @@ fn fixed_position(camera: &mut Camera, player: &Player, room: Option<&CamRoom>) 
     true
 }
 
-/// `dCamera_c::subjectCamera`, `d_camera.cpp:3829-4176`: the state its first frame writes, the
+/// `dCamera_c::subjectCamera`, `d_camera.cpp:4734-5086`: the state its first frame writes, the
 /// ten frames, or seven while the aim stick is held, the placement is walked across, and then
 /// the settled arm, which is [`subject_settled`].
 ///
@@ -1109,7 +1113,9 @@ fn subject_settled(
 
     let yaw = cache.direction.longitude();
     work.aim_x = (yaw - base_yaw).degree() / wide_angle;
-    work.aim_y = yaw.degree() / tall_angle;
+    // `d_camera.cpp:4992-4996`: the vertical aim is written back from the direction's
+    // latitude, not from its longitude.
+    work.aim_y = cache.direction.latitude().degree() / tall_angle;
     work.counter = 0;
     work.pad = false;
 
@@ -1144,7 +1150,7 @@ fn subject_settled(
     true
 }
 
-/// `dCamera_c::CalcSubjectAngle`, `d_camera.cpp:3692-3827`: the aim pair `m384` and `m388` the
+/// `dCamera_c::CalcSubjectAngle`, `d_camera.cpp:4584-4731`: the aim pair `m384` and `m388` the
 /// settled arm rotates the eye offset by, as the fraction of the two style angles the raw angle
 /// spans. `m384` is scaled by slot 24 and `m388` by slot 19 on the way out at `:3819-3822`, and
 /// the settled arm divides them back the same way at `:4068-4069`.
@@ -1196,7 +1202,7 @@ fn subject_angle(camera: &Camera, input: &EngineInput<'_>, work: &mut Subject) {
     work.from_pad = false;
 }
 
-/// `dCamera_c::eventCamera`, `d_camera.cpp:4679-4885`: twenty-eight named cutscene actions read
+/// `dCamera_c::eventCamera`, `d_camera.cpp:7175-7396`: twenty-eight named cutscene actions read
 /// off the running cutscene's camera staff, through
 /// [`cam_event::event`](super::cam_event::event).
 ///
@@ -1229,7 +1235,7 @@ fn non_owner(camera: &mut Camera) -> bool {
 }
 
 impl Camera {
-    /// `dCamera_c::Run`'s engine call at `d_camera.cpp:796`, through [`engine`].
+    /// `dCamera_c::Run`'s engine call at `d_camera.cpp:999`, through [`engine`].
     pub fn run_engine(
         &mut self,
         player: &Player,
@@ -1241,7 +1247,7 @@ impl Camera {
         engine(self, player, room, input, paths, events)
     }
 
-    /// `dCamera_c::Run`'s `shakeCamera` at `d_camera.cpp:812`: once a frame, after the engine and
+    /// `dCamera_c::Run`'s `shakeCamera` at `d_camera.cpp:1015`: once a frame, after the engine and
     /// before the collision pass. The four offsets stay on [`Camera::shake`] for the renderer.
     pub fn shake_pass(&mut self) {
         let anchor = if self.shake.flags & 0x10 == 0 && self.shake.flags & 0x20 != 0 {
@@ -1290,12 +1296,12 @@ fn nearest_on_segment(start: Vec3, end: Vec3, pos: Vec3) -> Option<Vec3> {
     Some(start + axis * t)
 }
 
-/// `d_camera.cpp:4496`: the centre walked onto its target by one share of the placement.
+/// `d_camera.cpp:7005`: the centre walked onto its target by one share of the placement.
 fn walk_center(cache: &mut ViewCache, target: Vec3, share: f32) {
     cache.center += (target - cache.center) * share;
 }
 
-/// `d_camera.cpp:4498-4500`: the three globe members walked onto their targets by one share.
+/// `d_camera.cpp:7007-7009`: the three globe members walked onto their targets by one share.
 fn walk_globes(cache: &mut ViewCache, want: SGlobe, share: f32) {
     let current = cache.direction;
     cache.direction = SGlobe::new(
@@ -1305,7 +1311,7 @@ fn walk_globes(cache: &mut ViewCache, want: SGlobe, share: f32) {
     );
 }
 
-/// `d_camera.cpp:4634-4645`: the eye's globe off a fixed position, held between the style's two
+/// `d_camera.cpp:7130-7141`: the eye's globe off a fixed position, held between the style's two
 /// radii and then walked onto by one share.
 fn walk_towards(cache: &mut ViewCache, position: Vec3, near: f32, far: f32, share: f32) {
     let mut globe = SGlobe::from_xyz(position - cache.center);
