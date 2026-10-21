@@ -3,9 +3,11 @@ use bevy_ecs::prelude::*;
 use crate::j2d::Screen;
 use crate::save::{SLOTS, SaveGame};
 use crate::sim::daynight::{DayNight, TIME_WRAP};
+use crate::text::msgget::MsgArchive;
 use crate::ui_menu_option::value_increase;
 use crate::ui_menu_save::{
     Color, MemCard, PadInput as SavePadInput, Pane, Particles, SlotState, StickControl, blank_save,
+    message_get,
 };
 
 pub const SCREEN_LABEL: &str = "file_select.blo";
@@ -232,6 +234,30 @@ pub const MSG_EXTRA_CONFIRM: u32 = 0x50;
 pub const MSG_EXTRA_BACK: u32 = 0x4E;
 pub const MSG_EXTRA_DONE: u32 = 0x51;
 pub const MSG_EXTRA_FAIL: u32 = 0x3D;
+
+/// The message numbers this screen shows. `fopMsgM_messageGet` reads each one
+/// out of the game's message archive (`d_file_select.cpp:514-516`), so the
+/// texts are resolved when the screen is set up.
+pub const FILE_SELECT_MESSAGES: [u32; 18] = [
+    MSG_TITLE,
+    MSG_RETURN,
+    MSG_RETURN_TITLE,
+    MSG_BROKEN,
+    MSG_CORRUPT_SUMMARY,
+    MSG_COPY_ASK,
+    MSG_COPY_TO,
+    MSG_COPY_OK,
+    MSG_COPY_DONE,
+    MSG_ERASE_OK,
+    MSG_ERASE_DONE,
+    MSG_ERASE_FAIL,
+    MSG_COPY_FAIL,
+    MSG_CONFIRM_DONE,
+    MSG_COPY_DEST_BUSY,
+    MSG_EXTRA_CONFIRM,
+    MSG_EXTRA_DONE,
+    MSG_EXTRA_FAIL,
+];
 
 pub const SE_MENU_OK: u32 = 0x0831;
 pub const SE_MENU_CANCEL: u32 = 0x0832;
@@ -916,6 +942,9 @@ pub struct FileSelect {
     pub colors: Colors,
     pub sounds: Vec<u32>,
     pub slot_picked: Option<usize>,
+    /// The text of every message the screen shows, read out of the game's
+    /// message archive.
+    pub messages: std::collections::HashMap<u32, String>,
 }
 
 #[derive(Resource, Clone, Debug, Default)]
@@ -976,6 +1005,7 @@ impl Default for FileSelect {
             colors: Colors::default(),
             sounds: Vec::new(),
             slot_picked: None,
+            messages: std::collections::HashMap::new(),
         }
     }
 }
@@ -990,7 +1020,7 @@ impl FileSelect {
     }
 
     pub fn message_set(&mut self, index: usize, msg_no: u32) {
-        let text = format!("\u{1}{msg_no}");
+        let text = self.message_text(msg_no);
         match index {
             0 => {
                 self.message_a = text.clone();
@@ -1003,6 +1033,26 @@ impl FileSelect {
             _ => {
                 self.message_c = text.clone();
                 self.panes.groups.message_text.set_string(&text);
+            }
+        }
+    }
+
+    /// The text of the message the screen shows for `msg_no`.
+    pub fn message_text(&self, msg_no: u32) -> String {
+        self.messages.get(&msg_no).cloned().unwrap_or_default()
+    }
+
+    /// `fopMsgM_messageGet` writes the message out of the game's message
+    /// archive into the screen's text box (`d_file_select.cpp:514-516`), so the
+    /// texts the screen shows are read when it is set up. None of these
+    /// messages is one of the Hyrule-language ones, so the clear count does
+    /// not pick a different text for them.
+    pub fn set_message_archive(&mut self, archive: &dyn MsgArchive, clear_count: u8) {
+        self.messages.clear();
+        for msg_no in FILE_SELECT_MESSAGES {
+            let text = message_get(archive, clear_count, msg_no);
+            if !text.is_empty() {
+                self.messages.insert(msg_no, text);
             }
         }
     }
@@ -1089,6 +1139,7 @@ impl FileSelect {
         self.panes = FileSelectPanes::default();
         self.stick = StickControl::new(5, 2, 3, 2);
         self.stick2 = StickControl::new(3, 1, 3, 2);
+        self.messages.clear();
     }
 
     pub fn initial(&mut self) {
@@ -1504,7 +1555,7 @@ impl FileSelect {
                     1,
                 );
                 let temp3 = self.pane_trance_rec_info(
-                    1,
+                    2,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -1567,7 +1618,7 @@ impl FileSelect {
             1,
         );
         let temp7 = self.pane_trance_rec_info(
-            1,
+            2,
             self.timer - IDX_10 as i16 * 2,
             IDX_12,
             0.0,
@@ -1656,7 +1707,7 @@ impl FileSelect {
                         1,
                     );
                     let temp6 = self.pane_trance_rec_info(
-                        1,
+                        2,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1729,7 +1780,7 @@ impl FileSelect {
                         1,
                     );
                     let temp6 = self.pane_trance_rec_info(
-                        1,
+                        2,
                         self.timer - IDX_37 as i16,
                         IDX_12,
                         0.0,
@@ -1755,7 +1806,7 @@ impl FileSelect {
                     1,
                 );
                 let temp4 = self.pane_trance_rec_info(
-                    1,
+                    2,
                     self.timer,
                     IDX_12,
                     0.0,
@@ -2021,16 +2072,20 @@ impl FileSelect {
     }
 
     pub fn rec_data_pane_move(&mut self) -> bool {
+        // `recDataPaneMove`, `d_file_select.cpp:669-716`: the slots that are not
+        // selected sweep from 400px to the right of their place down to 400px
+        // below it, and the selected slot slides down from one row above into
+        // its own place.
         let (temp1, temp2, temp3, temp4, temp5, temp6) = match self.select_num {
             0 => {
                 let temp1 = self.pane_trance_rec_tlt(
                     1,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2038,10 +2093,10 @@ impl FileSelect {
                     1,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2049,10 +2104,10 @@ impl FileSelect {
                     2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2060,10 +2115,10 @@ impl FileSelect {
                     2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2075,10 +2130,10 @@ impl FileSelect {
                     0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2086,10 +2141,10 @@ impl FileSelect {
                     0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2097,10 +2152,10 @@ impl FileSelect {
                     2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2108,10 +2163,10 @@ impl FileSelect {
                     2,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2120,9 +2175,9 @@ impl FileSelect {
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
-                    0.0,
-                    0.0,
                     -85.0,
+                    0.0,
+                    0.0,
                     IDX_07,
                     2,
                 );
@@ -2131,9 +2186,9 @@ impl FileSelect {
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
-                    0.0,
-                    0.0,
                     -85.0,
+                    0.0,
+                    0.0,
                     IDX_07,
                     2,
                 );
@@ -2145,10 +2200,10 @@ impl FileSelect {
                     0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2156,10 +2211,10 @@ impl FileSelect {
                     0,
                     self.timer - IDX_29 as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2167,10 +2222,10 @@ impl FileSelect {
                     1,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2178,10 +2233,10 @@ impl FileSelect {
                     1,
                     self.timer - IDX_2a as i16,
                     IDX_28,
+                    IDX_40 as f32,
                     0.0,
                     0.0,
                     IDX_40 as f32,
-                    0.0,
                     0,
                     1,
                 );
@@ -2190,9 +2245,9 @@ impl FileSelect {
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
-                    0.0,
-                    0.0,
                     -170.0,
+                    0.0,
+                    0.0,
                     IDX_07,
                     2,
                 );
@@ -2201,9 +2256,9 @@ impl FileSelect {
                     self.timer - IDX_2d as i16,
                     IDX_28,
                     0.0,
-                    0.0,
-                    0.0,
                     -170.0,
+                    0.0,
+                    0.0,
                     IDX_07,
                     2,
                 );
@@ -5360,28 +5415,43 @@ impl FileSelect {
             MenuItem::Erase => &mut self.panes.groups.erase_key,
             MenuItem::Back => &mut self.panes.groups.back_key,
         };
-        let label = match item {
-            MenuItem::Yes => &mut self.panes.groups.yes_label,
-            MenuItem::No => &mut self.panes.groups.no_label,
-            MenuItem::Start => &mut self.panes.groups.start_label,
-            MenuItem::Copy => &mut self.panes.groups.copy_label,
-            MenuItem::Erase => &mut self.panes.groups.erase_label,
-            MenuItem::Back => &mut self.panes.groups.back_label,
-        };
-        let text = match item {
-            MenuItem::Yes => Some(&mut self.panes.groups.yes_text),
-            MenuItem::No => Some(&mut self.panes.groups.no_text),
-            MenuItem::Start => None,
-            MenuItem::Copy => None,
-            MenuItem::Erase => None,
-            MenuItem::Back => Some(&mut self.panes.groups.back_text),
+        // Each item fades a key picture, a second picture and a text
+        // (`d_file_select.cpp:3088-3247`): the yes/no/start items fade
+        // 'ys00'/'no00'/'s000' and their text, the copy/erase/back items fade
+        // 'cp00'/'dl00'/'re00' and their text. `back_text` holds 'stat', the
+        // start item's text, and `back_label` holds 'retu', the back item's.
+        let (picture, text) = match item {
+            MenuItem::Yes => (
+                &mut self.panes.groups.yes_label,
+                Some(&mut self.panes.groups.yes_text),
+            ),
+            MenuItem::No => (
+                &mut self.panes.groups.no_label,
+                Some(&mut self.panes.groups.no_text),
+            ),
+            MenuItem::Start => (
+                &mut self.panes.groups.start_label,
+                Some(&mut self.panes.groups.back_text),
+            ),
+            MenuItem::Copy => (
+                &mut self.panes.groups.copy_pic[0],
+                Some(&mut self.panes.groups.copy_label),
+            ),
+            MenuItem::Erase => (
+                &mut self.panes.groups.erase_pic[0],
+                Some(&mut self.panes.groups.erase_label),
+            ),
+            MenuItem::Back => (
+                &mut self.panes.groups.back_pic,
+                Some(&mut self.panes.groups.back_label),
+            ),
         };
         group[0].pane_trans(0.0, param_2 + value * span);
         if param_5 == 1 {
             value = 1.0 - value;
         }
         group[0].set_now_alpha(value);
-        label.set_now_alpha(value);
+        picture.set_now_alpha(value);
         if let Some(pane) = text {
             pane.set_now_alpha(value);
         }

@@ -118,6 +118,11 @@ impl Menu {
         let Some(assets) = crate::panes::load() else {
             return;
         };
+        // The screen's messages are read out of the game's message archive
+        // (`fopMsgM_messageGet`, `d_file_select.cpp:514-516`), so the texts are
+        // resolved before the screen puts its title up.
+        let archives = crate::assets::load_msg_archives();
+        self.fs.set_message_archive(&archives, 0);
         self.fs.create(assets.screen.clone());
         for slot in 0..SLOTS {
             self.card.slots[slot] = crate::save::read_slot_in(&self.card.dir, slot);
@@ -131,6 +136,9 @@ impl Menu {
     pub fn sync_file_select_cursor(&mut self) {
         self.revision.set(self.revision.get().wrapping_add(1));
         self.fs.select_num = self.slot as u8;
+        // `recCursorMove`, `d_file_select.cpp:628-638`: the record cursor sits
+        // on the selected slot's row.
+        self.fs.rec_cursor_move();
     }
 
     /// `d_file_select.cpp` drives the opening through `open()`, one call per
@@ -198,9 +206,21 @@ impl Menu {
                 }
                 (Screen::FileSelect, Cmd::Confirm) => {
                     let slot = self.slot;
+                    // `menuSelect`, `d_file_select.cpp:904`: the slot the
+                    // player picked is the one the game saves into.
+                    self.card.set_data_num(slot as u8);
                     return Some(match self.slots.get(slot) {
                         Some(SlotInfo::File { .. }) => Action::Load(slot),
-                        _ => Action::New(slot),
+                        _ => {
+                            // A slot with no file holds the card's init data
+                            // (`dComIfGs_setInitDataToCard`, `d_menu_save.cpp:840`),
+                            // which is what the save path's checksum test
+                            // reads.
+                            self.card
+                                .set_memory_to_card(slot, crate::ui_menu_save::blank_save());
+                            self.card.set_checksum_game_data(slot);
+                            Action::New(slot)
+                        }
                     });
                 }
                 (Screen::FileSelect, Cmd::Back) => self.screen = Screen::Title,

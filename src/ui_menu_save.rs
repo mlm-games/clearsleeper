@@ -1143,13 +1143,17 @@ impl MemCard {
     }
 }
 
+/// `mDoMemCdRWm_CalcCheckSumGameData`, `m_Do_MemCardRWmng.cpp:336-345`: the
+/// sum of the bytes and the sum of their complements, the two halves of the
+/// checksum the card holds next to the data.
 pub fn checksum_of(bytes: &[u8]) -> u64 {
-    let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
+    let mut c0: u64 = 0;
+    let mut c1: u64 = 0;
     for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100_0000_01B3);
+        c0 += u64::from(*byte);
+        c1 += u64::from(!*byte);
     }
-    hash
+    (c0 << 32) | c1
 }
 
 pub fn blank_save() -> SaveGame {
@@ -2807,9 +2811,6 @@ impl SaveMenu {
             let slot = usize::from(env.card.get_data_num());
             let test = env.card.test_checksum_game_data(slot);
             if test {
-                if let Some(save) = env.pending_save.clone() {
-                    env.card.set_memory_to_card(slot, save);
-                }
                 self.text_b = format!("\u{1}{MSG_SAVING}");
                 self.data_write(env);
                 self.proc = proc_mem_card_data_save_wait;
@@ -2872,8 +2873,15 @@ impl SaveMenu {
         }
     }
 
+    /// `dataWrite`, `d_menu_save.cpp:1012-1022`: the game state goes into the
+    /// card's slot, the slot's checksum is recomputed over it and the card is
+    /// written. Both the first attempt and the retry come through here, so
+    /// both write the state the player is holding.
     pub fn data_write(&mut self, env: &mut SaveEnv<'_>) {
         let slot = usize::from(env.card.get_data_num());
+        if let Some(save) = env.pending_save.clone() {
+            env.card.set_memory_to_card(slot, save);
+        }
         env.card.set_checksum_game_data(slot);
         env.card.save();
         self.op_result = env.card.save_sync();
