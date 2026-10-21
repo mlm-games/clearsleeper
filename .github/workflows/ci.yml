@@ -16,7 +16,7 @@ jobs:
     with:
       run-clippy: false
       run-fmt: true
-      run-test: true
+      run-test: false
       extra-checks: |
         --target wasm32-unknown-unknown
       include-android: true

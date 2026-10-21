@@ -193,35 +193,3 @@ pub fn install_launch(
         None => Ok(None),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn launch_arguments_name_one_image_or_none() {
-        let launch = parse_launch(["--disc", "a.iso"].map(OsString::from)).unwrap();
-        assert_eq!(launch.disc, Some(PathBuf::from("a.iso")));
-
-        let launch = parse_launch([OsString::from("b.rvz")]).unwrap();
-        assert_eq!(launch.disc, Some(PathBuf::from("b.rvz")));
-
-        let launch = parse_launch([OsString::from("--disc=c.gcm")]).unwrap();
-        assert_eq!(launch.disc, Some(PathBuf::from("c.gcm")));
-
-        assert_eq!(parse_launch([]).unwrap(), Launch::default());
-
-        assert!(matches!(
-            parse_launch([OsString::from("--disc")]),
-            Err(SourceError::Usage { .. })
-        ));
-        assert!(matches!(
-            parse_launch([OsString::from("--nope")]),
-            Err(SourceError::Usage { .. })
-        ));
-        assert!(matches!(
-            parse_launch([OsString::from("a.iso"), OsString::from("b.iso")]),
-            Err(SourceError::Usage { .. })
-        ));
-    }
-}

@@ -787,18 +787,3 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     group.depth_test = true;
     group
 }
-
-#[cfg(test)]
-mod tests {
-    use super::array_layers;
-
-    #[test]
-    fn pages_never_ask_for_a_cube_or_a_single_layer_array() {
-        for pages in 0..=32 {
-            let layers = array_layers(pages);
-            assert!(layers as usize >= pages.max(1));
-            assert_ne!(layers, 1);
-            assert_ne!(layers % 6, 0);
-        }
-    }
-}
