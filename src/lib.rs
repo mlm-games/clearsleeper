@@ -530,13 +530,12 @@ impl App {
         } else {
             Vec::new()
         };
-        let file_select_pad = if self.menu.screen == menus::Screen::FileSelect
-            && self.intro.is_none()
-        {
-            Some(self.file_select_pad(held, &self.menu_prev, window_focused))
-        } else {
-            None
-        };
+        let file_select_pad =
+            if self.menu.screen == menus::Screen::FileSelect && self.intro.is_none() {
+                Some(self.file_select_pad(held, &self.menu_prev, window_focused))
+            } else {
+                None
+            };
         self.menu_prev.clone_from(held);
         if !self.assets_installed {
             self.stage_host_screens(&cmds);
@@ -627,7 +626,9 @@ impl App {
         if self.menu.fs.is_select_end() == crate::ui_file_select::SELECT_END_RETURN {
             self.menu.screen = menus::Screen::Title;
         }
-        self.menu.revision.set(self.menu.revision.get().wrapping_add(1));
+        self.menu
+            .revision
+            .set(self.menu.revision.get().wrapping_add(1));
     }
 
     fn apply_menu_action(&mut self, action: Option<menus::Action>) {
