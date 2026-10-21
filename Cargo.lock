@@ -959,7 +959,6 @@ dependencies = [
  "futures-lite",
  "game-utils",
  "glam",
- "image",
  "jpeg-decoder",
  "log",
  "nod",

@@ -46,7 +46,6 @@ pub mod sim;
 pub mod source;
 pub mod text;
 pub mod title_screen;
-pub mod trace;
 pub mod ui_file_select;
 pub mod ui_menu_collect;
 pub mod ui_menu_dmap;
@@ -370,7 +369,6 @@ impl App {
         if let Some(set) = set {
             self.install_room_set(set, 0);
         }
-        trace::install(&mut self.sim);
     }
 
     /// Frame boundary: poll the shell into the sim's intent resources.
