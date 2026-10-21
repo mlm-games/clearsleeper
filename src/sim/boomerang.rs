@@ -27,7 +27,6 @@ pub const SPEED: f32 = 60.0;
 pub const FLY_MAX: f32 = 2500.0;
 pub const FLY_MAX_RIDING: f32 = 5000.0;
 pub const RETURN_REACH: f32 = SPEED * 2.0;
-pub const HIT_REACH: f32 = SPEED;
 pub const CAPSULE_RADIUS: f32 = 30.0;
 pub const SPIN: i16 = 0x1F00;
 /// `0x3000` s16, the heading a free fly-out throw adds (`d_a_boomerang.cpp:518`).
@@ -259,8 +258,12 @@ pub fn control(
             if !boom.free && boom.locks <= boom.lock {
                 boom.returning();
             }
+            // `daBoomerang_c` puts its attack capsule up from the place it was to the place it
+            // is (`d_a_boomerang.cpp:693-694`), so the volume it reaches with is the path it
+            // just flew thickened by the capsule's own radius.
+            let from = boom.pos - carried;
             let at = AtObj::new(
-                Shape::sphere(boom.pos, CAPSULE_RADIUS + HIT_REACH),
+                Shape::sphere(boom.pos, CAPSULE_RADIUS),
                 AT_SPRM_NO_TG_HIT_INF,
                 &AtMeta {
                     at_type: AT_TYPE_BOOMERANG,
@@ -293,7 +296,7 @@ pub fn control(
                         ))
                     })
                     .collect();
-                crate::sim::contact_hit::at_tg(std::slice::from_ref(&at), &tg)
+                crate::sim::contact_hit::at_tg_swept(&at, from, boom.pos, CAPSULE_RADIUS, &tg)
             };
             for crossing in crossings {
                 let foe = crossing.target;
