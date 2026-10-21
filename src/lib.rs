@@ -1177,19 +1177,22 @@ impl App {
         })
     }
 
-    fn camera_underground(&self, camera: &OrbitCamera) -> bool {
+    fn camera_underground(&self, camera: &OrbitCamera, snapshot: &view::SceneSnapshot) -> bool {
         let Some(collision) = self.sim.world.get_resource::<sim::collision::Collision>() else {
             return false;
         };
         let eye = camera.eye();
-        collision
-            .ground_at(eye.x, eye.z)
-            .is_some_and(|ground| eye.y < ground + 8.0)
+        // The floor the player stands on, which is the ground under the player's own column
+        // with the ceiling the ground check uses (`main.cpp:4629`). The eye is under the
+        // ground when it drops below that floor: the surfaces above the player are roofs and
+        // ceilings the retail camera looks under, not ground.
+        let floor = sim::ground::surface(Some(collision), snapshot.player_pos);
+        floor.is_some_and(|floor| eye.y < floor + 8.0)
     }
 
-    /// The lookout's roof sits between the field camera's desired eye and the player, so the
-    /// retail follow camera pulls almost into the player. The fixed side view clears the roof and
-    /// still shows the island behind it.
+    /// The field camera's eye below the floor the player stands on. The retail follow camera
+    /// pulls in on its own when a wall is behind the player, so the fixed side view only
+    /// stands in for an eye that would sit under the ground.
     fn fallback_camera(&self, snapshot: &view::SceneSnapshot) -> OrbitCamera {
         OrbitCamera {
             target: snapshot.player_pos + glam::Vec3::Y * 70.0,
@@ -3202,7 +3205,7 @@ pub fn root_view(
     }
     let snapshot = app.snapshot();
     let mut camera = app.game_camera().unwrap_or_else(|| app.cam.get());
-    if app.camera_underground(&camera) || camera.dist < 140.0 {
+    if app.camera_underground(&camera, &snapshot) {
         camera = app.fallback_camera(&snapshot);
     }
     let frame = match &app.dff {
