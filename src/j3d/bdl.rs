@@ -53,6 +53,10 @@ const MATERIAL_COLOR_CHAN_NUM: usize = 0x002;
 const MATERIAL_COLOR_CHAN_IDX: usize = 0x00C;
 const COLOR_CHAN_STRIDE: usize = 8;
 const COLOR_CHAN_MAX: usize = 4;
+/// `J3DMaterialInitData::mAlphaCompIdx` (`J3DMaterialFactory.h:76`).
+const MATERIAL_ALPHA_COMP_IDX: usize = 0x146;
+/// `J3DAlphaCompInfo` (`J3DStruct.h:261-270`).
+const ALPHA_COMP_STRIDE: usize = 8;
 /// `J3DMaterialInitData::mTexNoIdx[i]`'s "no texture" value (`J3DMaterialFactory.cpp:509-515`).
 pub const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
 const MATERIAL_TEX_GEN_NUM: usize = 0x003;
@@ -236,14 +240,65 @@ pub struct RoomGroup {
     pub joint_indices: Vec<[u16; SKIN_INFLUENCES]>,
     pub joint_weights: Vec<[f32; SKIN_INFLUENCES]>,
     /// The joint a direct-matrix shape hangs off (`layout.matrix_field == None`,
-    /// `J3DShapeMtx`'s `mUseMtxIndex`); the shape's positions already carry that joint's bind
-    /// translation, so an animated pose applies `pose[joint] * inverse(bind[joint])`.
+    /// `J3DShapeMtx`'s `mUseMtxIndex`); the shape's positions are already in that joint's bind
+    /// space, so an animated pose applies `pose[joint] * inverse(bind[joint])`.
     pub direct_joint: Option<u16>,
     pub texture_page: Option<u32>,
     pub lit: bool,
-    /// `J3DColorBlock::getCullMode()` (`J3DMatBlock.h:1161`): 0 none, 1 back, 2 front, 3 all.
+    /// `J3DColorBlock::getCullMode()` (`J3DMatBlock.h:1161`), a `GXCullMode`
+    /// (`GXEnum.h:16-21`): 0 none, 1 front, 2 back, 3 all.
     pub cull: Option<u8>,
+    /// The material's own alpha test, `None` when the material has none.
+    pub alpha_test: Option<AlphaTest>,
     pub anim: Option<AnimBinding>,
+}
+
+/// `J3DAlphaComp` (`J3DMatBlock.h:704-759`): the alpha compare the material's
+/// `J3DPEBlock` loads (`J3DAlphaComp::load`, `J3DMatBlock.h:745-747`).
+///
+/// The two compares run on the fragment's alpha against their own reference,
+/// and `op` combines them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AlphaTest {
+    /// `J3DAlphaCompInfo::mComp0` (`J3DStruct.h:262`), a `GXCompare`.
+    pub comp0: u8,
+    /// `J3DAlphaCompInfo::mRef0`.
+    pub ref0: u8,
+    /// `J3DAlphaCompInfo::mOp`, a `GXAlphaOp`.
+    pub op: u8,
+    /// `J3DAlphaCompInfo::mComp1`, a `GXCompare`.
+    pub comp1: u8,
+    /// `J3DAlphaCompInfo::mRef1`.
+    pub ref1: u8,
+}
+
+/// One `GXCompare` (`GXEnum.h:465-474`) of an alpha test.
+fn alpha_compare(comp: u8, value: u8, reference: u8) -> bool {
+    match comp {
+        0 => false,
+        1 => value < reference,
+        2 => value == reference,
+        3 => value <= reference,
+        4 => value > reference,
+        5 => value != reference,
+        6 => value >= reference,
+        _ => true,
+    }
+}
+
+impl AlphaTest {
+    /// Whether a fragment with this alpha survives the test: the two compares
+    /// combined by `op` (`J3DAlphaComp::load`, `J3DMatBlock.h:745-747`).
+    pub fn passes(&self, alpha: u8) -> bool {
+        let first = alpha_compare(self.comp0, alpha, self.ref0);
+        let second = alpha_compare(self.comp1, alpha, self.ref1);
+        match self.op {
+            0 => first && second,
+            1 => first || second,
+            2 => first != second,
+            _ => first == second,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -289,8 +344,13 @@ pub fn parse(
     animation: Option<&crate::j3d::btk::TextureAnimation>,
 ) -> Result<RoomMesh, BdlError> {
     let blocks = Blocks::parse(data)?;
-    let joints = read_joints(data, &blocks)?;
-    let worlds = joints.worlds;
+    let Joints {
+        worlds,
+        matrices,
+        parents,
+        names,
+        material_nodes,
+    } = read_joints(data, &blocks)?;
     let draw_joints = read_draw_joints(data, &blocks, worlds.len())?;
     let envelopes = read_envelopes(data, &blocks, worlds.len())?;
     let inverse_bind = read_inverse_bind(data, &blocks, worlds.len())?;
@@ -306,13 +366,10 @@ pub fn parse(
         cos,
         animation,
     };
-    let material_nodes = joints.material_nodes;
     let mut mesh = RoomMesh::default();
-    mesh.joints = worlds.clone();
-    mesh.joint_matrices = joints.matrices;
-    mesh.inverse_bind = inverse_bind;
-    mesh.joint_parents = joints.parents;
-    mesh.joint_names = joints.names;
+    mesh.joints = worlds;
+    mesh.joint_parents = parents;
+    mesh.joint_names = names;
     mesh.materials = materials.iter().map(MaterialBinding::slot).collect();
     if let Some(animation) = animation {
         mesh.animations.push(animation.clone());
@@ -320,7 +377,8 @@ pub fn parse(
     read_shapes(
         &context,
         &blocks,
-        &worlds,
+        &matrices,
+        &inverse_bind,
         &draw_joints,
         &envelopes,
         &material_nodes,
@@ -328,6 +386,8 @@ pub fn parse(
         textures.len(),
         &mut mesh,
     )?;
+    mesh.joint_matrices = matrices;
+    mesh.inverse_bind = inverse_bind;
     bake_textures(&mut mesh, &textures);
     Ok(mesh)
 }
@@ -664,6 +724,11 @@ struct DrawBinding {
 struct SkinBinding {
     indices: [u16; SKIN_INFLUENCES],
     weights: [f32; SKIN_INFLUENCES],
+    /// The bind world of a whole-joint draw matrix, the matrix the vertex has to
+    /// leave the joint's space through before the skin matrix applies.
+    ///
+    /// `None` for an envelope, whose vertices are in model space already.
+    bind: Option<Mat4>,
 }
 
 fn read_draw_joints(
@@ -776,16 +841,33 @@ fn skin_binding(
     draw: u16,
     draws: &[DrawBinding],
     envelopes: &[SkinBinding],
-    joint_count: usize,
+    joint_matrices: &[Mat4],
+    inverse_bind: &[Mat4],
 ) -> Result<SkinBinding, BdlError> {
     let entry = *draws.get(usize::from(draw)).ok_or(BdlError::Range)?;
     if !entry.blended {
-        if usize::from(entry.target) >= joint_count {
+        let joint = usize::from(entry.target);
+        if joint >= joint_matrices.len() {
             return Err(BdlError::Range);
         }
         let mut binding = SkinBinding::default();
         binding.indices[0] = entry.target;
         binding.weights[0] = 1.0;
+        // A whole-joint draw matrix is the joint's own world matrix
+        // (`J3DModel::calcDrawMtx`, `J3DModel.cpp:787-825`), so its vertices are in the joint's
+        // space and the skin matrix has to be taken back out of them first. The skin matrix is
+        // the joint's world matrix times `EVP1`'s inverse joint matrix
+        // (`J3DModel::calcWeightEnvelopeMtx`, `J3DModel.cpp:574-680`), so the bind world that
+        // cancels it is the inverse of that inverse joint matrix.
+        binding.bind = Some(if joint < inverse_bind.len() {
+            inverse_bind[joint]
+                .try_inverse()
+                .ok_or(BdlError::Envelope)?
+        } else {
+            // Without an `EVP1` the skin matrix falls back to the joint's bind world, so the
+            // vertex leaves the joint's space through that one.
+            joint_matrices[joint]
+        });
         return Ok(binding);
     }
     Ok(*envelopes
@@ -959,6 +1041,7 @@ struct MaterialBinding {
     coord: Option<u8>,
     tex_gen: [Option<u8>; TEX_COORDS],
     cull: u8,
+    alpha_test: Option<AlphaTest>,
 }
 
 impl MaterialBinding {
@@ -977,6 +1060,7 @@ impl MaterialBinding {
             tex_nos: self.tex_nos,
             coord: self.coord,
             tex_gen: self.tex_gen,
+            alpha_test: self.alpha_test,
             ..MaterialSlot::default()
         }
     }
@@ -1037,6 +1121,9 @@ pub struct MaterialSlot {
     pub tev_colors: [Option<[i16; 4]>; TEV_COLOR_MAX],
     /// The TEV konst registers K0..K3 (`J3DTevBlock::getTevKColor(i)`, `J3DMatBlock.h:309`).
     pub tev_k_colors: [Option<[u8; 4]>; TEV_K_COLOR_MAX],
+    /// `J3DPEBlock`'s alpha compare (`J3DMaterialFactory::newAlphaComp`,
+    /// `J3DMaterialFactory.cpp:629-635`), `None` when the material has no test.
+    pub alpha_test: Option<AlphaTest>,
 }
 fn material_lit(
     data: &[u8],
@@ -1056,6 +1143,11 @@ fn material_lit(
             .get(at(init, MATERIAL_COLOR_CHAN_NUM)?)
             .ok_or(BdlError::Truncated)?,
     );
+    // `J3DMaterialFactory::newColorChanNum` (`J3DMaterialFactory.cpp:444-450`): a material that
+    // names no channel count has none.
+    if num_index == usize::from(u8::MAX) {
+        return Ok(false);
+    }
     let num_at = at(num_table, num_index)?;
     if at(num_at, 1)? > end {
         return Err(BdlError::Block);
@@ -1069,6 +1161,11 @@ fn material_lit(
             data,
             at(init, MATERIAL_COLOR_CHAN_IDX + channel * 2)?,
         )?);
+        // `J3DMaterialFactory::newColorChan` (`J3DMaterialFactory.cpp:453-459`): a channel the
+        // material does not name is the default one, which is off.
+        if info_index == usize::from(u16::MAX) {
+            continue;
+        }
         let info = at(info_table, info_index * COLOR_CHAN_STRIDE)?;
         if at(info, COLOR_CHAN_STRIDE)? > end {
             return Err(BdlError::Block);
@@ -1078,6 +1175,42 @@ fn material_lit(
         }
     }
     Ok(false)
+}
+
+/// `J3DMaterialFactory::newAlphaComp` (`J3DMaterialFactory.cpp:629-635`): the material's own
+/// alpha compare, which its `J3DPEBlock` loads (`J3DAlphaComp::load`, `J3DMatBlock.h:745-747`).
+///
+/// A material that names no compare has the default one, `j3dDefaultAlphaCmpID`
+/// (`J3DTevs.cpp:311`), which compares `ALWAYS` against `ALWAYS` and keeps every fragment.
+fn material_alpha_test(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    alpha_comp_table: u32,
+) -> Result<Option<AlphaTest>, BdlError> {
+    if alpha_comp_table == 0 {
+        return Ok(None);
+    }
+    let index = usize::from(read_u16(data, at(init, MATERIAL_ALPHA_COMP_IDX)?)?);
+    if index == usize::from(u16::MAX) {
+        return Ok(None);
+    }
+    let table = at(start, alpha_comp_table as usize)?;
+    let info = at(table, index * ALPHA_COMP_STRIDE)?;
+    if at(info, ALPHA_COMP_STRIDE)? > end {
+        return Err(BdlError::Block);
+    }
+    let byte = |offset: usize| -> Result<u8, BdlError> {
+        Ok(*data.get(at(info, offset)?).ok_or(BdlError::Truncated)?)
+    };
+    Ok(Some(AlphaTest {
+        comp0: byte(0)?,
+        ref0: byte(1)?,
+        op: byte(2)?,
+        comp1: byte(3)?,
+        ref1: byte(4)?,
+    }))
 }
 
 fn read_material_names(
@@ -1132,6 +1265,7 @@ fn material_coord(
     tex_coord_table: u32,
     tev_order_table: u32,
     tev_stage_table: u32,
+    tex_no_count: usize,
 ) -> Result<(Option<u8>, [Option<u8>; TEX_COORDS]), BdlError> {
     if tex_gen_num_table == 0
         || tex_coord_table == 0
@@ -1152,10 +1286,15 @@ fn material_coord(
     if stage_num > TEV_STAGE_MAX {
         return Err(BdlError::Descriptor);
     }
+    // `J3DMaterialFactory::countStages` (`J3DMaterialFactory.cpp:87-107`): the material's stage
+    // count is the larger of its own stage count and the number of texture units it names.
+    let stage_count = usize::from(stage_num)
+        .max(tex_no_count)
+        .min(TEV_STAGE_MAX as usize);
     let tex_gen = material_tex_gen(data, start, end, init, tex_gen_num, tex_coord_table)?;
     let tev_order_table_at = at(start, tev_order_table as usize)?;
     let mut coord = None;
-    for stage in 0..usize::from(stage_num) {
+    for stage in 0..stage_count {
         if at(init, MATERIAL_TEV_ORDER_IDX + stage * 2 + 2)? > end {
             return Err(BdlError::Block);
         }
@@ -1163,6 +1302,12 @@ fn material_coord(
             data,
             at(init, MATERIAL_TEV_ORDER_IDX + stage * 2)?,
         )?);
+        // `J3DMaterialFactory::newTevOrder` (`J3DMaterialFactory.cpp:518-524`): a stage that names
+        // no order gets the default one, whose texture map is `GX_TEXMAP_NULL`
+        // (`j3dDefaultTevOrderInfoNull`, `J3DTevs.cpp:301`), so it samples nothing.
+        if order_index == usize::from(u16::MAX) {
+            continue;
+        }
         let order = at(tev_order_table_at, order_index * TEV_ORDER_STRIDE)?;
         if at(order, TEV_ORDER_STRIDE)? > end {
             return Err(BdlError::Block);
@@ -1248,6 +1393,7 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     let tex_coord_table = read_u32(data, at(start, 0x38)?)?;
     let tev_order_table = read_u32(data, at(start, 0x4C)?)?;
     let tev_stage_table = read_u32(data, at(start, 0x58)?)?;
+    let alpha_comp_table = read_u32(data, at(start, 0x6C)?)?;
     let names = if name_table == 0 {
         Vec::new()
     } else {
@@ -1280,6 +1426,8 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             }
             _ => 0xFF,
         };
+        let alpha_test = material_alpha_test(data, start, end, init, alpha_comp_table)?;
+        let tex_no_count = tex_nos.iter().filter(|unit| unit.is_some()).count();
         let (coord, tex_gen) = material_coord(
             data,
             start,
@@ -1289,6 +1437,7 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             tex_coord_table,
             tev_order_table,
             tev_stage_table,
+            tex_no_count,
         )?;
         materials.push(MaterialBinding {
             tex_nos,
@@ -1297,6 +1446,7 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             coord,
             tex_gen,
             cull,
+            alpha_test,
         });
     }
     Ok(materials)
@@ -1639,7 +1789,8 @@ impl PrimitiveLayout {
 fn read_shapes(
     context: &ShapeContext<'_>,
     blocks: &Blocks,
-    worlds: &[[f32; 3]],
+    joint_matrices: &[Mat4],
+    inverse_bind: &[Mat4],
     draw_joints: &[DrawBinding],
     envelopes: &[SkinBinding],
     material_nodes: &[(u16, Option<u16>)],
@@ -1702,12 +1853,12 @@ fn read_shapes(
 
         let layout = PrimitiveLayout::parse(data, descriptor_table, descriptor_offset)?;
         let texcoord_field = layout.texcoord_field;
-        let (lit, cull) = match shape_materials[shape] {
+        let (lit, cull, alpha_test) = match shape_materials[shape] {
             Some(index) if !materials.is_empty() => {
                 let material = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
-                (material.lit, Some(material.cull))
+                (material.lit, Some(material.cull), material.alpha_test)
             }
-            _ => (false, None),
+            _ => (false, None, None),
         };
         let mut texture_page = if materials.is_empty() || texture_count == 0 {
             None
@@ -1745,6 +1896,7 @@ fn read_shapes(
             texture_page,
             lit,
             cull,
+            alpha_test,
             anim,
             ..RoomGroup::default()
         };
@@ -1752,7 +1904,7 @@ fn read_shapes(
         for subgroup in 0..group_count {
             let matrix = at(matrix_table, (matrix_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
             let draw_matrix = usize::from(read_u16(data, matrix)?);
-            let (world, bindings) = match layout.matrix_field {
+            let (bind, bindings) = match layout.matrix_field {
                 Some(_) => {
                     let count = usize::from(read_u16(data, at(matrix, SHAPE_INIT_MATRIX_SLOTS)?)?);
                     // `mFirstUseMtxIndex` indexes the `mpMtxTable` **u16** array
@@ -1772,14 +1924,21 @@ fn read_shapes(
                         let binding = if entry == MATRIX_UNSET {
                             slots[slot].ok_or(BdlError::Shape)?
                         } else {
-                            let binding =
-                                skin_binding(entry, draw_joints, envelopes, worlds.len())?;
+                            let binding = skin_binding(
+                                entry,
+                                draw_joints,
+                                envelopes,
+                                joint_matrices,
+                                inverse_bind,
+                            )?;
                             slots[slot] = Some(binding);
                             binding
                         };
                         resolved.push(binding);
                     }
-                    ([0.0, 0.0, 0.0], resolved)
+                    // A skinned shape's vertices are in model space, except for the ones a
+                    // whole-joint draw matrix places, which the vertex's own bind world moves.
+                    (Mat4::IDENTITY, resolved)
                 }
                 None => {
                     let entry = *draw_joints.get(draw_matrix).ok_or(BdlError::Range)?;
@@ -1787,11 +1946,15 @@ fn read_shapes(
                         return Err(BdlError::Envelope);
                     }
                     let joint = usize::from(entry.target);
-                    if joint >= worlds.len() {
+                    if joint >= joint_matrices.len() {
                         return Err(BdlError::Range);
                     }
                     group.direct_joint = Some(u16::try_from(joint).map_err(|_| BdlError::Range)?);
-                    (worlds[joint], Vec::new())
+                    // `J3DShapeMtx` (`J3DShapeFactory.cpp:115-121`) gives the shape one draw
+                    // matrix, and the draw matrix of a whole-joint entry is the joint's own
+                    // world matrix (`J3DModel::setAnmMtx`, `J3DModel.cpp:84`), so the shape's
+                    // vertices are in that joint's space and its bind world places them.
+                    (joint_matrices[joint], Vec::new())
                 }
             };
             let draw = at(draw_table, (draw_slot + subgroup) * SHAPE_GROUP_STRIDE)?;
@@ -1804,7 +1967,7 @@ fn read_shapes(
                 .get(display_start..display_end)
                 .ok_or(BdlError::Truncated)?;
             decode_display_list(
-                context, display, &layout, &bindings, textured, world, &mut group,
+                context, display, &layout, &bindings, textured, bind, &mut group,
             )?;
         }
         mesh.groups.push(group);
@@ -1837,7 +2000,7 @@ fn decode_display_list(
     layout: &PrimitiveLayout,
     bindings: &[SkinBinding],
     textured: bool,
-    world: [f32; 3],
+    bind: Mat4,
     group: &mut RoomGroup,
 ) -> Result<(), BdlError> {
     let data = context.data;
@@ -1935,9 +2098,21 @@ fn decode_display_list(
                 read_f32(data, position_at + 4)?,
                 read_f32(data, position_at + 8)?,
             ];
-            let lx = local[0] + world[0];
-            let ly = local[1] + world[1];
-            let lz = local[2] + world[2];
+            // The draw matrix of a whole-joint entry is the joint's own world matrix
+            // (`J3DShapeMtxConcatView::load`, `J3DShapeMtx.cpp:141-148`), so the vertex leaves
+            // the joint's space through that matrix: the shape's own bind for a shape that hangs
+            // off one joint, the joint's bind world for a whole-joint draw matrix inside a
+            // skinned shape.
+            let mut placed = glam::Vec3::from(local);
+            let mut normal_matrix = bind;
+            if let Some(joint_bind) = binding.bind {
+                placed = joint_bind.transform_point3(placed);
+                normal_matrix = bind * joint_bind;
+            }
+            let placed = bind.transform_point3(placed);
+            let lx = placed.x;
+            let ly = placed.y;
+            let lz = placed.z;
             group.positions.push([
                 lx * context.cos + lz * context.sin + context.origin[0],
                 ly,
@@ -1981,10 +2156,14 @@ fn decode_display_list(
                         f32::from(read_i16(data, normal_at + 4)?) * scale,
                     ]
                 };
+                // The normal matrix is the draw matrix's own 3x3 when the joint scales, and
+                // its inverse transpose otherwise (`J3DShapeMtx::loadNrmMtx`,
+                // `J3DShapeMtx.cpp:151-174`); the two agree on a rotation-only bind.
+                let normal = normal_matrix.transform_vector3(glam::Vec3::from(normal));
                 group.normals.push(normalize([
-                    normal[0] * context.cos + normal[2] * context.sin,
-                    normal[1],
-                    -normal[0] * context.sin + normal[2] * context.cos,
+                    normal.x * context.cos + normal.z * context.sin,
+                    normal.y,
+                    -normal.x * context.sin + normal.z * context.cos,
                 ]));
             }
             if let Some(uv) = uv {
