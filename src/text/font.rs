@@ -417,21 +417,24 @@ impl ResFont {
         let glyph = self.glyph_at(i).unwrap_or_default();
         let cell_w = glyph.cell_width.max(1) as i32;
         let cell_h = glyph.cell_height.max(1) as i32;
-        let across = i32::from(glyph.texture_width) / cell_w;
-        let down = i32::from(glyph.texture_height) / cell_h;
-        if across < 1 || down < 1 {
+        // `JUTResFont::loadImage` lays a page out with the block's own row and
+        // column counts, not with the page's pixel size (`JUTResFont.cpp:423-429`).
+        let rows = i32::from(glyph.num_rows);
+        let cols = i32::from(glyph.num_columns);
+        if rows < 1 || cols < 1 {
             return;
         }
-        let page_num_cells = across * down;
+        let page_num_cells = rows * cols;
         let page_idx = safe_div(code, page_num_cells);
         let cell_idx = safe_rem(code, page_num_cells);
-        let cell_col = safe_rem(cell_idx, across);
-        let cell_row = safe_div(cell_idx, across);
+        let cell_col = safe_rem(cell_idx, rows);
+        let cell_row = safe_div(cell_idx, rows);
         self.cell_x = cell_col * cell_w;
         self.cell_y = cell_row * cell_h;
 
-        let image_bytes =
-            (usize::from(glyph.texture_width) * usize::from(glyph.texture_height) / 2).max(1);
+        // The next page starts one `textureSize` further into the block
+        // (`JUTResFont.cpp:434`).
+        let image_bytes = (glyph.texture_size as usize).max(1);
         let page_at = self
             .gly1_at
             .wrapping_add(GLYPH_HEADER_SIZE)

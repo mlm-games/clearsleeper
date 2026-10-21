@@ -77,7 +77,9 @@ impl Default for ScreenPane {
             alpha: 0xFF,
             base_position: 0,
             rotation: 0,
-            influenced_alpha: false,
+            // `J2DPane::makePaneStream` sets `mInfluencedAlpha = true` before it
+            // reads the optional stream byte (`J2DPane.cpp:109`).
+            influenced_alpha: true,
             texture: None,
             palette: None,
             pic_binding: 0,
@@ -250,6 +252,9 @@ fn hierarchy(reader: &mut Reader<'_>, screen: &mut Screen) {
 }
 
 fn group(reader: &mut Reader<'_>, screen: &mut Screen, parent: Option<usize>, depth: u32) {
+    // `J2DScreen::makeHierarchyPanes` keeps `pPane`, the pane it created last, and
+    // hands it to the next `BGN1` group as that group's parent (`J2DScreen.cpp:35-63`).
+    // A pane created at this level stays a child of the level's own parent.
     let mut pending = parent;
     loop {
         if reader.at_end() || reader.at + 8 > reader.bytes.len() {
@@ -269,7 +274,6 @@ fn group(reader: &mut Reader<'_>, screen: &mut Screen, parent: Option<usize>, de
             b"BGN1" => {
                 reader.at = block_end;
                 group(reader, screen, pending, depth + 1);
-                pending = None;
                 continue;
             }
             _ => {}
@@ -640,6 +644,12 @@ impl StickControl {
     }
 }
 
+/// A stored colour word is `0xRRGGBBAA`: `JUtility::TColor::set(u32)` copies the
+/// word straight into the `{r, g, b, a}` bytes (`TColor.h:16-17`) and the GameCube
+/// is big-endian, so the word's top byte is red and its bottom byte is alpha. The
+/// retail code relies on that order: `J2DScreen::drawSelf` replaces the alpha with
+/// `color & 0xFFFFFF00 | alpha` (`J2DScreen.cpp:184`) and `J2DWindow::drawContents`
+/// tests it with `mColorTL & 0xFF` (`J2DWindow.cpp:229`).
 pub fn unpack_color(c: u32) -> [u8; 4] {
     [
         (c >> 24) as u8,

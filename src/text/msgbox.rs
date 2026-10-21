@@ -197,9 +197,12 @@ fn cstr_len(text: &[u8]) -> usize {
     text.iter().position(|&b| b == 0).unwrap_or(text.len())
 }
 
+/// `J2DPrint::parse` scales the colour's own alpha by the pane's draw alpha
+/// (`J2DPrint.cpp:171-172`). A colour word is 0xRRGGBBAA, so the alpha is its
+/// bottom byte (`TColor.h:16-17`).
 fn scale_alpha(color: u32, alpha: u8) -> u32 {
-    let a = (color >> 24) & 0xFF;
-    (((a * alpha as u32) / 0xFF) << 24) | (color & 0x00FF_FFFF)
+    let a = color & 0xFF;
+    (color & 0xFFFF_FF00) | ((a * alpha as u32) / 0xFF)
 }
 
 fn strtoll(text: &[u8], at: &mut usize, base: i32) -> (i32, usize) {

@@ -106,9 +106,14 @@ impl Canvas {
                     if index == 0 {
                         continue;
                     }
-                    let coverage = f32::from(index) / 15.0;
-                    let color = mix(quad.color, fx, fy);
-                    self.blend(x, y, [color[0], color[1], color[2], alpha], coverage);
+                    let (color, vertex_alpha) = mix(quad.color, fx, fy);
+                    // `JUTResFont::setGX` ends the font's tev with the rasterized
+                    // vertex alpha multiplied into the alpha the glyph's coverage
+                    // produced (`JUTResFont.cpp:209-214`). The vertex alpha already
+                    // carries the print's draw alpha (`J2DPrint.cpp:171-172`), so
+                    // `alpha` is only the extra fade a caller adds on top.
+                    let coverage = f32::from(index) / 15.0 * vertex_alpha * (alpha as f32 / 255.0);
+                    self.blend(x, y, [color[0], color[1], color[2], 255], coverage);
                 }
             }
         }
@@ -147,13 +152,23 @@ fn sample_uv(quad: &super::font::CharQuad, fx: f32, fy: f32, tex_w: f32, tex_h: 
     )
 }
 
-fn mix(colors: [u32; 4], fx: f32, fy: f32) -> [u8; 3] {
+/// The four vertex colours of a glyph quad, in the order the raster walks them,
+/// plus the vertex alpha the retail's last tev stage multiplies the glyph's
+/// coverage by. A colour word is 0xRRGGBBAA (`TColor.h:16-17`).
+fn mix(colors: [u32; 4], fx: f32, fy: f32) -> ([u8; 3], f32) {
     let split = |color: u32| [(color >> 24) as u8, (color >> 16) as u8, (color >> 8) as u8];
+    let alpha = |color: u32| f32::from((color & 0xFF) as u8) / 255.0;
     let (top_left, top_right, bottom_right, bottom_left) = (
         split(colors[0]),
         split(colors[1]),
         split(colors[2]),
         split(colors[3]),
+    );
+    let (top_left_a, top_right_a, bottom_right_a, bottom_left_a) = (
+        alpha(colors[0]),
+        alpha(colors[1]),
+        alpha(colors[2]),
+        alpha(colors[3]),
     );
     let mut out = [0_u8; 3];
     for index in 0..3 {
@@ -162,5 +177,7 @@ fn mix(colors: [u32; 4], fx: f32, fy: f32) -> [u8; 3] {
             f32::from(bottom_left[index]) * (1.0 - fx) + f32::from(bottom_right[index]) * fx;
         out[index] = (top * (1.0 - fy) + bottom * fy).round() as u8;
     }
-    out
+    let top_a = top_left_a * (1.0 - fx) + top_right_a * fx;
+    let bottom_a = bottom_left_a * (1.0 - fx) + bottom_right_a * fx;
+    (out, top_a * (1.0 - fy) + bottom_a * fy)
 }

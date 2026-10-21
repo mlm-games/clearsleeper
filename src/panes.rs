@@ -15,7 +15,6 @@ use crate::ui_menu_save::{Pane, SavePanes};
 
 const NESTED_ARCHIVE: &str = "dat/file_select.arc";
 const FONT_ARCHIVE: &str = "files/res/Msg/fontres.arc";
-const TAU: f32 = std::f32::consts::TAU;
 
 pub struct Assets {
     pub screen: Screen,
@@ -344,11 +343,14 @@ pub fn blit_texture(
     tint: [u8; 4],
     opacity: f32,
 ) {
+    let pivot = [rect[0] + rect[2] * 0.5, rect[1] + rect[3] * 0.5];
     blit(
         canvas,
         image,
         rect,
         0.0,
+        pivot,
+        false,
         [tint; 4],
         opacity,
         [0.0, 0.0, 1.0, 1.0],
@@ -390,18 +392,53 @@ pub fn draw_picture_image_tinted(
     black: [u8; 4],
     white: [u8; 4],
 ) {
+    let tumble = node.pic_mirror & 4 != 0;
     let uv = tex_coord(node.pic_binding, node.pic_mirror, rect, image);
+    // `J2DPane::makeMatrix` turns the pane's rotation with `MTXRotDeg`, so the
+    // stream's rotation is a whole number of degrees (`J2DPane.cpp:250`), and the
+    // pane turns about the base position `J2DPane::setBasePosition` picked from
+    // the pane's own box (`J2DPane.cpp:260-277`).
+    let offset = base_offset(node.base_position, [rect[2], rect[3]]);
+    let pivot = [rect[0] + offset[0], rect[1] + offset[1]];
     blit(
         canvas,
         image,
         rect,
-        f32::from(rotation) * TAU / 65536.0,
+        f32::from(rotation).to_radians(),
+        pivot,
+        tumble,
         node.corner_color.map(unpack_color),
         alpha,
         uv,
         black,
         white,
     );
+}
+
+/// A live pane carries the values the retail code changed after the screen was
+/// loaded; a value it left at zero still comes from the screen.
+fn live_or_blo(live: Option<f32>, blo: f32) -> f32 {
+    match live {
+        Some(value) if value != 0.0 => value,
+        _ => blo,
+    }
+}
+
+/// `J2DPane::setBasePosition` puts the pivot on a third of the pane's width and
+/// a third of its height: `pos % 3` picks the column and `pos / 3` the row
+/// (`J2DPane.cpp:260-277`).
+fn base_offset(base: u8, size: [f32; 2]) -> [f32; 2] {
+    let x = match base % 3 {
+        0 => 0.0,
+        1 => size[0] * 0.5,
+        _ => size[0],
+    };
+    let y = match base / 3 {
+        0 => 0.0,
+        1 => size[1] * 0.5,
+        _ => size[1],
+    };
+    [x, y]
 }
 
 fn wrap_axis(value: i64, size: usize, mode: u8) -> (usize, f32) {
@@ -540,11 +577,9 @@ fn tex_coord(binding: u8, mirror: u8, rect: [f32; 4], image: &Image) -> [f32; 4]
     } else {
         (rect[2], rect[3])
     };
-    let (tex_w, tex_h) = if tumble {
-        (image.height as f32, image.width as f32)
-    } else {
-        (image.width as f32, image.height as f32)
-    };
+    // `J2DPicture::drawFullSet` measures the window against the texture's own
+    // width and height even when the quad is tumbled (`J2DPicture.cpp:291-295`).
+    let (tex_w, tex_h) = (image.width as f32, image.height as f32);
     let (mut s0, mut s1) = if bind_left {
         (0.0f32, if bind_right { 1.0 } else { rect_w / tex_w })
     } else if bind_right {
@@ -599,36 +634,33 @@ fn draw_text(
     if let Some(live) = pane {
         box_.shift_set(live.shift_x, live.shift_y);
     }
-    let size_x = pane.map_or(f32::from(node.font_size_x), |p| p.font_size_x);
-    let size_y = pane.map_or(f32::from(node.font_size_y), |p| p.font_size_y);
-    if size_x > 0.0 {
-        box_.set_font_size(size_x, size_y);
-    }
-    let space = pane.map_or(node.char_space as f32, |p| p.char_space);
-    if space != 0.0 {
-        box_.set_char_space(space);
-    }
-    let line = pane.map_or(node.line_space as f32, |p| p.line_space);
-    if line > 0.0 {
-        box_.set_line_space(line);
-    }
+    // `J2DTextBox`'s stream constructor takes the char space, the line space and
+    // the font size straight from the stream (`J2DTextBox.cpp:44-47`); a live pane
+    // only carries the values the retail code changed since (`fopMsgM_setPaneData`).
+    let size_x = live_or_blo(pane.map(|p| p.font_size_x), f32::from(node.font_size_x));
+    let size_y = live_or_blo(pane.map(|p| p.font_size_y), f32::from(node.font_size_y));
+    box_.set_font_size(size_x, size_y);
+    let space = live_or_blo(pane.map(|p| p.char_space), node.char_space as f32);
+    box_.set_char_space(space);
+    let line = live_or_blo(pane.map(|p| p.line_space), node.line_space as f32);
+    box_.set_line_space(line);
     let bounds = [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]];
     let level = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
     let layout = box_.draw_self(fonts, bounds, rect[0], rect[1], level);
     if let Some(font) = fonts.get(slot) {
-        canvas.draw_layout(&layout, font, [rect[0], rect[1]], level);
+        // The draw alpha already rides in the layout's vertex colours
+        // (`J2DPrint.cpp:171-172`), so the raster needs no second copy of it.
+        canvas.draw_layout(&layout, font, [rect[0], rect[1]], 0xFF);
     }
 }
 
-/// `JUtility::TColor::toUInt32` (`TColor.h:20`) is the little-endian word of the
-/// `{r, g, b, a}` bytes, so a stored colour reads back as 0xAABBGGRR.
+/// `JUtility::TColor::toUInt32` (`TColor.h:20`) hands the `{r, g, b, a}` bytes to
+/// the word in the GameCube's big-endian order, so a stored colour word reads back
+/// as 0xRRGGBBAA: red in the top byte, alpha in the bottom one. The retail code
+/// depends on that order (`J2DScreen.cpp:184` replaces the low byte with the
+/// alpha, `J2DWindow.cpp:229` tests the low byte against 0xFF).
 fn unpack_color(value: u32) -> [u8; 4] {
-    [
-        value as u8,
-        (value >> 8) as u8,
-        (value >> 16) as u8,
-        (value >> 24) as u8,
-    ]
+    crate::j2d::unpack_color(value)
 }
 
 fn corner(tint: [[u8; 4]; 4], u: f32, v: f32) -> [f32; 4] {
@@ -649,6 +681,8 @@ fn blit(
     image: &Image,
     rect: [f32; 4],
     angle: f32,
+    pivot: [f32; 2],
+    tumble: bool,
     tint: [[u8; 4]; 4],
     opacity: f32,
     uv: [f32; 4],
@@ -663,31 +697,55 @@ fn blit(
     if image.width == 0 || image.height == 0 {
         return;
     }
-    let cx = rect[0] + rect[2] * 0.5;
-    let cy = rect[1] + rect[3] * 0.5;
     let half_w = rect[2] * 0.5;
     let half_h = rect[3] * 0.5;
+    // The pane's own corner relative to the pivot, and the pivot relative to the
+    // pane's box: `J2DPane::makeMatrix` turns the quad about the base position
+    // (`J2DPane.cpp:245-257`).
+    let origin = [pivot[0] - rect[0], pivot[1] - rect[1]];
     let (sin, cos) = angle.sin_cos();
-    let radius = (half_w * half_w + half_h * half_h).sqrt();
-    let x0 = (cx - radius).floor().max(0.0) as usize;
-    let y0 = (cy - radius).floor().max(0.0) as usize;
-    let x1 = ((cx + radius).ceil().max(0.0) as usize).min(canvas.width);
-    let y1 = ((cy + radius).ceil().max(0.0) as usize).min(canvas.height);
+    let mut min_x = f32::MAX;
+    let mut min_y = f32::MAX;
+    let mut max_x = f32::MIN;
+    let mut max_y = f32::MIN;
+    for corner in [
+        [-half_w, -half_h],
+        [half_w, -half_h],
+        [half_w, half_h],
+        [-half_w, half_h],
+    ] {
+        let rx = cos * corner[0] + sin * corner[1];
+        let ry = -sin * corner[0] + cos * corner[1];
+        min_x = min_x.min(pivot[0] + rx);
+        max_x = max_x.max(pivot[0] + rx);
+        min_y = min_y.min(pivot[1] + ry);
+        max_y = max_y.max(pivot[1] + ry);
+    }
+    let x0 = min_x.floor().max(0.0) as usize;
+    let y0 = min_y.floor().max(0.0) as usize;
+    let x1 = (max_x.ceil().max(0.0) as usize).min(canvas.width);
+    let y1 = (max_y.ceil().max(0.0) as usize).min(canvas.height);
     let span_u = uv[2] - uv[0];
     let span_v = uv[3] - uv[1];
     for y in y0..y1 {
         for x in x0..x1 {
-            let dx = x as f32 + 0.5 - cx;
-            let dy = y as f32 + 0.5 - cy;
+            let dx = x as f32 + 0.5 - pivot[0];
+            let dy = y as f32 + 0.5 - pivot[1];
             let local_x = cos * dx + sin * dy;
             let local_y = -sin * dx + cos * dy;
-            let u = (local_x + half_w) / rect[2];
-            let v = (local_y + half_h) / rect[3];
+            let u = (local_x + origin[0]) / rect[2];
+            let v = (local_y + origin[1]) / rect[3];
             if !(0.0..1.0).contains(&u) || !(0.0..1.0).contains(&v) {
                 continue;
             }
-            let s = uv[0] + span_u * u;
-            let t = uv[1] + span_v * v;
+            // A tumbled quad puts the texture's s along the pane's height and its
+            // t along the pane's width (`J2DPicture::drawFullSet`,
+            // `J2DPicture.cpp:327-331`).
+            let (s, t) = if tumble {
+                (uv[0] + span_u * v, uv[3] - span_v * u)
+            } else {
+                (uv[0] + span_u * u, uv[1] + span_v * v)
+            };
             let texel = if linear {
                 sample_linear(image, s, t)
             } else {
