@@ -718,7 +718,9 @@ impl BatteryGauge {
         } else if rot > BATTERY_ROT_MAX {
             BATTERY_ROT_HIGH
         } else {
-            BATTERY_ROT_BASE - ((rot - BATTERY_MIN_ROT) * BATTERY_ROT_SCALE + BATTERY_TEXT_BASE)
+            // The visual angle has its own 1.4 factor, unlike the 35.0 of the text angle
+            // (`d_2dnumber.cpp:174`).
+            BATTERY_ROT_BASE - ((rot - BATTERY_MIN_ROT) * BATTERY_ROT_TEXT + BATTERY_TEXT_BASE)
         };
     }
 

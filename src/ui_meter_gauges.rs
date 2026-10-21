@@ -7,7 +7,7 @@ use crate::text::msgproc::{MsgAppend, MsgProcs, fop_msgm_value_increase};
 pub const SCREEN_MAIN_PARTS1: &str = "main_parts1.blo";
 pub const SCREEN_MAIN_PARTS3: &str = "main_parts3.blo";
 pub const SCREEN_TIME_SWIM1: &str = "time_swim_1.blo";
-pub const SCREEN_TIME_SWIM2: &str = "time_swim2.blo";
+pub const SCREEN_TIME_SWIM2: &str = "time_swim_2.blo";
 pub const SCREEN_CHOICE_ROAD: &str = "choice_road.blo";
 
 pub const STTS_1: u32 = 0x0000_0001;

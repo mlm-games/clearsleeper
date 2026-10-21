@@ -76,14 +76,18 @@ impl Meter {
             self.vitals.heart_init(&mut self.env);
             self.bound = true;
         }
-        if self.vitals.max_hp != health.max || self.vitals.curr_hp != health.units {
-            self.vitals.max_hp = health.max;
-            self.vitals.curr_hp = health.units;
-            self.vitals.heart_scale_init();
+        // `dMeter_LifeMove` (`d_meter.cpp:1441-1495`) turns a pending life delta into `mAdjustHp`
+        // and steps the row one heart per frame, so hand the sim's change to the gauge as the
+        // pending item life count instead of snapping the row.
+        let life_delta = i32::from(health.units) - i32::from(self.env.life);
+        if life_delta != 0 {
+            self.env.item_life_count = life_delta as f32;
+        }
+        let max_delta = i32::from(health.max) - i32::from(self.env.max_life);
+        if max_delta != 0 {
+            self.env.item_max_life_count = max_delta as i16;
         }
         self.env.show_2d = true;
-        self.env.max_life = health.max;
-        self.env.life = health.units;
         self.vitals.heart_move(&mut self.env);
         self.vitals.heart_gauge_alpha();
         self.vitals.heart_draw();

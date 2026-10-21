@@ -3204,7 +3204,9 @@ impl Vitals {
         }
         let now = f32::from(self.heart_flash.now_alpha) * alpha;
         self.heart_flash.now_alpha = now as u8;
-        self.heart_flash.node.set_alpha((now * alpha) as u8);
+        self.heart_flash
+            .node
+            .set_alpha((f32::from(self.heart_flash.now_alpha) * alpha) as u8);
     }
 
     pub fn heart_init(&mut self, env: &mut VitalsEnv) {
