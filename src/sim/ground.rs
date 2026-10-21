@@ -4,10 +4,18 @@ use glam::Vec3;
 use super::collision::Collision;
 use super::player::Player;
 
+const GROUND_PROBE: f32 = 20.0;
+
+fn floor_below(collision: &Collision, pos: Vec3) -> Option<f32> {
+    collision
+        .ground_cross_below(pos + Vec3::Y * GROUND_PROBE)
+        .map(|hit| hit.height)
+}
+
 pub fn ground_check(collision: Option<Res<Collision>>, mut players: Query<&mut Player>) {
     for mut player in &mut players {
         let surface = match &collision {
-            Some(collision) => collision.ground_at(player.pos.x, player.pos.z),
+            Some(collision) => floor_below(collision, player.pos),
             None => Some(0.0),
         };
         if let Some(surface) = surface {
@@ -21,7 +29,7 @@ pub fn ground_check(collision: Option<Res<Collision>>, mut players: Query<&mut P
 
 pub fn grounded(collision: Option<&Collision>, pos: Vec3) -> bool {
     let surface = match collision {
-        Some(collision) => collision.ground_at(pos.x, pos.z),
+        Some(collision) => floor_below(collision, pos),
         None => Some(0.0),
     };
     matches!(surface, Some(ground) if pos.y <= ground)
@@ -29,14 +37,17 @@ pub fn grounded(collision: Option<&Collision>, pos: Vec3) -> bool {
 
 pub fn surface(collision: Option<&Collision>, pos: Vec3) -> Option<f32> {
     match collision {
-        Some(collision) => collision.ground_at(pos.x, pos.z),
+        Some(collision) => floor_below(collision, pos),
         None => Some(0.0),
     }
 }
 
 pub fn slope_normal(collision: Option<&Collision>, pos: Vec3) -> Vec3 {
     match collision {
-        Some(collision) => collision.ground_normal(pos.x, pos.z).unwrap_or(Vec3::Y),
+        Some(collision) => collision
+            .ground_cross_below(pos + Vec3::Y * GROUND_PROBE)
+            .map(|hit| hit.normal)
+            .unwrap_or(Vec3::Y),
         None => Vec3::Y,
     }
 }

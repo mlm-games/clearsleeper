@@ -184,6 +184,14 @@ fn actor_page(group: &crate::j3d::bdl::RoomGroup, pages: &[u32], page_base: u32)
 }
 
 pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&RoomMesh>) -> Frame3d {
+    let cam = OrbitCamera {
+        target: Vec3::new(
+            snapshot.player_pos.x,
+            snapshot.ground_y,
+            snapshot.player_pos.z,
+        ),
+        ..cam
+    };
     build_frame_with_actor(snapshot, cam, room, None, None, None)
 }
 
@@ -319,7 +327,7 @@ fn hair_groups(
     };
     let origin = Vec3::new(
         snapshot.player_pos.x,
-        snapshot.ground_y,
+        snapshot.player_pos.y,
         snapshot.player_pos.z,
     );
     let transform =
@@ -424,7 +432,7 @@ fn static_actor_groups(
 ) -> Vec<MeshGroup> {
     let origin = Vec3::new(
         snapshot.player_pos.x,
-        snapshot.ground_y,
+        snapshot.player_pos.y,
         snapshot.player_pos.z,
     );
     let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
@@ -491,7 +499,7 @@ fn static_actor_groups(
 fn place_actor(pose: Vec<Mat4>, snapshot: &SceneSnapshot) -> Vec<Mat4> {
     let origin = Vec3::new(
         snapshot.player_pos.x,
-        snapshot.ground_y,
+        snapshot.player_pos.y,
         snapshot.player_pos.z,
     );
     let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
