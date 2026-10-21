@@ -126,10 +126,12 @@ fn golden_sprint_off_ledge_leaps() {
     let (forward, up) = launch(17.0);
     let p = player(&app);
     assert_eq!(p.speed, forward + 0.4);
-    assert_eq!(p.speed_y, up - 2.5 - 0.5);
+    // `procAutoJump`, `main.cpp:7151-7172`: the extra half-step off the rise belongs to the
+    // tick that still holds a grabbed item, which a ledge hop never does.
+    assert_eq!(p.speed_y, up - 2.5);
     assert_eq!(
         p.pos,
-        Vec3::new(0.0, -2.5 + (up - 2.5 - 0.5), 36.0 + (forward + 0.4))
+        Vec3::new(0.0, -2.5 + (up - 2.5), 36.0 + (forward + 0.4))
     );
 }
 
@@ -230,6 +232,7 @@ fn golden_roll_off_ledge_leaps() {
     let (forward, up) = launch(17.0);
     let p = player(&app);
     assert_eq!(p.speed, forward + 0.4);
-    assert_eq!(p.speed_y, up - 2.5 - 0.5);
+    // `procAutoJump`, `main.cpp:7151-7172`: the rise only carries the gravity.
+    assert_eq!(p.speed_y, up - 2.5);
     assert_eq!(p.pos.z, 45.0 + (forward + 0.4));
 }

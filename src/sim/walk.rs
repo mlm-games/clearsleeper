@@ -10,10 +10,11 @@ use super::combat::Combat;
 use super::event::ItemPartner;
 use super::events::{STRIDE_UNITS, SimEvent, SimEvents, Stride};
 use super::ground;
-use super::hop::{HOP_ACCEL, HOP_RISE_STEP, Hop};
+use super::hop::{HOP_ACCEL, Hop};
 use super::intent::{CameraYaw, MoveIntent};
 use super::jump::{BACK_GRAVITY, BACK_RISE, BACK_SPEED, Jump, JumpKind, SIDE_GRAVITY, SIDE_OFFSET};
-use super::link_proc::{WALK_ALLOWED, allows};
+use super::link_proc::{Proc, WALK_ALLOWED, allows};
+use super::lock::Lock;
 use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
@@ -30,7 +31,8 @@ const DECEL_SCALE: f32 = 0.6;
 const DECEL_MAX_STEP: f32 = 2.5;
 const DECEL_MIN_STEP: f32 = 1.8;
 const ACCEL_EPSILON: f32 = 3.8146973e-6;
-const TURN_SCALE: i16 = 4;
+/// `mMove.m.field_0x6`, `main.cpp:2800`: the divisor every turn of the body runs on.
+const TURN_SCALE: i16 = 5;
 const TURN_PARAM: i16 = 3000;
 const TURN_PARAM_FLOOR: i16 = 10;
 const TURN_RATE: i16 = 100;
@@ -169,11 +171,13 @@ fn set_normal_speed(
     min_step: f32,
     max_step: f32,
 ) {
-    let (step_cap, decel_target) = if desired < player.speed {
+    // `setNormalSpeedF`, `main.cpp:2325-2348`: a target under the current speed drops the drive and
+    // runs the deceleration instead of the push.
+    let (drive, step_cap, decel_target) = if desired < player.speed {
         let span = player.speed - desired;
-        (span.clamp(min_step, max_step), desired)
+        (0.0, span.clamp(min_step, max_step), desired)
     } else {
-        (max_step, 0.0)
+        (drive, max_step, 0.0)
     };
     if drive.abs() < ACCEL_EPSILON {
         add_calc(&mut player.speed, decel_target, scale, step_cap, min_step);
@@ -208,6 +212,7 @@ pub fn walk(
     roll: Res<Roll>,
     jump: Res<Jump>,
     combat: Res<Combat>,
+    lock: Res<Lock>,
     mut partner: ResMut<ItemPartner>,
     collision: Option<Res<Collision>>,
     water: Res<Water>,
@@ -220,6 +225,12 @@ pub fn walk(
     if ships.iter().any(|ship| ship.riding) {
         return;
     }
+    // `setSpeedAndAngleNormal`, `main.cpp:2833`: the model only turns onto the stick while the
+    // player is not locked on and is not in the turn that drives the model itself.
+    let model_turns = lock.target.is_none()
+        && proc
+            .as_ref()
+            .map_or(true, |state| state.current != Proc::MoveTurn);
     for mut player in &mut players {
         let player = &mut *player;
         if !allows(proc.as_deref(), WALK_ALLOWED) {
@@ -242,7 +253,14 @@ pub fn walk(
         } else if combat.active {
             swing_tick(player);
         } else {
-            walk_tick(player, &intent, &camera, &mut stride, &mut events);
+            walk_tick(
+                player,
+                &intent,
+                &camera,
+                model_turns,
+                &mut stride,
+                &mut events,
+            );
         }
     }
 }
@@ -260,10 +278,10 @@ fn hop_tick(player: &mut Player) {
     };
     player.pos.x += speed_f * player.yaw.sin();
     player.pos.z += speed_f * player.yaw.cos();
+    // `procAutoJump`, `main.cpp:7151-7172`: the extra half-step off the rise belongs to the tick
+    // that is still holding a grabbed item, and a plain ledge hop never takes it (`mProcVar0.m34D0`
+    // is -1 from `main.cpp:7116`), so the rise only carries the gravity.
     player.speed_y = (player.speed_y + GRAVITY).max(MAX_FALL_SPEED);
-    if player.speed_y > 0.0 {
-        player.speed_y = (player.speed_y - HOP_RISE_STEP).max(0.0);
-    }
     player.pos.y += player.speed_y;
 }
 
@@ -319,11 +337,19 @@ fn walk_tick(
     player: &mut Player,
     intent: &MoveIntent,
     camera: &CameraYaw,
+    model_turns: bool,
     stride: &mut Stride,
     events: &mut SimEvents,
 ) {
     let stick = intent.axis.length().min(1.0);
-    locomote(player, target_yaw(intent, camera), stick, stride, events);
+    locomote(
+        player,
+        target_yaw(intent, camera),
+        stick,
+        model_turns,
+        stride,
+        events,
+    );
 }
 
 fn demo_walk_tick(
@@ -336,6 +362,7 @@ fn demo_walk_tick(
         player,
         partner.move_angle,
         partner.demo_stick.unwrap_or(0.0),
+        false,
         stride,
         events,
     );
@@ -409,6 +436,7 @@ fn locomote(
     player: &mut Player,
     target: i16,
     stick: f32,
+    model_turns: bool,
     stride: &mut Stride,
     events: &mut SimEvents,
 ) {
@@ -447,6 +475,25 @@ fn locomote(
     } else {
         0.0
     };
+    // `setSpeedAndAngleNormal`, `main.cpp:2833-2844`: the model turns onto the stick at twice the
+    // body's step and snaps onto the body the tick it crosses it.
+    if model_turns && stick > STICK_GATE {
+        let body = to_s16(player.yaw);
+        let before = to_s16(player.face).wrapping_sub(body);
+        let turned = add_calc_angle_s(
+            to_s16(player.face),
+            target,
+            TURN_SCALE,
+            TURN_PARAM * 2,
+            TURN_RATE * 2,
+        );
+        let after = turned.wrapping_sub(body);
+        player.face = from_s16(if i32::from(before) * i32::from(after) <= 0 {
+            body
+        } else {
+            turned
+        });
+    }
     set_normal_speed(
         player,
         desired,

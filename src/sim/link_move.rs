@@ -860,7 +860,7 @@ fn cut_proc(kind: CutKind) -> Proc {
     }
 }
 
-fn jump_proc(kind: JumpKind) -> Proc {
+pub(super) fn jump_proc(kind: JumpKind) -> Proc {
     match kind {
         JumpKind::Back => Proc::BackJump,
         JumpKind::Left | JumpKind::Right => Proc::SideStep,
@@ -1253,8 +1253,16 @@ fn want_move_turn(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     if player.speed.abs() <= REST_SPEED {
         return None;
     }
+    if probe.stick() <= STICK_GATE {
+        return None;
+    }
+    // `checkNextMode`, `main.cpp:4488-4500`: past the backward band of `getDirectionFromAngle` the
+    // body turns in place, and past the reversal limit it takes the same turn.
     if turn_between(probe.wanted(), to_s16(player.yaw)) <= REVERSAL_LIMIT
-        || probe.stick() <= STICK_GATE
+        && !matches!(
+            direction(probe.wanted(), to_s16(player.yaw)),
+            Direction::Back
+        )
     {
         return None;
     }
@@ -1363,6 +1371,8 @@ fn wait_turn_tick(player: &mut Player, proc: &LinkProc) -> Option<(Proc, MoveGap
         WAIT_TURN_MIN,
     );
     player.face = from_s16(held);
+    // `procWaitTurn`, `main.cpp:6579`: the body takes the model's own facing.
+    player.yaw = player.face;
     (held == 0).then_some((Proc::Wait, MoveGap::Ready))
 }
 
@@ -2071,11 +2081,17 @@ fn arm(
             player.face = player.yaw;
         }
         Proc::MoveTurn => {
-            if turn_between(probe.wanted(), to_s16(player.yaw)) > REVERSAL_LIMIT {
+            if dispatched {
+                // `procMoveTurn_init(1)`, `main.cpp:6605-6610`: the body takes the stick's own
+                // angle and the speed halves, and the model turns onto the body at the armed
+                // triple.
                 proc.turn_scale = MOVE_TURN_BACK_SCALE;
                 proc.turn_step = MOVE_TURN_BACK_MAX;
                 proc.turn_floor = MOVE_TURN_BACK_MIN;
+                player.yaw = from_s16(probe.wanted());
+                player.speed *= 0.5;
             } else {
+                // `procMoveTurn_init(0)`, `main.cpp:6611-6614`: the model catches up onto the body.
                 proc.turn_scale = MOVE_TURN_FACE_SCALE;
                 proc.turn_step = MOVE_TURN_FACE_MAX;
                 proc.turn_floor = MOVE_TURN_FACE_MIN;

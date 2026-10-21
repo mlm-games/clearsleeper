@@ -8,7 +8,7 @@ use super::combat::Combat;
 use super::ground::grounded;
 use super::health::Health;
 use super::intent::{CameraYaw, DoIntent, MoveIntent};
-use super::link_proc::{BACK_AIR, BACK_GROUND, allows};
+use super::link_proc::{BACK_AIR, BACK_GROUND, Proc, allows};
 use super::lock::Lock;
 use super::player::Player;
 use super::roll::Roll;
@@ -68,7 +68,7 @@ pub fn control(
     swim: Res<Swim>,
     lock: Res<Lock>,
     combat: Res<Combat>,
-    proc: Option<Res<super::link_proc::LinkProc>>,
+    mut proc: Option<ResMut<super::link_proc::LinkProc>>,
     mut roll: ResMut<Roll>,
     mut jump: ResMut<Jump>,
     mut players: Query<&mut Player>,
@@ -88,7 +88,17 @@ pub fn control(
             if grounded(collision.as_deref(), player.pos) && player.speed_y <= 0.0 {
                 jump.active = false;
                 player.speed = 0.0;
-                player.yaw = player.face;
+                // `procBackJumpLand_init`, `main.cpp:7043`, takes the body's facing from the
+                // model's, while `procSideStepLand_init`, `main.cpp:6366`, turns the body the
+                // other way instead.
+                player.yaw = match jump.kind {
+                    JumpKind::Back => player.face,
+                    JumpKind::Left => player.face + SIDE_OFFSET + PI,
+                    JumpKind::Right => player.face - SIDE_OFFSET + PI,
+                };
+                if let Some(state) = proc.as_deref_mut() {
+                    state.enter(Proc::Move);
+                }
             }
             continue;
         }
@@ -126,5 +136,11 @@ pub fn control(
         }
         jump.active = true;
         roll.active = false;
+        // `checkNextActionFromButton`, `main.cpp:4300-4312`: the button's own dispatcher takes the
+        // jump into the process that carries it, the back jump at `main.cpp:4305` and the side step
+        // at `main.cpp:4302`.
+        if let Some(state) = proc.as_deref_mut() {
+            state.enter(super::link_move::jump_proc(jump.kind));
+        }
     }
 }

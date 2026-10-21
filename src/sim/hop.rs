@@ -19,7 +19,6 @@ const HOP_FACING: u16 = 0x800;
 const HOP_ANGLE: f32 = 11000.0 * RAD_PER_UNIT;
 const HOP_SCALE: f32 = 1.6;
 pub(crate) const HOP_ACCEL: f32 = 0.4;
-pub(crate) const HOP_RISE_STEP: f32 = 0.5;
 
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct Hop {
