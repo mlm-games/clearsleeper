@@ -1,7 +1,7 @@
 use crate::assets::AssetRoot;
 use crate::intro::{self, PaneImages};
 use crate::j2d::{self, Bounds, Screen};
-use crate::sim::title::{self, PANE_COUNT, PANE_PRES, PANE_TAG, Title};
+use crate::sim::title::{self, PANE_TAG, Title};
 use crate::text::raster::Canvas;
 
 /// `TlogoE` holds `title_logo_e.blo` and the textures its panes name
@@ -23,9 +23,10 @@ impl TitleAssets {
 
 /// The J2D screen is drawn over the title scene at the origin (`d_a_title.cpp:566-572`).
 /// Retail also draws the title ship, subtitle and kirari models first (`d_a_title.cpp:533-563`);
-/// those models are not ported, so this composition carries the movie and the six panes. The
-/// USA `title_loop.thp` title card already carries the logo and the copyright, so only `pres`
-/// is drawn over it; without the movie every pane is the composition.
+/// those models are not ported, so this composition carries the movie and the six panes. Each
+/// pane carries the alpha `calc_2d_alpha` gives it (`d_a_title.cpp:358-419`): `zeld` and `nint`
+/// fade in, `pres` blinks once the title is entered, and `zelj`, `eft1` and `eft2` stay at zero
+/// on USA (`d_a_title.cpp:380`, `:435`), which is the alpha the render skips.
 pub fn render(
     canvas: &mut Canvas,
     assets: &TitleAssets,
@@ -37,29 +38,37 @@ pub fn render(
         pixel[3] = 0xFF;
     }
     if let Some((rgba, width, height)) = movie {
-        blit_fullscreen(canvas, rgba, width, height);
+        blit_movie(canvas, rgba, width, height);
     }
-    for index in 0..PANE_COUNT {
-        if movie.is_some() && index != PANE_PRES {
+    // `m_Screen->draw(0.0f, 0.0f, graf)` walks the screen's panes in the order the blo stores
+    // them (`J2DPane.cpp:200-202`), so the draw order is the screen's own.
+    for pane in &assets.screen.panes {
+        let Some(index) = PANE_TAG
+            .iter()
+            .position(|tag| pane.name.as_bytes() == tag.to_be_bytes().as_slice())
+        else {
             continue;
-        }
+        };
         if title.pane[index].alpha == 0 {
             continue;
         }
-        let tag = PANE_TAG[index].to_be_bytes();
-        let Ok(name) = std::str::from_utf8(&tag) else {
-            continue;
-        };
-        let Some(pane) = assets.screen.find(name) else {
-            continue;
-        };
         let bounds = [pane.bounds.x, pane.bounds.y, pane.bounds.w, pane.bounds.h];
         let alpha = f32::from(title.pane[index].alpha) / 255.0;
-        intro::draw_pane(canvas, &assets.screen, &assets.images, name, &bounds, alpha);
+        intro::draw_pane(
+            canvas,
+            &assets.screen,
+            &assets.images,
+            &pane.name,
+            &bounds,
+            alpha,
+        );
     }
 }
 
-fn blit_fullscreen(canvas: &mut Canvas, rgba: &[u8], width: u32, height: u32) {
+/// The movie is drawn at its own size, centred in the frame: `daMP_DrawPosX =
+/// (fbWidth - xSize) >> 1` and `daMP_DrawPosY = (efbHeight - ySize) >> 1`
+/// (`d_a_movie_player.cpp:4065-4066`).
+fn blit_movie(canvas: &mut Canvas, rgba: &[u8], width: u32, height: u32) {
     let source_width = width as usize;
     let source_height = height as usize;
     let Some(source_len) = source_width
@@ -71,16 +80,20 @@ fn blit_fullscreen(canvas: &mut Canvas, rgba: &[u8], width: u32, height: u32) {
     if source_width == 0 || source_height == 0 || rgba.len() < source_len {
         return;
     }
-    if source_width == canvas.width && source_height == canvas.height {
-        canvas.pixels.copy_from_slice(&rgba[..source_len]);
-        return;
-    }
-    for y in 0..canvas.height {
-        let source_y = y * source_height / canvas.height;
-        for x in 0..canvas.width {
-            let source_x = x * source_width / canvas.width;
-            let from = (source_y * source_width + source_x) * 4;
-            let to = (y * canvas.width + x) * 4;
+    let origin_x = (canvas.width as i32 - width as i32) / 2;
+    let origin_y = (canvas.height as i32 - height as i32) / 2;
+    for y in 0..source_height {
+        let to_y = origin_y + y as i32;
+        if to_y < 0 || to_y >= canvas.height as i32 {
+            continue;
+        }
+        for x in 0..source_width {
+            let to_x = origin_x + x as i32;
+            if to_x < 0 || to_x >= canvas.width as i32 {
+                continue;
+            }
+            let from = (y * source_width + x) * 4;
+            let to = (to_y as usize * canvas.width + to_x as usize) * 4;
             canvas.pixels[to..to + 4].copy_from_slice(&rgba[from..from + 4]);
         }
     }

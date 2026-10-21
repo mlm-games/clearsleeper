@@ -200,11 +200,13 @@ impl Text {
         self.msg_no = resolved;
         self.alpha = 0.0;
         self.timer = 0;
-        self.repeat = if msg_no != 0 {
-            i32::try_from(repeat.saturating_sub(1)).unwrap_or(i32::MAX)
-        } else {
-            0
-        };
+        // `if (param_1 != 0) { field_0x22ec = param_1 - 1; }` (`d_s_open_sub.cpp:37-39`):
+        // the repeat count is written only when the parameter is non-zero, so the chain
+        // `set_message(msgNo + 1, 0)` (`d_s_open_sub.cpp:158`) keeps the count it had and
+        // the next message repeats with it.
+        if repeat != 0 {
+            self.repeat = i32::try_from(repeat.saturating_sub(1)).unwrap_or(i32::MAX);
+        }
         self.next = false;
         let index = (resolved - MSG_FIRST) as usize;
         self.timer_max = i32::from(TIMER_TABLE.get(index).copied().unwrap_or(7)) * 30;
@@ -295,6 +297,12 @@ impl Text {
 }
 
 impl Intro {
+    /// One frame of `dScnOpen_proc_c::proc_execute` (`d_s_open_sub.cpp:282-555`).
+    ///
+    /// The decomp's `switch` falls out of a case into the next one wherever the case has
+    /// no `break` (`d_s_open_sub.cpp:287-544`), so one frame runs several cases: state 2
+    /// runs 3, 4 and 5 with it, state 12 runs 13, 14 and 15. The cases that end a frame are
+    /// 1, 5, 7, 9, 11, 15, 17, 21, 23, 25, 27, 31, 33, 37, 39, 41, 43 and 44.
     #[allow(clippy::too_many_lines)]
     pub fn step(&mut self, fonts: &mut FontBank, archive: &dyn MsgArchive) {
         if self.done {
@@ -303,10 +311,6 @@ impl Intro {
         if self.text.exec(fonts) {
             self.text.set(self.text.msg_no + 1, 0, fonts, archive);
         }
-        let message_alpha = self.text.alpha;
-        let next = self.text.next;
-        self.panes[TX1].alpha = message_alpha;
-        self.panes[TX2].alpha = message_alpha;
 
         macro_rules! hold {
             ($limit:expr, $to:expr) => {{
@@ -318,269 +322,307 @@ impl Intro {
             }};
         }
 
-        match self.state {
-            0 => {
-                self.timer = 0;
-                self.state = 1;
-            }
-            1 => hold!(90, 2),
-            2 => {
-                self.text.set(0x58E, 1, fonts, archive);
-                self.panes[TX1].offset_y = -190.0;
-                self.panes[TX2].offset_y = -190.0;
-                self.state = 3;
-            }
-            3 => {
-                if next {
-                    self.state = 4;
+        let mut case = self.state;
+        loop {
+            match case {
+                0 => {
+                    self.timer = 0;
+                    self.state = 1;
                 }
-            }
-            4 => {
-                self.panes[TX1].offset_y = 0.0;
-                self.panes[TX2].offset_y = 0.0;
-                self.timer = 0;
-                self.state = 5;
-            }
-            5 => hold!(60, 6),
-            6 => {
-                self.panes[D1].alpha = 0.0;
-                self.pos_x = 0.0;
-                self.alpha = 0.0;
-                self.state = 7;
-            }
-            7 => {
-                self.pos_x -= SLIDE_SLOW;
-                self.alpha += FADE;
-                if self.alpha >= 1.0 {
-                    self.alpha = 1.0;
-                    self.state = 8;
+                1 => {
+                    hold!(90, 2);
+                    break;
                 }
-                self.panes[D1].offset_y = self.pos_x;
-                self.panes[D1].alpha = self.alpha;
-            }
-            8 => {
-                self.text.set(0x579, 2, fonts, archive);
-                self.panes[D1].alpha = 1.0;
-                self.state = 9;
-            }
-            9 => {
-                self.pos_x -= SLIDE_SLOW;
-                if next {
-                    self.state = 10;
+                2 => {
+                    self.text.set(0x58E, 1, fonts, archive);
+                    self.panes[TX1].offset_y = -190.0;
+                    self.panes[TX2].offset_y = -190.0;
+                    self.state = 3;
                 }
-                self.panes[D1].offset_y = self.pos_x;
-            }
-            10 => {
-                self.panes[D1].alpha = 1.0;
-                self.panes[D2].alpha = 0.0;
-                self.alpha = 0.0;
-                self.state = 11;
-            }
-            11 => {
-                self.pos_x -= SLIDE_SLOW;
-                self.alpha += CROSS;
-                if self.alpha >= 1.0 {
-                    self.alpha = 1.0;
-                    self.state = 12;
+                3 => {
+                    if self.text.next {
+                        self.state = 4;
+                    }
                 }
-                self.panes[D1].offset_y = self.pos_x;
-                self.panes[D1].alpha = 1.0 - self.alpha;
-                self.panes[D2].alpha = self.alpha;
-            }
-            12 => {
-                self.text.set(0x57B, 3, fonts, archive);
-                self.state = 13;
-            }
-            13 => {
-                if next {
-                    self.state = 14;
+                4 => {
+                    self.panes[TX1].offset_y = 0.0;
+                    self.panes[TX2].offset_y = 0.0;
+                    self.timer = 0;
+                    self.state = 5;
                 }
-            }
-            14 => {
-                self.alpha = 1.0;
-                self.state = 15;
-            }
-            15 => {
-                self.alpha -= FADE;
-                if self.alpha <= 0.0 {
+                5 => {
+                    hold!(60, 6);
+                    break;
+                }
+                6 => {
+                    self.panes[D1].alpha = 0.0;
+                    self.pos_x = 0.0;
                     self.alpha = 0.0;
-                    self.state = 16;
+                    self.state = 7;
                 }
-                self.panes[D2].alpha = self.alpha;
-            }
-            16 => {
-                self.alpha = 0.0;
-                self.state = 17;
-            }
-            17 => {
-                self.alpha += FADE;
-                if self.alpha >= 1.0 {
-                    self.alpha = 1.0;
-                    self.state = 18;
+                7 => {
+                    self.pos_x -= SLIDE_SLOW;
+                    self.alpha += FADE;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 8;
+                    }
+                    self.panes[D1].offset_y = self.pos_x;
+                    self.panes[D1].alpha = self.alpha;
+                    break;
                 }
-                self.panes[D3].alpha = self.alpha;
-            }
-            18 => {
-                self.text.set(0x57E, 2, fonts, archive);
-                self.panes[D3].alpha = 1.0;
-                self.state = 19;
-            }
-            19 => {
-                if next {
-                    self.state = 20;
+                8 => {
+                    self.text.set(0x579, 2, fonts, archive);
+                    self.panes[D1].alpha = 1.0;
+                    self.state = 9;
                 }
-            }
-            20 => {
-                self.alpha = 1.0;
-                self.state = 21;
-            }
-            21 => {
-                self.alpha -= FADE;
-                if self.alpha <= 0.0 {
+                9 => {
+                    self.pos_x -= SLIDE_SLOW;
+                    if self.text.next {
+                        self.state = 10;
+                    }
+                    self.panes[D1].offset_y = self.pos_x;
+                    break;
+                }
+                10 => {
+                    self.panes[D1].alpha = 1.0;
+                    self.panes[D2].alpha = 0.0;
                     self.alpha = 0.0;
-                    self.state = 22;
+                    self.state = 11;
                 }
-                self.panes[D3].alpha = self.alpha;
-            }
-            22 => {
-                self.pos_x = 0.0;
-                self.alpha = 0.0;
-                self.state = 23;
-            }
-            23 => {
-                self.pos_x -= SLIDE_FAST;
-                self.alpha += FADE;
-                if self.alpha >= 1.0 {
+                11 => {
+                    self.pos_x -= SLIDE_SLOW;
+                    self.alpha += CROSS;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 12;
+                    }
+                    self.panes[D1].offset_y = self.pos_x;
+                    self.panes[D1].alpha = 1.0 - self.alpha;
+                    self.panes[D2].alpha = self.alpha;
+                    break;
+                }
+                12 => {
+                    self.text.set(0x57B, 3, fonts, archive);
+                    self.state = 13;
+                }
+                13 => {
+                    if self.text.next {
+                        self.state = 14;
+                    }
+                }
+                14 => {
                     self.alpha = 1.0;
-                    self.state = 24;
+                    self.state = 15;
                 }
-                self.panes[D4].offset_x = self.pos_x;
-                self.panes[D4].alpha = self.alpha;
-                self.panes[D42].alpha = self.alpha;
-            }
-            24 => {
-                self.text.set(0x580, 5, fonts, archive);
-                self.panes[D4].alpha = 1.0;
-                self.panes[D42].alpha = 1.0;
-                self.state = 25;
-            }
-            25 => {
-                self.pos_x -= SLIDE_FAST;
-                if next {
-                    self.state = 26;
+                15 => {
+                    self.alpha -= FADE;
+                    if self.alpha <= 0.0 {
+                        self.alpha = 0.0;
+                        self.state = 16;
+                    }
+                    self.panes[D2].alpha = self.alpha;
+                    break;
                 }
-                self.panes[D4].offset_x = self.pos_x;
-            }
-            26 => {
-                self.panes[D4].alpha = 1.0;
-                self.panes[D42].alpha = 1.0;
-                self.panes[D5].alpha = 0.0;
-                self.alpha = 0.0;
-                self.state = 27;
-            }
-            27 => {
-                self.pos_x -= SLIDE_FAST;
-                self.alpha += CROSS;
-                if self.alpha >= 1.0 {
-                    self.alpha = 1.0;
-                    self.state = 28;
-                }
-                self.panes[D4].offset_x = self.pos_x;
-                self.panes[D4].alpha = 1.0 - self.alpha;
-                self.panes[D42].alpha = 1.0 - self.alpha;
-                self.panes[D5].alpha = self.alpha;
-            }
-            28 => {
-                self.text.set(0x585, 4, fonts, archive);
-                self.panes[D5].alpha = 1.0;
-                self.state = 29;
-            }
-            29 => {
-                if next {
-                    self.state = 30;
-                }
-            }
-            30 => {
-                self.alpha = 1.0;
-                self.state = 31;
-            }
-            31 => {
-                self.alpha -= FADE;
-                if self.alpha <= 0.0 {
+                16 => {
                     self.alpha = 0.0;
-                    self.state = 32;
+                    self.state = 17;
                 }
-                self.panes[D5].alpha = self.alpha;
-            }
-            32 => {
-                self.timer = 0;
-                self.state = 33;
-            }
-            33 => hold!(90, 34),
-            34 => {
-                self.text.set(0x589, 1, fonts, archive);
-                self.panes[TX1].offset_y = -190.0;
-                self.panes[TX2].offset_y = -190.0;
-                self.state = 35;
-            }
-            35 => {
-                if next {
-                    self.state = 36;
+                17 => {
+                    self.alpha += FADE;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 18;
+                    }
+                    self.panes[D3].alpha = self.alpha;
+                    break;
                 }
-            }
-            36 => {
-                self.panes[TX1].offset_y = 0.0;
-                self.panes[TX2].offset_y = 0.0;
-                self.timer = 0;
-                self.state = 37;
-            }
-            37 => hold!(60, 38),
-            38 => {
-                self.scale = 2.0;
-                self.alpha = 0.0;
-                self.state = 39;
-            }
-            39 => {
-                self.scale -= SCALE_STEP;
-                self.alpha += FADE;
-                if self.alpha >= 1.0 {
+                18 => {
+                    self.text.set(0x57E, 2, fonts, archive);
+                    self.panes[D3].alpha = 1.0;
+                    self.state = 19;
+                }
+                19 => {
+                    if self.text.next {
+                        self.state = 20;
+                    }
+                }
+                20 => {
                     self.alpha = 1.0;
-                    self.state = 40;
+                    self.state = 21;
                 }
-                self.panes[D6].alpha = self.alpha;
-                self.panes[D6].scale = self.scale;
-            }
-            40 => {
-                self.text.set(0x58A, 4, fonts, archive);
-                self.panes[D6].alpha = 1.0;
-                self.state = 41;
-            }
-            41 => {
-                self.scale -= SCALE_STEP;
-                if self.scale < 1.0 {
-                    self.scale = 1.0;
+                21 => {
+                    self.alpha -= FADE;
+                    if self.alpha <= 0.0 {
+                        self.alpha = 0.0;
+                        self.state = 22;
+                    }
+                    self.panes[D3].alpha = self.alpha;
+                    break;
                 }
-                self.panes[D6].scale = self.scale;
-                if next {
-                    self.state = 42;
-                }
-            }
-            42 => {
-                self.alpha = 1.0;
-                self.state = 43;
-            }
-            43 => {
-                self.alpha -= FADE;
-                if self.alpha <= 0.0 {
+                22 => {
+                    self.pos_x = 0.0;
                     self.alpha = 0.0;
-                    self.state = 44;
+                    self.state = 23;
                 }
-                self.panes[D6].alpha = self.alpha;
+                23 => {
+                    self.pos_x -= SLIDE_FAST;
+                    self.alpha += FADE;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 24;
+                    }
+                    self.panes[D4].offset_x = self.pos_x;
+                    self.panes[D4].alpha = self.alpha;
+                    self.panes[D42].alpha = self.alpha;
+                    break;
+                }
+                24 => {
+                    self.text.set(0x580, 5, fonts, archive);
+                    self.panes[D4].alpha = 1.0;
+                    self.panes[D42].alpha = 1.0;
+                    self.state = 25;
+                }
+                25 => {
+                    self.pos_x -= SLIDE_FAST;
+                    if self.text.next {
+                        self.state = 26;
+                    }
+                    self.panes[D4].offset_x = self.pos_x;
+                    break;
+                }
+                26 => {
+                    self.panes[D4].alpha = 1.0;
+                    self.panes[D42].alpha = 1.0;
+                    self.panes[D5].alpha = 0.0;
+                    self.alpha = 0.0;
+                    self.state = 27;
+                }
+                27 => {
+                    self.pos_x -= SLIDE_FAST;
+                    self.alpha += CROSS;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 28;
+                    }
+                    self.panes[D4].offset_x = self.pos_x;
+                    self.panes[D4].alpha = 1.0 - self.alpha;
+                    self.panes[D42].alpha = 1.0 - self.alpha;
+                    self.panes[D5].alpha = self.alpha;
+                    break;
+                }
+                28 => {
+                    self.text.set(0x585, 4, fonts, archive);
+                    self.panes[D5].alpha = 1.0;
+                    self.state = 29;
+                }
+                29 => {
+                    if self.text.next {
+                        self.state = 30;
+                    }
+                }
+                30 => {
+                    self.alpha = 1.0;
+                    self.state = 31;
+                }
+                31 => {
+                    self.alpha -= FADE;
+                    if self.alpha <= 0.0 {
+                        self.alpha = 0.0;
+                        self.state = 32;
+                    }
+                    self.panes[D5].alpha = self.alpha;
+                    break;
+                }
+                32 => {
+                    self.timer = 0;
+                    self.state = 33;
+                }
+                33 => {
+                    hold!(90, 34);
+                    break;
+                }
+                34 => {
+                    self.text.set(0x589, 1, fonts, archive);
+                    self.panes[TX1].offset_y = -190.0;
+                    self.panes[TX2].offset_y = -190.0;
+                    self.state = 35;
+                }
+                35 => {
+                    if self.text.next {
+                        self.state = 36;
+                    }
+                }
+                36 => {
+                    self.panes[TX1].offset_y = 0.0;
+                    self.panes[TX2].offset_y = 0.0;
+                    self.timer = 0;
+                    self.state = 37;
+                }
+                37 => {
+                    hold!(60, 38);
+                    break;
+                }
+                38 => {
+                    self.scale = 2.0;
+                    self.alpha = 0.0;
+                    self.state = 39;
+                }
+                39 => {
+                    self.scale -= SCALE_STEP;
+                    self.alpha += FADE;
+                    if self.alpha >= 1.0 {
+                        self.alpha = 1.0;
+                        self.state = 40;
+                    }
+                    self.panes[D6].alpha = self.alpha;
+                    self.panes[D6].scale = self.scale;
+                    break;
+                }
+                40 => {
+                    self.text.set(0x58A, 4, fonts, archive);
+                    self.panes[D6].alpha = 1.0;
+                    self.state = 41;
+                }
+                41 => {
+                    self.scale -= SCALE_STEP;
+                    if self.scale < 1.0 {
+                        self.scale = 1.0;
+                    }
+                    self.panes[D6].scale = self.scale;
+                    if self.text.next {
+                        self.state = 42;
+                    }
+                    break;
+                }
+                42 => {
+                    self.alpha = 1.0;
+                    self.state = 43;
+                }
+                43 => {
+                    self.alpha -= FADE;
+                    if self.alpha <= 0.0 {
+                        self.alpha = 0.0;
+                        self.state = 44;
+                    }
+                    self.panes[D6].alpha = self.alpha;
+                    break;
+                }
+                44 => break,
+                _ => break,
             }
-            44 => {
-                self.done = true;
-            }
-            _ => {}
+            case += 1;
+        }
+
+        // The message's alpha reaches the text panes at the end of the frame
+        // (`d_s_open_sub.cpp:547-549`), after the state machine has run.
+        let message_alpha = self.text.alpha;
+        self.panes[TX1].alpha = message_alpha;
+        self.panes[TX2].alpha = message_alpha;
+
+        // `if (mpProc->mState == 44) changeGameScene();` (`d_s_open.cpp:70-71`).
+        if self.state == 44 {
+            self.done = true;
         }
     }
 }
@@ -600,6 +642,12 @@ pub fn render(
     fonts: &mut FontBank,
     draw_image: &dyn Fn(&mut Canvas, &str, &[f32; 4], f32),
 ) {
+    // The 2D opaque list is drawn over the frame cleared to the back colour, black
+    // (`d_drawlist.cpp:1570-1572`), so the opening's letterbox is black.
+    canvas.pixels.fill(0);
+    for pixel in canvas.pixels.chunks_exact_mut(4) {
+        pixel[3] = 0xFF;
+    }
     for index in DRAW_ORDER {
         let name = NAMES[index];
         let pane = &intro.panes[index];
