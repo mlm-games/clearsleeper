@@ -202,8 +202,19 @@ fn read_texel(src: &[u8], at: usize, format: TexFmt, x: usize) -> u32 {
 
 fn shade(format: TexFmt, raw: u32, pal: &[[u8; 4]]) -> [u8; 4] {
     match format {
-        TexFmt::I4 => [expand(raw as u8, 4); 4],
-        TexFmt::I8 => [raw as u8; 4],
+        // `J2DPicture::setTevMode` takes the picture's alpha from the texture when the
+        // texture carries one (`J2DPicture.cpp:495-503`), and the intensity formats have no
+        // alpha of their own: the texel's own value is the alpha
+        // (`gecko/crates/gecko/src/flipper/gx/texture.rs:77-117`, `:118-156`). A zero texel is
+        // therefore transparent, which is how the file select's ring and disc plates are drawn.
+        TexFmt::I4 => {
+            let level = expand(raw as u8, 4);
+            [level, level, level, level]
+        }
+        TexFmt::I8 => {
+            let level = raw as u8;
+            [level, level, level, level]
+        }
         TexFmt::Ia4 => {
             let value = raw as u8;
             [

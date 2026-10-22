@@ -351,12 +351,10 @@ fn deg2s(deg: f32) -> i16 {
 
 /// `JUtility::TColor::toUInt32` (`TColor.h:20`) stores `{r, g, b, a}` as 0xAABBGGRR.
 fn color_from(value: u32) -> Color {
-    Color::new(
-        value as u8,
-        (value >> 8) as u8,
-        (value >> 16) as u8,
-        (value >> 24) as u8,
-    )
+    // `JUtility::TColor` is a big endian `0xRRGGBBAA` word: the red byte is the top one and
+    // the alpha the bottom (`TColor.h:16-29`).
+    let [r, g, b, a] = crate::j2d::unpack_color(value);
+    Color::new(r, g, b, a)
 }
 
 pub use crate::j2d::F2;
