@@ -4,19 +4,23 @@
 //! `dComIfGp_getMenuArchive`), and `d_meter.cpp:7736-7750` binds `main_parts1.blo` and the heart
 //! textures from it. The row runs through `dMeter_heartInit`/`dMeter_heartMove`/`dMeter_heartDraw`
 //! (`d_meter.cpp:1581-1605`). The pane logic is `ui_meter_vitals`; this module binds it to the
-//! archive and composes the row into a canvas. The rest of the meter (item rows, magic, clock,
+//! archive and composes the row into a canvas, the heart flash overlay the retail draws behind
+//! the row (`d_meter.cpp:1349-1378`) among it. The rest of the meter (item rows, magic, clock,
 //! boss gauges) is ported but not drawn by the shell yet.
 
 use std::collections::HashMap;
 
 use crate::assets::AssetRoot;
 use crate::bti::{self, Image};
-use crate::j2d::Screens;
+use crate::j2d::{ScreenPane, Screens};
 use crate::sim::health::Health;
 use crate::text::raster::Canvas;
 use crate::ui_meter_vitals::{self, Vitals, VitalsEnv};
 
 pub const MENU_ARCHIVE: &str = "files/res/Msg/menures.arc";
+
+/// The heart flash overlay's pane, `htfl` in the meter screen.
+const FLASH_PANE: &str = "htfl";
 
 pub struct MeterAssets {
     pub screens: Screens,
@@ -46,6 +50,16 @@ impl MeterAssets {
 
     pub fn from_parts(screens: Screens, textures: HashMap<String, Image>) -> Self {
         Self { screens, textures }
+    }
+
+    /// The heart flash overlay's own pane in the meter screen, the one the retail draws
+    /// behind the row (`d_meter.cpp:1349-1378`).
+    pub fn flash_pane(&self) -> Option<&ScreenPane> {
+        self.screens
+            .cache
+            .iter()
+            .find(|(label, _)| label == ui_meter_vitals::PARTS1)
+            .and_then(|(_, screen)| screen.find(FLASH_PANE))
     }
 }
 
@@ -96,21 +110,37 @@ impl Meter {
 
     /// The row's visible panes as a change key, so the shell repaints the HUD canvas only while
     /// the row it draws (textures, rects, alphas) actually moves.
+    ///
+    /// The heart flash overlay leads the key: it grows and fades every frame the life is not
+    /// zero (`d_meter.cpp:1349-1378`), so the row it sits on is repainted with it.
     pub fn row_key(&self) -> Vec<(String, [u32; 4], u32)> {
-        self.visible_hearts()
-            .map(|(texture, rect, _, alpha)| {
-                (
-                    texture,
-                    [
-                        rect[0].to_bits(),
-                        rect[1].to_bits(),
-                        rect[2].to_bits(),
-                        rect[3].to_bits(),
-                    ],
-                    alpha.to_bits(),
-                )
-            })
-            .collect()
+        let mut key = Vec::new();
+        let flash = self.vitals.heart_flash.quad();
+        if flash.visible && flash.bound && flash.alpha > 0 && flash.w > 0.0 && flash.h > 0.0 {
+            key.push((
+                flash.texture.clone(),
+                [
+                    flash.x.to_bits(),
+                    flash.y.to_bits(),
+                    flash.w.to_bits(),
+                    flash.h.to_bits(),
+                ],
+                (f32::from(flash.alpha) / 255.0).to_bits(),
+            ));
+        }
+        key.extend(self.visible_hearts().map(|(texture, rect, _, alpha)| {
+            (
+                texture,
+                [
+                    rect[0].to_bits(),
+                    rect[1].to_bits(),
+                    rect[2].to_bits(),
+                    rect[3].to_bits(),
+                ],
+                alpha.to_bits(),
+            )
+        }));
+        key
     }
 
     /// The visible heart slots, each with its retail fill texture, pane rect and white tint
@@ -136,11 +166,46 @@ impl Meter {
     }
 
     pub fn render(&self, canvas: &mut Canvas, assets: &MeterAssets) {
+        self.render_flash(canvas, assets);
         for (texture, rect, tint, alpha) in self.visible_hearts() {
             let Some(image) = assets.textures.get(&texture) else {
                 continue;
             };
             crate::panes::blit_texture(canvas, image, rect, tint, alpha);
         }
+    }
+
+    /// The heart flash overlay: the `htfl` pane, the shining copy of the current heart the
+    /// retail draws behind the row.
+    ///
+    /// `dMeter_heartLightMove` (`d_meter.cpp:1349-1378`) grows the pane out of the current
+    /// heart's own size and fades it out over twelve frames, or twenty-two once the life is
+    /// past the first heart, and writes the grey to white ramp into the pane's black colour
+    /// as it goes. The cycle restarts on every step of a life change
+    /// (`d_meter.cpp:1345`), so a heart lost runs the flash again.
+    ///
+    /// The pane's place in the meter screen's tree is before the shadows and the hearts, so
+    /// it is drawn first.
+    fn render_flash(&self, canvas: &mut Canvas, assets: &MeterAssets) {
+        let quad = self.vitals.heart_flash.quad();
+        if !quad.visible || !quad.bound || quad.alpha == 0 || quad.w <= 0.0 || quad.h <= 0.0 {
+            return;
+        }
+        let Some(image) = assets.textures.get(&quad.texture) else {
+            return;
+        };
+        let Some(node) = assets.flash_pane() else {
+            return;
+        };
+        crate::panes::draw_picture_image_tinted(
+            canvas,
+            image,
+            node,
+            [quad.x, quad.y, quad.w, quad.h],
+            quad.rotation as u16,
+            f32::from(quad.alpha) / 255.0,
+            [quad.black.r, quad.black.g, quad.black.b, quad.black.a],
+            [quad.white.r, quad.white.g, quad.white.b, quad.white.a],
+        );
     }
 }

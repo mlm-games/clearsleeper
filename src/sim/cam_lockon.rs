@@ -7,34 +7,34 @@ use super::camera::Camera;
 use super::player::Player;
 use super::player_status::{self, PlayerStatus};
 
-/// The `dCamera_c::mEventFlags` bits `lockonCamera` reads or writes, `d_camera.cpp:3291-3640`.
+/// The `dCamera_c::mEventFlags` bits `lockonCamera` reads or writes, `d_camera.cpp:3556-3914`.
 ///
 /// Retail keeps them in the one event word beside the collision pass's own four. This port puts
 /// every bit below on [`Camera::event_flags`](super::camera::Camera::event_flags) except
 /// [`SIGHT`], whose two bits the collision pass is the only writer of, which is why they are
 /// composed from [`cam_bump::evflag`] rather than listed again.
 pub mod flag {
-    /// `setFlag(0x10)` at `d_camera.cpp:1240`, read at `:3439` and `:3576`: the player is
+    /// `setFlag(0x10)` at `d_camera.cpp:1440`, read at `:3708` and `:3846`: the player is
     /// aiming, which pins both cushions and the latitude rate.
     pub const AIM: u32 = 0x10;
-    /// `setFlag(0x100)` at `d_camera.cpp:3395` and cleared at `:3352`: the placement has held
+    /// `setFlag(0x100)` at `d_camera.cpp:3659` and cleared at `:3616`: the placement has held
     /// long enough that the longitude span stops being scaled over the first sixty frames.
     pub const ENTERED: u32 = 0x100;
-    /// `setFlag(0x2000)` at `d_camera.cpp:3638`, read by the collision pass at `:2119` for the
+    /// `setFlag(0x2000)` at `d_camera.cpp:3913`, read by the collision pass at `:2329` for the
     /// locked-on sight radius, which this port does not run.
     pub const LOCKED: u32 = 0x2000;
-    /// `setFlag(0x4000000)` at `d_camera.cpp:3563`: a charge pull-in is running.
+    /// `setFlag(0x4000000)` at `d_camera.cpp:3831`: a charge pull-in is running.
     pub const CHARGE: u32 = 0x4000_000;
-    /// `chkFlag(0x80080)` at `d_camera.cpp:3412`: the player must be inside the window. Both
-    /// bits are the collision pass's own, `setFlag(0x80)` at `:2235` and `setFlag(0x80000)` at
-    /// `:2225`, so this mask is composed from [`cam_bump::evflag`](super::cam_bump::evflag).
+    /// `chkFlag(0x80080)` at `d_camera.cpp:3677`: the player must be inside the window. Both
+    /// bits are the collision pass's own, `setFlag(0x80)` at `:2453` and `setFlag(0x80000)` at
+    /// `:2443`, so this mask is composed from [`cam_bump::evflag`](super::cam_bump::evflag).
     pub const SIGHT: u32 =
         crate::sim::cam_bump::evflag::CORNER | crate::sim::cam_bump::evflag::PULL_IN;
 }
 
 /// `dCamera_c::mWork.lockon`, `d_camera.h:308-324`, narrowed to the members the engine reads
 /// back. The padding between `m378` and `m380` is left out, and so is `m38C`, which the first
-/// frame zeroes at `d_camera.cpp:3300` and which no line of the readable text reads back.
+/// frame zeroes at `d_camera.cpp:3576` and which no line of the readable text reads back.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Lockon {
     /// `m378`: the `'LOCK'` mark retail stamps on the arm when its first frame runs.
@@ -62,11 +62,11 @@ pub struct Lockon {
     pub latitude_gain: f32,
     /// `m3B8`: the eased cushion the anchor's height is walked with.
     pub cushion: f32,
-    /// `m39C`: the latch `!LockonTruth() && STTS0_BOOMERANG_WAIT` sets at `:3325-3330`.
+    /// `m39C`: the latch `!LockonTruth() && STTS0_BOOMERANG_WAIT` sets at `:3596-3601`.
     /// Nothing in the target's readable text reads it back: the sibling's copy-rod arm at
     /// `sibling d_camera.cpp:4680-4707` does, and the target dropped that whole block.
     pub waiting: bool,
-    /// `m39D`: the latch `STTS0_UNK400` holds, so the `StartShock` at `:3339` fires once
+    /// `m39D`: the latch `STTS0_UNK400` holds, so the `StartShock` at `:3605` fires once
     /// per press. The latch is ported; the vibration has no port.
     pub shocked: bool,
 }
@@ -91,64 +91,64 @@ impl Default for Lockon {
     }
 }
 
-/// `mCamSetup.m0B0`, `d_cam_param.cpp:341`: the frames the longitude span is scaled over and
+/// `mCamSetup.m0B0`, `d_cam_param.cpp:342`: the frames the longitude span is scaled over and
 /// the divisor of the latitude rate's own ramp.
 const LOCK_FRAMES: f32 = 60.0;
-/// `mCamSetup.m0B4`, `d_cam_param.cpp:342`: the rate the span ramp starts from and decays off.
+/// `mCamSetup.m0B4`, `d_cam_param.cpp:343`: the rate the span ramp starts from and decays off.
 const RAMP_RATE: f32 = 0.15;
-/// `mCamSetup.m028`, `d_cam_param.cpp:312`: the settle rate every unblocked term runs on.
+/// `mCamSetup.m028`, `d_cam_param.cpp:315`: the settle rate every unblocked term runs on.
 const SETTLE: f32 = 0.33;
-/// `mCamSetup.mCusCus`, `d_cam_param.cpp:309`: the easing the two gains and the cushion run on.
+/// `mCamSetup.mCusCus`, `d_cam_param.cpp:311`: the easing the two gains and the cushion run on.
 const GAIN_CUSHION: f32 = 0.2;
-/// `mCamSetup.mBaseCushion`, `d_cam_param.cpp:317`: the centre's vertical cushion on the floor.
+/// `mCamSetup.mBaseCushion`, `d_cam_param.cpp:319`: the centre's vertical cushion on the floor.
 const CUSHION_BASE: f32 = 0.28;
-/// `mCamSetup.mJumpCushion`, `d_cam_param.cpp:318`: the same while the player is in the air.
+/// `mCamSetup.mJumpCushion`, `d_cam_param.cpp:320`: the same while the player is in the air.
 const CUSHION_JUMP: f32 = 1.0;
-/// `mCamSetup.mParallelDist`, `d_cam_param.cpp:326`: the globe's radius with no target.
+/// `mCamSetup.mParallelDist`, `d_cam_param.cpp:328`: the globe's radius with no target.
 const PARALLEL_DIST: f32 = 60.0;
-/// `mCamSetup.mCurveWeight`, `d_cam_param.cpp:322`: the ease on every ratio call below.
+/// `mCamSetup.mCurveWeight`, `d_cam_param.cpp:324`: the ease on every ratio call below.
 const CURVE_WEIGHT: f32 = 1.0;
 /// `dAttention_c::LockonReleaseDistanse`, `d_attention.cpp:1007-1022`: the release distance
 /// the two actors' separation is divided by. Retail picks the row by the target's own
-/// attention type and widens it by the angle off the player's facing; the port carries no
-/// attention type, so this is the row's own distance and nothing else, which is the same
-/// figure the lock list measures against.
+/// attention type and widens it by the angle off the player's facing; the port carries one
+/// row for every registered actor, the battle row at `d_att_dist.cpp:15`, whose angle
+/// widen is zero, so the release distance is that row's own release reach.
 const RELEASE: f32 = 200.0;
-/// `d_camera.cpp:3298`, `mWork.lockon.m378 = 'LOCK'`.
+/// `d_camera.cpp:3573`, `mWork.lockon.m378 = 'LOCK'`.
 const TAG: i32 = i32::from_be_bytes(*b"LOCK");
-/// `d_camera.cpp:3293`, `r28`: the frames the sight-block latch holds before it clears.
+/// `d_camera.cpp:3557`, `r28`: the frames the sight-block latch holds before it clears.
 const BLOCK_FRAMES: i32 = 60;
-/// `d_camera.cpp:3294`, `f30`: the gain on the latitude the obstructed arm eases onto, the
+/// `d_camera.cpp:3558`, `f30`: the gain on the latitude the obstructed arm eases onto, the
 /// one rate in the function that is not the setup's.
 const BLOCK_GAIN: f32 = 0.05;
-/// `d_camera.cpp:3441`: the centre-height cushion the aiming flag pins to.
+/// `d_camera.cpp:3709`: the centre-height cushion the aiming flag pins to.
 const AIM_CUSHION: f32 = 0.01;
-/// `d_camera.cpp:3577`: the rate the aiming flag's latitude converges on the style's own at.
+/// `d_camera.cpp:3847`: the rate the aiming flag's latitude converges on the style's own at.
 /// It is not the cushion's figure: the sibling reference has no arm here at all, so this is the
 /// target's own and the two differ.
 const AIM_LATITUDE: f32 = 0.05;
-/// `d_camera.cpp:3509` and `:3512`: the nudge either side of straight behind while blocked.
+/// `d_camera.cpp:3778` and `:3780`: the nudge either side of straight behind while blocked.
 const BLOCK_NUDGE: f32 = 15.0;
-/// `d_camera.cpp:3626`: the radius the obstructed arm walks the placement onto.
+/// `d_camera.cpp:3896`: the radius the obstructed arm walks the placement onto.
 const BLOCK_RADIUS: f32 = 280.0;
-/// `d_camera.cpp:3455`: the extra centre height the obstructed arm adds.
+/// `d_camera.cpp:3724`: the extra centre height the obstructed arm adds.
 const BLOCK_HEIGHT: f32 = 25.0;
-/// `d_camera.cpp:3523`: the rate for a style whose longitude span came out zero.
+/// `d_camera.cpp:3792`: the rate for a style whose longitude span came out zero.
 const ZERO_SPAN_RATE: f32 = 0.15;
-/// `d_camera.cpp:3540`: the ceiling on the residual divisor, in degrees.
+/// `d_camera.cpp:3809`: the ceiling on the residual divisor, in degrees.
 const RESIDUAL_CAP: f32 = 45.0;
-/// `d_camera.cpp:3541`: past this span the ceiling runs down from the span itself.
+/// `d_camera.cpp:3810`: past this span the ceiling runs down from the span itself.
 const SPAN_RUN: f32 = 135.0;
-/// `d_camera.cpp:3549`: under this horizontal separation the rate is scaled by its ratio.
+/// `d_camera.cpp:3817`: under this horizontal separation the rate is scaled by its ratio.
 const CLOSE_RANGE: f32 = 100.0;
-/// `d_camera.cpp:3430`: the main stick at or below this leaves the latch set for a frame.
+/// `d_camera.cpp:3695`: the main stick at or below this leaves the latch set for a frame.
 const LATCH_STICK: f32 = 0.1;
 
-/// `dCamera_c::lockonCamera(s32 style)`, `d_camera.cpp:3291-3640`.
+/// `dCamera_c::lockonCamera(s32 style)`, `d_camera.cpp:3556-3914`.
 ///
 /// The function is framed on the lock-on target throughout: its attention point becomes the
-/// globe the eye rides (`d_camera.cpp:3370-3374`), the separation of the two actors scales
-/// every style lookup (`d_camera.cpp:3375`), the sight tests at `:3412-3421` and `:3423-3426`
+/// globe the eye rides (`d_camera.cpp:3638`), the separation of the two actors scales
+/// every style lookup (`d_camera.cpp:3645`), the sight tests at `:3677-3686`
 /// need an actor to look at, and the frame it opens by latching the target's own state.
 ///
 /// This port has the target, and `EngineInput::lockon` carries it. Everything the readable
@@ -156,39 +156,39 @@ const LATCH_STICK: f32 = 0.1;
 /// stands in the way of the placement itself, which is the whole of the body here.
 ///
 /// Three members of the arm are now carried that the first draft left out: the `'LOCK'` tag
-/// `m378` takes, `m39C`'s latch and `m39D`'s, written at `:3298`, `:3330` and `:3339` from the
+/// `m378` takes, `m39C`'s latch and `m39D`'s, written at `:3573`, `:3596` and `:3605` from the
 /// pad states the port already publishes.
 ///
 /// The lock-on target the port publishes is `positionOf` and not `attentionPos`, so the boss arm
-/// below and the globe at `:3370-3374` are reading the same point retail reads the second of.
+/// below and the globe at `:3638` are reading the same point retail reads the second of.
 /// Nothing downstream distinguishes them.
 ///
 /// What is not ported, in the order the reference reaches it:
 ///
-/// - `d_camera.cpp:3323-3325`: `radiusActorInSight(mpPlayerActor, mpLockonTarget)`, whose
+/// - `d_camera.cpp:3588-3590`: `radiusActorInSight(mpPlayerActor, mpLockonTarget)`, whose
 ///   value the function discards. It needs the window scissor and the two actors' attention
 ///   points, and it feeds nothing else in the readable text.
-/// - `d_camera.cpp:3328-3330`: `m31D`, the moving-background carry. Nothing in the port
+/// - `d_camera.cpp:3593-3595`: `m31D`, the moving-background carry. Nothing in the port
 ///   publishes a moving background.
-/// - `d_camera.cpp:3338-3346`: the `StartShock` on `UNK400`. `m39D`'s latch is carried as
+/// - `d_camera.cpp:3603-3611`: the `StartShock` on `UNK400`. `m39D`'s latch is carried as
 ///   [`Lockon::shocked`] and written every frame, so only the vibration itself is missing; the
 ///   rising edge the reference gates it on is the port's one-frame `!shocked` read.
-/// - `d_camera.cpp:3363`: the parallel arm clears the camera's own target. The target arrives
+/// - `d_camera.cpp:3627`: the parallel arm clears the camera's own target. The target arrives
 ///   read-only, and retail's other three writers of it are the mode and type choosers this
 ///   port does not run, so the arm is taken on its own reading and the clearing is left to
 ///   them.
-/// - `d_camera.cpp:3369-3372`: the boss arm that takes the target's own position instead of
+/// - `d_camera.cpp:3633-3636`: the boss arm that takes the target's own position instead of
 ///   its attention point, which the port has no second position for.
-/// - `d_camera.cpp:3491-3496`: the forced lock-off on a blocked centre, which needs the
+/// - `d_camera.cpp:3760-3764`: the forced lock-off on a blocked centre, which needs the
 ///   forced-lock identity retail keeps in `mLockOnActorId`.
-/// - `d_camera.cpp:3583-3592`: the boomerang arm of the latitude, which needs the player's
+/// - `d_camera.cpp:3852-3865`: the boomerang arm of the latitude, which needs the player's
 ///   thrown boomerang and the map test in `m784`.
-/// - `d_camera.cpp:3596-3603`: the separation the `UNK400` arm measures into `fVar22`. The
+/// - `d_camera.cpp:3866-3873`: the separation the `UNK400` arm measures into `fVar22`. The
 ///   sibling writes the same member as the sight radius at `sibling d_camera.cpp:4702` and its
 ///   copy-rod arm reads it back at `:4690`; the target dropped that arm, so the value lands in a
 ///   member whose only later reader is the radius arm's own register reuse.
 ///
-/// One accessor does not read the way the arm around it suggests. At `d_camera.cpp:3580`
+/// One accessor does not read the way the arm around it suggests. At `d_camera.cpp:3849`
 /// the airborne arm eases the latitude toward `local_240.U()`, which under this port's
 /// `cSGlobe` spelling (`c_angle.h:165-172`, where the getters and the setters disagree) is
 /// the inclination rather than the latitude, and the difference is weighted by the latitude's
@@ -196,10 +196,10 @@ const LATCH_STICK: f32 = 0.1;
 /// there, which is the one line of this engine whose shape rests on how the reference spells
 /// its accessors.
 ///
-/// The radius arm at `d_camera.cpp:3604-3612` is the one place the target's own text cannot be
+/// The radius arm at `d_camera.cpp:3895-3906` is the one place the target's own text cannot be
 /// taken literally. `DefaultRadius` leaves its radius clamped when it returns false, and the
 /// true branch then reads a `fVar22` the reference has recycled: the function's opening
-/// `mCamSetup.m0B4`, the narrow-span rate at `:3530` and the `UNK400` separation above all land
+/// `mCamSetup.m0B4`, the narrow-span rate at `:3804` and the `UNK400` separation above all land
 /// there. The sibling's matching arm is readable and has a different shape again, easing toward
 /// the style's own near/far radius at two percent inside the band and toward the clamped radius
 /// at `0.4 * sp194` outside it (`sibling d_camera.cpp:5010-5016`), and the `sp194` ramp it scales
@@ -364,7 +364,9 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
         } else {
             -BLOCK_NUDGE
         });
-        yaw += (cache.direction.longitude().inv() + nudge - yaw) * 0.05;
+        // `d_camera.cpp:3775-3784`: the obstructed arm eases the placement's longitude onto
+        // the globe's own azimuth turned about, so the eye ends up behind the target.
+        yaw += (globe.longitude().inv() + nudge - yaw) * 0.05;
     } else {
         let rate = if target.is_none() {
             SETTLE
@@ -467,7 +469,7 @@ pub fn lockon(camera: &mut Camera, player: &Player, input: &EngineInput<'_>) -> 
     true
 }
 
-/// `dCamParam_c::LockonLongitude`, `d_cam_param.cpp:274-279`: the style's longitude span, the
+/// `dCamParam_c::LockonLongitude`, `d_cam_param.cpp:277-282`: the style's longitude span, the
 /// near slot at the ratio and the far slot at one.
 fn lockon_longitude(camera: &Camera, ratio: f32) -> SAngle {
     let near = SAngle::from_degrees(camera.val(param::LOCKON_LONGITUDE_MIN));
@@ -475,26 +477,26 @@ fn lockon_longitude(camera: &Camera, ratio: f32) -> SAngle {
     near + (far - near) * ratio
 }
 
-/// `dCamParam_c::LockonLatitude`, `d_cam_param.cpp:281-286`.
+/// `dCamParam_c::LockonLatitude`, `d_cam_param.cpp:284-289`.
 fn lockon_latitude(camera: &Camera, ratio: f32) -> SAngle {
     let near = SAngle::from_degrees(camera.val(param::LOCKON_LATITUDE_MIN));
     let far = SAngle::from_degrees(camera.val(param::LOCKON_LATITUDE_MAX));
     near + (far - near) * ratio
 }
 
-/// `dCamParam_c::LockonFovy`, `d_cam_param.cpp:288-293`.
+/// `dCamParam_c::LockonFovy`, `d_cam_param.cpp:291-296`.
 fn lockon_fovy(camera: &Camera, ratio: f32) -> f32 {
     let near = camera.val(param::LOCKON_FOVY_MIN);
     near + ratio * (camera.val(param::LOCKON_FOVY_MAX) - near)
 }
 
-/// `dCamParam_c::LockonCenterHeight`, `d_cam_param.cpp:295-300`.
+/// `dCamParam_c::LockonCenterHeight`, `d_cam_param.cpp:298-303`.
 fn lockon_center_height(camera: &Camera, ratio: f32) -> f32 {
     let near = camera.val(param::LOCKON_CENTER_HEIGHT_MIN);
     near + ratio * (camera.val(param::LOCKON_CENTER_HEIGHT_MAX) - near)
 }
 
-/// `dCamParam_c::RadiusRatio`, `d_cam_param.cpp:231-262`: how far the placement's radius sits
+/// `dCamParam_c::RadiusRatio`, `d_cam_param.cpp:234-265`: how far the placement's radius sits
 /// outside the style's own band, as a signed fraction.
 fn radius_ratio(camera: &Camera, radius: f32) -> f32 {
     let center = camera.val(param::UNK10);
@@ -520,7 +522,7 @@ fn radius_ratio(camera: &Camera, radius: f32) -> f32 {
     0.0
 }
 
-/// `dCamParam_c::DefaultRadius`, `d_cam_param.cpp:200-229`: false, and the radius clamped into
+/// `dCamParam_c::DefaultRadius`, `d_cam_param.cpp:203-232`: false, and the radius clamped into
 /// the style's band, when it sat outside it.
 fn default_radius(camera: &Camera, radius: &mut f32) -> bool {
     let first = camera.val(param::UNK13);
@@ -541,7 +543,7 @@ fn default_radius(camera: &Camera, radius: &mut f32) -> bool {
     true
 }
 
-/// `dCamSetup_c::CheckLatitudeRange`, `d_cam_param.cpp:362-378`.
+/// `dCamSetup_c::CheckLatitudeRange`, `d_cam_param.cpp:365-380`.
 fn check_latitude_range(camera: &Camera, angle: &mut i16) -> bool {
     let upper = SAngle::from_degrees(camera.setup.latitude_upper).val();
     let lower = SAngle::from_degrees(camera.setup.latitude_lower).val();
@@ -556,7 +558,7 @@ fn check_latitude_range(camera: &Camera, angle: &mut i16) -> bool {
     true
 }
 
-/// `dCamera_c::pointInSight`, `d_camera.cpp:1659-1667`: the point projected through the
+/// `dCamera_c::pointInSight`, `d_camera.cpp:1874-1882`: the point projected through the
 /// published view and tested against the window's scissor. The port has the viewport where
 /// retail reaches for the window, and the projection the same `mDoLib_project` answers.
 fn point_in_sight(camera: &Camera, point: Vec3) -> bool {
@@ -567,7 +569,7 @@ fn point_in_sight(camera: &Camera, point: Vec3) -> bool {
     proj.x > 0.0 && proj.x < port.width && proj.y > 0.0 && proj.y < port.height
 }
 
-/// `dCamMath::customRBRatio`, `d_cam_param.cpp:48-59`: the rational ratio folded onto the half
+/// `dCamMath::customRBRatio`, `d_cam_param.cpp:51-62`: the rational ratio folded onto the half
 /// turn, so an input past it saturates instead of leaving the curve.
 fn custom_rbr_ratio(x: f32, y: f32) -> f32 {
     if x > core::f32::consts::FRAC_1_SQRT_2 {
