@@ -35,12 +35,7 @@ impl TitleAssets {
 /// the reel hands the game back to the title screen on a button press or when it runs out
 /// (`d_s_title.cpp:86-89`). The title screen itself is the 3D title scene with this screen
 /// over it (`d_a_title.cpp:626-631`).
-pub fn render(
-    canvas: &mut Canvas,
-    assets: &TitleAssets,
-    title: &Title,
-    _movie: Option<(&[u8], u32, u32)>,
-) {
+pub fn render(canvas: &mut Canvas, assets: &TitleAssets, title: &Title) {
     canvas.pixels.fill(0);
     for pixel in canvas.pixels.chunks_exact_mut(4) {
         pixel[3] = 0xFF;

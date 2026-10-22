@@ -106,13 +106,8 @@ pub struct App {
     /// The last input the web build logged, so the console gets a line per change.
     input_state: u64,
     movie: Option<movie::Movie>,
-    movie_frame: usize,
-    movie_clock: f32,
     intro_clock: f32,
-    movie_pixels: Vec<u8>,
-    movie_size: (u32, u32),
     movie_sound: bool,
-    movie_done: bool,
     pub intro: Option<IntroStage>,
     /// True once an asset source (disc image or the development tree) is installed. The shell's
     /// own screens are pre-boot only: from here on every frame is the game's own rendering.
@@ -239,13 +234,8 @@ impl App {
             frame: 0,
             input_state: 0,
             movie: None,
-            movie_frame: 0,
-            movie_clock: 0.0,
             intro_clock: 0.0,
-            movie_pixels: Vec::new(),
-            movie_size: (0, 0),
             movie_sound: false,
-            movie_done: false,
             intro: None,
             assets_installed: assets::AssetRoot::from_env().is_ok(),
             title_stage: None,
@@ -766,38 +756,6 @@ impl App {
         stage.revision = stage.revision.wrapping_add(1);
     }
 
-    fn step_movie(&mut self, dt: Duration) {
-        if self.movie.is_none() {
-            return;
-        }
-        self.start_movie_sound();
-        if self.movie_pixels.is_empty() {
-            self.movie_frame = 0;
-        } else {
-            let interval = self.movie_interval();
-            self.movie_clock += dt.as_secs_f32();
-            if self.movie_clock >= interval {
-                self.movie_clock -= interval;
-                let frames = self.movie.as_ref().map_or(1, movie::Movie::len).max(1);
-                let next = self.movie_frame + 1;
-                if next >= frames {
-                    self.audio.play(audio::MOVIE_CUE);
-                    self.movie_done = true;
-                }
-                self.movie_frame = next % frames;
-            } else {
-                return;
-            }
-        }
-        self.decode_movie_frame();
-    }
-
-    fn movie_interval(&self) -> f32 {
-        self.movie
-            .as_ref()
-            .map_or(1.0 / 30.0, movie::Movie::interval)
-    }
-
     /// `daTitle_c::execute` owns the title actor while the scene is up; a request for
     /// `fpcNm_NAME_SCENE_e` (`d_a_title.cpp:657`) is the transition to the file select.
     fn handle_title_request(&mut self) {
@@ -862,22 +820,6 @@ impl App {
             .world
             .get_resource_or_insert_with(sim::title::TitleKirakira::default) =
             sim::title::TitleKirakira::default();
-        self.movie_frame = 0;
-        self.movie_clock = 0.0;
-        self.movie_done = false;
-        self.movie_pixels.clear();
-        self.decode_movie_frame();
-    }
-
-    fn decode_movie_frame(&mut self) {
-        if let Some((w, h, pixels)) = self
-            .movie
-            .as_mut()
-            .and_then(|m| m.frame(self.movie_frame).ok())
-        {
-            self.movie_size = (w, h);
-            self.movie_pixels = movie::to_rgba(&pixels);
-        }
     }
 
     fn step_title(&mut self) {
@@ -894,16 +836,7 @@ impl App {
         let Some(stage) = self.title_stage.as_mut() else {
             return;
         };
-        let movie = if self.movie_pixels.is_empty() {
-            None
-        } else {
-            Some((
-                self.movie_pixels.as_slice(),
-                self.movie_size.0,
-                self.movie_size.1,
-            ))
-        };
-        title_screen::render(&mut stage.canvas, &stage.assets, &title, movie);
+        title_screen::render(&mut stage.canvas, &stage.assets, &title);
         stage.revision = stage.revision.wrapping_add(1);
     }
 
@@ -2827,7 +2760,10 @@ impl App {
         if intro_running {
             self.step_intro(dt);
         } else if self.menu.screen == menus::Screen::Title && self.assets_installed {
-            self.step_movie(dt);
+            // The attract reel belongs to the title scene (`d_s_title.cpp:122`), not to the
+            // title screen, which draws the 3D title scene with the J2D screen over it
+            // (`d_a_title.cpp:626-631`). The reel's own track is what plays here.
+            self.start_movie_sound();
         } else if self.movie_sound {
             // The movie player belongs to the title scene (`d_s_title.cpp:122`), so its
             // soundtrack stops with it and a title that comes back plays it again
