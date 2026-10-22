@@ -34,6 +34,14 @@ pub const PANE_EFT2: usize = 5;
 pub const PANE_TAG: [u32; PANE_COUNT] =
     [TAG_ZELD, TAG_ZELJ, TAG_PRES, TAG_NINT, TAG_EFT1, TAG_EFT2];
 
+/// The panes the title screen puts on the screen. `zelj` is the Japanese-only subtitle logo,
+/// which the decomp holds at zero outside Japan (`d_a_title.cpp:380`), `eft1` and `eft2` are
+/// the 8x8 dummies whose alpha the decomp never commits (`d_a_title.cpp:516-518`), and
+/// `pres` is left out because the port's owner asked for PRESS START to be ignored; retail
+/// fades it in over frames 160-180 and blinks it once the title is entered
+/// (`d_a_title.cpp:413-419`, `:444-454`).
+pub const PANE_DRAWN: &[usize] = &[PANE_ZELD, PANE_NINT];
+
 pub const PANE_ORIGIN: [[f32; 2]; PANE_COUNT] = [
     [150.0, 108.0],
     [134.0, 247.0],

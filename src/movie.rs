@@ -412,6 +412,14 @@ fn index<R: Read + Seek>(
 
 /// The title movie's path under an extracted `CS_ASSETS` tree.
 ///
+/// `daMP_c_Init` names `/thpdemo/title_loop.thp` for the title scene and
+/// `/thpdemo/end_st_epilogue.thp` for the ending scene (`d_a_movie_player.cpp:4225-4228`),
+/// and the title scene creates its movie player with the index that picks the first of them
+/// (`d_s_title.cpp:122`). The reel is the attract movie of that scene, which hands the game
+/// back to the title screen on a button press or when it runs out (`d_s_title.cpp:86-89`);
+/// it is not the title screen itself, which is the 3D title scene with the J2D logo over it
+/// (`d_a_title.cpp:626-631`).
+///
 /// A disc image has no path to hand a file handle, so the app reads the same entry through
 /// [`crate::assets::AssetRoot::read`] and builds the movie with [`Movie::from_bytes`].
 pub const TITLE_PATH: &str = "files/thpdemo/title_loop.thp";

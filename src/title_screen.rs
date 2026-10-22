@@ -1,7 +1,7 @@
 use crate::assets::AssetRoot;
 use crate::intro::{self, PaneImages};
 use crate::j2d::{self, Bounds, Screen};
-use crate::sim::title::{self, PANE_TAG, Title};
+use crate::sim::title::{self, PANE_DRAWN, PANE_TAG, Title};
 use crate::text::raster::Canvas;
 
 /// `TlogoE` holds `title_logo_e.blo` and the textures its panes name
@@ -23,22 +23,27 @@ impl TitleAssets {
 
 /// The J2D screen is drawn over the title scene at the origin (`d_a_title.cpp:566-572`).
 /// Retail also draws the title ship, subtitle and kirari models first (`d_a_title.cpp:533-563`);
-/// those models are not ported, so this composition carries the movie and the six panes. Each
+/// those models are not ported, so this composition carries the J2D panes alone. Each
 /// pane carries the alpha `calc_2d_alpha` gives it (`d_a_title.cpp:358-419`): `zeld` and `nint`
-/// fade in, `pres` blinks once the title is entered, and `zelj`, `eft1` and `eft2` stay at zero
-/// on USA (`d_a_title.cpp:380`, `:435`), which is the alpha the render skips.
+/// fade in, `zelj` stays at zero outside Japan (`d_a_title.cpp:380`), and `eft1` and `eft2`
+/// are the dummies whose alpha is never committed (`d_a_title.cpp:516-518`), which is the
+/// alpha the render skips.
+///
+/// The attract reel is not drawn here. `title_loop.thp` is the movie the title scene's own
+/// movie player plays (`d_s_title.cpp:122`, `d_a_movie_player.cpp:4226`), and the title actor
+/// hands the game to that scene when the next-stage flag is set (`d_a_title.cpp:661-675`);
+/// the reel hands the game back to the title screen on a button press or when it runs out
+/// (`d_s_title.cpp:86-89`). The title screen itself is the 3D title scene with this screen
+/// over it (`d_a_title.cpp:626-631`).
 pub fn render(
     canvas: &mut Canvas,
     assets: &TitleAssets,
     title: &Title,
-    movie: Option<(&[u8], u32, u32)>,
+    _movie: Option<(&[u8], u32, u32)>,
 ) {
     canvas.pixels.fill(0);
     for pixel in canvas.pixels.chunks_exact_mut(4) {
         pixel[3] = 0xFF;
-    }
-    if let Some((rgba, width, height)) = movie {
-        blit_movie(canvas, rgba, width, height);
     }
     // `m_Screen->draw(0.0f, 0.0f, graf)` walks the screen's panes in the order the blo stores
     // them (`J2DPane.cpp:200-202`), so the draw order is the screen's own.
@@ -49,6 +54,9 @@ pub fn render(
         else {
             continue;
         };
+        if !PANE_DRAWN.contains(&index) {
+            continue;
+        }
         if title.pane[index].alpha == 0 {
             continue;
         }
@@ -62,40 +70,6 @@ pub fn render(
             &bounds,
             alpha,
         );
-    }
-}
-
-/// The movie is drawn at its own size, centred in the frame: `daMP_DrawPosX =
-/// (fbWidth - xSize) >> 1` and `daMP_DrawPosY = (efbHeight - ySize) >> 1`
-/// (`d_a_movie_player.cpp:4065-4066`).
-fn blit_movie(canvas: &mut Canvas, rgba: &[u8], width: u32, height: u32) {
-    let source_width = width as usize;
-    let source_height = height as usize;
-    let Some(source_len) = source_width
-        .checked_mul(source_height)
-        .and_then(|pixels| pixels.checked_mul(4))
-    else {
-        return;
-    };
-    if source_width == 0 || source_height == 0 || rgba.len() < source_len {
-        return;
-    }
-    let origin_x = (canvas.width as i32 - width as i32) / 2;
-    let origin_y = (canvas.height as i32 - height as i32) / 2;
-    for y in 0..source_height {
-        let to_y = origin_y + y as i32;
-        if to_y < 0 || to_y >= canvas.height as i32 {
-            continue;
-        }
-        for x in 0..source_width {
-            let to_x = origin_x + x as i32;
-            if to_x < 0 || to_x >= canvas.width as i32 {
-                continue;
-            }
-            let from = (y * source_width + x) * 4;
-            let to = (to_y as usize * canvas.width + to_x as usize) * 4;
-            canvas.pixels[to..to + 4].copy_from_slice(&rgba[from..from + 4]);
-        }
     }
 }
 
