@@ -105,9 +105,7 @@ pub struct App {
     frame: u64,
     /// The last input the web build logged, so the console gets a line per change.
     input_state: u64,
-    movie: Option<movie::Movie>,
     intro_clock: f32,
-    movie_sound: bool,
     pub intro: Option<IntroStage>,
     /// True once an asset source (disc image or the development tree) is installed. The shell's
     /// own screens are pre-boot only: from here on every frame is the game's own rendering.
@@ -233,9 +231,7 @@ impl App {
             input_keys: 0,
             frame: 0,
             input_state: 0,
-            movie: None,
             intro_clock: 0.0,
-            movie_sound: false,
             intro: None,
             assets_installed: assets::AssetRoot::from_env().is_ok(),
             title_stage: None,
@@ -254,14 +250,6 @@ impl App {
         #[cfg(not(target_arch = "wasm32"))]
         {
             app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
-        }
-        app.movie = movie::title_path().and_then(|path| movie::Movie::open(&path).ok());
-        if app.movie.is_none() {
-            // A disc image has no path for the file handle, so the same entry is read as bytes.
-            app.movie = assets::AssetRoot::from_env()
-                .ok()
-                .and_then(|root| root.read(movie::TITLE_PATH).ok())
-                .and_then(|bytes| movie::Movie::from_bytes(bytes).ok());
         }
         app.title_stage = assets::AssetRoot::from_env()
             .ok()
@@ -859,23 +847,6 @@ impl App {
         stage.canvas.clear();
         stage.meter.render(&mut stage.canvas, &stage.assets);
         stage.revision = stage.revision.wrapping_add(1);
-    }
-
-    fn start_movie_sound(&mut self) {
-        if self.movie_sound {
-            return;
-        }
-        self.movie_sound = true;
-        let Some(wave) = self.movie.as_mut().and_then(|m| m.soundtrack().ok()) else {
-            return;
-        };
-        if self
-            .audio
-            .load_cue(audio::MOVIE_CUE, audio::movie_cue(), &[&wave])
-            .is_ok()
-        {
-            self.audio.play(audio::MOVIE_CUE);
-        }
     }
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
@@ -2759,17 +2730,6 @@ impl App {
         let intro_running = self.intro.is_some();
         if intro_running {
             self.step_intro(dt);
-        } else if self.menu.screen == menus::Screen::Title && self.assets_installed {
-            // The attract reel belongs to the title scene (`d_s_title.cpp:122`), not to the
-            // title screen, which draws the 3D title scene with the J2D screen over it
-            // (`d_a_title.cpp:626-631`). The reel's own track is what plays here.
-            self.start_movie_sound();
-        } else if self.movie_sound {
-            // The movie player belongs to the title scene (`d_s_title.cpp:122`), so its
-            // soundtrack stops with it and a title that comes back plays it again
-            // (`d_a_movie_player.cpp:4080-4091`).
-            self.audio.stop_cue(audio::MOVIE_CUE);
-            self.movie_sound = false;
         }
         let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
             && self.menu.screen == menus::Screen::Playing;
