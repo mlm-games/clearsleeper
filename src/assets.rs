@@ -1583,9 +1583,12 @@ pub fn gc_texture_to_rgba(
             source,
             |line, x| {
                 let at = x * 2;
-                let value = u16::from_be_bytes([line[at], line[at + 1]]);
-                let level = (value >> 8) as u8;
-                [level, level, level, value as u8]
+                // An IA8 texel is a 16-bit word with the alpha in the high half and the
+                // intensity in the low half, the same way IA4 keeps its alpha in the high
+                // nibble (`gecko/crates/gecko/src/flipper/gx/texture.rs:200-238`, `:170-194`).
+                let alpha = line[at];
+                let level = line[at + 1];
+                [level, level, level, alpha]
             },
         ),
         GX_TF_RGB5A3 => gc_tiled(

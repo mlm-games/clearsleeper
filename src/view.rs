@@ -393,7 +393,7 @@ fn hair_groups(
                 indices: group_indices(group),
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
-                depth_test: true,
+                depth_test: group.z_compare,
                 ..MeshGroup::default()
             }
         })
@@ -440,7 +440,7 @@ fn skinned_groups(
                 joint_nodes: (0..actor.joints.len()).collect(),
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
-                depth_test: true,
+                depth_test: group.z_compare,
                 ..SkinnedMesh::default()
             };
             mesh.name = "cl".to_string();
@@ -507,7 +507,7 @@ fn static_actor_groups(
                 indices: group_indices(group),
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
-                depth_test: true,
+                depth_test: group.z_compare,
                 ..MeshGroup::default()
             })
         })

@@ -57,6 +57,22 @@ const COLOR_CHAN_MAX: usize = 4;
 const MATERIAL_ALPHA_COMP_IDX: usize = 0x146;
 /// `J3DAlphaCompInfo` (`J3DStruct.h:261-270`).
 const ALPHA_COMP_STRIDE: usize = 8;
+/// `J3DMaterialBlock::mpZModeInfo` (`J3DModelLoader.h:64`).
+const MATERIAL_Z_MODE_TABLE: usize = 0x74;
+/// `J3DMaterialBlock::mpBlendInfo` (`J3DModelLoader.h:66`).
+const MATERIAL_BLEND_TABLE: usize = 0x70;
+/// `J3DMaterialInitData::mZModeIdx` (`J3DMaterialFactory.h:55`).
+const MATERIAL_Z_MODE_IDX: usize = 0x06;
+/// `J3DMaterialInitData::mBlendIdx` (`J3DMaterialFactory.h:77`).
+const MATERIAL_BLEND_IDX: usize = 0x148;
+/// `J3DZModeInfo` (`J3DStruct.h:254-259`).
+const Z_MODE_STRIDE: usize = 4;
+/// `J3DBlendInfo` (`J3DStruct.h:230-235`).
+const BLEND_STRIDE: usize = 4;
+/// `GX_BM_NONE` (`GXEnum.h:147`).
+pub const GX_BM_NONE: u8 = 0;
+/// `GX_BM_BLEND` (`GXEnum.h:148`).
+pub const GX_BM_BLEND: u8 = 1;
 /// `J3DMaterialInitData::mTexNoIdx[i]`'s "no texture" value (`J3DMaterialFactory.cpp:509-515`).
 pub const MATERIAL_UNTEXTURED: u16 = 0xFFFF;
 const MATERIAL_TEX_GEN_NUM: usize = 0x003;
@@ -230,7 +246,7 @@ impl RoomMesh {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RoomGroup {
     pub positions: Vec<[f32; 3]>,
     pub colors: Vec<[f32; 3]>,
@@ -250,7 +266,41 @@ pub struct RoomGroup {
     pub cull: Option<u8>,
     /// The material's own alpha test, `None` when the material has none.
     pub alpha_test: Option<AlphaTest>,
+    /// `J3DZModeInfo::mCompareEnable` (`J3DStruct.h:255`): whether the material's Z test is
+    /// on. Link's eye materials turn it off (`cl.bdl`'s `eyeL`/`eyeR`), so the eye draws over
+    /// the face it is modelled into instead of being hidden by it.
+    pub z_compare: bool,
+    /// `J3DZModeInfo::mUpdateEnable` (`J3DStruct.h:257`): whether the material writes depth.
+    pub z_update: bool,
+    /// `J3DBlendInfo::mBlendMode` (`J3DStruct.h:231`): `GX_BM_NONE` or `GX_BM_BLEND`.
+    pub blend: u8,
     pub anim: Option<AnimBinding>,
+}
+
+impl Default for RoomGroup {
+    /// The default Z mode, `j3dDefaultZModeID` (`J3DTevs.cpp:311`): the Z test compares and
+    /// writes, and the default blend is opaque (`J3DPEBlockOpa::load`,
+    /// `J3DMatBlock.cpp:1454-1460`).
+    fn default() -> Self {
+        Self {
+            positions: Vec::new(),
+            colors: Vec::new(),
+            normals: Vec::new(),
+            uvs: Vec::new(),
+            indices: Vec::new(),
+            joint_indices: Vec::new(),
+            joint_weights: Vec::new(),
+            direct_joint: None,
+            texture_page: None,
+            lit: false,
+            cull: None,
+            alpha_test: None,
+            z_compare: true,
+            z_update: true,
+            blend: GX_BM_NONE,
+            anim: None,
+        }
+    }
 }
 
 /// `J3DAlphaComp` (`J3DMatBlock.h:704-759`): the alpha compare the material's
@@ -1042,6 +1092,9 @@ struct MaterialBinding {
     tex_gen: [Option<u8>; TEX_COORDS],
     cull: u8,
     alpha_test: Option<AlphaTest>,
+    z_compare: bool,
+    z_update: bool,
+    blend: u8,
 }
 
 impl MaterialBinding {
@@ -1211,6 +1264,67 @@ fn material_alpha_test(
         comp1: byte(3)?,
         ref1: byte(4)?,
     }))
+}
+
+/// `J3DMaterialFactory::newZMode` (`J3DMaterialFactory.cpp:646-652`): the material's own Z mode,
+/// which the game reads back through `J3DZMode::getCompareEnable` (`J3DMatBlock.h:631`).
+///
+/// A material that names no mode has the default one, `j3dDefaultZModeID` (`J3DTevs.cpp:311`),
+/// which the Z mode table answers with compare on, `LEQUAL` and depth writes on
+/// (`makeZModeTable`, `J3DTevs.cpp:270-282`).
+///
+/// The compare enable is what separates Link's eye materials from the rest of the model: they
+/// turn it off, so the eye draws over the face it is modelled into rather than behind it.
+fn material_z_mode(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    z_mode_table: u32,
+) -> Result<(bool, bool), BdlError> {
+    if z_mode_table == 0 {
+        return Ok((true, true));
+    }
+    let index = usize::from(block_byte(data, init, MATERIAL_Z_MODE_IDX, end)?);
+    if index == usize::from(u8::MAX) {
+        return Ok((true, true));
+    }
+    let table = at(start, z_mode_table as usize)?;
+    let info = at(table, index * Z_MODE_STRIDE)?;
+    if at(info, Z_MODE_STRIDE)? > end {
+        return Err(BdlError::Block);
+    }
+    let byte = |offset: usize| -> Result<u8, BdlError> {
+        Ok(*data.get(at(info, offset)?).ok_or(BdlError::Truncated)?)
+    };
+    Ok((byte(0)? != 0, byte(2)? != 0))
+}
+
+/// `J3DMaterialFactory::newBlend` (`J3DMaterialFactory.cpp:636-642`): the material's own blend
+/// mode, which the game reads back through `J3DBlend::getType` (`J3DMatBlock.h:668`).
+///
+/// A material that names no blend has the default one, `j3dDefaultBlendInfo`
+/// (`J3DTevs.cpp:308`), which blends with the source alpha.
+fn material_blend(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    init: usize,
+    blend_table: u32,
+) -> Result<u8, BdlError> {
+    if blend_table == 0 {
+        return Ok(GX_BM_BLEND);
+    }
+    let index = usize::from(read_u16(data, at(init, MATERIAL_BLEND_IDX)?)?);
+    if index == usize::from(u16::MAX) {
+        return Ok(GX_BM_BLEND);
+    }
+    let table = at(start, blend_table as usize)?;
+    let info = at(table, index * BLEND_STRIDE)?;
+    if at(info, BLEND_STRIDE)? > end {
+        return Err(BdlError::Block);
+    }
+    Ok(*data.get(at(info, 0)?).ok_or(BdlError::Truncated)?)
 }
 
 fn read_material_names(
@@ -1394,6 +1508,8 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
     let tev_order_table = read_u32(data, at(start, 0x4C)?)?;
     let tev_stage_table = read_u32(data, at(start, 0x58)?)?;
     let alpha_comp_table = read_u32(data, at(start, 0x6C)?)?;
+    let z_mode_table = read_u32(data, at(start, MATERIAL_Z_MODE_TABLE)?)?;
+    let blend_table = read_u32(data, at(start, MATERIAL_BLEND_TABLE)?)?;
     let names = if name_table == 0 {
         Vec::new()
     } else {
@@ -1427,6 +1543,8 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             _ => 0xFF,
         };
         let alpha_test = material_alpha_test(data, start, end, init, alpha_comp_table)?;
+        let (z_compare, z_update) = material_z_mode(data, start, end, init, z_mode_table)?;
+        let blend = material_blend(data, start, end, init, blend_table)?;
         let tex_no_count = tex_nos.iter().filter(|unit| unit.is_some()).count();
         let (coord, tex_gen) = material_coord(
             data,
@@ -1447,6 +1565,9 @@ fn read_materials(data: &[u8], blocks: &Blocks) -> Result<Vec<MaterialBinding>, 
             tex_gen,
             cull,
             alpha_test,
+            z_compare,
+            z_update,
+            blend,
         });
     }
     Ok(materials)
@@ -1853,12 +1974,19 @@ fn read_shapes(
 
         let layout = PrimitiveLayout::parse(data, descriptor_table, descriptor_offset)?;
         let texcoord_field = layout.texcoord_field;
-        let (lit, cull, alpha_test) = match shape_materials[shape] {
+        let (lit, cull, alpha_test, z_compare, z_update, blend) = match shape_materials[shape] {
             Some(index) if !materials.is_empty() => {
                 let material = materials.get(usize::from(index)).ok_or(BdlError::Range)?;
-                (material.lit, Some(material.cull), material.alpha_test)
+                (
+                    material.lit,
+                    Some(material.cull),
+                    material.alpha_test,
+                    material.z_compare,
+                    material.z_update,
+                    material.blend,
+                )
             }
-            _ => (false, None, None),
+            _ => (false, None, None, true, true, GX_BM_NONE),
         };
         let mut texture_page = if materials.is_empty() || texture_count == 0 {
             None
@@ -1897,6 +2025,9 @@ fn read_shapes(
             lit,
             cull,
             alpha_test,
+            z_compare,
+            z_update,
+            blend,
             anim,
             ..RoomGroup::default()
         };
