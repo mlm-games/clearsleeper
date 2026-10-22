@@ -16,8 +16,12 @@ use crate::ui_menu_save::{Pane, SavePanes};
 const NESTED_ARCHIVE: &str = "dat/file_select.arc";
 const FONT_ARCHIVE: &str = "files/res/Msg/fontres.arc";
 
+/// `MENU_CLOTH_TYPE_FILE_SELECT`'s cloth colour (`d_menu_cloth.cpp:66-69`).
+const CLOTH_COLOR: [u8; 4] = [0xBE, 0xB4, 0x64, 0xAA];
+
 pub struct Assets {
     pub screen: Screen,
+    pub parts: Option<crate::ui_file_select_parts::Parts>,
     pub textures: HashMap<String, Image>,
     names: Vec<String>,
     font_data: Vec<Vec<u8>>,
@@ -59,6 +63,8 @@ impl Assets {
     /// Load a top-level stage archive and, when the screen lives in a nested one,
     /// that archive inside it. `file_select.blo` is under `dat/file_select.arc`
     /// in `Stage.arc`; `menu_save.blo` and `gameover.blo` sit in their own archives.
+    /// The file select archive also holds the prompt screen the retail draws
+    /// over the file select (`d_s_name.cpp:362`).
     pub fn load_from(
         root: &AssetRoot,
         archive: &str,
@@ -74,6 +80,11 @@ impl Assets {
             None => stage,
         };
         let screen = crate::j2d::parse(inner.read(label).ok()?)?;
+        let parts = inner
+            .read(crate::ui_file_select_parts::PARTS_LABEL)
+            .ok()
+            .and_then(crate::j2d::parse)
+            .map(crate::ui_file_select_parts::Parts::bind);
         let mut textures = HashMap::new();
         for name in inner.entries() {
             if !name.ends_with(".bti") {
@@ -103,6 +114,7 @@ impl Assets {
         }
         Some(Assets {
             screen,
+            parts,
             textures,
             names,
             font_data,
@@ -112,6 +124,7 @@ impl Assets {
     pub fn from_parts(screen: Screen, textures: HashMap<String, Image>) -> Assets {
         Assets {
             screen,
+            parts: None,
             textures,
             names: Vec::new(),
             font_data: Vec::new(),
@@ -165,19 +178,32 @@ fn with_fonts<R>(assets: &Assets, run: impl FnOnce(&mut FontBank) -> R) -> R {
 }
 
 pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &Assets) {
-    // The BACK pane binds `sky_cloth.bti`, which the retail game generates at
-    // runtime: `dScnName_c::cloth_create` builds an 11x11 vertex grid from trig
-    // (`d_menu_cloth.cpp:161`) and the J2D pane binds the mesh it registers. No
-    // such file exists on disc, so nothing here can supply it. The cloth the
-    // file select hangs is the `MENU_CLOTH_TYPE_FILE_SELECT` one, whose colour
-    // `d_menu_cloth.cpp:66` gives, and the backdrop is that colour until the
-    // cloth's own wave mesh is ported.
-    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [0xBE, 0xB4, 0x64, 0xFF]);
-    draw_screen_impl(canvas, assets, &live_table(panes), false);
+    // The retail hangs the file select over a night sky and a cloth: the sky
+    // is the J3D model `vr_sky.bdl` the `Vrbox` actor loads
+    // (`d_a_vrbox.cpp:165`, spawned by `d_stage.cpp:2241-2244`), the cloth the
+    // `MENU_CLOTH_TYPE_FILE_SELECT` mesh `dScnName_c::cloth2D_create` builds
+    // (`d_s_name.cpp:342-352`) and `dDlst_FLSEL_CLOTH_c::draw` lays over the sky
+    // (`d_s_name.cpp:1495-1502`). Neither reaches the 2D canvas this screen is
+    // drawn into, so the backdrop is the cloth colour at the cloth's own alpha
+    // (`d_menu_cloth.cpp:66-69`) over the layer behind.
+    //
+    // `file_select.blo`'s BACK pane binds `sky_cloth.bti`, which is on no disc:
+    // `J2DPicture` looks its texture up by name (`J2DPicture.cpp:185-187`) and
+    // draws nothing when the name is missing (`J2DPicture.cpp:234-236`), so the
+    // retail leaves that pane empty as well.
+    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], CLOTH_COLOR);
+    draw_screen_impl(canvas, assets, &assets.screen, &live_table(panes), false);
+    crate::ui_file_select_parts::draw(canvas, assets);
 }
 
 pub fn draw_save_menu(canvas: &mut Canvas, panes: &SavePanes, assets: &SaveAssets) {
-    draw_screen_impl(canvas, &assets.assets, &save_live_table(panes), true);
+    draw_screen_impl(
+        canvas,
+        &assets.assets,
+        &assets.assets.screen,
+        &save_live_table(panes),
+        true,
+    );
 }
 
 /// The save and game over screens give `fopMsgM_setAlpha` a live `mNowAlpha`
@@ -185,16 +211,27 @@ pub fn draw_save_menu(canvas: &mut Canvas, panes: &SavePanes, assets: &SaveAsset
 /// select's `parts_set` leaves zero meaning "not written yet" and falls back to
 /// the blo's alpha. `draw_screen` takes the live value unconditionally.
 pub fn draw_screen(canvas: &mut Canvas, assets: &Assets, live: &HashMap<&str, &Pane>) {
-    draw_screen_impl(canvas, assets, live, true);
+    draw_screen_impl(canvas, assets, &assets.screen, live, true);
+}
+
+/// Draw one J2D screen with the live panes the retail bound to it.
+pub fn draw_screen_table(
+    canvas: &mut Canvas,
+    assets: &Assets,
+    screen: &Screen,
+    live: &HashMap<&str, &Pane>,
+) {
+    draw_screen_impl(canvas, assets, screen, live, false);
 }
 
 fn draw_screen_impl(
     canvas: &mut Canvas,
     assets: &Assets,
+    screen: &Screen,
     live: &HashMap<&str, &Pane>,
     zero_alpha_clear: bool,
 ) {
-    let nodes = &assets.screen.panes;
+    let nodes = &screen.panes;
     let mut origin = vec![[0.0f32; 2]; nodes.len()];
     let mut shift = vec![[0.0f32; 2]; nodes.len()];
     let mut alpha = vec![0f32; nodes.len()];
