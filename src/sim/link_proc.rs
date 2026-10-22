@@ -1522,6 +1522,20 @@ pub struct LinkProc {
     /// `mProcVar0.m34D0`, the divisor `procMoveTurn_init` picks at `main.cpp:6606` and
     /// `main.cpp:6612`.
     pub turn_scale: i16,
+    /// Whether the player was off the ground on the previous tick, which is the tick the
+    /// landing dispatcher looks for: the reference asks its own accumulator for the ground hit
+    /// on every tick, `mAcch.ChkGroundHit()`, and the landing is the tick that answers it after
+    /// a tick that did not, `changeLandProc`, `main.cpp:4922`.
+    pub airborne: bool,
+    /// `mProcVar0.m34D0` of the land damage state, `main.cpp:7252` and `main.cpp:7255`: the
+    /// counter the state waits out before it stands up again.
+    pub land_wait: i32,
+    /// `mProcVar6.m3570` of the land damage state, `main.cpp:7259` and `main.cpp:7286`: whether
+    /// the state has started its stand up.
+    pub land_stand: bool,
+    /// Whether the land damage state cost any life, which is what leaves the damage mode word
+    /// on, `main.cpp:7253`, and so picks the rate its stand up runs at, `main.cpp:7280-7284`.
+    pub land_hurt: bool,
 }
 
 impl Default for LinkProc {
@@ -1544,6 +1558,10 @@ impl LinkProc {
             turn_step: 0,
             turn_floor: 0,
             turn_scale: 0,
+            airborne: false,
+            land_wait: 0,
+            land_stand: false,
+            land_hurt: false,
         }
     }
 

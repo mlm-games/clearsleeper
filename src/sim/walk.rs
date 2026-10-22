@@ -19,8 +19,9 @@ use super::player::Player;
 use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::{
-    BACKWARD_LIMIT, SWIM_DECEL_MAX, SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE, SWIM_MAX_SPEED,
-    SWIM_TURN_MAX, SWIM_TURN_MIN, SWIM_TURN_SCALE, Swim,
+    BACKWARD_LIMIT, SWIM_BACK_SPEED, SWIM_BODY_MAX, SWIM_BODY_MIN, SWIM_BODY_SCALE, SWIM_DECEL_MAX,
+    SWIM_DECEL_MIN, SWIM_DECEL_SCALE, SWIM_DRIVE, SWIM_MAX_SPEED, SWIM_TURN_MAX, SWIM_TURN_MIN,
+    SWIM_TURN_SCALE, Swim,
 };
 use super::water::Water;
 
@@ -243,7 +244,7 @@ pub fn walk(
         } else if partner.demo_stick.is_some() {
             demo_walk_tick(player, &partner, &mut stride, &mut events);
         } else if swim.active {
-            swim_tick(player, &intent, &camera);
+            swim_tick(player, &intent, &camera, lock.target.is_some());
         } else if hop.active {
             hop_tick(player);
         } else if roll.active {
@@ -518,35 +519,82 @@ fn locomote(
     player.pos.y += player.speed_y;
 }
 
-fn swim_tick(player: &mut Player, intent: &MoveIntent, camera: &CameraYaw) {
+fn swim_tick(player: &mut Player, intent: &MoveIntent, camera: &CameraYaw, locked: bool) {
     let stick = intent.axis.length().min(1.0);
+    let target = target_yaw(intent, camera);
+    let mut backwards = false;
     let drive = if stick > STICK_GATE {
-        let target = target_yaw(intent, camera);
-        let before = player.yaw;
-        let yaw = to_s16(player.yaw);
-        if angle_distance(target, yaw) > BACKWARD_LIMIT {
-            player.yaw = from_s16(target);
+        if locked {
+            // `setSpeedAndAngleSwim`, `swim.inc:57-67`: under a lock-on the body turns onto the
+            // stick's own heading, and a stick held behind it stops the body dead.
+            let before = to_s16(player.yaw);
+            if angle_distance(target, before) > BACKWARD_LIMIT {
+                backwards = true;
+                0.0
+            } else {
+                player.yaw = from_s16(add_calc_angle_s(
+                    before,
+                    target,
+                    SWIM_TURN_SCALE,
+                    SWIM_TURN_MAX,
+                    SWIM_TURN_MIN,
+                ));
+                SWIM_DRIVE * stick * from_s16(to_s16(player.yaw).wrapping_sub(before)).cos()
+            }
         } else {
-            player.yaw = from_s16(add_calc_angle_s(
-                yaw,
-                target,
-                SWIM_TURN_SCALE,
-                SWIM_TURN_MAX,
-                SWIM_TURN_MIN,
-            ));
+            // `setSpeedAndAngleSwim`, `swim.inc:27-41`: the model turns onto the stick's own
+            // heading, and a stick held behind it snaps the model and the body onto it outright.
+            let before = to_s16(player.face);
+            if angle_distance(target, before) > BACKWARD_LIMIT {
+                player.face = from_s16(target);
+                player.yaw = player.face;
+                SWIM_DRIVE * stick * from_s16(target.wrapping_sub(before)).cos()
+            } else {
+                player.face = from_s16(add_calc_angle_s(
+                    before,
+                    target,
+                    SWIM_TURN_SCALE,
+                    SWIM_TURN_MAX,
+                    SWIM_TURN_MIN,
+                ));
+                SWIM_DRIVE * stick * from_s16(to_s16(player.face).wrapping_sub(before)).cos()
+            }
         }
-        SWIM_DRIVE * stick * (player.yaw - before).cos()
     } else {
         0.0
     };
+    if !locked {
+        // `setSpeedAndAngleSwim`, `swim.inc:47`: the body follows the model at its own rate.
+        player.yaw = from_s16(add_calc_angle_s(
+            to_s16(player.yaw),
+            to_s16(player.face),
+            SWIM_BODY_SCALE,
+            SWIM_BODY_MAX,
+            SWIM_BODY_MIN,
+        ));
+    }
+    // `setSpeedAndAngleSwim`, `swim.inc:73`: a locked-on swimmer may only reach the speed its
+    // own turn towards the model allows.
+    let max = if locked {
+        let offset = from_s16(to_s16(player.yaw).wrapping_sub(to_s16(player.face)));
+        SWIM_MAX_SPEED * ((offset.cos() + 1.0) * 0.25 + 0.5)
+    } else {
+        SWIM_MAX_SPEED
+    };
     set_normal_speed(
         player,
-        SWIM_MAX_SPEED * stick * stick,
+        max * stick * stick,
         drive,
         SWIM_DECEL_SCALE,
         SWIM_DECEL_MIN,
         SWIM_DECEL_MAX,
     );
+    if backwards && player.speed < SWIM_BACK_SPEED {
+        // `setSpeedAndAngleSwim`, `swim.inc:83-86`: a swimmer going backwards is put back on the
+        // stick's own heading and stopped, but only while it is still slow.
+        player.yaw = from_s16(target);
+        player.speed = 0.0;
+    }
     let speed_f = if player.speed.abs() < SPEED_F_EPS {
         0.0
     } else {

@@ -23,9 +23,17 @@ pub const SWIM_DRIVE: f32 = 3.0;
 pub const SWIM_TURN_SCALE: i16 = 17;
 pub const SWIM_TURN_MAX: i16 = 5000;
 pub const SWIM_TURN_MIN: i16 = 1200;
+/// `cLib_addCalcAngleS(&current.angle.y, shape_angle.y, 2, 0x2000, 0x1000)`, `swim.inc:47`: the
+/// rate the body follows the model at while the player swims.
+pub const SWIM_BODY_SCALE: i16 = 2;
+pub const SWIM_BODY_MAX: i16 = 0x2000;
+pub const SWIM_BODY_MIN: i16 = 0x1000;
 pub const SWIM_DECEL_SCALE: f32 = 0.02;
 pub const SWIM_DECEL_MAX: f32 = 2.0;
 pub const SWIM_DECEL_MIN: f32 = 0.5;
+/// `setSpeedAndAngleSwim`, `swim.inc:84`: the speed under which a swimmer going backwards is put
+/// back on the stick's own heading and stopped.
+pub const SWIM_BACK_SPEED: f32 = 5.0;
 pub const BACKWARD_LIMIT: u16 = 0x6000;
 
 #[derive(Resource, Debug, Clone, Copy, Default)]

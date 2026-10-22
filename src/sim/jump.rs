@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 
 use bevy_ecs::prelude::*;
 
+use super::anim_clock::{FrameClocks, FrameCtrl, Mode, Under};
 use super::collision::Collision;
 use super::combat::Combat;
 use super::ground::grounded;
@@ -23,6 +24,27 @@ const SIDE_PITCH: f32 = 6200.0 * RAD_PER_UNIT;
 const SIDE_SPEED: f32 = 30.0;
 pub(crate) const SIDE_GRAVITY: f32 = -2.4;
 pub(crate) const SIDE_OFFSET: f32 = FRAC_PI_2;
+/// `m_HIO->mBackJump.m.field_0x1C`, `main.cpp:7021`: the drop past which a back jump has
+/// become a fall, and `m_HIO->mSideStep.m.field_0x30`, `main.cpp:6344`: the same for a side step.
+const BACK_FALL_DROP: f32 = 30.0;
+const SIDE_FALL_DROP: f32 = 50.0;
+/// `m_HIO->mBackJump.m.field_0x24`, `main.cpp:7035`: the rate the back jump's landing animation
+/// runs at, `m_HIO->mBackJump.m.field_0x28` the frame it starts from and
+/// `m_HIO->mBackJump.m.field_0x2` the frame it ends at.
+const BACK_LAND_RATE: f32 = 0.8;
+const BACK_LAND_START: i16 = 0;
+const BACK_LAND_END: i16 = 5;
+/// `m_HIO->mSideStep.m.field_0x1C`, `main.cpp:6362`: the rate the side step's landing animation
+/// runs at, `m_HIO->mSideStep.m.field_0x20` the frame it starts from and
+/// `m_HIO->mSideStep.m.field_0x6` the frame it ends at.
+const SIDE_LAND_RATE: f32 = 0.85;
+const SIDE_LAND_START: i16 = 1;
+const SIDE_LAND_END: i16 = 5;
+/// `m_HIO->mBackJump.m.field_0x30`, `main.cpp:7069`: the frame the back jump's landing state
+/// has to pass before the player goes back to the dispatcher.
+pub(crate) const BACK_LAND_FRAME: f32 = 2.0;
+/// `m_HIO->mSideStep.m.field_0x28`, `main.cpp:6379`: the same for the side step.
+pub(crate) const SIDE_LAND_FRAME: f32 = 1.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum JumpKind {
@@ -39,6 +61,7 @@ pub struct Jump {
     held: bool,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub(super) enum Direction {
     Forward,
     Left,
@@ -59,6 +82,47 @@ pub(super) fn direction(desired: i16, face: i16) -> Direction {
     }
 }
 
+/// The drop past which the jump has become a fall, `procBackJump`, `main.cpp:7021-7022`, and
+/// `procSideStep`, `main.cpp:6344-6345`: the feet have fallen further below the height the jump
+/// left the ground at than the jump's own table allows, so the jump gives up and the fall takes
+/// over, and the fall is what lands.
+fn fall_drop(kind: JumpKind) -> f32 {
+    match kind {
+        JumpKind::Back => BACK_FALL_DROP,
+        JumpKind::Left | JumpKind::Right => SIDE_FALL_DROP,
+    }
+}
+
+/// The landing state the jump leaves into, `procBackJumpLand_init`, `main.cpp:7015-7016`, and
+/// `procSideStepLand_init`, `main.cpp:6335-6336`.
+fn land_proc(kind: JumpKind) -> Proc {
+    match kind {
+        JumpKind::Back => Proc::BackJumpLand,
+        JumpKind::Left | JumpKind::Right => Proc::SideStepLand,
+    }
+}
+
+/// The landing animation the state plays, `procBackJumpLand_init`, `main.cpp:7033-7038`, and
+/// `procSideStepLand_init`, `main.cpp:6362`.
+fn land_anime(kind: JumpKind, clock: &mut FrameCtrl) {
+    match kind {
+        JumpKind::Back => clock.set_frame_ctrl(
+            Mode::None,
+            BACK_LAND_START,
+            BACK_LAND_END,
+            BACK_LAND_RATE,
+            f32::from(BACK_LAND_START),
+        ),
+        JumpKind::Left | JumpKind::Right => clock.set_frame_ctrl(
+            Mode::None,
+            SIDE_LAND_START,
+            SIDE_LAND_END,
+            SIDE_LAND_RATE,
+            f32::from(SIDE_LAND_START),
+        ),
+    }
+}
+
 pub fn control(
     collision: Option<Res<Collision>>,
     do_intent: Res<DoIntent>,
@@ -68,6 +132,7 @@ pub fn control(
     swim: Res<Swim>,
     lock: Res<Lock>,
     combat: Res<Combat>,
+    mut clocks: ResMut<FrameClocks>,
     mut proc: Option<ResMut<super::link_proc::LinkProc>>,
     mut roll: ResMut<Roll>,
     mut jump: ResMut<Jump>,
@@ -96,8 +161,14 @@ pub fn control(
                     JumpKind::Left => player.face + SIDE_OFFSET + PI,
                     JumpKind::Right => player.face - SIDE_OFFSET + PI,
                 };
-                if let Some(state) = proc.as_deref_mut() {
-                    state.enter(Proc::Move);
+                let drop = proc
+                    .as_deref()
+                    .map_or(0.0, |state| state.takeoff_y - player.pos.y);
+                if drop <= fall_drop(jump.kind) {
+                    land_anime(jump.kind, clocks.under_mut(Under::Move0));
+                    if let Some(state) = proc.as_deref_mut() {
+                        state.enter(land_proc(jump.kind));
+                    }
                 }
             }
             continue;

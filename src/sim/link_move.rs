@@ -3,14 +3,15 @@ use bevy_ecs::system::SystemParam;
 use glam::{Vec2, Vec3};
 
 use super::anim_clock::{FrameClocks, FrameCtrl, Mode, Under};
-use super::collision::{Collision, MoveFrom, WallProbe, WallTrace};
+use super::collision::{Collision, MoveFrom, WALL_HEIGHTS, WALL_RADIUS, WallProbe, WallTrace};
 use super::combat::{Combat, CutKind};
+use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::ground_code::{FrontWall, WallCode};
 use super::health::Health;
 use super::hop::Hop;
 use super::intent::{CameraYaw, MoveIntent, PadButtons};
-use super::jump::{Direction, Jump, JumpKind, direction};
+use super::jump::{BACK_LAND_FRAME, Direction, Jump, JumpKind, SIDE_LAND_FRAME, direction};
 use super::link_proc::{CUT_AIR, LinkProc, Proc};
 use super::lock::Lock;
 use super::player::Player;
@@ -20,6 +21,7 @@ use super::pushable::{
 use super::roll::Roll;
 use super::ship::Ship;
 use super::swim::Swim;
+use super::vibration::Vibration;
 use super::walk::{add_calc, add_calc_angle_s, from_s16, target_yaw, to_s16};
 
 /// `mStickDistance > 0.05f`, the gate every stick test in the reference opens with.
@@ -57,6 +59,60 @@ pub const SWIM_LOW: f32 = 37.5;
 pub const ROLL_RATE: f32 = 1.3;
 pub const ROLL_START: f32 = 6.0;
 pub const ROLL_END: f32 = 19.0;
+/// `mFall.m.field_0x38`, `main.cpp:4947`: the frame the roll off a ledge starts its own
+/// animation from, the roll the button starts runs from the first frame instead.
+const LEDGE_ROLL_START: f32 = 6.0;
+/// `m_HIO->mFall.m.field_0x14` and `m_HIO->mFall.m.field_0x10`, `main.cpp:4925-4927`: the drop
+/// the landing dispatcher sorts into its bands, written the way the reference writes them, a
+/// hundredfold the table's own words.
+const FALL_HURT: f32 = 2000.0;
+const FALL_WOUND: f32 = 6000.0;
+/// `0.5f * (m_HIO->mFall.m.field_0x14 * 100.0f)`, `main.cpp:4952`: the drop the land damage
+/// state starts at without costing any life.
+const FALL_STAGGER: f32 = 1000.0;
+/// `m_HIO->mFall.m.field_0xC`, `main.cpp:7252`: the ticks the land damage state waits out
+/// before it stands up when it cost no life.
+const LAND_WAIT: i32 = 3;
+/// `m_HIO->mFall.m.field_0x2`, `main.cpp:7255`: the ticks the land damage state waits out
+/// before it stands up when it cost life.
+const LAND_WAIT_HURT: i32 = 30;
+/// `m_HIO->mFall.m.field_0x1C`, `main.cpp:7258`: the rate the land damage state's own
+/// animation runs at, `m_HIO->mFall.m.field_0x20` the frame it starts from and
+/// `m_HIO->mFall.m.field_0x4` the frame it ends at.
+const LAND_RATE: f32 = 0.8;
+const LAND_START_FRAME: i16 = 4;
+const LAND_END_FRAME: i16 = 9;
+/// `m_HIO->mFall.m.field_0x28` and `m_HIO->mFall.m.field_0x50`, `main.cpp:7280-7285`: the rate
+/// the land damage state's stand up runs at, the one the damage mode word asks for and the one
+/// it does not.
+const LAND_STAND_RATE: f32 = 0.3;
+const LAND_STAND_RATE_CLEAR: f32 = 1.2;
+/// `m_HIO->mFall.m.field_0x2C`, `main.cpp:7285`: the frame the stand up starts from and
+/// `m_HIO->mFall.m.field_0x6` the frame it ends at.
+const LAND_STAND_START: i16 = 1;
+const LAND_STAND_END: i16 = 9;
+/// `m_HIO->mFall.m.field_0x30`, `main.cpp:7272`: the frame the stand up has to pass before the
+/// land damage state lets the player go.
+const LAND_STAND_FRAME: f32 = 9.0;
+/// `m_HIO->mAutoJump.m.field_0x40`, `main.cpp:7228`: the frame the land state has to pass
+/// before it lets the player go.
+const LAND_FRAME: f32 = 7.0;
+/// `m_HIO->mAutoJump.m.field_0x28`, `main.cpp:7201`: the frame the land state's own animation
+/// starts from, `m_HIO->mAutoJump.m.field_0x4` the frame it ends at and
+/// `m_HIO->mAutoJump.m.field_0x24` the rate it runs at, which is nothing.
+const LAND_ANIM_START: i16 = 1;
+const LAND_ANIM_END: i16 = 11;
+const LAND_ANIM_RATE: f32 = 0.0;
+/// `JA_SE_LK_FALL_DAMAGE`, `JAZelAudio_SE.h:487`.
+const SE_LK_FALL_DAMAGE: u32 = 0x2816;
+/// `dComIfGp_getVibration().StartShock(7, -0x21, cXyz(0.0f, 1.0f, 0.0f))`, `main.cpp:7240`, `:7245`
+/// and `:7247`: the pattern the worst landing starts, the middle one and the one that costs no
+/// life.
+const LAND_SHOCK_WOUND: i32 = 7;
+const LAND_SHOCK_HURT: i32 = 5;
+const LAND_SHOCK_STAGGER: i32 = 2;
+const LAND_SHOCK_FLAGS: i32 = -0x21;
+const LAND_SHOCK_COORD: Vec3 = Vec3::new(0.0, 1.0, 0.0);
 
 /// `cLib_distanceAngleS` through a signed subtraction, `c_lib.cpp:364`: the turn from one facing
 /// to another, which never folds past half a turn.
@@ -180,10 +236,6 @@ const CLIMB_DOWN_DROP: f32 = 20.0;
 const HANG_FALL_SPEED: f32 = 6.0;
 /// `mFall.m.field_0x4C`, `main.cpp:6945`: the speed a side roll enters at.
 const ROLL_SPEED: f32 = 26.0;
-/// `main.cpp:10689`, the standing wall radius `setFrontWallType` traces from, and
-/// `main.cpp:10654-10656` the three heights it traces at.
-const WALL_RADIUS: f32 = 35.0;
-const WALL_HEIGHTS: [f32; 3] = [30.1, 89.9, 125.0];
 /// `main.cpp:4550`, the near reach of the wall trace before the player's own wall radius.
 const WALL_TRACE_REACH: f32 = 25.0;
 /// `pushpull.inc:118`: the scale, the largest step and the smallest step `procPushPullWait` turns
@@ -403,6 +455,30 @@ pub const SITES: &[MoveSite] = &[
         gap: MoveGap::Ready,
     },
     MoveSite {
+        proc: Proc::Land,
+        entry: "main.cpp:4963",
+        exit: "main.cpp:7226",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::LandDamage,
+        entry: "main.cpp:4928",
+        exit: "main.cpp:7271",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::BackJumpLand,
+        entry: "main.cpp:7016",
+        exit: "main.cpp:7067",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
+        proc: Proc::SideStepLand,
+        entry: "main.cpp:6336",
+        exit: "main.cpp:6379",
+        gap: MoveGap::Ready,
+    },
+    MoveSite {
         proc: Proc::HangStart,
         entry: "main.cpp:4783",
         exit: "hang.inc:259",
@@ -593,7 +669,10 @@ struct Probe<'a> {
     pad: Option<&'a PadButtons>,
     swim: &'a Swim,
     jump: &'a Jump,
-    roll: &'a Roll,
+    /// The roll the player is in when the tick began. The word is copied rather than borrowed
+    /// because the landing dispatcher writes to the roll it finds, and the probe is read for the
+    /// whole tick.
+    roll: Roll,
     hop: &'a Hop,
     combat: &'a Combat,
     lock: &'a Lock,
@@ -733,7 +812,10 @@ impl Probe<'_> {
 pub struct Modes<'w> {
     pub swim: Res<'w, Swim>,
     pub jump: Res<'w, Jump>,
-    pub roll: Res<'w, Roll>,
+    /// The roll the button starts and the roll the landing dispatcher starts, which is why the
+    /// word is written to and not only read: `procFrontRoll_init`, `main.cpp:6806`, is what puts
+    /// the roll's own animation on its cursor.
+    pub roll: ResMut<'w, Roll>,
     pub hop: Res<'w, Hop>,
     pub combat: Res<'w, Combat>,
     pub lock: Res<'w, Lock>,
@@ -1269,31 +1351,31 @@ fn want_move_turn(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
     Some((Proc::MoveTurn, MoveGap::Ready))
 }
 
-/// `changeLandProc`, `main.cpp:4943-4953`: the stick has to be held, the body must not be asked to
-/// reverse, the drop from the height the jump left the ground at must clear
-/// [`ROLL_DROP`], and the body must be asked to go forward. The speed and the rate the roll itself
-/// runs on are the three words above; the roll ends on its own animation frame, which the port has
-/// no clock for.
-fn want_side_roll(player: &Player, probe: &Probe) -> Option<(Proc, MoveGap)> {
+/// `changeLandProc`, `main.cpp:4940-4950`: the stick has to be held past the landing mark, the
+/// stick has to be pointing the way the body is already facing, the body and the model must not
+/// be more than a half turn apart, and the drop from the height the fall left the ground at must
+/// clear [`ROLL_DROP`]. A body and a model that agree make it a front roll, which starts its own
+/// animation at the frame the fall table names, and a model turned off the body makes it a side
+/// roll, `main.cpp:4945-4950`.
+fn want_ledge_roll(player: &Player, probe: &Probe, drop: f32) -> Option<Proc> {
     if probe.dead || probe.riding {
         return None;
     }
-    if probe.stick() <= LAND_STICK || probe.drop < ROLL_DROP {
+    if probe.stick() <= LAND_STICK || drop < ROLL_DROP {
         return None;
     }
-    if matches!(
-        direction(probe.wanted(), to_s16(player.yaw)),
-        Direction::Back
-    ) {
+    if direction(probe.wanted(), to_s16(player.yaw)) != Direction::Forward {
         return None;
     }
-    if matches!(
-        direction(probe.wanted(), to_s16(player.face)),
-        Direction::Back
-    ) {
+    let offset = to_s16(player.yaw).wrapping_sub(to_s16(player.face));
+    if offset.unsigned_abs() > 0x6000 {
         return None;
     }
-    Some((Proc::SideRoll, MoveGap::Ready))
+    Some(if offset.unsigned_abs() <= 0x2000 {
+        Proc::FrontRoll
+    } else {
+        Proc::SideRoll
+    })
 }
 
 /// `changeFrontWallTypeProc`, `main.cpp:4822-4836`: a front wall of type 3 is a climbable face.
@@ -1338,10 +1420,38 @@ const ASKS: &[for<'a> fn(&Player, &Probe<'a>) -> Option<(Proc, MoveGap)>] = &[
     want_slide,
     want_wait_turn,
     want_move_turn,
-    want_side_roll,
     want_climb,
     want_hang,
 ];
+
+/// `procLandDamage_init`, `main.cpp:7235-7264`: the life the band costs, the rumble it starts,
+/// the sound it plays and the counter the state waits out before it stands up again. The two
+/// bands that cost life take it off the life count, which the reference keeps in quarter hearts,
+/// `dMeter_LifeMove`, `d_meter.cpp:1450`, so the worst landing costs two of them and the middle
+/// one costs one.
+fn land_damage(
+    proc: &mut LinkProc,
+    health: &mut Health,
+    events: &mut SimEvents,
+    vibration: &mut Vibration,
+    drop: f32,
+) {
+    let (hurt, wait, shock) = if drop >= FALL_WOUND {
+        (2u8, LAND_WAIT_HURT, LAND_SHOCK_WOUND)
+    } else if drop >= FALL_HURT {
+        (1u8, LAND_WAIT_HURT, LAND_SHOCK_HURT)
+    } else {
+        (0u8, LAND_WAIT, LAND_SHOCK_STAGGER)
+    };
+    if hurt > 0 {
+        health.damage(hurt);
+    }
+    proc.land_wait = wait;
+    proc.land_hurt = hurt > 0;
+    proc.land_stand = false;
+    events.list.push(SimEvent::Se(SE_LK_FALL_DAMAGE));
+    let _ = vibration.start_shock(shock, LAND_SHOCK_FLAGS, LAND_SHOCK_COORD);
+}
 
 /// The reference asks its own guards in this order, and only a process this module does not own may
 /// be replaced.
@@ -1948,17 +2058,91 @@ fn climb_move_tick(player: &mut Player, probe: &Probe, previous: Proc) -> Option
     }
 }
 
+/// `procLand`, `main.cpp:7220-7232`: the land state ends when its own animation has stopped or
+/// when its frame is past the auto jump table's mark, and it hands the player to the ordinary
+/// dispatcher.
+fn land_tick(player: &mut Player, probe: &Probe, clock: &FrameCtrl) -> Option<(Proc, MoveGap)> {
+    if clock.rate() < 0.01 || clock.frame() > LAND_FRAME {
+        return Some((named(player, probe), MoveGap::Ready));
+    }
+    None
+}
+
+/// `procLandDamage`, `main.cpp:7267-7290`: the state waits its counter out once its own animation
+/// has stopped, then plays the stand up and lets the player go when that one has run past its
+/// own mark.
+fn land_damage_tick(
+    player: &mut Player,
+    probe: &Probe,
+    proc: &mut LinkProc,
+    clock: &mut FrameCtrl,
+) -> Option<(Proc, MoveGap)> {
+    if proc.land_stand {
+        if clock.rate() < 0.01 || clock.frame() > LAND_STAND_FRAME {
+            return Some((named(player, probe), MoveGap::Ready));
+        }
+        return None;
+    }
+    if clock.rate() < 0.01 {
+        if proc.land_wait > 0 {
+            proc.land_wait -= 1;
+        } else {
+            let rate = if proc.land_hurt {
+                LAND_STAND_RATE
+            } else {
+                LAND_STAND_RATE_CLEAR
+            };
+            clock.set_frame_ctrl(
+                Mode::None,
+                LAND_STAND_START,
+                LAND_STAND_END,
+                rate,
+                f32::from(LAND_STAND_START),
+            );
+            proc.land_stand = true;
+        }
+    }
+    None
+}
+
+/// `procBackJumpLand`, `main.cpp:7061-7079`: the back jump's landing state ends when its own
+/// animation has stopped or when its frame is past the back jump table's mark, and it hands the
+/// player back to the ordinary dispatcher.
+fn back_jump_land_tick(
+    player: &mut Player,
+    probe: &Probe,
+    clock: &FrameCtrl,
+) -> Option<(Proc, MoveGap)> {
+    if clock.rate() < 0.01 || clock.frame() > BACK_LAND_FRAME {
+        return Some((named(player, probe), MoveGap::Ready));
+    }
+    None
+}
+
+/// `procSideStepLand`, `main.cpp:6374-6384`: the same shape, with the side step table's mark.
+fn side_step_land_tick(
+    player: &mut Player,
+    probe: &Probe,
+    clock: &FrameCtrl,
+) -> Option<(Proc, MoveGap)> {
+    if clock.rate() < 0.01 || clock.frame() > SIDE_LAND_FRAME {
+        return Some((named(player, probe), MoveGap::Ready));
+    }
+    None
+}
+
 /// The tick of whichever owned process is standing. `None` when it stays where it is, which is the
 /// normal answer for a state whose only exit is its own animation.
 fn tick(
     player: &mut Player,
     probe: &Probe,
     state: &mut MoveState,
-    proc: &LinkProc,
+    proc: &mut LinkProc,
     reach: &mut pushable::Call,
-    clock: &FrameCtrl,
+    clock: &mut FrameCtrl,
 ) -> Option<(Proc, MoveGap)> {
-    match proc.current {
+    let current = proc.current;
+    match current {
         Proc::Crouch => crouch_tick(player, probe),
         Proc::CrouchDefense => crouch_defense_tick(player, probe),
         Proc::CrawlStart => match crawl_tick(player, probe, false) {
@@ -1995,6 +2179,10 @@ fn tick(
             None
         }
         Proc::SideRoll => side_roll_tick(player, probe, proc),
+        Proc::Land => land_tick(player, probe, clock),
+        Proc::LandDamage => land_damage_tick(player, probe, proc, clock),
+        Proc::BackJumpLand => back_jump_land_tick(player, probe, clock),
+        Proc::SideStepLand => side_step_land_tick(player, probe, clock),
         Proc::HangStart | Proc::HangWallCatch => hang_catch(player, probe, state),
         Proc::HangFallStart => hang_fall_tick(player, probe, state),
         Proc::HangUp => {
@@ -2098,6 +2286,31 @@ fn arm(
             }
         }
         Proc::SideRoll => player.speed = ROLL_SPEED,
+        Proc::Land => {
+            // `procLand_init`, `main.cpp:7195-7201`: the land state kills the speed and plays
+            // the landing animation, which the reference runs at a rate of nothing.
+            player.speed = 0.0;
+            clock.set_frame_ctrl(
+                Mode::None,
+                LAND_ANIM_START,
+                LAND_ANIM_END,
+                LAND_ANIM_RATE,
+                f32::from(LAND_ANIM_START),
+            );
+        }
+        Proc::LandDamage => {
+            // `procLandDamage_init`, `main.cpp:7250-7258`: the land damage state kills the speed
+            // and plays its own animation, and the counter it waits out is written by the
+            // dispatcher that entered it.
+            player.speed = 0.0;
+            clock.set_frame_ctrl(
+                Mode::None,
+                LAND_START_FRAME,
+                LAND_END_FRAME,
+                LAND_RATE,
+                f32::from(LAND_START_FRAME),
+            );
+        }
         Proc::ClimbUpStart => arm_climb(player, state),
         Proc::ClimbDownStart => arm_climb_down(player, state),
         Proc::PushPullWait => arm_push_pull_wait(probe, state, player, dispatched),
@@ -2227,7 +2440,7 @@ pub fn control(
     camera: Res<CameraYaw>,
     collision: Option<Res<Collision>>,
     pad: Option<Res<PadButtons>>,
-    health: Res<Health>,
+    mut health: ResMut<Health>,
     modes: Modes<'_>,
     polys: Option<Res<PushPulls>>,
     mut reach: pushable::Call<'_, '_>,
@@ -2236,11 +2449,13 @@ pub fn control(
     mut state: ResMut<MoveState>,
     mut clocks: ResMut<FrameClocks>,
     mut players: Query<&mut Player>,
+    mut events: ResMut<SimEvents>,
+    mut vibration: ResMut<Vibration>,
 ) {
     let Modes {
         swim,
         jump,
-        roll,
+        mut roll,
         hop,
         combat,
         lock,
@@ -2259,7 +2474,7 @@ pub fn control(
         pad: pad.as_deref(),
         swim: &swim,
         jump: &jump,
-        roll: &roll,
+        roll: *roll,
         hop: &hop,
         combat: &combat,
         lock: &lock,
@@ -2271,16 +2486,80 @@ pub fn control(
         dead: health.units == 0,
         riding,
     };
+    // `m35F0 - current.pos.y`, `main.cpp:4923`: the drop the landing dispatcher sorts into its
+    // bands. The height the fall began at is read before the takeoff word is rewritten, because
+    // the rewrite puts the height the feet are standing at under the player's feet.
+    let drop = proc.takeoff_y - player.pos.y;
     let launch = takeoff(player, &probe, entered_air, proc.takeoff_y);
     proc.mark_takeoff(launch);
     probe.drop = proc.takeoff_y - player.pos.y;
     proc.advance();
+    // `mAcch.ChkGroundHit`, `main.cpp:11411`: the ground is asked for on every tick, and the
+    // landing is the tick that answers it after a tick that did not.
+    let grounded_now = grounded(solid, player.pos);
+    let landed = proc.airborne && grounded_now;
+    proc.airborne = !grounded_now;
     if !probe.dead
         && !probe.riding
         && !probe.busy()
         && let Some(trace) = probe.front_wall()
     {
         state.latch_wall(&trace);
+    }
+    if landed
+        && !probe.riding
+        && !probe.dead
+        && !matches!(proc.current, Proc::BackJumpLand | Proc::SideStepLand)
+    {
+        // `changeLandProc`, `main.cpp:4922-4964`: the landing dispatcher. The bands come first,
+        // then the roll off the ledge, then the band that costs no life, and the plain landing
+        // last.
+        if drop >= FALL_HURT {
+            land_damage(&mut proc, &mut health, &mut events, &mut vibration, drop);
+            enter(
+                &mut state,
+                &mut proc,
+                &probe,
+                player,
+                clock,
+                Proc::LandDamage,
+                true,
+            );
+        } else if let Some(roll_proc) = want_ledge_roll(player, &probe, drop) {
+            if roll_proc == Proc::FrontRoll {
+                // `procFrontRoll_init`, `main.cpp:6806-6808`: the roll off a ledge starts its own
+                // animation at the frame the fall table names, not at the first one, and it runs
+                // at the speed the landing dispatcher gives it, `main.cpp:4946`.
+                roll.active = true;
+                roll.frame = LEDGE_ROLL_START;
+                player.speed = ROLL_SPEED;
+            }
+            enter(
+                &mut state, &mut proc, &probe, player, clock, roll_proc, true,
+            );
+        } else if drop >= FALL_STAGGER {
+            land_damage(&mut proc, &mut health, &mut events, &mut vibration, drop);
+            enter(
+                &mut state,
+                &mut proc,
+                &probe,
+                player,
+                clock,
+                Proc::LandDamage,
+                true,
+            );
+        } else {
+            enter(
+                &mut state,
+                &mut proc,
+                &probe,
+                player,
+                clock,
+                Proc::Land,
+                true,
+            );
+        }
+        return;
     }
     if !MoveState::owns(proc.current) {
         state.asked = None;
@@ -2318,7 +2597,7 @@ pub fn control(
         return;
     }
     let standing = proc.current;
-    let ask = tick(player, &probe, &mut state, &proc, &mut reach, clock);
+    let ask = tick(player, &probe, &mut state, &mut proc, &mut reach, clock);
     let moved = settle(player, &probe, &mut state, &mut proc, clock, ask);
     if moved || proc.current != standing || !asks_dispatcher(standing) {
         return;
