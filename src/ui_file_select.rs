@@ -1226,6 +1226,31 @@ impl FileSelect {
             MenuItem::Erase,
         );
         self.pane_trance_menu_item(self.timer, IDX_34, IDX_42 as f32, 0.0, 1, 0, MenuItem::Back);
+        // menu_start, menu_copy, menu_erase, menu_back are single panes,
+        // not part of start_key/copy_key/erase_key/back_key arrays
+        let value = value_increase(i32::from(IDX_34), i32::from(self.timer), IDX_42 as u8);
+        let span = IDX_42 as f32 - 0.0;
+        self.panes
+            .groups
+            .start_label
+            .pane_trans(0.0, IDX_42 as f32 + value * span);
+        self.panes.groups.start_label.set_now_alpha(value);
+        self.panes
+            .groups
+            .copy_label
+            .pane_trans(0.0, IDX_42 as f32 + value * span);
+        self.panes.groups.copy_label.set_now_alpha(value);
+        self.panes
+            .groups
+            .erase_label
+            .pane_trans(0.0, IDX_42 as f32 + value * span);
+        self.panes.groups.erase_label.set_now_alpha(value);
+        self.panes
+            .groups
+            .back_label
+            .pane_trans(0.0, IDX_42 as f32 + value * span);
+        self.panes.groups.back_label.set_now_alpha(value);
+
     }
 
     pub fn yes_no_pane_move_set(&mut self) {
