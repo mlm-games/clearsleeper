@@ -136,7 +136,14 @@ fn font_bytes(root: &AssetRoot, local: &Archive, name: &str) -> Option<Vec<u8>> 
     if let Some(bytes) = local.read(name).ok() {
         return Some(bytes.to_vec());
     }
-    let stem = name.strip_suffix(".bfn")?.strip_suffix('_')?;
+    // A blo names the font with the language marker the screen was authored in
+    // (`rock_24_20_4i_e.bfn`) while the disc spells the file with the region's
+    // (`rock_24_20_4i_usa.bfn`, `d_msg.cpp:960`). The retail never resolves the blo's
+    // name: it puts the message font on the text boxes instead
+    // (`d_file_select.cpp:2347-2541`, the font from `:125`), so the name only has to
+    // pick the same file the message font is.
+    let base = name.strip_suffix(".bfn")?;
+    let stem = base.rsplit_once('_').map(|(stem, _)| stem)?;
     let archive = root.read_archive(FONT_ARCHIVE).ok()?;
     let entries = archive.entries();
     let mut locale: Option<&str> = None;

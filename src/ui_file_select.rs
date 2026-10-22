@@ -924,6 +924,10 @@ pub struct FileSelect {
     pub proc: u8,
     pub timer: i16,
     pub timer2: i16,
+    /// Whether the opening animation has run to its end. The retail opens the
+    /// screen before its state machine starts (`d_s_name.cpp:1129-1148`), so
+    /// the two never share the timer.
+    pub open_done: bool,
     pub flag_3934: [u8; 2],
     pub icon_mode: u8,
     pub use_type: u8,
@@ -987,6 +991,7 @@ impl Default for FileSelect {
             proc: proc_data_select,
             timer: 0,
             timer2: 0,
+            open_done: false,
             flag_3934: [0; 2],
             icon_mode: ICON_MODE_DEFAULT,
             use_type: MODE_NORMAL,
@@ -1140,6 +1145,7 @@ impl FileSelect {
         self.stick = StickControl::new(5, 2, 3, 2);
         self.stick2 = StickControl::new(3, 1, 3, 2);
         self.messages.clear();
+        self.open_done = false;
     }
 
     pub fn initial(&mut self) {
@@ -1180,6 +1186,7 @@ impl FileSelect {
 
     pub fn pane_trans_init(&mut self) {
         self.timer = 0;
+        self.open_done = false;
         self.pane_trance_title(self.timer, IDX_08, IDX_48 as f32, 0.0, IDX_07, 0);
         self.pane_trance_rec_tlt(0, self.timer, IDX_0c, IDX_18 as f32, 0.0, 0.0, 0.0, 1, 0);
         self.pane_trance_rec_tlt(1, self.timer, IDX_0d, IDX_18 as f32, 0.0, 0.0, 0.0, 1, 0);
@@ -1456,10 +1463,22 @@ impl FileSelect {
             1,
             0,
         );
+        // `menuPaneMove` (`d_file_select.cpp:2691-2703`) and `MessagePaneMove`
+        // (`:2681-2684`) are the retail's way of bringing the menu row and the
+        // message box off the offsets `paneTransInit` parks them at (`:2657`,
+        // `:2663`): `field_0x42` (100) below the row and `field_0x44` (500)
+        // right of the box, eased with the square root curve of
+        // `fopMsgM_valueIncrease` (`f_op/f_op_msg_mng.cpp:9929-9963`). The
+        // port runs them with the open so the row and the box are on the
+        // screen once it settles.
+        let temp8 = self.menu_pane_move(IDX_42 as f32, 0.0, IDX_35 as i16, 1, 0);
+        let temp9 = self.message_pane_move(IDX_44 as f32, 0.0, 0.0, 0.0, IDX_30 as i16, 1, 0);
 
         self.timer += 1;
 
-        temp1 && temp2 && temp3 && temp4 && temp5 && temp6 && temp7
+        let done = temp1 && temp2 && temp3 && temp4 && temp5 && temp6 && temp7 && temp8 && temp9;
+        self.open_done = done;
+        done
     }
 
     pub fn close(&mut self) -> bool {
@@ -1870,6 +1889,14 @@ impl FileSelect {
     }
 
     pub fn move_step(&mut self, pad: &PadInput, card: &mut MemCard, current: Option<SaveGame>) {
+        // The retail opens the screen before its state machine starts:
+        // `FileSelOpenMain` calls `_open()` until it returns 1 and only then
+        // `FileSelectMain` calls `_move()` (`d_s_name.cpp:1129-1148`). The
+        // state machine resets the timer the open counts on, so it must not
+        // run while the open is still going.
+        if !self.open_done {
+            return;
+        }
         let probe = card.get_probe_stat();
         if (probe == 0 || probe == 1) && self.flag_3941 == 0 {
             self.flag_392e = 1;
@@ -2344,15 +2371,10 @@ impl FileSelect {
         let mut temp5 = false;
         let (temp2, temp3);
         if self.data_broken[self.select_num as usize] != 0 {
-            temp2 = self.message_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
-                1,
-                0,
-            );
+            // The message box is on the screen since the open, so only the
+            // yes/no row still slides up (`yesNoPaneMove`,
+            // `d_file_select.cpp:2706-2715`).
+            temp2 = true;
             temp3 = self.yes_no_pane_move(
                 IDX_42 as f32,
                 0.0,
@@ -2363,22 +2385,11 @@ impl FileSelect {
             temp4 = self.pane_alpha_title_txt(self.timer - IDX_29 as i16, IDX_09);
             temp5 = true;
         } else {
-            temp2 = self.rec_info_pane_move(
-                IDX_44 as f32,
-                0.0,
-                0.0,
-                0.0,
-                (IDX_30 as i16) + i16::from(self.flag_3920),
-                1,
-                0,
-            );
-            temp3 = self.menu_pane_move(
-                IDX_42 as f32,
-                0.0,
-                (IDX_35 as i16) + i16::from(self.flag_3920),
-                1,
-                0,
-            );
+            // The record info group and the menu row sit at their resting
+            // positions since the open as well, so neither is moved again
+            // here (`paneTransInit`, `d_file_select.cpp:2647-2665`).
+            temp2 = true;
+            temp3 = true;
         }
 
         self.timer += 1;

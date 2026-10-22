@@ -81,7 +81,6 @@ pub struct Menu {
     pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
     pub uploaded: std::cell::Cell<u64>,
     pub revision: std::cell::Cell<u64>,
-    pub fs_open_done: Cell<bool>,
     pub title_click: Rc<Cell<Option<usize>>>,
 }
 
@@ -106,7 +105,6 @@ impl Menu {
             shot: std::cell::Cell::new(None),
             uploaded: std::cell::Cell::new(u64::MAX),
             revision: std::cell::Cell::new(0),
-            fs_open_done: Cell::new(false),
             title_click: Rc::new(Cell::new(None)),
         }
     }
@@ -129,7 +127,6 @@ impl Menu {
         }
         self.fs.set_save_data(&self.card);
         self.fs.select_num = self.slot as u8;
-        self.fs_open_done.set(false);
     }
 
     /// Follows the menu cursor so the highlighted slot matches the drawn pane.
@@ -142,15 +139,14 @@ impl Menu {
     }
 
     /// `d_file_select.cpp` drives the opening through `open()`, one call per
-    /// frame. The port kept only the call made when the cursor moved, so the
-    /// panes froze at their off-screen starting positions.
+    /// frame, until it reports the screen is up (`_open`,
+    /// `d_file_select.cpp:267-291`).
     pub fn tick_file_select(&mut self) -> bool {
-        if self.fs_open_done.get() {
+        if self.fs.open_done {
             return true;
         }
         let done = self.fs.open();
         self.revision.set(self.revision.get().wrapping_add(1));
-        self.fs_open_done.set(done);
         done
     }
 
