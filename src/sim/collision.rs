@@ -34,6 +34,15 @@ const ATTRIBUTE_SHIFT: u32 = 16;
 const GROUND_MASK: u32 = 0x03E00000;
 const GROUND_SHIFT: u32 = 21;
 const DET_EPSILON: f32 = 1.0e-6;
+/// `G_CM3D_F_ABS_MIN`, `c_m3d.cpp:22`: the reference's own "is zero" tolerance, which
+/// `cM3d_IsZero` at `c_m3d.h:135` compares against.
+const ABS_MIN: f32 = 3.8146973e-06;
+/// `daPy_lk_c::setBgCheckParam`, `d_a_player_main.cpp:10708`: the standing player's wall
+/// radius, which `mAcchCir[0].GetWallR` hands the wall correction.
+pub const WALL_RADIUS: f32 = 35.0;
+/// `daPy_lk_c::setBgCheckParam`, `d_a_player_main.cpp:10673-10675`: the three wall circle
+/// heights of the standing player.
+pub const WALL_HEIGHTS: [f32; 3] = [30.1, 89.9, 125.0];
 /// `setFrontWallType` at `main.cpp:4610`: how far below its ledge the player has to be before the
 /// ledge counts at all.
 const LEDGE_DROP: f32 = 125.0;
@@ -78,6 +87,10 @@ const HIDE_TURN_LIMIT: i32 = 0x2AAA;
 /// `whide.inc:161`: the widest turn a hidden wall may still answer to.
 const HIDE_YAW_LIMIT: u32 = 0x1555;
 pub const NO_EXIT: u8 = 0x3F;
+/// `dBgS::GetGrpRoomInfId`, `d_bg_s.cpp:120-136`: the room read id the reference answers with
+/// when the polygon carries no group, which `dStage_RoomCheck` at `d_stage.cpp:2278-2280`
+/// reads as "no room set".
+pub const NO_ROOM_READ: u8 = 0xFF;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DzbError {
@@ -113,6 +126,10 @@ pub struct Collision {
     tris: Vec<[u16; 3]>,
     planes: Vec<Plane>,
     codes: Vec<PolyCodes>,
+    /// `cBgD_Tri_t::m_grp` (`c_bg_w.h:57`) read through `cBgW::GetGrpInf`
+    /// (`c_bg_w.h:179`) and `dBgS::GetGrpRoomInfId` (`d_bg_s.cpp:120-136`): the room read id
+    /// each polygon carries, `0xFF` for a polygon whose group names none.
+    room_read: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -310,6 +327,20 @@ pub struct WallTrace {
     pub auto_jump: bool,
 }
 
+/// What `dBgW::RwgWallCorrect`, `d_bg_w.cpp:42`, leaves behind after it has pushed the player
+/// out of the walls it found.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WallCorrection {
+    /// The player's position after the correction.
+    pub pos: Vec3,
+    /// `RwgWallCorrect`'s own return value: whether a wall was corrected against.
+    pub hit: bool,
+    /// `SetWallPolyIndex`, `d_bg_w.cpp:180`: the polygon the correction landed on.
+    pub tri: Option<usize>,
+    /// `SetWallAngleY`, `d_bg_w.cpp:181`: the wall's own facing.
+    pub angle_y: Option<i16>,
+}
+
 fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     let bytes = data.get(at..at + 4)?;
     Some(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
@@ -484,6 +515,109 @@ fn angle_distance(a: i16, b: i16) -> u16 {
     i32::from(a.wrapping_sub(b) as i16).unsigned_abs() as u16
 }
 
+/// `cM3d_Len2dSqPntAndSegLine`, `c_m3d.cpp:46-66`: the closest point of a segment to a point,
+/// the squared distance to it, and whether the point's projection falls on the segment.
+fn point_segment_sq(point: Vec2, start: Vec2, end: Vec2) -> (bool, Vec2, f32) {
+    let delta = end - start;
+    let dot = delta.dot(delta);
+    if dot < ABS_MIN {
+        return (false, start, 0.0);
+    }
+    let along = delta.dot(point - start) / dot;
+    let closest = start + delta * along;
+    (
+        (0.0..=1.0).contains(&along),
+        closest,
+        closest.distance_squared(point),
+    )
+}
+
+/// `cM2d_CrossCirLin`, `c_m2d.cpp:11-55`: where a ray out of a point inside a circle leaves
+/// it. The reference takes the larger of the two roots, which is the far side of the circle.
+fn cross_circle_line(center: Vec2, radius: f32, start: Vec2, direction: Vec2) -> Vec2 {
+    let offset = start - center;
+    let quad = direction.dot(direction);
+    let linear = 2.0 * direction.dot(offset);
+    let constant = offset.length_squared() - radius * radius;
+    let mut t = 0.0;
+    if quad < ABS_MIN {
+        if linear.abs() >= ABS_MIN {
+            t = -constant / linear;
+        }
+    } else {
+        let disc = linear * linear - 4.0 * quad * constant;
+        if disc.abs() < ABS_MIN {
+            t = -linear / (2.0 * quad);
+        } else if disc > 0.0 {
+            let scale = 1.0 / (2.0 * quad);
+            let first = scale * (-linear + disc.sqrt());
+            let second = scale * (-linear - disc.sqrt());
+            t = first.max(second);
+        }
+    }
+    if t.abs() < ABS_MIN {
+        start
+    } else {
+        start + direction * t
+    }
+}
+
+/// `dBgS_Acch::GetWallAddY`, `d_bg_s_acch.cpp:467-480`: the ground plane's own drop over the
+/// offset the wall test makes, which lifts the wall test height on a slope. The reference's
+/// `getCrossYLessD` at `c_m3d_g_pla.h:42` leaves the plane's own offset out, so only the
+/// plane's normal is read here.
+fn wall_add_y(ground: Option<Vec3>, offset: Vec2) -> f32 {
+    let Some(normal) = ground else {
+        return 0.0;
+    };
+    if normal.y < GROUND_NY {
+        return 0.0;
+    }
+    let cross = -(normal.x * offset.x + normal.z * offset.y) / normal.y;
+    if cross > 0.0 { 0.0 } else { -cross }
+}
+
+/// `dBgW::RwgWallCorrect`'s own cross section, `d_bg_w.cpp:80-151`: the two points where the
+/// wall polygon meets the height the wall is tested at. A polygon that lies wholly above or
+/// wholly below that height carries no cross section, and one with a single vertex exactly at
+/// it is left alone, which is the reference's own `sp8C != 1` arm.
+fn wall_cross_section(corners: [Vec3; 3], y: f32) -> Option<(Vec2, Vec2)> {
+    let heights = [corners[0].y - y, corners[1].y - y, corners[2].y - y];
+    if (heights[0] > 0.0 && heights[1] > 0.0 && heights[2] > 0.0)
+        || (heights[0] < 0.0 && heights[1] < 0.0 && heights[2] < 0.0)
+    {
+        return None;
+    }
+    let zeros = heights
+        .iter()
+        .filter(|height| height.abs() < ABS_MIN)
+        .count();
+    if zeros == 1 {
+        return None;
+    }
+    let (top, left, right) = if (heights[0] > 0.0 && heights[1] <= 0.0 && heights[2] <= 0.0)
+        || (heights[0] < 0.0 && heights[1] >= 0.0 && heights[2] >= 0.0)
+    {
+        (0usize, 1usize, 2usize)
+    } else if (heights[1] > 0.0 && heights[0] <= 0.0 && heights[2] <= 0.0)
+        || (heights[1] < 0.0 && heights[0] >= 0.0 && heights[2] >= 0.0)
+    {
+        (1, 0, 2)
+    } else {
+        (2, 0, 1)
+    };
+    let over_left = heights[top] - heights[left];
+    let over_right = heights[top] - heights[right];
+    if over_left.abs() < ABS_MIN || over_right.abs() < ABS_MIN {
+        return None;
+    }
+    let along_left = -heights[left] / over_left;
+    let along_right = -heights[right] / over_right;
+    let first = corners[left] + (corners[top] - corners[left]) * along_left;
+    let second = corners[right] + (corners[top] - corners[right]) * along_right;
+    Some((Vec2::new(first.x, first.z), Vec2::new(second.x, second.z)))
+}
+
 /// `main.cpp:4662-4692`: the pair of corners of a ladder polygon at one height is its foot, and
 /// the third corner its top. The foot point and the top height both come out of that pairing.
 fn ladder_ledge(points: [Vec3; 3]) -> (Vec3, f32) {
@@ -563,9 +697,18 @@ impl Collision {
             info1.push(u32_at(data, at + 4).ok_or(DzbError::Truncated)?);
         }
 
+        let group_count = u32_at(data, 0x20).ok_or(DzbError::Truncated)?;
+        let group_offset = u32_at(data, 0x24).ok_or(DzbError::Truncated)?;
+        let mut group_info = Vec::with_capacity(group_count as usize);
+        for index in 0..group_count as usize {
+            let at = group_offset as usize + index * GROUP_STRIDE;
+            group_info.push(u32_at(data, at + 0x30).ok_or(DzbError::Truncated)?);
+        }
+
         let mut tris = Vec::with_capacity(tri_count as usize);
         let mut planes = Vec::with_capacity(tri_count as usize);
         let mut codes = Vec::with_capacity(tri_count as usize);
+        let mut room_read = Vec::with_capacity(tri_count as usize);
         for index in 0..tri_count as usize {
             let at = tri_offset as usize + index * TRI_STRIDE;
             let ids = [
@@ -581,6 +724,16 @@ impl Collision {
                 (Some(&info), Some(&raw)) => Self::codes_of(info, raw),
                 _ => PolyCodes::default(),
             });
+            // `cBgD_Tri_t::m_grp` (`c_bg_w.h:57`) and `cBgW::GetGrpInf` (`c_bg_w.h:179`):
+            // the group a polygon belongs to, and the group's own word whose low byte
+            // `dBgS::GetGrpRoomInfId` (`d_bg_s.cpp:135`) reads the room read id out of. A
+            // polygon whose group is `0xFFFF` names none, which is that function's `0xFF`.
+            let group = u16_at(data, at + 8).ok_or(DzbError::Truncated)?;
+            room_read.push(
+                group_info
+                    .get(usize::from(group))
+                    .map_or(NO_ROOM_READ, |info| (info & 0xFF) as u8),
+            );
             tris.push(ids);
             planes.push(plane(
                 verts[usize::from(ids[0])],
@@ -594,6 +747,7 @@ impl Collision {
             tris,
             planes,
             codes,
+            room_read,
         })
     }
 
@@ -632,6 +786,7 @@ impl Collision {
         }));
         self.planes.extend(other.planes);
         self.codes.extend(other.codes);
+        self.room_read.extend(other.room_read);
         self.verts.extend(other.verts);
         Ok(())
     }
@@ -1312,6 +1467,137 @@ impl Collision {
     pub fn crawl_clear(&self, pos: Vec3, feet: f32, clearance: f32) -> bool {
         self.roof_chk(pos)
             .is_some_and(|roof| roof.height - feet <= clearance)
+    }
+
+    /// `dBgW::RwgWallCorrect`, `d_bg_w.cpp:42-259`, as `dBgS::WallCorrect` at `d_bg_s.cpp:332`
+    /// runs it: the player's own circle against the wall polygons of the stage, corrected along
+    /// the wall's own normal instead of by clamping a coordinate.
+    ///
+    /// `radius` is `mAcchCir[0].GetWallR` and `heights` the three `GetWallH` values, which
+    /// `daPy_lk_c::setBgCheckParam` at `d_a_player_main.cpp:10673-10712` gives the standing
+    /// player: `35` for the radius, and `30.1`, `89.9` and `125` for the heights.
+    ///
+    /// `speed_y` is `dBgS_Acch::GetSpeedY`, `d_bg_s_acch.h:105`, and `ground` the normal of the
+    /// plane the ground check found, which `GetWallAddY` at `d_bg_s_acch.cpp:467-480` reads to
+    /// lift the wall test height by the ground's own drop over the radius.
+    pub fn wall_correct(
+        &self,
+        pos: Vec3,
+        radius: f32,
+        heights: &[f32],
+        speed_y: f32,
+        ground: Option<Vec3>,
+    ) -> WallCorrection {
+        let mut out = WallCorrection {
+            pos,
+            hit: false,
+            tri: None,
+            angle_y: None,
+        };
+        for index in 0..self.tris.len() {
+            let plane = self.planes[index];
+            // `cBgW::ClassifyPlane`, `c_bg_w.cpp:175-184`: the ground list takes the faces at
+            // `0.5` and flatter, the roof list the faces under `-0.8`, and the wall list the
+            // rest. `WallCorrectRp` at `d_bg_w.cpp:270-272` hands the wall list and the roof
+            // list to `RwgWallCorrect`, so a roof is corrected against as well.
+            if plane.normal.y >= GROUND_NY {
+                continue;
+            }
+            // `d_bg_w.cpp:52-61`: a face whose normal has no horizontal part carries no
+            // correction, and the reference walks on to the next polygon of the list.
+            let horizontal = plane.normal.x.hypot(plane.normal.z);
+            if horizontal < ABS_MIN {
+                continue;
+            }
+            let inverse = 1.0 / horizontal;
+            let corners = self.corners(&self.tris[index]);
+            // The reference culls by the node tree's box (`d_bg_w.cpp:264`), which holds a whole
+            // block of polygons. A box around one polygon is tighter, so the reach is doubled:
+            // the player stands within the radius of the wall, and the wall's own cross section
+            // is pushed out by the radius as well.
+            let reach = 2.0 * radius;
+            let min_x = corners[0].x.min(corners[1].x).min(corners[2].x);
+            let max_x = corners[0].x.max(corners[1].x).max(corners[2].x);
+            let min_z = corners[0].z.min(corners[1].z).min(corners[2].z);
+            let max_z = corners[0].z.max(corners[1].z).max(corners[2].z);
+            let away_x = (min_x - out.pos.x).max(0.0).max(out.pos.x - max_x);
+            let away_z = (min_z - out.pos.z).max(0.0).max(out.pos.z - max_z);
+            if away_x * away_x + away_z * away_z > reach * reach {
+                continue;
+            }
+            for height in heights {
+                // `d_bg_w.cpp:65-78`: the offset the wall's normal carries over the radius, and
+                // the height the wall is tested at.
+                let scale = inverse * radius;
+                let offset = Vec2::new(scale * plane.normal.x, scale * plane.normal.z);
+                let test = wall_add_y(ground, offset) + (out.pos.y + *height) - speed_y;
+                let Some((first, second)) = wall_cross_section(corners, test) else {
+                    continue;
+                };
+                // `d_bg_w.cpp:153-173`: the wall's own cross section, pushed out by the radius,
+                // and the player's distance to it.
+                let (on_segment, closest, seg_sq) = point_segment_sq(
+                    Vec2::new(out.pos.x, out.pos.z),
+                    first + offset,
+                    second + offset,
+                );
+                let delta = closest - Vec2::new(out.pos.x, out.pos.z);
+                let rr = radius * radius;
+                if seg_sq > rr || delta.dot(offset) < 0.0 {
+                    continue;
+                }
+                if on_segment {
+                    // `dBgW::positionWallCorrect`, `d_bg_w.cpp:32-40`: the player is pushed out
+                    // along the wall's own normal by the distance it stands inside the radius.
+                    let push = seg_sq.sqrt() * inverse;
+                    out.pos.x += push * plane.normal.x;
+                    out.pos.z += push * plane.normal.z;
+                } else {
+                    // `d_bg_w.cpp:186-244`: the corner of the wall, and the circle around the
+                    // player the corner has to leave.
+                    let player = Vec2::new(out.pos.x, out.pos.z);
+                    let first_sq = (first - player).length_squared();
+                    let second_sq = (second - player).length_squared();
+                    let (corner, corner_sq) = if first_sq < second_sq {
+                        (first, first_sq)
+                    } else {
+                        (second, second_sq)
+                    };
+                    if corner_sq > rr || (corner_sq - rr).abs() < 0.008 {
+                        continue;
+                    }
+                    let exit = cross_circle_line(
+                        player,
+                        radius,
+                        corner,
+                        Vec2::new(-plane.normal.x, -plane.normal.z),
+                    );
+                    out.pos.x += corner.x - exit.x;
+                    out.pos.z += corner.y - exit.y;
+                }
+                out.hit = true;
+                out.tri = Some(index);
+                out.angle_y = Some(atan2s(plane.normal.x, plane.normal.z));
+            }
+        }
+        out
+    }
+
+    /// `dBgS::GetGrpRoomInfId`, `d_bg_s.cpp:120-136`: the room read id the ground polygon's
+    /// group carries, which `dStage_RoomCheck` at `d_stage.cpp:2277` reads to pick the room set
+    /// to load. `None` is that function's own `0xFF`, the answer for a polygon whose group
+    /// names none. The background's own room number, `mRoomNo2` (`d_bg_w.cpp:23`), is `0xFF` for
+    /// the static room backgrounds, so the group is always what answers here.
+    pub fn room_read_id(&self, tri: usize) -> Option<u8> {
+        let id = *self.room_read.get(tri)?;
+        (id != NO_ROOM_READ).then_some(id)
+    }
+
+    /// The room read id of the ground polygon under a point, which is the polygon the player
+    /// stands on and the one `dStage_RoomCheck` is handed at `d_stage.cpp:2277`.
+    pub fn ground_room_read_id(&self, x: f32, z: f32) -> Option<u8> {
+        let (_, index) = self.ground_hit(x, z)?;
+        self.room_read_id(index)
     }
 
     fn wall(surface: Plane) -> bool {

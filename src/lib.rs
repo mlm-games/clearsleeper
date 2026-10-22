@@ -47,6 +47,7 @@ pub mod source;
 pub mod text;
 pub mod title_screen;
 pub mod ui_file_select;
+pub mod ui_file_select_parts;
 pub mod ui_menu_collect;
 pub mod ui_menu_dmap;
 pub mod ui_menu_fmap;
@@ -2976,6 +2977,14 @@ impl App {
         yaw: f32,
         layer: i8,
     ) {
+        // `dSv_zoneActor_c::init` (`d_save.cpp:1318-1323`) clears the zone actor bits, and it
+        // runs from `dStage_roomControl_c::init` (`d_stage.cpp:122-152`), which only happens
+        // when a stage is created. A room transition inside the same stage keeps them.
+        let same_stage = self
+            .sim
+            .world
+            .get_resource::<sim::area::StageName>()
+            .is_some_and(|name| name.0 == tables.name());
         // `dScnKy_env_light_c::init`'s time arms (`d_kankyo.cpp:467-481`): the pending time a cut
         // asked for with `dKy_set_nexttime` (`d_event_data.cpp:45-46`) becomes the clock as the
         // next stage mounts and the pending slot goes back to `-1.0f`, then the new stage's own
@@ -3062,10 +3071,10 @@ impl App {
             rooms.first().map_or(-1, |room| *room as i8),
         ));
         self.room_actors.clear();
-        self.sim
-            .world
-            .resource_mut::<sim::flags::ZoneActors>()
-            .clear();
+        sim::transition::carry_zone_actors(
+            &mut *self.sim.world.resource_mut::<sim::flags::ZoneActors>(),
+            same_stage,
+        );
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::weight::init(&mut self.sim.world);
         sim::spawn_actors(&mut self.sim.world, &tables);
@@ -3237,7 +3246,18 @@ impl App {
         };
         let room = tables.room_at(player.pos.x, player.pos.z);
         let fallback = std::slice::from_ref(&room);
-        let requested = tables.load_set(room);
+        // `dStage_RoomCheck` (`d_stage.cpp:2265-2292`) takes the room set from the room read
+        // table by the read id the ground polygon's group names, and leaves the room set alone
+        // when that id is the reference's own `0xFF` (`d_stage.cpp:2278-2280`).
+        let read_id = self
+            .sim
+            .world
+            .get_resource::<sim::transition::RoomSetRequest>()
+            .and_then(|request| request.read_id);
+        let requested = match read_id {
+            Some(id) => tables.load_set(id),
+            None => tables.load_set(room),
+        };
         let requested = if requested.is_empty() {
             fallback
         } else {
