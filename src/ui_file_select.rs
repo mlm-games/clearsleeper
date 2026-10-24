@@ -1250,7 +1250,6 @@ impl FileSelect {
             .back_label
             .pane_trans(0.0, IDX_42 as f32 + value * span);
         self.panes.groups.back_label.set_now_alpha(value);
-
     }
 
     pub fn yes_no_pane_move_set(&mut self) {

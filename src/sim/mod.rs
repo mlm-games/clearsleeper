@@ -15,10 +15,12 @@ pub mod arrow;
 pub mod arrowice;
 pub mod arrowlight;
 pub mod aryll;
+pub mod ashut;
 pub mod atdoor;
 pub mod att;
 pub mod atttag;
 pub mod auzu;
+pub mod aygr;
 pub mod ba1;
 pub mod balloon;
 pub mod barrel;
@@ -129,6 +131,7 @@ pub mod gryw;
 pub mod gtaki;
 pub mod gull;
 pub mod gy_ctrl;
+pub mod hami2;
 pub mod hami3;
 pub mod hami4;
 pub mod hammer;
@@ -237,6 +240,7 @@ pub mod mmusic;
 pub mod molgera;
 pub mod morth;
 pub mod movebox;
+pub mod msdan;
 pub mod msdan2;
 pub mod msdansb;
 pub mod msdansub2;
@@ -793,6 +797,10 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if shutter2::is_shutter2(&source.name) {
         let v = shutter2::Shutter2::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if aygr::is_aygr(&source.name) {
+        world
+            .spawn((actor, aygr::Aygr::spawn(source.parameters)))
+            .id()
     } else if auzu::is_auzu(&source.name) {
         let v = auzu::Auzu::spawn(source.parameters);
         world.spawn((actor, v)).id()
@@ -1476,6 +1484,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
             .id()
     } else if gbed::is_gbed(&source.name) {
         world.spawn((actor, gbed::Gbed::spawn())).id()
+    } else if hami2::is_hami2(&source.name) {
+        let v = hami2::Hami2::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if hami4::is_hami4(&source.name) {
         let v = hami4::Hami4::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
@@ -1541,6 +1552,10 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if amiprop::is_amiprop(&source.name) {
         let v = amiprop::Amiprop::spawn(source.parameters, actor.angle);
         world.spawn((actor, v)).id()
+    } else if msdan::is_msdan(&source.name) {
+        world
+            .spawn((actor, msdan::Msdan::spawn(source.parameters)))
+            .id()
     } else if msdansb::is_msdansb(&source.name) {
         let v = msdansb::Msdansb::spawn(
             source.parameters,
@@ -1579,6 +1594,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world.spawn((actor, v)).id()
     } else if warpfo::is_warpfo(&source.name) {
         world.spawn((actor, warpfo::Warpfo::spawn())).id()
+    } else if ashut::is_ashut(&source.name) {
+        let v = ashut::Ashut::spawn(source.parameters, world.resource::<flags::Switches>());
+        world.spawn((actor, v)).id()
     } else if atdoor::is_atdoor(&source.name) {
         let v = atdoor::Atdoor::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
@@ -1871,6 +1889,15 @@ pub fn build(
         .unwrap_or_default();
     sim.world.insert_resource(event_list);
     if let Ok(root) = crate::assets::AssetRoot::from_env() {
+        // `dStage_Create` ends with `dComIfGp_evmng_create()` (`d_stage.cpp:2246`), whose
+        // `dEvent_manager_c::create` reads `event_list.dat` out of the stage's `Stage.arc`
+        // (`d_event_manager.cpp:166`). Without this the manager stays the default empty one and
+        // every `dComIfGp_evmng_getEventIdx` misses.
+        if let Some(tables) = tables {
+            if let Some(manager) = event_manager::load_stage_event_list(&root, tables.name()) {
+                sim.world.insert_resource(manager);
+            }
+        }
         let actor_table = stage_data::load_actor_table(&root).unwrap_or_default();
         sim.world.insert_resource(actor_table);
     }
@@ -2264,6 +2291,7 @@ pub fn build(
                         plant::control.in_set(WwSimSet::Execute),
                         quake::control.in_set(WwSimSet::Execute),
                         amiprop::control.in_set(WwSimSet::Execute),
+                        msdan::control.in_set(WwSimSet::Execute),
                         msdansb::control.in_set(WwSimSet::Execute),
                         ritem::control.in_set(WwSimSet::Execute),
                         qtkhd::control.in_set(WwSimSet::Execute),
@@ -2458,6 +2486,8 @@ pub fn build(
                 )
                     .chain(),
                 (
+                    hami2::control.in_set(WwSimSet::Execute),
+                    ashut::control.in_set(WwSimSet::Execute),
                     hami3::control.in_set(WwSimSet::Execute),
                     floormaster::control.in_set(WwSimSet::Execute),
                     andsw0::control.in_set(WwSimSet::Execute),

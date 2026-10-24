@@ -332,8 +332,19 @@ impl App {
         let mut query = world.query::<&mut Player>();
         let mut player = query.iter_mut(world).next().expect("player exists at boot");
         *player = save.player.clone().into();
+        // `sea` is both the prologue and the whole Great Sea now, so only a save standing on the
+        // prologue's point 206 gets the opening camera; any other `sea` save keeps the ordinary
+        // follow camera.
         if save.stage == assets::PROLOGUE_STAGE {
-            self.place_camera(save.area.spawn.into(), save.area.yaw, true);
+            let prologue = assets::load_stage_spawn(
+                assets::PROLOGUE_STAGE,
+                assets::STAGE_START_ROOM,
+                assets::PROLOGUE_SPAWN_POINT,
+            );
+            let here = glam::Vec3::from(save.area.spawn);
+            if prologue.is_some_and(|(spawn, _)| here.distance_squared(spawn) < 1.0) {
+                self.place_camera(save.area.spawn.into(), save.area.yaw, true);
+            }
         }
         Ok(())
     }

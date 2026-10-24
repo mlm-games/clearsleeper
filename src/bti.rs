@@ -227,10 +227,10 @@ fn shade(format: TexFmt, raw: u32, pal: &[[u8; 4]]) -> [u8; 4] {
         TexFmt::Ia8 => {
             let value = raw as u32;
             [
-                value as u8,           // intensity (low byte)
-                value as u8,           // intensity (low byte)
-                value as u8,           // intensity (low byte)
-                (value >> 8) as u8,    // alpha (high byte)
+                value as u8,        // intensity (low byte)
+                value as u8,        // intensity (low byte)
+                value as u8,        // intensity (low byte)
+                (value >> 8) as u8, // alpha (high byte)
             ]
         }
         TexFmt::Rgb565 => rgb565(raw as u16),

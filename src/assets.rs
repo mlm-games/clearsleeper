@@ -14,11 +14,19 @@ const STAGE_ROOT: &str = "files/res/Stage";
 pub const STAGE_SPAWN_POINT: u8 = 128;
 pub const STAGE_START_ROOM: u8 = 44;
 pub const SEA_STAGE: &str = "sea";
-/// The opening demo's next stage: `dComIfGp_setNextStage("sea_T", 0, 44, 0)`
-/// (`d_com_inf_game.cpp:496`). Its start point 0 is the one on Outset; the `sea` stage's
-/// point 128 puts the player on the water and is not the prologue's spawn.
-pub const PROLOGUE_STAGE: &str = "sea_T";
-pub const PROLOGUE_SPAWN_POINT: u8 = 0;
+/// A new save returns to `sea` room 44, Outset Island (`d_save.cpp:63-67`, the default
+/// `dSv_player_return_place_c::init`, with `dIsleRoom_OutsetIsland_e = 44` at `d_save.h:348`),
+/// at point 206. `sea_T` is the title scene's demo copy of the island - its `LBNK` names
+/// `Demo51` (`title.stb`) rather than the prologue's `Demo02` (`awake.stb`), so it is not the
+/// stage the sister's opening cutscene runs in.
+pub const PROLOGUE_STAGE: &str = "sea";
+pub const PROLOGUE_SPAWN_POINT: u8 = 206;
+/// The first cutscene after the legend: `sea`'s event list names `awake` and its `PACKAGE`
+/// staff mounts `awake.stb` (`dat/event_list.dat`). `dMs_placenameMove` watches the demo's
+/// frame 0xC8 and sets `dSv_event_flag_c::UNK_3510` there (`d_menu_window.cpp:1326-1332`), so
+/// that save bit is the one that says the sister's cutscene has played.
+pub const PROLOGUE_EVENT: &str = "awake";
+pub const PROLOGUE_EVENT_FLAG: u16 = 0x3510;
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
     "bdl/model1.bdl",
@@ -193,8 +201,9 @@ pub fn load_stage(stage: &str) -> Option<crate::sim::collision::StageData> {
     load_stage_at(stage, STAGE_SPAWN_POINT)
 }
 
-/// Load a stage's collision and the start point `spawn_point` on its first room. `sea_T` uses
-/// point 0 while `sea` uses [`STAGE_SPAWN_POINT`], so the spawn is part of the stage choice.
+/// Load a stage's collision and the start point `spawn_point` on its first room. A stage's
+/// start point is part of the stage choice: the prologue uses point 206 on `sea`'s room 44,
+/// while a normal `sea` arrival uses [`STAGE_SPAWN_POINT`].
 pub fn load_stage_at(stage: &str, spawn_point: u8) -> Option<crate::sim::collision::StageData> {
     match stage_from_assets(stage, spawn_point) {
         Ok(stage) => Some(stage),

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
-use bevy_ecs::prelude::{Without, World};
+use bevy_ecs::prelude::{With, Without, World};
 use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;
@@ -688,12 +688,47 @@ impl App {
             self.menu.screen = menus::Screen::Title;
             return;
         }
+        let new_game = self.pending_slot.is_some();
         self.menu.screen = menus::Screen::Playing;
         if let Some(slot) = self.pending_slot.take() {
             if let Err(e) = self.write_slot(slot) {
                 log::warn!("clearsleeper: slot {slot} write failed ({e})");
             }
         }
+        if new_game {
+            self.order_prologue_event();
+        }
+    }
+
+    /// The opening legend ends in `sea` room 44, where the `awake` event is the sister's
+    /// cutscene. `dComIfGp_event_order` has no automatic stage-entry caller in the decomp;
+    /// the stage event list and the room's `LBNK` demo archive (`Demo02`, the one holding
+    /// `awake.stb`) are what make the cutscene playable there. Order it once per save: the
+    /// demo sets `UNK_3510` at frame 0xC8 (`d_menu_window.cpp:1326-1332`), so a save that
+    /// already saw it is left in play.
+    fn order_prologue_event(&mut self) {
+        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
+        if stories.test(assets::PROLOGUE_EVENT_FLAG) {
+            return;
+        }
+        let list = self.sim.world.resource::<sim::event::EventList>().clone();
+        let Some(index) = list.event_index(assets::PROLOGUE_EVENT) else {
+            return;
+        };
+        let player = {
+            let mut players = self
+                .sim
+                .world
+                .query_filtered::<Entity, With<sim::player::Player>>();
+            players.iter(&self.sim.world).next()
+        };
+        let Some(player) = player else {
+            return;
+        };
+        self.sim
+            .world
+            .resource_mut::<sim::event::ActiveEvent>()
+            .order(&list, index, player);
     }
 
     /// The opening scene's `execute` runs once a 30 Hz frame (`d_s_open.cpp:67-72`), so its
@@ -2329,6 +2364,35 @@ impl App {
                 )
             } else if entity.contains::<sim::branch::Branch>() {
                 let (min, max) = sim::branch::Branch::spawn().cull();
+                lift = min[1];
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
+            } else if entity.contains::<sim::ashut::Ashut>() {
+                let (min, max) =
+                    sim::ashut::Ashut::spawn(0, &sim::flags::Switches::default()).cull();
+                lift = min[1];
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
+            } else if entity.contains::<sim::aygr::Aygr>() {
+                let (min, max) = sim::aygr::Aygr::spawn(0).cull();
+                lift = min[1];
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    max[1] - min[1],
+                    (max[0] - min[0]) * 0.5,
+                )
+            } else if entity.contains::<sim::hami2::Hami2>() {
+                let (min, max) =
+                    sim::hami2::Hami2::spawn(0, &sim::flags::Switches::default()).cull();
                 lift = min[1];
                 (
                     view::ActorKind::Scenery,

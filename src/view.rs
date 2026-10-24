@@ -1,6 +1,7 @@
 use glam::{Mat4, Vec2, Vec3};
 use repame_view3d::{
-    BatchDesc, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload, SkinnedMesh,
+    BatchDesc, CullMode, Frame3d, MeshGroup, OrbitCamera, Rgb, SceneFilter, SceneUpload,
+    SkinnedMesh,
 };
 
 use crate::j3d::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
@@ -158,22 +159,22 @@ fn used_pages(actor: &RoomMesh) -> Vec<u32> {
 /// `GXCullMode` is {none 0, front 1, back 2, all 3} (`GXEnum.h:16-21`). The viewport has one
 /// cull face (back), so a no-cull material is emitted twice with the opposite winding, a
 /// front-cull material once with the opposite winding and an all-cull material not at all.
-fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> Vec<u32> {
+fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> (Vec<u32>, CullMode) {
     let reverse = |indices: &[u32]| {
         indices
             .chunks_exact(3)
             .flat_map(|triangle| [triangle[0], triangle[2], triangle[1]])
             .collect::<Vec<_>>()
     };
-    match group.cull.unwrap_or(2) {
-        0 => {
+    match group.cull {
+        Some(0) => {
             let mut indices = group.indices.clone();
             indices.extend(reverse(&group.indices));
-            indices
+            (indices, CullMode::None)
         }
-        1 => reverse(&group.indices),
-        3 => Vec::new(),
-        _ => group.indices.clone(),
+        Some(1) => (reverse(&group.indices), CullMode::Back),
+        Some(3) => (Vec::new(), CullMode::Back),
+        _ => (group.indices.clone(), CullMode::Back),
     }
 }
 
@@ -385,15 +386,17 @@ fn hair_groups(
             } else {
                 Vec::new()
             };
+            let (indices, cull_mode) = group_indices(group);
             MeshGroup {
                 positions,
                 colors: group.colors.clone(),
                 normals,
                 uvs: group.uvs.clone(),
-                indices: group_indices(group),
+                indices,
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: group.z_compare,
+                cull_mode,
                 ..MeshGroup::default()
             }
         })
@@ -428,12 +431,13 @@ fn skinned_groups(
                 && group.joint_indices.len() == group.positions.len()
         })
         .map(|(_, group)| {
+            let (indices, _) = group_indices(group);
             let mut mesh = SkinnedMesh {
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),
                 uvs: group.uvs.clone(),
                 colors: group.colors.clone(),
-                indices: group_indices(group),
+                indices,
                 joints: group.joint_indices.clone(),
                 weights: group.joint_weights.clone(),
                 inverse_bind: inverse_bind.clone(),
@@ -499,15 +503,17 @@ fn static_actor_groups(
             } else {
                 Vec::new()
             };
+            let (indices, cull_mode) = group_indices(group);
             Some(MeshGroup {
                 positions,
                 colors: group.colors.clone(),
                 normals,
                 uvs: group.uvs.clone(),
-                indices: group_indices(group),
+                indices,
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: group.z_compare,
+                cull_mode,
                 ..MeshGroup::default()
             })
         })
@@ -657,6 +663,7 @@ fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
 }
 
 fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
+    let (indices, cull_mode) = group_indices(group);
     MeshGroup {
         positions: group.positions.clone(),
         colors: group.colors.clone(),
@@ -666,10 +673,11 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
             Vec::new()
         },
         uvs: animated_uvs(room, group, tick),
-        indices: group_indices(group),
+        indices,
         texture_page: group.texture_page.unwrap_or(0),
         alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
         depth_test: true,
+        cull_mode,
         ..MeshGroup::default()
     }
 }
