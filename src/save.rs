@@ -342,7 +342,7 @@ impl App {
                 assets::PROLOGUE_SPAWN_POINT,
             );
             let here = glam::Vec3::from(save.area.spawn);
-            if prologue.is_some_and(|(spawn, _)| here.distance_squared(spawn) < 1.0) {
+            if prologue.is_some_and(|spawn| here.distance_squared(spawn.pos) < 1.0) {
                 self.place_camera(save.area.spawn.into(), save.area.yaw, true);
             }
         }

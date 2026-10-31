@@ -159,6 +159,7 @@ pub struct StageTables {
     actors: Vec<StageActor>,
     exits: Vec<StageExit>,
     events: Vec<String>,
+    event_switches: Vec<u8>,
     cameras: StageCameras,
     name: String,
     has_sea: bool,
@@ -407,9 +408,9 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         Some((count, offset)) => parse_exits(data, count, offset)?,
         None => Vec::new(),
     };
-    let events = match locate(b"EVNT") {
+    let (events, event_switches) = match locate(b"EVNT") {
         Some((count, offset)) => parse_events(data, count, offset)?,
-        None => Vec::new(),
+        None => (Vec::new(), Vec::new()),
     };
     let mut stage_cameras = parse_camera_tables(data, locate, b"CAMR", b"AROB")?;
     let room_level = parse_camera_tables(data, locate, b"RCAM", b"RARO")?;
@@ -431,18 +432,25 @@ pub fn parse(data: &[u8]) -> Result<StageTables, DzsError> {
         actors,
         exits,
         events,
+        event_switches,
         cameras: stage_cameras,
         name: String::new(),
         has_sea,
     })
 }
 
-fn parse_events(data: &[u8], count: u32, offset: u32) -> Result<Vec<String>, DzsError> {
+/// The `EVNT` chunk's rows: `dStage_Event_dt_c` (`d_stage.h:329-345`) is a leading byte, a
+/// 15-byte name and eight bytes at `+0x10`. Two of those matter to a stage entry: `mSpawnSwitchNo`
+/// at `+0x13` is the switch `dEvent_exception_c::setStartDemo` tests and sets
+/// (`d_event_manager.cpp:40-52`), and `field_0x14` is the spawn point the row belongs to
+/// (`d_event.cpp:98-102`). The rest is camera/wipe data this port has no reader for.
+fn parse_events(data: &[u8], count: u32, offset: u32) -> Result<(Vec<String>, Vec<u8>), DzsError> {
     let end = table_end(offset as usize, count as usize, EVENT_LEN)?;
     if end > data.len() {
         return Err(DzsError::BadTable);
     }
     let mut events = Vec::with_capacity(count as usize);
+    let mut switches = Vec::with_capacity(count as usize);
     for index in 0..count as usize {
         let at = offset as usize + index * EVENT_LEN + 1;
         if at + EVENT_NAME_LEN > data.len() {
@@ -454,8 +462,15 @@ fn parse_events(data: &[u8], count: u32, offset: u32) -> Result<Vec<String>, Dzs
             .position(|&byte| byte == 0)
             .unwrap_or(EVENT_NAME_LEN);
         events.push(String::from_utf8_lossy(&raw[..stop]).into_owned());
+        // The `+0x13` byte sits inside the name field's alignment slack for a 15-byte name
+        // (`+1` through `+15`), so it is read from the row rather than the name.
+        switches.push(
+            *data
+                .get(offset as usize + index * EVENT_LEN + 0x13)
+                .unwrap_or(&0xFF),
+        );
     }
-    Ok(events)
+    Ok((events, switches))
 }
 
 fn parse_placements(data: &[u8], count: u32, offset: u32) -> Result<Vec<Placement>, DzsError> {
@@ -692,6 +707,13 @@ impl StageTables {
 
     pub fn event_names(&self) -> &[String] {
         &self.events
+    }
+
+    /// `dStage_Event_dt_c::mSpawnSwitchNo` (`d_stage.h:335`): the switch a stage entry through
+    /// this event's spawn point tests and then sets (`d_event_manager.cpp:40-52`), so a start
+    /// demo such as `sea`'s `awake` plays once per save rather than on every arrival.
+    pub fn event_spawn_switch(&self, index: u8) -> Option<u8> {
+        self.event_switches.get(usize::from(index)).copied()
     }
 
     /// The camera rows `dStage_dt_c::getCamera` answers with once the stage file is loaded. The

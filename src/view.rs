@@ -156,23 +156,12 @@ fn used_pages(actor: &RoomMesh) -> Vec<u32> {
 }
 
 /// `J3DMaterial::load` sets the GX cull mode from the material (`J3DMaterial.cpp:194`), and
-/// `GXCullMode` is {none 0, front 1, back 2, all 3} (`GXEnum.h:16-21`). The viewport has one
-/// cull face (back), so a no-cull material is emitted twice with the opposite winding, a
-/// front-cull material once with the opposite winding and an all-cull material not at all.
+/// `GXCullMode` is {none 0, front 1, back 2, all 3} (`GXEnum.h:16-21`). The group keeps the
+/// material's own face selection and an all-cull material draws nothing.
 fn group_indices(group: &crate::j3d::bdl::RoomGroup) -> (Vec<u32>, CullMode) {
-    let reverse = |indices: &[u32]| {
-        indices
-            .chunks_exact(3)
-            .flat_map(|triangle| [triangle[0], triangle[2], triangle[1]])
-            .collect::<Vec<_>>()
-    };
     match group.cull {
-        Some(0) => {
-            let mut indices = group.indices.clone();
-            indices.extend(reverse(&group.indices));
-            (indices, CullMode::None)
-        }
-        Some(1) => (reverse(&group.indices), CullMode::Back),
+        Some(0) => (group.indices.clone(), CullMode::None),
+        Some(1) => (group.indices.clone(), CullMode::Front),
         Some(3) => (Vec::new(), CullMode::Back),
         _ => (group.indices.clone(), CullMode::Back),
     }
@@ -188,11 +177,30 @@ fn alpha_cutoff(test: Option<&crate::j3d::bdl::AlphaTest>) -> f32 {
     const GREATER: u8 = 4;
     const GEQUAL: u8 = 6;
     const ALWAYS: u8 = 7;
+    const OP_AND: u8 = 0;
+    const OP_OR: u8 = 1;
     let Some(test) = test else {
         return 0.0;
     };
     if test.comp0 == ALWAYS {
         return 0.0;
+    }
+    let lower = |comp: u8, reference: u8| -> Option<f32> {
+        match comp {
+            GREATER => Some((f32::from(reference) + 1.0) / 255.0),
+            GEQUAL => Some(f32::from(reference) / 255.0),
+            ALWAYS => Some(0.0),
+            _ => None,
+        }
+    };
+    if let (Some(first), Some(second)) =
+        (lower(test.comp0, test.ref0), lower(test.comp1, test.ref1))
+    {
+        return match test.op {
+            OP_AND => first.max(second),
+            OP_OR => first.min(second),
+            _ => first.min(second),
+        };
     }
     match test.comp0 {
         GEQUAL if test.comp1 == ALWAYS || (test.comp1 == LEQUAL && test.ref1 == u8::MAX) => {
@@ -202,6 +210,14 @@ fn alpha_cutoff(test: Option<&crate::j3d::bdl::AlphaTest>) -> f32 {
         NEVER => 1.0,
         _ => 0.0,
     }
+}
+
+/// `J3DMaterial`'s blend mode and `J3DZModeInfo::mUpdateEnable` (`J3DStruct.h:230-259`). The
+/// renderer's transparent pass is the only way to turn depth writes off, so a material that does
+/// not update Z joins it even when its blend mode is NONE; with alpha 1 that is the same replace
+/// the GX pass does.
+fn transparent(group: &crate::j3d::bdl::RoomGroup) -> bool {
+    group.blend != crate::j3d::bdl::GX_BM_NONE || !group.z_update
 }
 
 fn actor_page(group: &crate::j3d::bdl::RoomGroup, pages: &[u32], page_base: u32) -> u32 {
@@ -396,6 +412,7 @@ fn hair_groups(
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: group.z_compare,
+                transparent: transparent(group),
                 cull_mode,
                 ..MeshGroup::default()
             }
@@ -445,6 +462,7 @@ fn skinned_groups(
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: group.z_compare,
+                transparent: transparent(group),
                 ..SkinnedMesh::default()
             };
             mesh.name = "cl".to_string();
@@ -513,6 +531,7 @@ fn static_actor_groups(
                 texture_page: actor_page(group, pages, page_base),
                 alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
                 depth_test: group.z_compare,
+                transparent: transparent(group),
                 cull_mode,
                 ..MeshGroup::default()
             })
@@ -676,7 +695,8 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
         indices,
         texture_page: group.texture_page.unwrap_or(0),
         alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
-        depth_test: true,
+        depth_test: group.z_compare,
+        transparent: transparent(group),
         cull_mode,
         ..MeshGroup::default()
     }

@@ -108,6 +108,7 @@ pub fn control(
     targeting: Res<TargetIntent>,
     item: Res<ItemIntent>,
     use_intent: Res<UseIntent>,
+    scope: Res<super::scope::Scope>,
     mut status: ResMut<PlayerStatus>,
     mut info: ResMut<crate::text::msgproc::MsgGameInfo>,
 ) {
@@ -132,6 +133,10 @@ pub fn control(
     }
     if use_intent.0 {
         bits |= STTS0_HOOKSHOT_AIM;
+    }
+    // `dComIfGp_setPlayerStatus0(0, daPyStts0_TELESCOPE_LOOK_e)` - `d_a_player_main.cpp:5915`.
+    if scope.active {
+        bits |= STTS0_TELESCOPE_LOOK;
     }
     if player.face > 0.9 {
         bits |= STTS0_CRAWL;

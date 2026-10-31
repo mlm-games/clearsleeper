@@ -1324,6 +1324,13 @@ impl Aryll {
                     } else if ctx.text.info.release_scope_mode() {
                         ctx.camera_running = true;
                         self.player_reset_flag();
+                        // `daPy_getPlayerLinkActorClass()->onNoResetFlg0(
+                        // daPy_py_c::daPyFlg0_SCOPE_CANCEL)` (`d_a_npc_ls1.cpp:1636`): the
+                        // telescope comes down on its own, and the next end check sees the scope
+                        // message status back at `MSG_UNK0` and finishes the scene.
+                        if let Some(scope) = ctx.scope.as_deref_mut() {
+                            scope.request_cancel();
+                        }
                         self.bgm_fade = BGM_STOP_FADE;
                         ctx.events.list.push(SimEvent::Bgm(BGM_ISLAND_LINK_2));
                         self.scope_used = true;
@@ -2705,6 +2712,10 @@ pub struct Ctx<'a> {
     pub events: &'a mut SimEvents,
     pub equipped: &'a Equipped,
     pub collect: &'a Collect,
+    /// The telescope the scene talks through, for the one write the reference makes on it:
+    /// `onNoResetFlg0(daPyFlg0_SCOPE_CANCEL)` when `zelda_fly` runs out
+    /// (`d_a_npc_ls1.cpp:1635-1636`).
+    pub scope: Option<&'a mut super::scope::Scope>,
     pub text: &'a mut Text<'a>,
 }
 
@@ -2835,7 +2846,9 @@ pub fn control(
     mut world: World,
     mut msg: Msg,
     camera: Res<super::camera::Camera>,
+    mut scope: Option<ResMut<super::scope::Scope>>,
     others: Query<(Entity, &Actor), Without<Aryll>>,
+    mut birds: Query<&mut super::bird::Bird>,
     mut actors: Query<(Entity, &mut Actor, &mut Aryll)>,
 ) {
     let player = msg.players.iter().next().copied();
@@ -2859,6 +2872,12 @@ pub fn control(
         let ctx_project = camera.project(aryll.attn_pos);
         let ctx_project_high = camera.project(aryll.attn_pos + Vec3::Y * PROJECT_LIFT);
         let fov_y = camera.fovy();
+        // `dComIfGp_getCameraZoomScale(0)` (`d_a_npc_ls1.cpp:1848`, `:1858`): the scope's own
+        // zoom scale, absent while the eye is down.
+        let scope_zoom = scope
+            .as_ref()
+            .filter(|scope| scope.active)
+            .map(|scope| scope.zoom);
         let mut ctx = Ctx {
             entity,
             pos: actor.pos,
@@ -2876,7 +2895,7 @@ pub fn control(
             demo_actor: None,
             partner_chirp: false,
             partner_odoroki: false,
-            scope_zoom: None,
+            scope_zoom,
             scope_wipe: false,
             camera_running: true,
             ground_hit: false,
@@ -2894,6 +2913,7 @@ pub fn control(
             events: &mut world.events,
             equipped: &world.equipped,
             collect: &world.collect,
+            scope: scope.as_deref_mut(),
             text: &mut text,
         };
         if !aryll.entered {
@@ -2905,7 +2925,27 @@ pub fn control(
                 continue;
             }
         }
+        // `bm1_npc_p->getOdoroki()` (`d_a_npc_ls1.cpp:1874`): the partner's surprise, read by the
+        // focus step of the scope conversation.
+        if let Some(partner) = aryll.partner
+            && let Ok(bird) = birds.get(partner)
+        {
+            ctx.partner_odoroki = bird.get_odoroki();
+        }
         aryll.execute(actor, &mut ctx, &others);
+        // The two writes Aryll's scope makes on the partner: `setTelescopeDemo()` when the scope's
+        // message mode opens (`d_a_npc_ls1.cpp:1814`) and `setFocus()` at the zoom threshold
+        // (`:1861`). Both are one-way latches in the reference (`d_a_npc_bm1.h:64-65`).
+        if let Some(partner) = aryll.partner
+            && let Ok(mut bird) = birds.get_mut(partner)
+        {
+            if aryll.partner_telescope_demo {
+                bird.set_telescope_demo();
+            }
+            if aryll.partner_focus {
+                bird.set_focus();
+            }
+        }
     }
 }
 

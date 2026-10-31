@@ -17,6 +17,13 @@ const WIDE_Y: f32 = 480.0;
 const BASE_X: f32 = 320.0;
 const BASE_Y: f32 = 240.0;
 const DEPTH_CLAMP: f32 = 500000.0;
+/// The telescope's field of view at full zoom. `d_camera.cpp:4868-4869` narrows
+/// `mViewCache.mFovy` to `mWork.subject.m3A0`, and `:4890-4893` seeds `m39C` at two thirds of the
+/// style's own field of view, so the scoped view keeps its style's field of view divided by the
+/// `dComIfGp_getCameraZoomScale` the aryll conversation reads (`d_a_npc_ls1.cpp:1848`, `:1858`).
+/// The pair bounds a magnification the port's `9.0` scale cannot leave: 45 degrees down to 2.
+const SCOPE_FOVY_MIN: f32 = 0.0349066;
+const SCOPE_FOVY_MAX: f32 = 0.7853982;
 
 /// `view_port_class` from `f_op_view.h`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -430,6 +437,7 @@ pub fn track(
     solid: Option<Res<super::collision::Collision>>,
     sea: Option<Res<super::sea::Sea>>,
     room: Option<Res<CamRoom>>,
+    scope: Option<Res<super::scope::Scope>>,
     mut events: Option<ResMut<super::event_manager::EventManager>>,
     mut paths: ResMut<super::cam_event::SplinePaths>,
     mut camera: ResMut<Camera>,
@@ -437,6 +445,39 @@ pub fn track(
     let Some(player) = players.iter().next() else {
         return;
     };
+    // `dComIfGp_getCamera(0)->mCamera.Start()` at the end of Aryll's `zelda_fly`
+    // (`d_a_npc_ls1.cpp:1634`) hands the view back to the camera before the scope comes down, so
+    // an event camera outranks the scope's own.
+    let event_camera = events
+        .as_ref()
+        .is_some_and(|manager| manager.camera_play != 0);
+    if let Some(scope) = scope
+        .as_deref()
+        .filter(|scope| scope.active && !event_camera)
+    {
+        // `d_camera.cpp:1297-1299` sends the telescope's frame to camera mode `0xe`, whose
+        // `subjectCamera` scoped block (`:4840-4870`, `:4907-4912`) publishes a first-person view:
+        // the player's own eye at the aim pair the stick walks, and a field of view that narrows
+        // with the zoom scale. `mWork.subject.m3A0` is the settled field of view and `m39C` two
+        // thirds of it (`:4890-4893`), so the scope's view at rest is the style's own and the
+        // magnification divides it. The 320x320 viewport inset at `:4911` and the scope HUD's
+        // ring and arrow (`d_scope.cpp`) have no port yet.
+        let eye = scope.eye(player.pos);
+        let base = if camera.view_cache.fovy > 1.0 {
+            camera.view_cache.fovy.to_radians()
+        } else {
+            DEFAULT_FOVY
+        };
+        let fovy = (base / scope.zoom).clamp(SCOPE_FOVY_MIN, SCOPE_FOVY_MAX);
+        if camera.view.is_none() {
+            camera.view = Some(View::default());
+        }
+        if let Some(view) = camera.view.as_mut() {
+            view.aim(eye, eye + scope.forward(), Vec3::Y);
+            view.set_fovy(fovy);
+        }
+        return;
+    }
     let orbit_delta = (orbit.0 - camera.orbit_yaw).to_degrees();
     camera.orbit_yaw = orbit.0;
     let turn = if sub.value() > C_STICK_GATE {

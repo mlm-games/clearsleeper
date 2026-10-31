@@ -136,6 +136,10 @@ pub struct Collision {
 pub struct StageData {
     pub spawn: Vec3,
     pub yaw: f32,
+    /// The `PLYR` row's parameter word. `daPy_lk_c` reads its start event out of bits 24-31
+    /// (`d_a_player_main.h:1881`, `getStartEvent`) and its start mode out of bits 12-15
+    /// (`:1879`), which is how the prologue's point 206 asks for `awake`.
+    pub player: u32,
     pub collision: Collision,
 }
 

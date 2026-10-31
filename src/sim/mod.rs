@@ -268,6 +268,9 @@ pub mod npc_tt;
 pub mod npc_uk;
 pub mod obj_akabe;
 pub mod obj_correct;
+pub mod obj_ekskz;
+pub mod obj_htetu1;
+pub mod obj_itnak;
 pub mod obj_mkie;
 pub mod obj_nest;
 pub mod obj_paper;
@@ -314,6 +317,7 @@ pub mod sbox;
 pub mod scenechange;
 pub mod scenery;
 pub mod schedule;
+pub mod scope;
 pub mod sea;
 pub mod seatag;
 pub mod select;
@@ -877,6 +881,12 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if obj_correct::is_obj_correct(&source.name) {
         let v = obj_correct::ObjCorrect::spawn(source.parameters);
         world.spawn((actor, v)).id()
+    } else if obj_ekskz::is_ekskz(&source.name) {
+        obj_ekskz::spawn(world, source)
+    } else if obj_htetu1::is_htetu1(&source.name) {
+        obj_htetu1::spawn(world, source)
+    } else if obj_itnak::is_itnak(&source.name) {
+        obj_itnak::spawn(world, source)
     } else if obj_swheavy::is_obj_swheavy(&source.name) {
         let v = obj_swheavy::SwHeavy::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, v)).id()
@@ -1854,6 +1864,7 @@ pub fn build(
         .insert_resource(contact_run::ContactResults::default());
     kytag00::init(&mut sim.world);
     player_status::init(&mut sim.world);
+    sim.world.insert_resource(scope::Scope::default());
     daynight::init(&mut sim.world);
     sim.world.insert_resource(cam_event::SplinePaths::default());
     weather::init(&mut sim.world);
@@ -1869,6 +1880,7 @@ pub fn build(
     registry::init(&mut sim.world);
     sim.world.insert_resource(flags::OrderFlags::default());
     sim.world.insert_resource(flags::ZoneActors::default());
+    sim.world.insert_resource(event::ItemGets::default());
     sim.world.insert_resource(inventory::Equipped::default());
     sim.world.insert_resource(inventory::Got::default());
     sim.world.insert_resource(clock::Clock::default());
@@ -1972,6 +1984,16 @@ pub fn build(
     sim.world.insert_resource(att::AttNonPos::default());
     sim.world.insert_resource(bwdg::BwdgStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
+    // `daPy_lk_c::create`'s start demo (`d_a_player_main.cpp:12328`) is resolved from the spawn
+    // row the stage was entered through, so it is staged here and ordered once play begins.
+    let start = stage
+        .as_ref()
+        .map_or_else(event::StartEvent::default, |stage| {
+            event::StartEvent::from_player(stage.player, |index| {
+                tables.and_then(|tables| tables.event_spawn_switch(index))
+            })
+        });
+    sim.world.insert_resource(start);
     let mut area = area::Area::default();
     if let Some(stage) = stage {
         area.spawn = stage.spawn;
@@ -2021,6 +2043,11 @@ pub fn build(
                         (
                             flags::clear_order_flags.in_set(WwSimSet::Execute),
                             event::begin.in_set(WwSimSet::Execute),
+                            // The telescope's item arm runs before the view and the status word it
+                            // feeds: `procScope_init` raises `daPyStts0_TELESCOPE_LOOK_e`
+                            // (`d_a_player_main.cpp:5915`), and the same frame's camera
+                            // (`d_camera.cpp:1297-1299`) and actors read it.
+                            scope::control.in_set(WwSimSet::Execute),
                             registry::control.in_set(WwSimSet::Execute),
                             actor::snapshot.in_set(WwSimSet::Execute),
                             snap::control.in_set(WwSimSet::Execute),
@@ -2098,6 +2125,9 @@ pub fn build(
                         torch::control.in_set(WwSimSet::Execute),
                         usovmc::control.in_set(WwSimSet::Execute),
                         obj_akabe::control.in_set(WwSimSet::Execute),
+                        obj_ekskz::control.in_set(WwSimSet::Execute),
+                        obj_htetu1::control.in_set(WwSimSet::Execute),
+                        obj_itnak::control.in_set(WwSimSet::Execute),
                         acorn_leaf::control.in_set(WwSimSet::Execute),
                         molgera::control.in_set(WwSimSet::Execute),
                         magma::control.in_set(WwSimSet::Execute),
@@ -2244,6 +2274,10 @@ pub fn build(
                         kantera::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
+                    // `daDitem_c::Delete`'s `execItemGet` (`d_a_demo_item.cpp:432-435`) runs as
+                    // the item cut removes the actor, so the grant lands in the same tick the cut
+                    // ends; the actors that ordered the cut read it on their next execute.
+                    (event::grant_items.in_set(WwSimSet::Execute),).chain(),
                     (
                         aryll::control.in_set(WwSimSet::Execute),
                         aryll::grant_sword.in_set(WwSimSet::Execute),

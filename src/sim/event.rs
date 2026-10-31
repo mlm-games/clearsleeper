@@ -256,6 +256,44 @@ impl StageEvents {
     }
 }
 
+/// `dEvent_exception_c`'s start demo (`d_event_manager.cpp:11-54`). `daPy_lk_c::create` asks for
+/// `getStartEvent()` - the `PLYR` row's parameter bits 24-31 (`d_a_player_main.h:1881`) - and the
+/// exception resolves that `EVNT` row, refuses it when the row's spawn switch is already on
+/// (`:44-48`), and otherwise turns the switch on and hands the name back (`:49-52`). `sea`'s
+/// `EVNT` row 29 is `awake` on switch 0x5C, which is what makes the sister's cutscene play on a
+/// new save and stay quiet on later arrivals at point 206.
+pub const NO_START_EVENT: u8 = 0xFF;
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StartEvent {
+    pub index: u8,
+    /// `dStage_Event_dt_c::mSpawnSwitchNo` (`d_stage.h:335`); `0xFF` is no switch.
+    pub switch: u8,
+}
+
+impl Default for StartEvent {
+    fn default() -> Self {
+        Self {
+            index: NO_START_EVENT,
+            switch: NO_START_EVENT,
+        }
+    }
+}
+
+impl StartEvent {
+    /// `dEvent_exception_c::setStartDemo`'s resolution of one `PLYR` row: the row's event index
+    /// and the `EVNT` row's spawn switch, or [`StartEvent::default`] when the row names no event.
+    pub fn from_player(player: u32, switch: impl FnOnce(u8) -> Option<u8>) -> Self {
+        let index = (player >> 24) as u8;
+        if index == NO_START_EVENT {
+            return Self::default();
+        }
+        Self {
+            index,
+            switch: switch(index).unwrap_or(NO_START_EVENT),
+        }
+    }
+}
+
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct EventList {
     sections: Vec<Section>,
@@ -438,6 +476,30 @@ pub const PRESENT_ACTOR: &str = "PresentItem";
 pub struct PresentItem {
     pub item: u8,
     pub hidden: bool,
+}
+
+/// The demo item actor's hand-over. `daDitem_c::Delete` calls `execItemGet(m_itemNo)`
+/// (`d_a_demo_item.cpp:432-435`) as the cut removes the actor, which is the write that actually
+/// puts the item in the player's inventory - the `011get_item` cut only plays the animation. The
+/// cut queues the number here and [`grant_items`] applies it in the same tick, so the actor that
+/// ordered `get_telescope` sees the telescope on the next frame.
+#[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
+pub struct ItemGets(pub Vec<u8>);
+
+/// `execItemGet`'s two writes: `dComIfGs_setCollect`/`setSelectEquip` through
+/// [`Equipped::collect`] and the item-screen "got" bit (`dComIfGs_onCollect`, read by
+/// `d_a_npc_fa1.cpp`'s fairy gift and the chest path).
+pub fn grant_items(
+    mut gets: ResMut<ItemGets>,
+    mut equipped: ResMut<super::inventory::Equipped>,
+    mut got: ResMut<super::inventory::Got>,
+) {
+    for item in gets.0.drain(..) {
+        equipped.collect(item);
+        if let Some(slot) = super::inventory::slot_of(item) {
+            got.gain(slot, 0);
+        }
+    }
 }
 
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
@@ -892,6 +954,8 @@ pub struct StageIo<'w> {
     pub room_demo: ResMut<'w, super::demo::RoomDemoArchive>,
     pub readers: Res<'w, DemoReaders>,
     pub creates: ResMut<'w, DemoCreates>,
+    /// The `011get_item` hand-over queue, drained by [`grant_items`] right after this system.
+    pub gets: ResMut<'w, ItemGets>,
     pub fade: ResMut<'w, Fade>,
     pub wipe: ResMut<'w, Wipe>,
     pub vibration: ResMut<'w, Vibration>,
@@ -1041,9 +1105,40 @@ pub fn control(
                 &mut q.presents,
                 &mut q.zeldas,
                 &mut q.commands,
+                &mut io.gets,
                 goal,
             );
         }
+    }
+    placename_move(&list, &active, &io.demo, &mut story);
+}
+
+/// The save bit `dMs_placenameMove` raises during the prologue: `dSv_event_flag_c::UNK_3510`
+/// (`d_save_event_flag.inc:404`), the one the file select's extra-data test reads
+/// (`d_s_name.cpp:1173`).
+const PROLOGUE_SEEN_BIT: u16 = 0x3510;
+const PROLOGUE_EVENT: &str = "awake";
+/// The demo frame that turns the stage name on (`d_menu_window.cpp:1329`); `0x15E` turns it off
+/// again (`:1331-1332`), which the port has no place-name panel to hide.
+const STAGE_NAME_ON_FRAME: i32 = 0xC8;
+
+/// `dMs_placenameMove` (`d_menu_window.cpp:1322-1334`): the sister's opening cutscene reveals the
+/// island's name at frame 0xC8, and that same frame is where the save learns the prologue has
+/// played. The port has no `PName` panel wired yet, so only the bit is carried.
+fn placename_move(
+    list: &EventList,
+    active: &ActiveEvent,
+    demo: &DemoManager,
+    story: &mut StoryBits,
+) {
+    if story.test(PROLOGUE_SEEN_BIT) {
+        return;
+    }
+    let Some(index) = list.event_index(PROLOGUE_EVENT) else {
+        return;
+    };
+    if active.start_check(index) && demo.frame_no_msg() == STAGE_NAME_ON_FRAME {
+        story.set(PROLOGUE_SEEN_BIT);
     }
 }
 
@@ -1064,6 +1159,7 @@ fn staff_cut(
     presents: &mut Query<&mut PresentItem>,
     zeldas: &mut Query<&mut Zelda>,
     commands: &mut Commands,
+    gets: &mut ItemGets,
     goal: Option<Vec3>,
 ) {
     // The `goal` parameter is `dComIfGp_evmng_getGoal()` (`d_com_inf_game.h:3735-3737`), the
@@ -1177,7 +1273,7 @@ fn staff_cut(
             ),
             "Link" => link_cut(
                 run, list, flags, actors, ships, msg, table, partner, anms, players, commands,
-                presents, goal,
+                presents, gets, goal,
             ),
             "Ship" => ship_cut(run, list, flags, actors, ships),
             _ => {}
@@ -2370,6 +2466,7 @@ fn link_cut(
     players: &mut Query<(Entity, &mut Player)>,
     commands: &mut Commands,
     presents: &mut Query<&mut PresentItem>,
+    gets: &mut ItemGets,
     goal: Option<Vec3>,
 ) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
@@ -2378,7 +2475,7 @@ fn link_cut(
     let mode = leading_digits(&cut.name, 3);
     if mode == Some(GET_ITEM_MODE) {
         get_item_cut(
-            run, list, flags, msg, table, partner, anms, players, commands, presents,
+            run, list, flags, msg, table, partner, anms, players, commands, presents, gets,
         );
         return;
     }
@@ -2640,6 +2737,7 @@ fn get_item_cut(
     players: &mut Query<(Entity, &mut Player)>,
     commands: &mut Commands,
     presents: &mut Query<&mut PresentItem>,
+    gets: &mut ItemGets,
 ) {
     if run.get_stage & GET_DONE != 0 {
         cut_end(run, list, flags);
@@ -2713,6 +2811,11 @@ fn get_item_cut(
             run.get_msg_live = false;
             run.get_stage |= GET_DONE;
             if let Some(entity) = partner.entity.take() {
+                // `daDitem_c::Delete`'s `execItemGet(m_itemNo)` (`d_a_demo_item.cpp:432-435`):
+                // the actor hands the item over as it leaves, unless the cut suppressed it.
+                if partner.item != super::inventory::NO_ITEM {
+                    gets.0.push(partner.item);
+                }
                 let _ = commands.entity(entity).despawn();
             }
             cut_end(run, list, flags);

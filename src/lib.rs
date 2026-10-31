@@ -696,23 +696,45 @@ impl App {
             }
         }
         if new_game {
-            self.order_prologue_event();
+            self.order_start_event();
         }
     }
 
-    /// The opening legend ends in `sea` room 44, where the `awake` event is the sister's
-    /// cutscene. `dComIfGp_event_order` has no automatic stage-entry caller in the decomp;
-    /// the stage event list and the room's `LBNK` demo archive (`Demo02`, the one holding
-    /// `awake.stb`) are what make the cutscene playable there. Order it once per save: the
-    /// demo sets `UNK_3510` at frame 0xC8 (`d_menu_window.cpp:1326-1332`), so a save that
-    /// already saw it is left in play.
-    fn order_prologue_event(&mut self) {
-        let stories = *self.sim.world.resource::<sim::flags::StoryBits>();
-        if stories.test(assets::PROLOGUE_EVENT_FLAG) {
+    /// `daPy_lk_c::create`'s start demo (`d_a_player_main.cpp:12328`,
+    /// `dComIfGp_evmng_startDemo(getStartEvent())`) through `dEvent_exception_c::setStartDemo`
+    /// (`d_event_manager.cpp:24-54`): the row the player spawned on names an `EVNT` index, and
+    /// that row's spawn switch is what keeps a one-shot cutscene from replaying. `sea` room 44's
+    /// point-206 `PLYR` row carries start event 29, `awake`, on switch 0x5C - the sister's
+    /// opening cutscene - and the room's `LBNK` demo archive (`Demo02`) is what the event's
+    /// `PACKAGE` staff mounts.
+    fn order_start_event(&mut self) {
+        let start = *self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::event::StartEvent::default);
+        if start.index == sim::event::NO_START_EVENT {
             return;
         }
+        let Some(name) = self
+            .sim
+            .world
+            .get_resource::<sim::event::StageEvents>()
+            .and_then(|names| names.name(start.index))
+            .map(str::to_owned)
+        else {
+            return;
+        };
+        // `dComIfGs_isSwitch(switchNo, room)` first (`d_event_manager.cpp:44-48`): a switch that
+        // is already on means the row's demo has played, and the exception answers with no event.
+        if start.switch != sim::event::NO_START_EVENT {
+            let mut switches = self.sim.world.resource_mut::<sim::flags::Switches>();
+            if switches.test(start.switch) {
+                return;
+            }
+            switches.set(start.switch);
+        }
         let list = self.sim.world.resource::<sim::event::EventList>().clone();
-        let Some(index) = list.event_index(assets::PROLOGUE_EVENT) else {
+        let Some(index) = list.event_index(&name) else {
             return;
         };
         let player = {
@@ -2210,6 +2232,26 @@ impl App {
                 let (min, max) = doc.cull();
                 lift = min[1];
                 (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(npc) = entity.get::<sim::npc_ac1::NpcAc1>() {
+                let (min, max) = npc.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(npc) = entity.get::<sim::npc_co1::NpcCo1>() {
+                let (min, max) = npc.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(npc) = entity.get::<sim::npc_gp1::NpcGp1>() {
+                let (min, max) = npc.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(npc) = entity.get::<sim::npc_pf1::NpcPf1>() {
+                let (min, max) = npc.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(npc) = entity.get::<sim::npc_uk::NpcUk>() {
+                let (min, max) = npc.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
             } else if entity.contains::<sim::plant::Plant>() {
                 let (min, max) = sim::plant::Plant::spawn().cull();
                 lift = min[1];
@@ -2716,6 +2758,250 @@ impl App {
                     max[1] - min[1],
                     (max[0] - min[0]) * 0.5,
                 )
+            } else if let Some(x) = entity.get::<sim::adnno::Adnno>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::daioeye::DaioEye>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::demodk::DemoDk>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::esekh::Esekh>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::eskban::Eskban>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ikari::Ikari>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kaji::Kaji>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Fire, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kamome2::Kamome2>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Gull, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kanat::Kanat>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kanban::Kanban>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kantera::Kantera>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kmon::Kmon>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::kui::Kui>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::npc_km1::NpcKm1>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Talker, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_akabe::Akabe>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_eff::ObjEff>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_ekskz::Ekskz>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_htetu1::Htetu1>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_itnak::Itnak>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::obj_nest::ObjNest>() {
+                let (bottom, height, half) = x.cull();
+                lift = bottom;
+                (view::ActorKind::Scenery, 0, height, half)
+            } else if let Some(x) = entity.get::<sim::obj_paper::Paper>() {
+                let (bottom, height, half) = x.cull();
+                lift = bottom;
+                (view::ActorKind::Scenery, 0, height, half)
+            } else if let Some(x) = entity.get::<sim::otble::Otble>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::qtkhd::Qtkhd>() {
+                let (half, top) = x.cull();
+                lift = 0.0;
+                (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(x) = entity.get::<sim::ritem::Ritem>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Pickup, x.item, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::sbox::Sbox>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::sie_flag::SieFlag>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ssturu::SsTuru>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::table::Table>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::tenmado::Tenmado>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::tide::Tide>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::touseki::Touseki>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::usovmc::Usovmc>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::vdora::Vdora>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::warpgn::Warpgn>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::warpt::Warpt>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ygcwp::Ygcwp>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ygush::Ygush>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::zouk::Zouk>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::bemos::Bemos>() {
+                // Cull boxes: `d_a_obj_bemos.cpp:1388` (CULLBOX_4), `d_a_mbdoor.cpp:611`
+                // (CULLBOX_6), `d_a_obj_hfuck1.cpp:277` (CULLBOX_3), `d_a_jbo.cpp:277` and
+                // `d_a_nh.cpp:534` (CULLBOX_0), `d_a_obj_gaship2.cpp:157` (CULLBOX_0),
+                // `d_a_obj_bscurtain.cpp:149` / `d_a_obj_roten.cpp:203` (CULLBOX_4),
+                // `d_a_ep.cpp:560-561` for the 160 cube; `swlight` draws the lamp box from the
+                // arrival-state eeprom table (`d_a_obj_swlight.cpp:130` is its 240 cull sphere).
+                lift = 0.0;
+                (view::ActorKind::Enemy, 0, 800.0, 100.0)
+            } else if entity.contains::<sim::mbdoor::Mbdoor>() {
+                let (min, max) = ([-150.0_f32, 0.0, -150.0], [150.0_f32, 300.0, 150.0]);
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::hfuck1::Hfuck1>() {
+                let (min, max) = ([-75.0_f32, 0.0, -75.0], [75.0_f32, 150.0, 75.0]);
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::jbaba::Baba>() {
+                let (min, max) = ([-40.0_f32, 0.0, -40.0], [40.0_f32, 125.0, 40.0]);
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::nh::Nh>() {
+                let (min, max) = ([-40.0_f32, 0.0, -40.0], [40.0_f32, 125.0, 40.0]);
+                lift = min[1];
+                (view::ActorKind::Enemy, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::gaship2::Gaship2>() {
+                let (min, max) = ([-40.0_f32, 0.0, -40.0], [40.0_f32, 125.0, 40.0]);
+                lift = min[1];
+                (view::ActorKind::Ship, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::bscurtain::BsCurtain>() {
+                let (min, max) = ([-100.0_f32, 0.0, -100.0], [100.0_f32, 800.0, 100.0]);
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if entity.contains::<sim::roten::Roten>() {
+                let (min, max) = ([-100.0_f32, 0.0, -100.0], [100.0_f32, 800.0, 100.0]);
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::ep::Ep>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (base, height, half) = x.hull();
+                lift = base;
+                (view::ActorKind::Fire, 0, height, half)
+            } else if entity.contains::<sim::swlight::Swlight>() {
+                lift = 0.0;
+                (
+                    view::ActorKind::Scenery,
+                    0,
+                    sim::swlight::LAMP_TOP,
+                    sim::swlight::LAMP_HALF_X,
+                )
+            } else if let Some(x) = entity.get::<sim::canon2::Canon2>() {
+                if !x.drawn() {
+                    continue;
+                }
+                let (base, height, half) = x.hull();
+                lift = base;
+                (view::ActorKind::Cannon, 0, height, half)
             } else if entity.contains::<sim::dummy::Dummy>() {
                 let (min, max) = sim::dummy::Dummy::spawn().cull();
                 lift = min[1];
@@ -2922,11 +3208,18 @@ impl App {
             return;
         };
         let rooms = assets::room_set_for(&tables, dest.room);
-        let Some((spawn, yaw)) = assets::load_stage_spawn(&dest.stage, dest.room, dest.start)
-        else {
+        let Some(spawn) = assets::load_stage_spawn(&dest.stage, dest.room, dest.start) else {
             return;
         };
-        self.swap_stage(tables, rooms, spawn, yaw, layer);
+        // The destination row's start event. `daPy_lk_c` reads it off the row it is created on
+        // (`d_a_player_main.cpp:12328`), so a stage entered through an `EVNT` spawn point asks for
+        // that event as its own player comes up, not before.
+        let start = sim::event::StartEvent::from_player(spawn.player, |index| {
+            tables.event_spawn_switch(index)
+        });
+        self.swap_stage(tables, rooms, spawn.pos, spawn.yaw, layer);
+        self.sim.world.insert_resource(start);
+        self.order_start_event();
     }
 
     pub fn swap_stage(
@@ -2937,6 +3230,11 @@ impl App {
         yaw: f32,
         layer: i8,
     ) {
+        // A stage mount with no spawn row of its own - a save load - must not inherit the start
+        // event the previous mount asked for. The entry paths that do have a row replace this.
+        self.sim
+            .world
+            .insert_resource(sim::event::StartEvent::default());
         // `dSv_zoneActor_c::init` (`d_save.cpp:1318-1323`) clears the zone actor bits, and it
         // runs from `dStage_roomControl_c::init` (`d_stage.cpp:122-152`), which only happens
         // when a stage is created. A room transition inside the same stage keeps them.

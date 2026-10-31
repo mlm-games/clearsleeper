@@ -21,12 +21,6 @@ pub const SEA_STAGE: &str = "sea";
 /// stage the sister's opening cutscene runs in.
 pub const PROLOGUE_STAGE: &str = "sea";
 pub const PROLOGUE_SPAWN_POINT: u8 = 206;
-/// The first cutscene after the legend: `sea`'s event list names `awake` and its `PACKAGE`
-/// staff mounts `awake.stb` (`dat/event_list.dat`). `dMs_placenameMove` watches the demo's
-/// frame 0xC8 and sets `dSv_event_flag_c::UNK_3510` there (`d_menu_window.cpp:1326-1332`), so
-/// that save bit is the one that says the sister's cutscene has played.
-pub const PROLOGUE_EVENT: &str = "awake";
-pub const PROLOGUE_EVENT_FLAG: u16 = 0x3510;
 const ROOM_MODELS: [&str; 4] = [
     "bdl/model.bdl",
     "bdl/model1.bdl",
@@ -805,7 +799,16 @@ pub fn load_stage_tables(stage: &str) -> Option<crate::dzs::StageTables> {
     }
 }
 
-pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<(glam::Vec3, f32)> {
+/// One `PLYR` row of a room: where the player wakes up on entering through that point, and the
+/// row's own parameter word (its start event lives in bits 24-31, `d_a_player_main.h:1881`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StageSpawn {
+    pub pos: glam::Vec3,
+    pub yaw: f32,
+    pub player: u32,
+}
+
+pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<StageSpawn> {
     match stage_spawn_from_assets(stage, room, point) {
         Ok(spawn) => Some(spawn),
         Err(error) => {
@@ -952,19 +955,16 @@ fn stage_from_assets(
     let relative = room_path(stage, STAGE_START_ROOM);
     let path = root.path(&relative);
     let room = root.read_archive(&relative)?;
-    let (spawn, yaw) = stage_spawn(room.read("dzr/room.dzr")?, path, spawn_point)?;
+    let spawn = stage_spawn(room.read("dzr/room.dzr")?, path, spawn_point)?;
     Ok(crate::sim::collision::StageData {
-        spawn,
-        yaw,
+        spawn: spawn.pos,
+        yaw: spawn.yaw,
+        player: spawn.player,
         collision,
     })
 }
 
-fn stage_spawn_from_assets(
-    stage: &str,
-    room: u8,
-    point: u8,
-) -> Result<(glam::Vec3, f32), AssetError> {
+fn stage_spawn_from_assets(stage: &str, room: u8, point: u8) -> Result<StageSpawn, AssetError> {
     let root = AssetRoot::from_env()?;
     let relative = room_path(stage, room);
     let path = root.path(&relative);
@@ -1155,7 +1155,7 @@ fn room_path(stage: &str, room: u8) -> String {
     format!("{STAGE_ROOT}/{stage}/Room{room}.arc")
 }
 
-pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<(glam::Vec3, f32), AssetError> {
+pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<StageSpawn, AssetError> {
     let corrupt = |detail: &'static str| AssetError::Corrupt {
         path: path.clone(),
         detail,
@@ -1203,7 +1203,11 @@ pub fn stage_spawn(data: &[u8], path: PathBuf, point: u8) -> Result<(glam::Vec3,
             read_f32(data, at + 0x14).ok_or_else(|| corrupt("dzr truncated"))?,
         );
         let angle_y = read_i16(data, at + 0x1A).ok_or_else(|| corrupt("dzr truncated"))?;
-        return Ok((spawn, f32::from(angle_y) * RAD_PER_UNIT));
+        return Ok(StageSpawn {
+            pos: spawn,
+            yaw: f32::from(angle_y) * RAD_PER_UNIT,
+            player: read_u32(data, at + 0x08).ok_or_else(|| corrupt("dzr truncated"))?,
+        });
     }
     Err(corrupt("dzr spawn point missing"))
 }

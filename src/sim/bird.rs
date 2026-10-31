@@ -87,13 +87,41 @@ pub fn spawn_ok(parameters: u32, collect: &Collect, stories: &StoryBits, day: bo
 pub struct Bird {
     /// `mSpecificType` (`d_a_npc_bm1.h:341`), the parameter's low byte.
     pub kind: u8,
+    /// `m881` (`d_a_npc_bm1.h:289`), set by `setTelescopeDemo()` (`:65`). Aryll's scope raises it
+    /// when the scope's message mode opens (`d_a_npc_ls1.cpp:1814`).
+    telescope_demo: bool,
+    /// `m882` (`d_a_npc_bm1.h:290`), set by `setFocus()` (`:64`). Aryll raises it when the zoom
+    /// reaches the focus threshold (`d_a_npc_ls1.cpp:1861`).
+    focus: bool,
+    /// `m880` (`d_a_npc_bm1.h:288`), the surprise Aryll's scope conversation waits for through
+    /// `getOdoroki()` (`:61`, read at `d_a_npc_ls1.cpp:1874`). It is only ever set, by the status
+    /// 3 arm of `setStt` (`d_a_npc_bm1.cpp:3035`), so it latches.
+    odoroki: bool,
 }
 
 impl Bird {
     pub fn spawn(parameters: u32) -> Self {
         Self {
             kind: (parameters & TYPE_MASK) as u8,
+            telescope_demo: false,
+            focus: false,
+            odoroki: false,
         }
+    }
+
+    /// `setTelescopeDemo()` (`d_a_npc_bm1.h:65`).
+    pub fn set_telescope_demo(&mut self) {
+        self.telescope_demo = true;
+    }
+
+    /// `setFocus()` (`d_a_npc_bm1.h:64`).
+    pub fn set_focus(&mut self) {
+        self.focus = true;
+    }
+
+    /// `getOdoroki()` (`d_a_npc_bm1.h:61`).
+    pub fn get_odoroki(&self) -> bool {
+        self.odoroki
     }
 }
 
@@ -101,4 +129,14 @@ pub fn is_bird(name: &str) -> bool {
     name == BIRD_ACTOR
 }
 
-pub fn control(_birds: Query<&Bird>) {}
+/// `d_wait` leaving for `lookup` (`d_a_npc_bm1.cpp:3090-3096`) and `lookup`'s status 3
+/// (`:3098-3104`, `:3033-3037`): once the scope has both raised the telescope demo and focused
+/// on him, the Rito turns to look and the surprise bit latches. `d_wait` also raises
+/// `fopAcM_SetStatusMap(this, 7)` (`:3093`), the no-draw status the port has no shell reader for.
+pub fn control(mut birds: Query<&mut Bird>) {
+    for mut bird in &mut birds {
+        if bird.telescope_demo && bird.focus && !bird.odoroki {
+            bird.odoroki = true;
+        }
+    }
+}
