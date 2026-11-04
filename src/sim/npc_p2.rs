@@ -355,7 +355,7 @@ pub struct P2Hio {
     pub player_near: f32,
 }
 
-fn child_npc(
+const fn child_npc(
     eye_y: f32,
     max_head_x: i16,
     max_head_y: i16,
@@ -1012,7 +1012,7 @@ impl NpcP2 {
 
     /// `next_msgStatus` (`:524-599`): advances `mMsgNo` and answers whether the box should show
     /// the next page or close.
-    fn next_msg_status(&mut self) -> u16 {
+    fn next_msg_status(&mut self) -> u8 {
         match self.msg_no {
             MSG_1018 => {
                 self.msg_no = MSG_1019;
@@ -1161,7 +1161,7 @@ impl NpcP2 {
                     let eye = self.eye_pos;
                     ctx.text.message_set(self.msg_no, eye);
                 }
-                ctx.text.set_status(next as u8);
+                ctx.text.set_status(next);
             } else if mode == STATUS_BOX_CLOSED as u16 {
                 ctx.text.set_status(STATUS_MSG_DESTROYED);
                 self.talk_state = -1;

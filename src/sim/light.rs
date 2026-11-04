@@ -343,7 +343,7 @@ impl Light {
     /// box [`Light::cull`] already returns; `dComIfG_Bgsp()->Regist` and `SetCrrFunc` (`:131-132`),
     /// the `dBgW` registration; and `init_collision` (`:133`), whose volume this module surveys
     /// instead of registering - see the module docs.
-    fn create_init(&mut self, ctx: &mut Context<'_>) {
+    fn create_init(&mut self, ctx: &mut Context<'_, '_, '_>) {
         // ```
         // if (dKy_daynight_check() == 1) {
         //     if (dComIfGs_isEventBit(dSv_event_flag_c::UNK_1C02)) mLightAngle = get_light_dif_angle();
@@ -407,7 +407,7 @@ impl Light {
     /// `eventInfo.checkCommandDemoAccrpt()` (`:244`) is the house reduction to
     /// `Stage::Play | Stage::Close` on this actor's own slot (`src/sim/ferris.rs:811-819`), and
     /// `dComIfGp_event_reset()` (`:252`) is [`ActiveEvent::end`].
-    fn exe_event(&mut self, ctx: &mut Context<'_>) {
+    fn exe_event(&mut self, ctx: &mut Context<'_, '_, '_>) {
         match self.event_state {
             // `case 1:` (`d_a_obj_light.cpp:243-249`)
             1 => {
@@ -461,7 +461,7 @@ impl Light {
     /// counts from 2 to 80 without a pause - the angle is written to 0 every frame, and only on
     /// the frame the script is idle does the slow `0x40` step run. Both night arms play the round
     /// cue, the unlit one every frame (`:303`).
-    fn renew_angle(&mut self, ctx: &mut Context<'_>) {
+    fn renew_angle(&mut self, ctx: &mut Context<'_, '_, '_>) {
         if self.now_event(self.light_event) {
             // `d_a_obj_light.cpp:293-298`
             if self.light_timer == 0 {
@@ -501,7 +501,7 @@ impl Light {
     ///
     /// The no-hit arm (`:107-110`) re-publishes the volume at `current.pos` minus 75 on y, which is
     /// the registration [`Light::reaches`] tests against instead of one the shared pass holds.
-    fn set_collision(&mut self, ctx: &mut Context<'_>) {
+    fn set_collision(&mut self, ctx: &mut Context<'_, '_, '_>) {
         if !ctx.night {
             return;
         }
@@ -534,7 +534,7 @@ impl Light {
     /// The boolean is [`contact::cross_at_tg`], whose own test is
     /// [`Shape::intersects`] (`src/sim/contact.rs:704`) - the same call the shared pass would have
     /// made had the arrow registered an attack object here.
-    fn reaches(&self, ctx: &Context<'_>) -> bool {
+    fn reaches(&self, ctx: &Context<'_, '_, '_>) -> bool {
         let base = ctx.actor_pos - Vec3::Y * CYL_DROP;
         let centre = base + Vec3::Y * (CYL_HEIGHT * 0.5);
         let tg = Shape::cylinder(centre, CYL_RADIUS, CYL_HEIGHT);
@@ -572,7 +572,7 @@ impl Light {
     /// between the two `effect` values is the cue and the rumble at `:167-168`, and the
     /// `set_fire(0)` of `d_a_obj_light.cpp:135` is [`Light::create_init`]'s call while
     /// [`Light::control_light`] passes 1 (`:316`).
-    fn set_fire(&mut self, effect: i32, ctx: &mut Context<'_>) -> bool {
+    fn set_fire(&mut self, effect: i32, ctx: &mut Context<'_, '_, '_>) -> bool {
         if self.fire {
             // `mFireCallback.remove(); return FALSE;` (`:172-173`)
             self.fire = false;
@@ -595,7 +595,7 @@ impl Light {
     /// which is why 75/76/77/79/80 are four toggles of one bit rather than any logic - retail is
     /// strobing the flag while the light comes up. Frame 80 zeroes the counter, and with `mLit`
     /// still 1 (`:104`) nothing sets it again, so the script is once per actor.
-    fn control_light(&mut self, ctx: &mut Context<'_>) {
+    fn control_light(&mut self, ctx: &mut Context<'_, '_, '_>) {
         match self.light_timer {
             0 => {} // <- :310
             TIMER_ORDER => {
@@ -629,7 +629,7 @@ impl Light {
     /// `daObjLight::Act_c::control_treasure` (`:332-338`): the twenty-frame wait after the event,
     /// then switch 93 goes up and the timer is cleared so the write happens once. The `> 1` test
     /// then the `== 1` test is one decrement per frame, and a zero timer matches neither.
-    fn control_treasure(&mut self, ctx: &mut Context<'_>) {
+    fn control_treasure(&mut self, ctx: &mut Context<'_, '_, '_>) {
         if self.treasure_timer > 1 {
             self.treasure_timer -= 1; // <- :333
         }
@@ -641,7 +641,7 @@ impl Light {
 
     /// `_execute` (`:341-351`), the reference's order, with the two dropped calls left where they
     /// sat.
-    fn execute(&mut self, ctx: &mut Context<'_>) {
+    fn execute(&mut self, ctx: &mut Context<'_, '_, '_>) {
         // `exe_fire();` (`:342`) - the flame's matrix and alpha, dropped.
         self.exe_event(ctx); // <- :343
         self.renew_angle(ctx); // <- :344
@@ -664,7 +664,7 @@ impl Light {
 /// rumble; `arrows` answers [`Light::reaches`]; and `actor_pos` / `night` / `counter0` are the
 /// `current.pos`, `dKy_daynight_check()` and `g_Counter.mCounter0` reads the reference makes
 /// directly off the actor and the clock.
-struct Context<'a> {
+struct Context<'a, 'w, 's> {
     bits: &'a mut StoryBits,
     switches: &'a mut Switches,
     global: &'a mut LightGlobal,
@@ -672,14 +672,14 @@ struct Context<'a> {
     list: &'a EventList,
     events: &'a mut SimEvents,
     vibration: &'a mut Vibration,
-    arrows: &'a Query<'_, '_, &Arrow>,
+    arrows: &'a Query<'w, 's, &Arrow>,
     entity: Entity,
     actor_pos: Vec3,
     night: bool,
     counter0: u32,
 }
 
-impl Context<'_> {
+impl Context<'_, '_, '_> {
     /// `mDoAud_seStart(JA_SE_OBJ_L_HOUSE_ROUND, &current.pos)`
     /// (`d_a_obj_light.cpp:296`, `:303`), the cue both night arms and the event arm play.
     fn round_se(&mut self) {
