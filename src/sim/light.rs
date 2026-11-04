@@ -672,7 +672,7 @@ struct Context<'a, 'w, 's> {
     list: &'a EventList,
     events: &'a mut SimEvents,
     vibration: &'a mut Vibration,
-    arrows: &'a Query<'w, 's, &Arrow>,
+    arrows: &'a Query<'w, 's, &'static Arrow>,
     entity: Entity,
     actor_pos: Vec3,
     night: bool,
