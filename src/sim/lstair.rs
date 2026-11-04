@@ -349,7 +349,7 @@ impl Lstair {
         // }
         // ```
         // (:246-251). `mAppearTimer < 0` HOLDS the motion: while the countdown is running (>= 0) the
-        // offset does not move at all. `cLib_calcTimer` (`c_lib.h:85-91`) decrements a non-zero
+        // offset does not move at all. `cLib_calcTimer` (`c_lib.h:100-105`) decrements a non-zero
         // value by one and returns it.
         if self.appear_timer >= 0 {
             return;

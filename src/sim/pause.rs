@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 
 use super::damage_resolve::HitStop;
 
-/// `cLib_calcTimer` (`SSystem/SComponent/c_lib.h:85`): step `value` down unless it is already zero,
+/// `cLib_calcTimer` (`SSystem/SComponent/c_lib.h:100-105`): step `value` down unless it is already zero,
 /// then hand it back. The zero guard is what floors a countdown at zero instead of letting it run
 /// negative, and the retail field is an `s8`, so the step itself wraps.
 pub fn c_lib_calc_timer(value: &mut i8) -> i8 {

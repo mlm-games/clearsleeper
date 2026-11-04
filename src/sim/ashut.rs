@@ -39,9 +39,9 @@ const RISE_MAX_BOUNCE: f32 = -4.0; // <- d_a_obj_ashut.cpp:33
 const CULL_MIN: [f32; 3] = [-80.0, -5.0, -30.0]; // <- d_a_obj_ashut.cpp:59
 const CULL_MAX: [f32; 3] = [80.0, 250.0, 30.0]; // <- d_a_obj_ashut.cpp:59
 
-/// `JA_SE_OBJ_P_SHIP_SHTR_OP = 0x699D` (`JAZelAudio_SE.h:1937`), started at `:173`.
+/// `JA_SE_OBJ_P_SHIP_SHTR_OP = 0x699D` (`JAZelAudio_SE.h:1937`), started at `:1937`.
 const SE_SHUTTER_OPEN: u32 = 0x699D; // <- JAZelAudio_SE.h:1937
-/// `JA_SE_OBJ_P_SHIP_SHTR_CL = 0x699E` (`JAZelAudio_SE.h:1938`), started at `:137`.
+/// `JA_SE_OBJ_P_SHIP_SHTR_CL = 0x699E` (`JAZelAudio_SE.h:1938`), started at `:1938`.
 const SE_SHUTTER_CLOSE: u32 = 0x699E; // <- JAZelAudio_SE.h:1938
 
 /// `Mode_e { Mode_UPPER, Mode_U_L, Mode_LOWER, Mode_L_U, Mode_DEMOREQ, Mode_NONE }`

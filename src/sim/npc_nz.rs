@@ -4,6 +4,11 @@ use glam::Vec3;
 
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
+use super::event_cut::{
+    self, CONTINUE_TALK as GEN_CONTINUE_TALK, EventCut, MOVE_TO_ACTOR as GEN_MOVE_TO_ACTOR,
+    MOVE_TO_POS as GEN_MOVE_TO_POS, TALK_MSG as GEN_TALK_MSG, TURN_TO_ACTOR as GEN_TURN_TO_ACTOR,
+    TURN_TO_POS as GEN_TURN_TO_POS, WAIT as GEN_WAIT,
+};
 use super::flags::{Collect, EventFlags};
 use super::intent::DoIntent;
 use super::inventory::{Equipped, NO_ITEM, check_get_item};
@@ -140,32 +145,8 @@ const SLOT_BOTTLE_COUNT: usize = 4; // <- dInvSlot_BOTTLE_COUNT_e, d_com_inf_gam
 const ITEM_EMPTY_BOTTLE: u8 = 0x50; // <- dItemNo_EMPTY_BOTTLE_e, d_item_data.h:96
 const ITEM_BOMB_BAG: u8 = 0x31; // <- dItemNo_BOMB_BAG_e, d_item_data.h:56
 
-// dNpc_EventCut_c action_table - d_npc_event_cut.inc:11-19
-const GEN_WAIT: usize = 0; // <- :13
-const GEN_TURN_TO_ACTOR: usize = 1; // <- :14
-const GEN_MOVE_TO_ACTOR: usize = 2; // <- :15
-const GEN_TURN_TO_POS: usize = 3; // <- :16
-const GEN_MOVE_TO_POS: usize = 4; // <- :17
-const GEN_TALK_MSG: usize = 5; // <- :18
-const GEN_CONTINUE_TALK: usize = 6; // <- :19
-const GEN_ACTIONS: [&str; 7] = [
-    "WAIT",
-    "TURN_TO_ACTOR",
-    "MOVE_TO_ACTOR",
-    "TURN_TO_POS",
-    "MOVE_TO_POS",
-    "TALK_MSG",
-    "CONTINUE_TALK",
-]; // <- :19
-const GEN_TURN_TYPE_DEFAULT: i32 = 1; // <- cutTurnToPosStart, :402
-const GEN_TIMER_DEFAULT: i32 = 1; // <- cutTurnToPosStart, :411
-const GEN_TIMER_WAIT_DEFAULT: i32 = 0; // <- cutWaitStart, :91
-const GEN_SPEED_DEFAULT: f32 = 2.0; // <- cutMoveToPosStart, :510
-const GEN_STABLE_ANGLE: f32 = 5376.0; // <- std::fabsf(temp2) < 5376.0f, :466
-const GEN_MOVE_SCALE: f32 = 0.1; // <- cLib_addCalc2 scale, :548
-const GEN_MOVE_DONE: f32 = 5.0; // <- dist < 5.0f, :546
-const GEN_TURN_BACKBONE_LOCK: u32 = 0; // <- mTurnType case 0, :457
-const GEN_TURN_HEAD_LOCK: u32 = 2; // <- mTurnType case 2, :452
+// The seven shared acts, their indices and their defaults are `super::event_cut`'s; the act names
+// come from its `ACTIONS` through `event_cut::act_index`.
 
 // cutProc action_table - d_a_npc_nz_cut.inc:120-128
 const CUT_EATESA: usize = 0; // <- :121
@@ -231,14 +212,6 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     (sum % 1.0).abs()
 }
 
-fn calc_timer(value: &mut i32) -> i32 {
-    let before = *value;
-    if before != 0 {
-        *value -= 1;
-    }
-    before
-}
-
 fn abs_xz(v: Vec3) -> f32 {
     (v.x * v.x + v.z * v.z).sqrt()
 }
@@ -254,19 +227,6 @@ fn distance_angle_s(x: i16, y: i16) -> i32 {
 /// `cLib_addCalcAngleS2` (`c_lib.cpp:192-202`).
 fn add_calc_angle_s2(value: &mut i16, target: i16, scale: i16, max_step: i16) {
     super::stream::add_calc_angle_s2(value, target, scale, max_step);
-}
-
-/// `cLib_addCalc2` (`c_lib.cpp:56-66`).
-fn add_calc2(value: &mut f32, target: f32, scale: f32, max_step: f32) {
-    if *value != target {
-        let mut step = scale * (target - *value);
-        if step > max_step {
-            step = max_step;
-        } else if step < -max_step {
-            step = -max_step;
-        }
-        *value += step;
-    }
 }
 
 /// `cLib_addCalcPosXZ` (`c_lib.cpp:105-131`), the XZ pair.
@@ -513,48 +473,6 @@ fn limitter(value: &mut i16, min_diff: i16, max_diff: i16) {
     }
 }
 
-/// `dNpc_EventCut_c` state - d_npc.h:120-137.
-#[derive(Debug, Clone, PartialEq)]
-pub struct EventCut {
-    pub timer: i32,
-    pub turn_speed: i16,
-    pub add_angle: i16,
-    pub del_distance: f32,
-    pub attention: bool,
-    pub no_turn: bool,
-    pub turn_type: u32,
-    pub set_id: u16,
-    pub offset_pos: Vec3,
-    pub speed: f32,
-    pub pos: Vec3,
-    pub target_angle: i16,
-    pub field_0x44: f32,
-    pub actor_name: Option<String>,
-    pub field_0x52: u8,
-}
-
-impl EventCut {
-    pub fn create() -> Self {
-        Self {
-            timer: 0,
-            turn_speed: 0,
-            add_angle: 0,
-            del_distance: 0.0,
-            attention: false,
-            no_turn: false,
-            turn_type: 0,
-            set_id: 0,
-            offset_pos: Vec3::ZERO,
-            speed: 0.0,
-            pos: Vec3::ZERO,
-            target_angle: 0,
-            field_0x44: 0.0,
-            actor_name: None,
-            field_0x52: 0,
-        }
-    }
-}
-
 /// One non-`NpcNz` actor, snapshotted once per tick for
 /// `dNpc_EventCut_c::findActorCallBack` (`d_npc_event_cut.inc:346-388`).
 #[derive(Debug, Clone, PartialEq)]
@@ -713,18 +631,18 @@ impl NpcNz {
         }
     }
 
-    /// `daNpc_Nz_c::modeWaitInit` (`:457-459`).
+    /// `daNpc_Nz_c::modeWaitInit` (`:538-540`).
     fn mode_wait_init(&mut self) {}
 
-    /// `daNpc_Nz_c::modeWait` (`:462-464`).
+    /// `daNpc_Nz_c::modeWait` (`:543-545`).
     fn mode_wait(&mut self) {
         self.order = ORDER_TALK;
     }
 
-    /// `daNpc_Nz_c::modeEventEsaInit` (`:467-469`).
+    /// `daNpc_Nz_c::modeEventEsaInit` (`:548-550`).
     fn mode_event_esa_init(&mut self) {}
 
-    /// `daNpc_Nz_c::modeEventEsa` (`:472-491`), minus `deleteShopItem` and
+    /// `daNpc_Nz_c::modeEventEsa` (`:553-572`), minus `deleteShopItem` and
     /// `dComIfGp_event_reset`.
     fn mode_event_esa(&mut self, ctx: &mut Ctx<'_>) {
         if !self.generic_cut_proc(ctx) {
@@ -741,7 +659,7 @@ impl NpcNz {
         }
     }
 
-    /// `daNpc_Nz_c::modeProc` (`:494-522`).
+    /// `daNpc_Nz_c::modeProc` (`:575-603`).
     fn mode_proc(&mut self, proc: i32, ctx: &mut Ctx<'_>) {
         if proc == PROC_INIT {
             match ctx.new_mode {
@@ -819,7 +737,7 @@ impl NpcNz {
         status
     }
 
-    /// `daNpcNz_getShopBoughtMsg` (`:525-555`), minus the bomb/arrow capacity
+    /// `daNpcNz_getShopBoughtMsg` (`:606-636`), minus the bomb/arrow capacity
     /// checks (`:535`, `:539`) and the bait-capacity check (`:543`): the sim has
     /// no bomb/arrow count or bait-bag resource. `execItemGet` is limited to the
     /// rupee payout the sim models.
@@ -902,7 +820,7 @@ impl NpcNz {
         msg_status
     }
 
-    /// `daNpc_Nz_c::anmAtr` (`:736-813`), minus the `mpMorf->checkFrame` end-frame
+    /// `daNpc_Nz_c::anmAtr` (`:821-898`), minus the `mpMorf->checkFrame` end-frame
     /// tests (`:737`, `:740`) and every `getShopItem(...)->show()/hide()`.
     fn anm_atr(&mut self, status: u8, ctx: &mut Ctx<'_>) {
         if self.prm_idx == ANM_TALK_PRE {
@@ -941,10 +859,7 @@ impl NpcNz {
         let Some((cut, advance)) = ctx.active.staff_cut(ctx.list, STAFF_NZ) else {
             return false;
         };
-        let Some(act) = GEN_ACTIONS
-            .iter()
-            .position(|name| ctx.list.cut_name(cut) == Some(*name))
-        else {
+        let Some(act) = event_cut::act_index(ctx.list, cut) else {
             ctx.end_staff_cut();
             return false;
         };
@@ -964,7 +879,8 @@ impl NpcNz {
         match act {
             GEN_WAIT => self.gen_wait_proc(ctx),
             GEN_TURN_TO_ACTOR | GEN_TURN_TO_POS => self.gen_turn_proc(ctx),
-            GEN_MOVE_TO_ACTOR | GEN_MOVE_TO_POS => self.gen_move_proc(ctx),
+            GEN_MOVE_TO_ACTOR => self.gen_move_to_actor_proc(ctx),
+            GEN_MOVE_TO_POS => self.gen_move_to_pos_proc(ctx),
             GEN_TALK_MSG | GEN_CONTINUE_TALK => self.gen_talk_msg_proc(ctx),
             _ => {}
         }
@@ -973,171 +889,100 @@ impl NpcNz {
 
     /// `dNpc_EventCut_c::cutWaitStart` (`d_npc_event_cut.inc:85-93`).
     fn gen_wait_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(GEN_TIMER_WAIT_DEFAULT);
+        let _ = event_cut::start(&mut self.cut, GEN_WAIT, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutWaitProc` (`d_npc_event_cut.inc:96-100`).
     fn gen_wait_proc(&mut self, ctx: &mut Ctx<'_>) {
-        if calc_timer(&mut self.cut.timer) == 0 {
+        if event_cut::wait_proc(&mut self.cut) {
             ctx.end_staff_cut();
         }
     }
 
     /// `dNpc_EventCut_c::cutTurnToActorStart` (`d_npc_event_cut.inc:103-171`).
     fn gen_turn_to_actor_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.actor_name = ctx
-            .list
-            .cut_text(cut, "ActorName")
-            .filter(|name| *name != "Player")
-            .map(str::to_owned);
-        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
-        self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
-        self.cut.turn_type = ctx
-            .list
-            .cut_number(cut, "TurnType")
-            .unwrap_or(GEN_TURN_TYPE_DEFAULT)
-            .max(0) as u32;
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(GEN_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.field_0x44 = 0.0;
+        let _ = event_cut::start(&mut self.cut, GEN_TURN_TO_ACTOR, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutMoveToActorStart` (`d_npc_event_cut.inc:241-299`).
     fn gen_move_to_actor_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.actor_name = ctx
-            .list
-            .cut_text(cut, "ActorName")
-            .filter(|name| *name != "Player")
-            .map(str::to_owned);
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
-        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
-        self.cut.speed = ctx
-            .list
-            .cut_float(cut, "Speed")
-            .unwrap_or(GEN_SPEED_DEFAULT);
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
+        let _ = event_cut::start(&mut self.cut, GEN_MOVE_TO_ACTOR, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutTurnToPosStart` (`d_npc_event_cut.inc:391-441`).
     fn gen_turn_to_pos_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.pos = ctx.list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
-        self.cut.turn_type = ctx
-            .list
-            .cut_number(cut, "TurnType")
-            .unwrap_or(GEN_TURN_TYPE_DEFAULT)
-            .max(0) as u32;
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(GEN_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
-        self.cut.field_0x44 = 0.0;
+        let _ = event_cut::start(&mut self.cut, GEN_TURN_TO_POS, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutMoveToPosStart` (`d_npc_event_cut.inc:479-528`).
     fn gen_move_to_pos_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.pos = ctx.list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.cut.speed = ctx
-            .list
-            .cut_float(cut, "Speed")
-            .unwrap_or(GEN_SPEED_DEFAULT);
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
+        let _ = event_cut::start(&mut self.cut, GEN_MOVE_TO_POS, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutTurnToActorProc` / `cutTurnToPosProc`
     /// (`d_npc_event_cut.inc:174-238` / `:444-476`).
     fn gen_turn_proc(&mut self, ctx: &mut Ctx<'_>) {
-        self.cut_goal(ctx);
-        let pos = ctx.actor_pos;
-        let t_angle = target_angle_y(pos, self.cut.pos);
-        match self.cut.turn_type {
-            GEN_TURN_HEAD_LOCK => {
+        if !self.cut_goal(ctx) {
+            return;
+        }
+        let step = event_cut::turn_proc(&mut self.cut, ctx.actor_pos, ctx.actor_angle[1]);
+        match step.lock {
+            event_cut::TurnLock::Head => {
                 self.jnt.set_trn();
                 self.jnt.off_backbone_lock();
             }
-            GEN_TURN_BACKBONE_LOCK => self.jnt.on_backbone_lock(),
-            _ => self.jnt.off_backbone_lock(),
+            event_cut::TurnLock::Backbone => self.jnt.on_backbone_lock(),
+            event_cut::TurnLock::Off => self.jnt.off_backbone_lock(),
         }
-        let temp2 = (t_angle.wrapping_sub(ctx.actor_angle[1]) as f32).abs();
-        if self.cut.field_0x44 == temp2 && temp2 < GEN_STABLE_ANGLE {
-            calc_timer(&mut self.cut.timer);
-        }
-        if self.cut.timer == 0 {
-            self.cut.turn_speed = 0;
+        if step.finished {
             ctx.end_staff_cut();
         }
-        self.cut.field_0x44 = (t_angle.wrapping_sub(ctx.actor_angle[1]) as f32).abs();
     }
 
-    /// `dNpc_EventCut_c::cutMoveToActorProc` / `cutMoveToPosProc`
-    /// (`d_npc_event_cut.inc:302-343` / `:531-554`).
-    fn gen_move_proc(&mut self, ctx: &mut Ctx<'_>) {
-        self.cut_goal(ctx);
-        let goal = self.cut.pos;
-        let angle = if self.cut.add_angle != 0 {
-            self.cut.target_angle.wrapping_add(self.cut.add_angle)
-        } else {
-            target_angle_y(ctx.actor_pos, goal)
-        };
-        let rad = walk::from_s16(angle);
-        let temp = Vec3::new(
-            goal.x - self.cut.del_distance * rad.sin(),
-            goal.y,
-            goal.z - self.cut.del_distance * rad.cos(),
-        );
-        if self.cut.speed == 0.0 {
-            ctx.actor_pos = temp;
+    /// `dNpc_EventCut_c::cutMoveToActorProc` (`d_npc_event_cut.inc:302-343`).
+    fn gen_move_to_actor_proc(&mut self, ctx: &mut Ctx<'_>) {
+        if !self.cut_goal(ctx) {
+            return;
+        }
+        let goal = event_cut::move_to_actor_goal(&self.cut, ctx.actor_pos);
+        if event_cut::move_proc(&mut self.cut, goal, &mut ctx.actor_pos) {
             ctx.end_staff_cut();
         }
-        let dist = abs_xz(temp - ctx.actor_pos);
-        add_calc2(&mut ctx.actor_pos.x, temp.x, GEN_MOVE_SCALE, self.cut.speed);
-        add_calc2(&mut ctx.actor_pos.z, temp.z, GEN_MOVE_SCALE, self.cut.speed);
-        if dist < GEN_MOVE_DONE {
-            self.cut.speed = 0.0;
+    }
+
+    /// `dNpc_EventCut_c::cutMoveToPosProc` (`d_npc_event_cut.inc:531-554`). `mPos` came from the
+    /// cut's own `Pos` parameter, so no actor search runs here.
+    fn gen_move_to_pos_proc(&mut self, ctx: &mut Ctx<'_>) {
+        let goal = event_cut::move_to_pos_goal(&self.cut, ctx.actor_pos);
+        if event_cut::move_proc(&mut self.cut, goal, &mut ctx.actor_pos) {
             ctx.end_staff_cut();
         }
     }
 
     /// `dNpc_EventCut_c::cutTalkMsgStart` (`d_npc_event_cut.inc:557-584`).
     fn gen_talk_msg_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.curr_msg_no = ctx
-            .list
-            .cut_number(cut, "msg_num")
-            .map(|no| no as u32)
-            .unwrap_or(0);
-        self.end_msg_no = ctx
-            .list
-            .cut_number(cut, "end_msg")
-            .map(|no| no as u32)
-            .unwrap_or(u32::MAX);
-        self.cut.field_0x52 = 1;
+        if let Some(update) = event_cut::start(&mut self.cut, GEN_TALK_MSG, ctx.list, cut) {
+            match update {
+                event_cut::TalkUpdate::Msg { curr, end } => {
+                    self.curr_msg_no = curr;
+                    self.end_msg_no = end;
+                }
+                event_cut::TalkUpdate::Continue { end } => self.end_msg_no = end,
+            }
+        }
     }
 
     /// `dNpc_EventCut_c::cutContinueTalkStart` (`d_npc_event_cut.inc:587-597`).
     fn gen_continue_talk_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.end_msg_no = ctx
-            .list
-            .cut_number(cut, "end_num")
-            .map(|no| no as u32)
-            .unwrap_or(u32::MAX);
+        if let Some(update) = event_cut::start(&mut self.cut, GEN_CONTINUE_TALK, ctx.list, cut) {
+            match update {
+                event_cut::TalkUpdate::Msg { curr, end } => {
+                    self.curr_msg_no = curr;
+                    self.end_msg_no = end;
+                }
+                event_cut::TalkUpdate::Continue { end } => self.end_msg_no = end,
+            }
+        }
     }
 
     /// `dNpc_EventCut_c::cutTalkMsgProc` (`d_npc_event_cut.inc:600-614`).
@@ -1159,31 +1004,20 @@ impl NpcNz {
         }
     }
 
-    /// `dNpc_EventCut_c::cutTurnToActorProc`'s goal selection (`:205-221`).
-    fn cut_goal(&mut self, ctx: &mut Ctx<'_>) {
-        if self.cut.actor_name.is_none() {
-            self.cut.target_angle = ctx.player_angle;
-            self.cut.pos = ctx.player_eye.unwrap_or(Vec3::ZERO) + self.cut.offset_pos;
-            return;
-        }
-        let name = self.cut.actor_name.as_ref();
-        let from = ctx.actor_pos;
-        let Some((pos, angle)) = ctx.find_target(self.cut.set_id, name, from) else {
+    /// `dNpc_EventCut_c::cutTurnToActorProc`'s goal selection (`:205-221`). False is the
+    /// `mpTargetActor == NULL` arm's `cutEnd` (`:206-209`).
+    fn cut_goal(&mut self, ctx: &mut Ctx<'_>) -> bool {
+        let found = event_cut::goal(
+            &mut self.cut,
+            ctx.actor_pos,
+            ctx.player_eye,
+            ctx.player_angle,
+            &mut |set_id, name, from| ctx.find_target(set_id, name, from),
+        );
+        if !found {
             ctx.end_staff_cut();
-            return;
-        };
-        self.cut.target_angle = angle;
-        if self.cut.add_angle != 0 && self.cut.del_distance != 0.0 {
-            let yaw = angle.wrapping_add(self.cut.add_angle);
-            let rad = walk::from_s16(yaw);
-            self.cut.pos = Vec3::new(
-                pos.x - self.cut.del_distance * rad.sin(),
-                pos.y,
-                pos.z - self.cut.del_distance * rad.cos(),
-            );
-        } else {
-            self.cut.pos = pos + self.cut.offset_pos;
         }
+        found
     }
 
     /// `daNpc_Nz_c::cutProc` (`d_a_npc_nz_cut.inc:108-181`).
@@ -1308,7 +1142,7 @@ impl NpcNz {
         }
     }
 
-    /// `daNpc_Nz_c::cutChkGetItemStart` (`d_a_npc_nz_cut.inc:378-382`).
+    /// `daNpc_Nz_c::cutChkGetItemStart` (`d_a_npc_nz_cut.inc:390-394`).
     fn cut_chk_get_item_start(&mut self, ctx: &mut Ctx<'_>) {
         if self.order >= ORDER_GETITEM {
             let slot = self.esa_event;
@@ -1316,7 +1150,7 @@ impl NpcNz {
         }
     }
 
-    /// `daNpc_Nz_c::_execute` (`:816-832`), minus the renderer, `setMtx`,
+    /// `daNpc_Nz_c::_execute` (`:901-917`), minus the renderer, `setMtx`,
     /// `TailControl` and `mAcch.CrrPos`.
     pub fn execute(&mut self, actor: &mut Actor, ctx: &mut Ctx<'_>) {
         self.check_order(ctx.talk_command);
@@ -1447,14 +1281,14 @@ impl Ctx<'_> {
     }
 
     /// `dNpc_EventCut_c::findActorCallBack` (`d_npc_event_cut.inc:346-388`).
-    fn find_target(&self, set_id: u16, name: Option<&String>, from: Vec3) -> Option<(Vec3, i16)> {
+    fn find_target(&self, set_id: u16, name: Option<&str>, from: Vec3) -> Option<(Vec3, i16)> {
         let mut best: Option<(Vec3, i16)> = None;
         for actor in self.targets {
             if set_id != 0 && actor.set_id == set_id {
                 return Some((actor.pos, actor.angle));
             }
             let Some(name) = name else { continue };
-            if actor.name != name.as_str() {
+            if actor.name != name {
                 continue;
             }
             match best {

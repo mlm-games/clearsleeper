@@ -153,36 +153,16 @@ const DEG2S: f32 = 0x8000 as f32 / 180.0; // <- cM_deg2s, SSystem/SComponent/c_a
 const NO_ITEM: u8 = 0xFF; // <- mItemNo = 0xff, :459, :717
 const TYPE_NORMAL: i8 = 0; // <- decideType field_0x7C6 = 0, :550
 
-// dNpc_EventCut_c action_table - d_npc_event_cut.inc:11-19
-const CUT_WAIT: usize = 0; // <- :13
-const CUT_TURN_TO_ACTOR: usize = 1; // <- :14
-const CUT_MOVE_TO_ACTOR: usize = 2; // <- :15
-const CUT_TURN_TO_POS: usize = 3; // <- :16
-const CUT_MOVE_TO_POS: usize = 4; // <- :17
-const CUT_TALK_MSG: usize = 5; // <- :18
-const CUT_CONTINUE_TALK: usize = 6; // <- :19
-const CUT_ACTIONS: [&str; 7] = [
-    "WAIT",
-    "TURN_TO_ACTOR",
-    "MOVE_TO_ACTOR",
-    "TURN_TO_POS",
-    "MOVE_TO_POS",
-    "TALK_MSG",
-    "CONTINUE_TALK",
-]; // <- :19
-
-const CUT_NO_TARGET: i32 = -1; // <- dComIfGp_evmng_getMyStaffId == -1, :27
-const CUT_TURN_TYPE_DEFAULT: i32 = 1; // <- cutTurnToPosStart :402
-const CUT_TIMER_DEFAULT: i32 = 1; // <- cutTurnToPosStart :411
-const CUT_TIMER_WAIT_DEFAULT: i32 = 0; // <- cutWaitStart :91
-const CUT_SPEED_DEFAULT: f32 = 2.0; // <- cutMoveToPosStart :510
-const CUT_STABLE_ANGLE: f32 = 5376.0; // <- std::fabsf(temp2) < 5376.0f, :466
+// dNpc_EventCut_c action_table - d_npc_event_cut.inc:11-19, shared from `event_cut`.
+use super::event_cut::{
+    self, ACTIONS as CUT_ACTIONS, CONTINUE_TALK as CUT_CONTINUE_TALK,
+    MOVE_TO_ACTOR as CUT_MOVE_TO_ACTOR, MOVE_TO_POS as CUT_MOVE_TO_POS, NO_TARGET as CUT_NO_TARGET,
+    TALK_MSG as CUT_TALK_MSG, TURN_TO_ACTOR as CUT_TURN_TO_ACTOR, TURN_TO_POS as CUT_TURN_TO_POS,
+    WAIT as CUT_WAIT,
+};
+// The cut table's own tuning now lives in `event_cut`; only the turn settle this module shares
+// with `chkAttention` stays here.
 const CUT_TURN_SETTLE_ADD: i32 = 4; // <- cLib_addCalcAngleL min_step, d_npc.cpp:934-937
-const CUT_MOVE_SCALE: f32 = 0.1; // <- cLib_addCalc2 scale, :548
-const CUT_MOVE_DONE: f32 = 5.0; // <- dist < 5.0f, :546
-const CUT_TURN_BACKBONE_LOCK: u32 = 0; // <- mTurnType case 0, :457
-const CUT_TURN_HEAD_LOCK: u32 = 2; // <- mTurnType case 2, :452
-const CUT_TURN_DEFAULT: u32 = 3; // <- mTurnType default, :459
 
 // _create fopAcM_setCullSizeBox - :947
 const CULL_MIN: [f32; 3] = [-110.0, -20.0, -100.0]; // <- fopAcM_setCullSizeBox, d_a_npc_hi1.cpp:947
@@ -211,12 +191,12 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     (sum % 1.0).abs()
 }
 
-/// `cLib_getRndValue` (`c_lib.h:80-82`).
+/// `cLib_getRndValue` (`c_lib.h:95-97`).
 fn rnd_value(seed: &mut [i32; 3], min: i16, range: i16) -> i16 {
     min.wrapping_add((rnd(seed) * range as f32) as i16)
 }
 
-/// `cLib_calcTimer` (`c_lib.h:85-89`).
+/// `cLib_calcTimer` (`c_lib.h:100-105`).
 fn calc_timer<T: Copy + PartialEq + Default>(value: &mut T) -> T {
     let cur = *value;
     if cur != T::default() {
@@ -238,24 +218,6 @@ fn target_angle_y(from: Vec3, to: Vec3) -> i16 {
 fn target_angle_x(from: Vec3, to: Vec3) -> i16 {
     let delta = to - from;
     walk::to_s16(delta.y.atan2(abs_xz(delta)))
-}
-
-/// `cM_atan2s`.
-fn atan2s(y: f32, x: f32) -> i16 {
-    walk::to_s16(y.atan2(x))
-}
-
-/// `cLib_addCalc2` (`c_lib.cpp:56-66`).
-fn add_calc2(value: &mut f32, target: f32, scale: f32, max_step: f32) {
-    if *value != target {
-        let mut step = scale * (target - *value);
-        if step > max_step {
-            step = max_step;
-        } else if step < -max_step {
-            step = -max_step;
-        }
-        *value += step;
-    }
 }
 
 /// `cLib_addCalcAngleL` (`c_lib.cpp:205-231`).
@@ -282,7 +244,7 @@ fn add_calc_angle_l(value: i32, target: i32, scale: i32, max_step: i32, min_step
     }
 }
 
-/// `cLib_addCalcAngleS` (`c_lib.cpp:190-203`).
+/// `cLib_addCalcAngleS` (`c_lib.cpp:159-189`).
 fn add_calc_angle_s(value: i16, target: i16, scale: i16, max_step: i16, min_step: i16) -> i16 {
     walk::add_calc_angle_s(value, target, scale, max_step, min_step)
 }
@@ -494,47 +456,9 @@ impl JntCtrl {
     }
 }
 
-/// `dNpc_EventCut_c` state - d_npc.h:120-137, d_npc_event_cut.inc.
-#[derive(Debug, Clone, PartialEq)]
-pub struct EventCut {
-    pub timer: i32,
-    pub turn_speed: i16,
-    pub add_angle: i16,
-    pub del_distance: f32,
-    pub attention: bool,
-    pub no_turn: bool,
-    pub turn_type: u32,
-    pub set_id: u16,
-    pub offset_pos: Vec3,
-    pub speed: f32,
-    pub pos: Vec3,
-    pub target_angle: i16,
-    pub field_0x44: f32,
-    pub actor_name: Option<String>,
-    pub field_0x52: u8,
-}
-
-impl EventCut {
-    pub fn create() -> Self {
-        Self {
-            timer: 0,
-            turn_speed: 0,
-            add_angle: 0,
-            del_distance: 0.0,
-            attention: false,
-            no_turn: false,
-            turn_type: 0,
-            set_id: 0,
-            offset_pos: Vec3::ZERO,
-            speed: 0.0,
-            pos: Vec3::ZERO,
-            target_angle: 0,
-            field_0x44: 0.0,
-            actor_name: None,
-            field_0x52: 0,
-        }
-    }
-}
+/// `dNpc_EventCut_c`'s state now lives in [`super::event_cut`], which `Hi1` was the first actor
+/// to carry and which every other event NPC runs from.
+pub use super::event_cut::EventCut;
 
 #[derive(Component, Debug, Clone, PartialEq)]
 pub struct NpcHi1 {
@@ -1127,186 +1051,99 @@ impl NpcHi1 {
 
     /// `dNpc_EventCut_c::cutWaitStart` (`d_npc_event_cut.inc:85-93`).
     fn cut_wait_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(CUT_TIMER_WAIT_DEFAULT);
+        let _ = event_cut::start(&mut self.cut, CUT_WAIT, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutWaitProc` (`d_npc_event_cut.inc:96-100`).
     fn cut_wait_proc(&mut self, ctx: &mut Ctx<'_>) {
-        if calc_timer(&mut self.cut.timer) == 0 {
+        if event_cut::wait_proc(&mut self.cut) {
             ctx.end_staff_cut(STAFF_HI1);
         }
     }
 
     /// `dNpc_EventCut_c::cutTurnToActorStart` (`d_npc_event_cut.inc:103-171`).
     fn cut_turn_to_actor_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.actor_name = ctx
-            .list
-            .cut_text(cut, "ActorName")
-            .filter(|name| *name != "Player")
-            .map(str::to_owned);
-        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
-        self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
-        self.cut.turn_type = ctx
-            .list
-            .cut_number(cut, "TurnType")
-            .unwrap_or(CUT_TURN_TYPE_DEFAULT)
-            .max(0) as u32;
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(CUT_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.field_0x44 = 0.0;
+        let _ = event_cut::start(&mut self.cut, CUT_TURN_TO_ACTOR, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutTurnToActorProc` / `cutTurnToPosProc`
     /// (`d_npc_event_cut.inc:174-238` / `:444-476`).
     fn cut_turn_to_proc(&mut self, pos: Vec3, ctx: &mut Ctx<'_>) {
-        self.cut_goal(pos, ctx);
-        let t_angle = target_angle_y(pos, self.cut.pos);
-        match self.cut.turn_type {
-            CUT_TURN_HEAD_LOCK => {
+        if !self.cut_goal(pos, ctx) {
+            return;
+        }
+        let step = event_cut::turn_proc(&mut self.cut, pos, pos_angle(ctx));
+        match step.lock {
+            event_cut::TurnLock::Head => {
                 self.jnt.set_trn();
                 self.jnt.off_backbone_lock();
             }
-            CUT_TURN_BACKBONE_LOCK => self.jnt.on_backbone_lock(),
-            _ => self.jnt.off_backbone_lock(),
+            event_cut::TurnLock::Backbone => self.jnt.on_backbone_lock(),
+            event_cut::TurnLock::Off => self.jnt.off_backbone_lock(),
         }
-        let angle = pos_angle(ctx);
-        let temp2 = (t_angle.wrapping_sub(angle) as f32).abs();
-        if self.cut.field_0x44 == temp2 && temp2 < CUT_STABLE_ANGLE {
-            calc_timer(&mut self.cut.timer);
-        }
-        if self.cut.timer == 0 {
-            self.cut.turn_speed = 0;
+        if step.finished {
             ctx.end_staff_cut(STAFF_HI1);
         }
-        self.cut.field_0x44 = (t_angle.wrapping_sub(pos_angle(ctx)) as f32).abs();
     }
 
     /// `dNpc_EventCut_c::cutMoveToActorStart` (`d_npc_event_cut.inc:241-299`).
     fn cut_move_to_actor_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.actor_name = ctx
-            .list
-            .cut_text(cut, "ActorName")
-            .filter(|name| *name != "Player")
-            .map(str::to_owned);
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.cut.offset_pos = ctx.list.cut_vec(cut, "OffsetPos").unwrap_or(Vec3::ZERO);
-        self.cut.set_id = ctx.list.cut_number(cut, "SetId").unwrap_or(0).max(0) as u16;
-        self.cut.speed = ctx
-            .list
-            .cut_float(cut, "Speed")
-            .unwrap_or(CUT_SPEED_DEFAULT);
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
+        let _ = event_cut::start(&mut self.cut, CUT_MOVE_TO_ACTOR, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutMoveToActorProc` (`d_npc_event_cut.inc:302-343`).
     fn cut_move_to_actor_proc(&mut self, pos: Vec3, ctx: &mut Ctx<'_>) {
-        self.cut_goal(pos, ctx);
-        let goal = self.cut.pos;
-        let mut temp = goal;
-        let angle = if self.cut.add_angle != 0 {
-            self.cut.target_angle.wrapping_add(self.cut.add_angle)
-        } else {
-            atan2s(goal.x - pos.x, goal.z - pos.z)
-        };
-        temp.x -= self.cut.del_distance * walk::from_s16(angle).sin();
-        temp.z -= self.cut.del_distance * walk::from_s16(angle).cos();
-        if self.cut.speed == 0.0 {
-            ctx.actor_pos = temp;
-            ctx.end_staff_cut(STAFF_HI1);
+        if !self.cut_goal(pos, ctx) {
+            return;
         }
-        let dist = abs_xz(temp - ctx.actor_pos);
-        add_calc2(&mut ctx.actor_pos.x, temp.x, CUT_MOVE_SCALE, self.cut.speed);
-        add_calc2(&mut ctx.actor_pos.z, temp.z, CUT_MOVE_SCALE, self.cut.speed);
-        if dist < CUT_MOVE_DONE {
-            self.cut.speed = 0.0;
+        let goal = event_cut::move_to_actor_goal(&self.cut, pos);
+        if event_cut::move_proc(&mut self.cut, goal, &mut ctx.actor_pos) {
             ctx.end_staff_cut(STAFF_HI1);
         }
     }
 
     /// `dNpc_EventCut_c::cutTurnToPosStart` (`d_npc_event_cut.inc:391-441`).
     fn cut_turn_to_pos_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.pos = ctx.list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
-        self.cut.turn_type = ctx
-            .list
-            .cut_number(cut, "TurnType")
-            .unwrap_or(CUT_TURN_TYPE_DEFAULT)
-            .max(0) as u32;
-        self.cut.timer = ctx
-            .list
-            .cut_number(cut, "Timer")
-            .unwrap_or(CUT_TIMER_DEFAULT);
-        self.cut.turn_speed = ctx.list.cut_number(cut, "TurnSpeed").unwrap_or(0) as i16;
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
-        self.cut.field_0x44 = 0.0;
+        let _ = event_cut::start(&mut self.cut, CUT_TURN_TO_POS, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutMoveToPosStart` (`d_npc_event_cut.inc:479-528`).
     fn cut_move_to_pos_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.no_turn = ctx.list.cut_number(cut, "NoTurn").is_some();
-        self.cut.pos = ctx.list.cut_vec(cut, "Pos").unwrap_or(Vec3::ZERO);
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.cut.speed = ctx
-            .list
-            .cut_float(cut, "Speed")
-            .unwrap_or(CUT_SPEED_DEFAULT);
-        self.cut.del_distance = ctx.list.cut_float(cut, "DelDistance").unwrap_or(0.0);
-        self.cut.add_angle = ctx.list.cut_number(cut, "AddAngle").unwrap_or(0) as i16;
+        let _ = event_cut::start(&mut self.cut, CUT_MOVE_TO_POS, ctx.list, cut);
     }
 
     /// `dNpc_EventCut_c::cutMoveToPosProc` (`d_npc_event_cut.inc:531-554`).
     fn cut_move_to_pos_proc(&mut self, _pos: Vec3, ctx: &mut Ctx<'_>) {
-        let angle = target_angle_y(ctx.actor_pos, self.cut.pos);
-        let mut temp = self.cut.pos;
-        temp.x -= self.cut.del_distance * walk::from_s16(angle).sin();
-        temp.z -= self.cut.del_distance * walk::from_s16(angle).cos();
-        if self.cut.speed == 0.0 {
-            ctx.actor_pos = temp;
-            ctx.end_staff_cut(STAFF_HI1);
-        }
-        let dist = abs_xz(temp - ctx.actor_pos);
-        add_calc2(&mut ctx.actor_pos.x, temp.x, CUT_MOVE_SCALE, self.cut.speed);
-        add_calc2(&mut ctx.actor_pos.z, temp.z, CUT_MOVE_SCALE, self.cut.speed);
-        if dist < CUT_MOVE_DONE {
-            self.cut.speed = 0.0;
+        let goal = event_cut::move_to_pos_goal(&self.cut, ctx.actor_pos);
+        if event_cut::move_proc(&mut self.cut, goal, &mut ctx.actor_pos) {
             ctx.end_staff_cut(STAFF_HI1);
         }
     }
 
     /// `dNpc_EventCut_c::cutTalkMsgStart` (`d_npc_event_cut.inc:557-584`).
     fn cut_talk_msg_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.cut.attention = ctx.list.cut_number(cut, "Attention").is_some();
-        self.curr_msg_no = ctx
-            .list
-            .cut_number(cut, "msg_num")
-            .map(|no| no as u32)
-            .unwrap_or(0);
-        self.end_msg_no = ctx
-            .list
-            .cut_number(cut, "end_msg")
-            .map(|no| no as u32)
-            .unwrap_or(u32::MAX);
-        self.cut.field_0x52 = 1;
+        if let Some(update) = event_cut::start(&mut self.cut, CUT_TALK_MSG, ctx.list, cut) {
+            match update {
+                event_cut::TalkUpdate::Msg { curr, end } => {
+                    self.curr_msg_no = curr;
+                    self.end_msg_no = end;
+                }
+                event_cut::TalkUpdate::Continue { end } => self.end_msg_no = end,
+            }
+        }
     }
 
     /// `dNpc_EventCut_c::cutContinueTalkStart` (`d_npc_event_cut.inc:587-597`).
     fn cut_continue_talk_start(&mut self, cut: usize, ctx: &Ctx<'_>) {
-        self.end_msg_no = ctx
-            .list
-            .cut_number(cut, "end_num")
-            .map(|no| no as u32)
-            .unwrap_or(u32::MAX);
+        if let Some(update) = event_cut::start(&mut self.cut, CUT_CONTINUE_TALK, ctx.list, cut) {
+            match update {
+                event_cut::TalkUpdate::Msg { curr, end } => {
+                    self.curr_msg_no = curr;
+                    self.end_msg_no = end;
+                }
+                event_cut::TalkUpdate::Continue { end } => self.end_msg_no = end,
+            }
+        }
     }
 
     /// `dNpc_EventCut_c::cutTalkMsgProc` (`d_npc_event_cut.inc:600-614`).
@@ -1330,33 +1167,18 @@ impl NpcHi1 {
     /// `dNpc_EventCut_c::cutTurnToActorProc`'s goal selection (`:205-221`), storing
     /// into `mPos` exactly as retail does. `:216` reads the target's
     /// `shape_angle.y`; the sim only carries `current.angle.y`.
-    fn cut_goal(&mut self, from: Vec3, ctx: &mut Ctx<'_>) {
-        let want_player = match self.cut.actor_name {
-            None => true,
-            Some(_) => false,
-        };
-        if want_player {
-            self.cut.target_angle = ctx.player_angle;
-            self.cut.pos = ctx.player_eye.unwrap_or(Vec3::ZERO) + self.cut.offset_pos;
-            return;
-        }
-        let name = self.cut.actor_name.as_ref();
-        let Some((pos, angle)) = ctx.find_target(self.cut.set_id, name, from) else {
+    fn cut_goal(&mut self, from: Vec3, ctx: &mut Ctx<'_>) -> bool {
+        let found = event_cut::goal(
+            &mut self.cut,
+            from,
+            ctx.player_eye,
+            ctx.player_angle,
+            &mut |set_id, name, from| ctx.find_target(set_id, name, from),
+        );
+        if !found {
             ctx.end_staff_cut(STAFF_HI1);
-            self.cut.pos = Vec3::ZERO;
-            return;
-        };
-        self.cut.target_angle = angle;
-        self.cut.pos = if self.cut.add_angle != 0 && self.cut.del_distance != 0.0 {
-            let angle = angle.wrapping_add(self.cut.add_angle);
-            Vec3::new(
-                pos.x - self.cut.del_distance * walk::from_s16(angle).sin(),
-                pos.y,
-                pos.z - self.cut.del_distance * walk::from_s16(angle).cos(),
-            )
-        } else {
-            pos + self.cut.offset_pos
-        };
+        }
+        found
     }
 
     /// `daNpc_Hi1_c::_execute` (`:846-899`), minus the renderer, `demo()`,
@@ -1528,14 +1350,14 @@ impl Ctx<'_> {
     }
 
     /// `dNpc_EventCut_c::findActorCallBack` (`d_npc_event_cut.inc:346-388`).
-    fn find_target(&self, set_id: u16, name: Option<&String>, from: Vec3) -> Option<(Vec3, i16)> {
+    fn find_target(&self, set_id: u16, name: Option<&str>, from: Vec3) -> Option<(Vec3, i16)> {
         let mut best: Option<(Vec3, i16)> = None;
         for actor in self.targets {
             if set_id != 0 && actor.set_id == set_id {
                 return Some((actor.pos, actor.angle));
             }
             let Some(name) = name else { continue };
-            if actor.name != name.as_str() {
+            if actor.name != name {
                 continue;
             }
             match best {

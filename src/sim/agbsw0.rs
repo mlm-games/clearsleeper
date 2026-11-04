@@ -2720,6 +2720,34 @@ fn distance_xz(from: Vec3, to: Vec3) -> f32 {
     (dx * dx + dz * dz).sqrt()
 }
 
+/// `incTclDispose` (`tww/src/d/d_com_static.cpp:81-93`) counts the idols that have gone under
+/// for good, capped at two, and `tell_agb_sink` (`d_a_obj_vtil.cpp:433`) is the idol's only
+/// caller. The `dComIfGp_getAgb()` and `isActive()` guards are [`AGB_PRESENT`].
+pub fn inc_tcl_dispose() {
+    if !AGB_PRESENT {
+        return; // d_com_static.cpp:82-88
+    }
+    let figure = FIGURE_DISPOSE.load(Ordering::Relaxed); // d_com_static.cpp:89
+    if figure >= 2 {
+        return;
+    }
+    FIGURE_DISPOSE.store(figure + 1, Ordering::Relaxed); // d_com_static.cpp:92
+}
+
+/// `incTclBeat` (`tww/src/d/d_com_static.cpp:96-108`) counts the idols the player has beaten and
+/// thrown back, capped at six, and `tell_agb_attack` (`d_a_obj_vtil.cpp:372`) is the idol's only
+/// caller. The `dComIfGp_getAgb()` and `isActive()` guards are [`AGB_PRESENT`].
+pub fn inc_tcl_beat() {
+    if !AGB_PRESENT {
+        return; // d_com_static.cpp:97-103
+    }
+    let figure = FIGURE_BEAT.load(Ordering::Relaxed); // d_com_static.cpp:104
+    if figure >= 6 {
+        return;
+    }
+    FIGURE_BEAT.store(figure + 1, Ordering::Relaxed); // d_com_static.cpp:107
+}
+
 pub struct Ctx<'a> {
     pub f: &'a Facts,
     pub agb: Option<Agb>,

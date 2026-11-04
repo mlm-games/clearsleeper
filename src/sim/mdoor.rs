@@ -97,9 +97,9 @@ pub const EVENT_UNK_1101: u32 = 0x1101; // <- d_a_mdoor.cpp:127
 /// `dSv_event_flag_c::UNK_1140 = 0x1140` (`d_save_event_flag.inc:127`), cleared at `:141` and set
 /// at `:344`.
 pub const EVENT_UNK_1140: u32 = 0x1140; // <- d_a_mdoor.cpp:141
-/// `JA_SE_OBJ_CAGE_CLOSE = 0x697C` (`JAZelAudio_SE.h:1905`), at `:205`.
+/// `JA_SE_OBJ_CAGE_CLOSE = 0x697C` (`JAZelAudio_SE.h:1905`), at `:1905`.
 pub const SE_CLOSE: u32 = 0x697C; // <- d_a_mdoor.cpp:205
-/// `JA_SE_OBJ_CAGE_OPEN = 0x697D` (`JAZelAudio_SE.h:1906`), at `:213` and `:308`.
+/// `JA_SE_OBJ_CAGE_OPEN = 0x697D` (`JAZelAudio_SE.h:1906`), at `:1906` and `:1906`.
 pub const SE_OPEN: u32 = 0x697D; // <- d_a_mdoor.cpp:213
 /// `dComIfGp_evmng_getEventIdx("MORI1_EVENT", 0xFF)` (`:133`) - type 0's event.
 pub const EVENT_MORI1: &str = "MORI1_EVENT"; // <- d_a_mdoor.cpp:133

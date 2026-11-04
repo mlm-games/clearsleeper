@@ -966,7 +966,7 @@ pub struct Barrel2 {
 }
 
 /// `daObj::PrmAbstract(this, W, S)` (`d/d_a_obj.h:14`), `((1 << W) - 1) & (param >> S)`, copied
-/// exactly. `fopAcM_GetParam(this)` returns the WHOLE `u32` (`f_op_actor_mng.h:127-129`).
+/// exactly. `fopAcM_GetParam(this)` returns the WHOLE `u32` (`f_op_actor_mng.h:143-145`).
 fn abstract_param(param: u32, width: u32, shift: u32) -> u32 {
     ((1 << width) - 1) & (param >> shift)
 }

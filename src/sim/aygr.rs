@@ -25,7 +25,7 @@ const CULL_MAX: [f32; 3] = [500.0, 4000.0, 500.0]; // <- d_a_obj_aygr.cpp:51
 /// Neither `HitPoints` nor `Hurt` is attached.
 ///
 /// `Mthd_Create` can only fail in resource load / `MoveBGCreate` (`:75-98`), so `spawn` never
-/// refuses. `Delete` returns `TRUE` (`:101-103`).
+/// refuses. `Delete` returns `TRUE` (`:81-83`).
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Aygr {
     /// `prm_get_mdl()` (`d_a_obj_aygr.h:11`) - true also builds the climbable ladder model and

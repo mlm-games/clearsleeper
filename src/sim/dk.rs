@@ -48,7 +48,7 @@ use bevy_ecs::prelude::*;
 
 use super::actor::Actor;
 use super::event::{ActiveEvent, EventList};
-use super::flags::EventFlags;
+use super::flags::StoryBits;
 
 /// `d_stage.cpp:844` binds `Dk` to `fpcNm_DK_e`, the profile of `d_a_dk.cpp:408-423`.
 pub const DK_ACTORS: [&str; 1] = ["Dk"];
@@ -83,9 +83,11 @@ const PARAM_FLYING: u8 = 1;
 /// `dComIfGs_isEventBit(dSv_event_flag_c::UNK_0310)` (`d_a_dk.cpp:254`). The id is
 /// `d_save_event_flag.inc:29`. RULE 12: retail `dSv_event_c` indexes `mFlags[i_no >> 8]` by BYTE,
 /// so the id is passed through untouched - never pre-shifted, pre-masked or renumbered.
-const FLAG_UNK_0310: u32 = 0x0310;
+/// `dComIfGs_isEventBit` reads the SAVE flags, i.e. [`StoryBits`]; `EventFlags` is `dEvDtFlag_c`,
+/// the event-script store, and testing this bit there never sees `zelda_fly`'s write.
+const FLAG_UNK_0310: u16 = 0x0310;
 /// `dComIfGs_isEventBit(dSv_event_flag_c::UNK_0001)` (`d_a_dk.cpp:264`), `d_save_event_flag.inc:13`.
-const FLAG_UNK_0001: u32 = 0x0001;
+const FLAG_UNK_0001: u16 = 0x0001;
 
 /// `dComIfGp_evmng_startCheck("zelda_fly")` (`d_a_dk.cpp:259`).
 const EVENT_ZELDA_FLY: &str = "zelda_fly";
@@ -132,7 +134,7 @@ impl Dk {
         actor: &mut Actor,
         list: &EventList,
         active: &ActiveEvent,
-        flags: &EventFlags,
+        stories: &StoryBits,
     ) {
         if HIO_M05 != 0 {
             return;
@@ -146,7 +148,7 @@ impl Dk {
         // only reader is `daDk_Draw` (`:185`), which is renderer-only and omitted.
         match self.mode {
             MODE_BOSS => {
-                if flags.test(FLAG_UNK_0310) {
+                if stories.test(FLAG_UNK_0310) {
                     self.mode = MODE_FLY_START;
                 }
             }
@@ -156,12 +158,12 @@ impl Dk {
                 if zelda_fly_running(list, active) {
                     self.mode = MODE_FLYING;
                 }
-                if flags.test(FLAG_UNK_0001) {
+                if stories.test(FLAG_UNK_0001) {
                     self.mode = MODE_RELEASED;
                 }
             }
             MODE_FLYING => {
-                if flags.test(FLAG_UNK_0001) {
+                if stories.test(FLAG_UNK_0001) {
                     self.mode = MODE_RELEASED;
                 }
             }
@@ -188,10 +190,10 @@ pub fn is_dk(name: &str) -> bool {
 pub fn control(
     list: Res<EventList>,
     active: Res<ActiveEvent>,
-    flags: Res<EventFlags>,
+    stories: Res<StoryBits>,
     mut dragons: Query<(&mut Actor, &mut Dk)>,
 ) {
     for (mut actor, mut dragon) in &mut dragons {
-        dragon.execute(&mut actor, &list, &active, &flags);
+        dragon.execute(&mut actor, &list, &active, &stories);
     }
 }

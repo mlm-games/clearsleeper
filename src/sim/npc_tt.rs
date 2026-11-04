@@ -440,7 +440,7 @@ impl NpcTt {
         }
     }
 
-    /// `daNpc_Tt_c::danceInit` (`d_a_npc_tt_anm.inc:103-110`).
+    /// `daNpc_Tt_c::danceInit` (`d_a_npc_tt_anm.inc:146-153`).
     fn dance_init(&mut self, param: i32) {
         if param != 0 || self.flags & FLAG_DANCE == 0 {
             self.dance_step = 0;

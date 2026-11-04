@@ -35,7 +35,7 @@ pub const SHOP_ACTOR: &str = "Bs1";
 const EVENT_GETDEMO: &str = "BS1_GETDEMO"; // <- dComIfGp_evmng_getEventIdx, :1566
 const EVENT_GETDEMO_BS2: &str = "BS2_GETDEMO"; // <- :1572
 
-/// `fopAcM_GetParamBit(param, 0x14, 0x4)` — `f_op_actor_mng.h:131-133`.
+/// `fopAcM_GetParamBit(param, 0x14, 0x4)` — `f_op_actor_mng.h:147-149`.
 const TYPE_SHIFT: u32 = 0x14;
 const TYPE_MASK: u32 = 0xF;
 const TYPE_NORMAL: i8 = 0; // <- switch (mType) case 0, :2141
@@ -1656,7 +1656,7 @@ impl Text<'_> {
         self.one.m1169 != 0
     }
 
-    /// `dComIfGp_getMessageRupee` — `d_com_inf_game.h:2806-2808`.
+    /// `dComIfGp_getMessageRupee` — `d_com_inf_game.h:999-1001`.
     fn price(&self) -> i16 {
         self.info.message_rupee
     }

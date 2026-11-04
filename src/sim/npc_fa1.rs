@@ -170,7 +170,7 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     (sum % 1.0).abs()
 }
 
-/// `cLib_getRndValue` (`c_lib.h:80-82`) narrowed to the u8/u16 shapes used here.
+/// `cLib_getRndValue` (`c_lib.h:95-97`) narrowed to the u8/u16 shapes used here.
 fn rnd_u16(seed: &mut [i32; 3], min: f32, range: f32) -> u16 {
     (min + rnd(seed) * range) as u16
 }
@@ -983,7 +983,7 @@ impl Ctx<'_> {
         self.health.heal(amount);
     }
 
-    /// `execItemGet(dItemNo_RECOVER_FAIRY_e)` (`d_item.cpp:669-671`): the item is
+    /// `execItemGet(dItemNo_RECOVER_FAIRY_e)` (`d_item.cpp:534-536`): the item is
     /// recorded in `Got`/`Equipped` and its effect is the life top-up.
     fn give_item(&mut self, item: u8) {
         if let Some(slot) = super::inventory::slot_of(item) {

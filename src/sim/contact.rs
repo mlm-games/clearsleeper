@@ -331,7 +331,7 @@ impl GStts {
     }
 }
 
-/// `dCcD_GObjInf` (`d_cc_d.h:376`) reduced to what contact resolution reads and writes: the three
+/// `dCcD_GObjInf` (`d_cc_d.h:245`) reduced to what contact resolution reads and writes: the three
 /// general `mSPrm` words, the CO response word and the CO contact process id.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct GObjInf {

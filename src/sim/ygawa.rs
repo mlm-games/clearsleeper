@@ -9,13 +9,13 @@ pub const YGAWA_ACTORS: [&str; 1] = ["yg_awa"];
 /// writer is the HIO editor. It is also the `yg_awa_data field_0x298[16]` bound
 /// (`d_a_yougan.h:34`).
 const AWA_NUM: usize = 16;
-/// `l_HIO.field_0x0C` (`d_a_yougan.cpp:42`) - the base rise rate.
+/// `l_HIO.field_0x0C` (`d_a_yougan.cpp:32`) - the base rise rate.
 const RISE_BASE: f32 = 40.0;
-/// `l_HIO.field_0x10` (`d_a_yougan.cpp:43`) - the `cM_rndF` spread on the rise rate.
+/// `l_HIO.field_0x10` (`d_a_yougan.cpp:32`) - the `cM_rndF` spread on the rise rate.
 const RISE_SPREAD: f32 = 60.0;
-/// `l_HIO.field_0x14` (`d_a_yougan.cpp:44`) - the base bubble size.
+/// `l_HIO.field_0x14` (`d_a_yougan.cpp:32`) - the base bubble size.
 const SIZE_BASE: f32 = 0.2;
-/// `l_HIO.field_0x18` (`d_a_yougan.cpp:45`) - the `cM_rndF` spread on the bubble size.
+/// `l_HIO.field_0x18` (`d_a_yougan.cpp:32`) - the `cM_rndF` spread on the bubble size.
 const SIZE_SPREAD: f32 = 0.5;
 /// `cM_initRnd(100, 100, 100)` (`m_Do_machine.cpp:617`) - the only seed `cM_rnd`'s three static
 /// lanes (`c_math.cpp:167`) are ever given, so it is the proven startup state.

@@ -24,7 +24,7 @@ const SYMBOL_DIN_FLAG: u8 = SYMBOL_DIN; // <- d_com_inf_game.h:1691 (d_a_ykgr.cp
 /// `m0C = 3` in `daYkgr_HIO_c`'s constructor (`d_a_ykgr.cpp:29`) - the per-frame alpha step of
 /// `:203-217`.
 const HIO_ALPHA_STEP: u8 = 3; // <- d_a_ykgr.cpp:29
-/// `m14 = -5.0f` (`d_a_ykgr.cpp:31`), the far end of the `YkgrCB.setParam` blend at `:200`.
+/// `m14 = -5.0f` (`d_a_ykgr.cpp:60`), the far end of the `YkgrCB.setParam` blend at `:200`.
 const HIO_M14: f32 = -5.0; // <- d_a_ykgr.cpp:31
 /// `m18 = -3.0f` (`d_a_ykgr.cpp:32`), the near end of the same blend.
 const HIO_M18: f32 = -3.0; // <- d_a_ykgr.cpp:32
@@ -127,7 +127,7 @@ impl Ykgr {
     /// (`:91-93`). `dPath_GetRoomPath(pathIndex, fopAcM_GetRoomNo(this))` (`:132`) resolves a room
     /// `PATH` block, which RULE 3b lists as absent, so `m_path` is always NULL here and the rest of
     /// `getPosRate` - the `m_points`/`m_num` walk of `:101-107`, the
-    /// `l_HIO.m20` (1500.0f, `:34`) / `l_HIO.m24` (500.0f, `:35`) clamp of `:109-113` and the
+    /// `l_HIO.m20` (1500.0f, `:59`) / `l_HIO.m24` (500.0f, `:59`) clamp of `:109-113` and the
     /// `(fVar4 - m24) / (m20 - m24)` normalisation of `:115` - has no input. The proven `0.0f`
     /// return is what `m2D0` chases at `:197`.
     fn pos_rate(&self) -> f32 {

@@ -35,6 +35,12 @@ const ITEM_SAVE_SHIFT: u32 = 16;
 const ITEM_SAVE_MASK: u32 = 0x7F;
 const TYPE_SHIFT: u32 = 24;
 const TYPE_MASK: u32 = 0xF;
+/// `PRM_STICK_W = 1, PRM_STICK_S = 31` (`d_a_tsubo.h:48-49`), the bit `prm_get_stick` reads
+/// (`:197-199`). While it is set the pot is pinned to `home.pos` at create (`d_a_tsubo.cpp:1311-1314`)
+/// and an acorn still hangs on its leaf (`d_a_acorn_leaf.cpp:157-159`); `mode_carry_init` clears it
+/// with `prm_off_stick()` as the pot leaves for the player's hands (`d_a_tsubo.cpp:1911`,
+/// `d_a_tsubo.h:215`).
+const STICK_SHIFT: u32 = 31;
 
 pub const FALL_DAMP: f32 = 0.9;
 pub const CARRY_KIND: u8 = 0x3F;
@@ -77,6 +83,7 @@ pub struct Tsubo {
     pub kind: u8,
     pub move_bg: u8,
     pub item_save: u8,
+    pub stick: bool,
     pub speed: f32,
     pub speed_y: f32,
     pub heading: glam::Vec3,
@@ -91,6 +98,7 @@ impl Tsubo {
             kind: ((parameters >> TYPE_SHIFT) & TYPE_MASK) as u8,
             move_bg: ((parameters >> MOVE_BG_SHIFT) & MOVE_BG_MASK) as u8,
             item_save: ((parameters >> ITEM_SAVE_SHIFT) & ITEM_SAVE_MASK) as u8,
+            stick: parameters & (1 << STICK_SHIFT) != 0,
             speed: 0.0,
             speed_y: 0.0,
             heading: Vec3::ZERO,

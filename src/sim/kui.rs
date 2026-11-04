@@ -172,7 +172,7 @@ impl Kui {
     /// if (i_this->type == 3) { i_this->field_0x2A1 = 4; }
     /// ```
     ///
-    /// `fopAcM_GetParam` returns the WHOLE `u32` (`f_op_actor_mng.h:127-129`), so `& 0xF`, `>> 8` and
+    /// `fopAcM_GetParam` returns the WHOLE `u32` (`f_op_actor_mng.h:143-145`), so `& 0xF`, `>> 8` and
     /// `>> 0x18` are the only masks. `field_0x2A1` (`param >> 8`, `:484`) is DROPPED: it only feeds
     /// the `scale` switch at `:494-522`, whose writes are consumed by `MtxScale` / `setBaseScale`
     /// (`:321`, `:330`, `:339`, `:349`, `:354`) - renderer work with no modelled reader (RULE 3b), so

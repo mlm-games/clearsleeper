@@ -315,7 +315,7 @@ impl Warpgn {
     /// m388 = true;
     /// return rt;
     /// ```
-    /// (`:352-370`). `cLib_calcTimer` (`c_lib.h:85-91`) decrements a non-zero value and returns
+    /// (`:352-370`). `cLib_calcTimer` (`c_lib.h:100-105`) decrements a non-zero value and returns
     /// it, so `== 0` means the countdown expired on THIS tick - which is why `mTimer = 100` is
     /// inside the arm.
     fn act_appear(&mut self) -> bool {

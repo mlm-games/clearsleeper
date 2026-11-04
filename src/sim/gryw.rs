@@ -104,7 +104,7 @@ impl Gryw {
 impl Gryw {
     /// `Create` (`d_a_obj_gryw00.cpp:151-190`): `param_get_swSave` reads bits 0..8, and a switch
     /// that is already set at load time takes the "puzzle already solved" branch - static
-    /// high-water BTK (`:156`), `high_water_level_act_proc` (`:160`) and the water/wave levels
+    /// high-water BTK (`:273`), `high_water_level_act_proc` (`:160`) and the water/wave levels
     /// pinned high (`:162-166`). Otherwise the actor waits hidden (`:169-177`).
     pub fn spawn(parameters: u32, switches: &Switches) -> Self {
         let switch_no = ((parameters >> SWSAVE_SHIFT) & SWSAVE_MASK) as u8;
@@ -223,7 +223,7 @@ impl Gryw {
     /// drains into the renderer's emitter pool - so the four requests are queued at the position
     /// the reference creates them.
     ///
-    /// `particle_move` (`:129-138`) then follows the two held emitters - `setGlobalTranslation` at
+    /// `particle_move` (`:83-92`) then follows the two held emitters - `setGlobalTranslation` at
     /// `home.pos + (0, mWaterLv, 0)` - and `particle_delete` (`:140-150`) retires them. The queue
     /// carries one-shot requests and no emitter handle, so neither call has a destination: the two
     /// held effects are placed once, where retail creates them.

@@ -23,16 +23,16 @@
 //! `hand_draw` (`:11-13`), `daSitem_Draw` (`:16-18`), `hand_mtx_set` (`:21-23`), `control3`
 //! (`:26-28`), `control1` (`:31-33`), `control2` (`:36-38`), `cut_control1` (`:41-43`), `my_break`
 //! (`:46-48`), `cut_control2` (`:51-53`), `hand_move` (`:56-58`), `daSitem_Execute` (`:61-63`),
-//! `daSitem_Delete` (`:71-73`), `useHeapInit` (`:76-78`), `daSitem_solidHeapCB` (`:81-83`) and
+//! `daSitem_Delete` (`:71-73`), `useHeapInit` (`:76-78`), `daSitem_solidHeapCB` (`:497-499`) and
 //! `daSitem_Create` (`:86-144`). The ONLY things that exist are:
-//!   * `daSitem_IsDelete` (`:66-68`), the bare `return TRUE` of RULE 6b;
+//!   * `daSitem_IsDelete` (`:473-475`), the bare `return TRUE` of RULE 6b;
 //!   * two `static dCcD_SrcSph` tables inside the stubbed `daSitem_Create`: `tg_sph_src`
 //!     (`:88-115`, radius 20.0, `SrcObjAt Type = AT_TYPE_UNK800` with `Set|VsPlayer`,
 //!     `SrcObjTg Type` all-but-boomerang/water/unk20000/wind/unk400000/light with `Set|IsEnemy`,
 //!     `SrcObjCo SPrm = Set|IsPlayer|VsGrpAll`) and `bm_sph_src` (`:116-143`, radius 80.0,
 //!     `SrcObjAt Type = 0`, `SrcObjTg Type = AT_TYPE_BOOMERANG | AT_TYPE_WIND`);
-//!   * the five dispatch thunks `Mthd_*` (`:763-785`) and `l_daSitem_Method` (`:146-152`);
-//!   * `g_profile_SITEM` (`:154-169`): `List ID 0x0007`, `List Prio fpcPi_CURRENT_e`,
+//!   * the five dispatch thunks `Mthd_*` (`:763-785`) and `l_daSitem_Method` (`:602-608`);
+//!   * `g_profile_SITEM` (`:610-625`): `List ID 0x0007`, `List Prio fpcPi_CURRENT_e`,
 //!     `Proc Name fpcNm_SITEM_e`, `Size sizeof(sitem_class)`, `Size Other 0`, `Parameters 0`,
 //!     `Status fopAcStts_UNK4000_e | fopAcStts_UNK40000_e`, `Group fopAc_ENEMY_e`,
 //!     `Cull Type fopAc_CULLBOX_CUSTOM_e`.
@@ -57,7 +57,7 @@ pub const SITEM_ACTORS: [&str; 1] = ["Sitem"];
 
 /// `m_itemNo = fopAcM_GetParamBit(fopAcM_GetParam(this), 0, 8)` (`d_a_shop_item.cpp:197`), where
 /// `fopAcM_GetParamBit(param, shift, bit)` is `(param >> shift) & ((1 << bit) - 1)`
-/// (`include/f_op/f_op_actor_mng.h:131-133`).
+/// (`include/f_op/f_op_actor_mng.h:147-149`).
 const ITEM_SHIFT: u32 = 0; // <- d_a_shop_item.cpp:197
 const ITEM_WIDTH: u32 = 8; // <- d_a_shop_item.cpp:197
 /// `u8 type = fopAcM_GetParamBit(fopAcM_GetParam(this), 8, 4)` (`d_a_shop_item.cpp:24`, `:35`,

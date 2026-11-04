@@ -84,7 +84,7 @@ const SWITCH_MASK: u32 = 0xFF; // <- d_a_shutter.h:60
 /// (a) inbound damage: NONE. (b) outbound damage: NONE. `daShutter_c` is a bare `fopAc_ac_c`
 /// holding two `J3DModel*`, two `dBgW*`, two `Mtx`, a `cXyz[2]` and the switch/staff bookkeeping
 /// (`d_a_shutter.h:38-56`); it registers no `dCcD` collider of any kind. The two `mdBgW` are
-/// `dBgW` moving backgrounds built from the Htobi1/Htobi2 DZBs (`CreateHeap` `:59`), which is not a
+/// `dBgW` moving backgrounds built from the Htobi1/Htobi2 DZBs (`CreateHeap` `:7`), which is not a
 /// `dCcD` collider and is RULE 3b absent besides. The profile `Group` is `fopAc_ACTOR_e` (`:328`).
 /// Neither `combat::HitPoints` nor `enemy::Hurt` is attached - attaching them would let
 /// `combat::control` despawn a shutter retail cannot damage.
@@ -345,7 +345,7 @@ impl Shutter2 {
             // `case ACT_WAIT02:` (:176-183)
             Some(a) if a == ACT_WAIT02 => {
                 // `if (cLib_calcTimer(&mTimer) == 0)` (:178) - `cLib_calcTimer`
-                // (`c_lib.h:85-91`) decrements a non-zero value by one and returns it.
+                // (`c_lib.h:100-105`) decrements a non-zero value by one and returns it.
                 if self.timer != 0 {
                     self.timer -= 1;
                 }

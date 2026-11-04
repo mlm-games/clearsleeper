@@ -80,7 +80,7 @@ const EVENT_BASE: i8 = 3;
 const STAGE_HYRULE: &str = "Hyrule"; // <- :357
 const STAGE_HYROOM: &str = "Hyroom"; // <- :360
 
-/// `cLib_getRndValue(min, range) = min + cM_rndF(range)` — `c_lib.h:80`.
+/// `cLib_getRndValue(min, range) = min + cM_rndF(range)` — `c_lib.h:95-97`.
 /// `cLib_getRndValue(0x5A, 0xB4)` — `:1918`, `:2309`.
 const RND_MIN_SWAY: i32 = 0x5A;
 const RND_RANGE_SWAY: f32 = 180.0; // <- 0xB4

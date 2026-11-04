@@ -19,7 +19,7 @@ const SE_READ_RIDDLE_1: u32 = 0x0806; // <- JAZelAudio_SE.h:18
 const SE_SLIDE_AMI_OPEN: u32 = 0x69C7; // <- JAZelAudio_SE.h:1976
 
 /// `fopAcM_orderOtherEvent(this, name)` (`d_a_obj_hami4.cpp:84`, `:96`) reaches
-/// `fopAcM_orderOtherEvent2` (`f_op_actor_mng.h:702`) and then
+/// `fopAcM_orderOtherEvent2` (`f_op_actor_mng.h:567`) and then
 /// `dComIfGp_event_orderOld(dEvtType_OTHER_e, ...)` (`f_op_actor_mng.cpp:692-698`).
 fn order(entity: Entity, list: &EventList, active: &mut ActiveEvent, name: &str) {
     let Some(slot) = list.event_index(name) else {

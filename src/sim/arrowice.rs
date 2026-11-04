@@ -9,7 +9,7 @@
 //!
 //! The whole of this translation unit is unreachable from stage placement, and that is the one
 //! behaviour that IS fully verifiable here. `dStage_actorInit` (`d_stage.cpp:1688-1711`) builds
-//! every stage actor with `fopAcM_CreateAppend()` (`f_op_actor_mng.cpp:2431-2444`), which sets
+//! every stage actor with `fopAcM_CreateAppend()` (`f_op_actor_mng.cpp:78-91`), which sets
 //! `params->parent_id = fpcM_ERROR_PROCESS_ID_e` (`:2441`), and `dStage_actorCreate`
 //! (`d_stage.cpp:1300-1312`) passes that straight to `fopAcM_Create` without touching
 //! `parent_id`. `fopAcM_ct` copies it into `actor->parentActorID` (`f_op_actor.cpp:275`). So a

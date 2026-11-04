@@ -100,7 +100,7 @@ impl SwPropeller {
     /// `set_mtx` (`:97`), the `kaiten` joint-name scan (`:99-105`) and `mpModel->calc()` (`:106`) -
     /// heap, `dBgS_ObjAcch`, `dCcD`, model and joint work.
     ///
-    /// RULE 2: `set_mtx` (`:144-149`) reads `scale` only for `setBaseScale`, and the stage-placed
+    /// RULE 2: `set_mtx` (`:132-137`) reads `scale` only for `setBaseScale`, and the stage-placed
     /// scale is exactly 1.0, so nothing is lost.
     pub fn spawn(parameters: u32) -> Self {
         Self {

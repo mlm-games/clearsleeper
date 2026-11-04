@@ -46,7 +46,7 @@ const CHILD_SIZE_SHIFT: u32 = 16; // <- d_a_obj_msdan.cpp:27
 const EVENT_NONE: u8 = 0xFF; // <- d_a_obj_msdan.cpp:39
 /// `M_evname[] = "Msdan"` (`:12`, used at `:40`).
 const EVENT_NAME: &str = "Msdan"; // <- d_a_obj_msdan.cpp:40
-/// `JA_SE_READ_RIDDLE_1 = 0x0806` (`JAZelAudio_SE.h:18`), started at `:67` and `:79`.
+/// `JA_SE_READ_RIDDLE_1 = 0x0806` (`JAZelAudio_SE.h:18`), started at `:18` and `:18`.
 const SE_READ_RIDDLE: u32 = 0x0806; // <- JAZelAudio_SE.h:18
 /// `fopAcM_create` uses `NO_SET_ID` for a runtime-created actor (`f_op_actor_mng.cpp:82`).
 const NO_SET_ID: u16 = 0xFFFF; // <- f_op_actor_mng.cpp:82

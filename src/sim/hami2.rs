@@ -26,9 +26,9 @@ const GATE_STEP: i16 = 0x100; // <- d_a_obj_hami2.cpp:112
 const CULL_MIN: [f32; 3] = [-1200.0, -40000.0, -1200.0]; // <- d_a_obj_hami2.cpp:92
 const CULL_MAX: [f32; 3] = [1200.0, 40000.0, 1200.0]; // <- d_a_obj_hami2.cpp:92
 
-/// `JA_SE_OBJ_KAITEN_AMI_OPEN = 0x69C4` (`JAZelAudio_SE.h:1973`), started at `:104`.
+/// `JA_SE_OBJ_KAITEN_AMI_OPEN = 0x69C4` (`JAZelAudio_SE.h:1973`), started at `:1973`.
 const SE_KAITEN_AMI_OPEN: u32 = 0x69C4; // <- JAZelAudio_SE.h:1973
-/// `JA_SE_READ_RIDDLE_1 = 0x0806` (`JAZelAudio_SE.h:18`), started at `:105`.
+/// `JA_SE_READ_RIDDLE_1 = 0x0806` (`JAZelAudio_SE.h:18`), started at `:18`.
 const SE_READ_RIDDLE: u32 = 0x0806; // <- JAZelAudio_SE.h:18
 /// `dComIfGp_getVibration().StartShock(4, -33, cXyz(0.0f, 1.0f, 0.0f))` (`:115`, `:144`).
 const SHOCK_PATTERN: i32 = 4; // <- d_a_obj_hami2.cpp:115
@@ -52,7 +52,7 @@ const STATE_CLOSE_DEMO: u8 = 5; // <- d_a_obj_hami2.cpp:165
 /// `J3DModel` and two `dBgW`s; there is no `dCcD` collider anywhere in the TU and the profile
 /// `Group` is `fopAc_ACTOR_e` (`:224`). Neither `HitPoints` nor `Hurt` is attached.
 ///
-/// `Mthd_Delete` (`:127-138`) releases the background and the archive; `Delete` (`:124-126`)
+/// `Mthd_Delete` (`:102-113`) releases the background and the archive; `Delete` (`:97-99`)
 /// returns `TRUE`. There is no refusal path in `Mthd_Create` beyond resource/heap load
 /// (`:107-121`), so `spawn` never refuses.
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -152,7 +152,7 @@ impl Hami2 {
                 }
             }
             STATE_OPEN_STOP => {
-                // `daObjHami2_open_stop` (`:181-186`)
+                // `daObjHami2_open_stop` (`:163-168`)
                 if !switches.test(self.switch_no) {
                     self.order(EVENT_CLOSE, list, active, entity);
                     self.state = STATE_CLOSE_WAIT;

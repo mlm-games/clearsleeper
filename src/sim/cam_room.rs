@@ -130,7 +130,7 @@ impl CamRoom {
         self.arrow_entry.as_ref()
     }
 
-    /// `dCamera_c::GetCameraTypeFromMapToolID`, `d_camera.cpp:1473-1520`. A `room_no` of `-1`
+    /// `dCamera_c::GetCameraTypeFromMapToolID`, `d_camera.cpp:1673-1720`. A `room_no` of `-1`
     /// resolves against the whole-stage pair, any other room against that room's own pair, whose
     /// absence answers [`NO_CAM_TYPE`] the way the original's null camera does. The answer is
     /// `cam_type::TYPE_KEEP` for a row that keeps the camera where it is, which

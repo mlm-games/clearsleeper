@@ -1778,7 +1778,7 @@ impl DemoAmbient {
 ///
 /// `mPosition` and `mDirection` are `Option`s because the reference never initialises them: the
 /// constructor writes `mFlags = 0` and nothing else (`d_demo.h:238`), and `JSGSetPosition` /
-/// `JSGSetDirection` (`d_demo.cpp:475-478`, `:502-505`) are the only writers, while the matching
+/// `JSGSetDirection` (`d_demo.cpp:502-505`, `:502-505`) are the only writers, while the matching
 /// getters are the empty `JStage::TLight` defaults (`JSGLight.cpp` `JSGGetPosition`,
 /// `JSGGetDirection`). `None` is the port's state for a field nothing has written.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

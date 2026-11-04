@@ -15,7 +15,7 @@ const CULL_MAX_Z: f32 = 600.0; // <- d_a_ikari.cpp:144
 /// Forsaken Fortress anchor. The stage string is `Ikari` (`d_stage.cpp:830`) and the archive is
 /// `Ikari` (`d_a_ikari.cpp:15`), with `S_IKARI2..4` (`d_a_ikari.cpp:45-49`).
 ///
-/// `_execute` (`:87-104`) is driven entirely by `dKyw_get_wind_vec()` and
+/// `_execute` (`:228-245`) is driven entirely by `dKyw_get_wind_vec()` and
 /// `dKyw_get_wind_power()` (`:90-92`), which are weather config with no home in this sim (the
 /// only wind state here is `windmill::Wind::strength`, the Wind's-Requiem event strength
 /// written by `wind::control`, which is a different quantity). `mTimer` (`:88`, `:99`) is

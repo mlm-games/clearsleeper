@@ -268,7 +268,7 @@ fn rnd(seed: &mut [i32; 3]) -> f32 {
     (sum % 1.0).abs()
 }
 
-/// `cLib_calcTimer` — tww/include/SSystem/SComponent/c_lib.h:85-90
+/// `cLib_calcTimer` — tww/include/SSystem/SComponent/c_lib.h:100-105
 fn calc_timer(value: &mut i16) -> bool {
     if *value != 0 {
         *value = value.wrapping_sub(1);
@@ -1796,7 +1796,7 @@ impl Kamome {
     }
 
     /// `cLib_getRndValue(min, range)` is `min + cM_rndF((f32)range)` -
-    /// tww/include/SSystem/SComponent/c_lib.h:80-82, and `cM_rndF(f)` is `cM_rnd() * f` -
+    /// tww/include/SSystem/SComponent/c_lib.h:95-97, and `cM_rndF(f)` is `cM_rnd() * f` -
     /// tww/src/SSystem/SComponent/c_math.cpp:185-187. The second argument is a RANGE,
     /// not an upper bound, so `cLib_getRndValue(60, 60)` yields 60..120 and not a
     /// constant 60.

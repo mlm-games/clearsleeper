@@ -470,7 +470,7 @@ pub fn set_wind_power(weather: &Weather, particle: &mut Particle) {
     particle.offset_position += wind * (power * WIND_POWER_GAIN);
 }
 
-/// `dPa_windPcallBack::execute` (`d_particle.cpp:583-585`).
+/// `dPa_windPcallBack::execute` (`d_particle.cpp:652-654`).
 pub fn wind_particle_execute(weather: &Weather, particle: &mut Particle) {
     set_wind_power(weather, particle);
 }
@@ -716,7 +716,7 @@ pub fn smoke_new(rate_off: u8) -> Smoke {
 
 /// `dPa_smokeEcallBack::dPa_smokeEcallBack(u8, u8, u8, u8)` (`d_particle.cpp:332-343`): the four
 /// arguments are the rate flag, the follow switch, the flag word and the immortal latch, in that
-/// order. `dPa_control_c::mSmokeEcallback` is built from `(0, 1, 1, 1)` (`d_particle.cpp:609`),
+/// order. `dPa_control_c::mSmokeEcallback` is built from `(0, 1, 1, 1)` (`d_particle.cpp:678`),
 /// which is the shared instance [`Jpa::smoke_callback`] carries.
 pub fn smoke_new_shared(rate_off: u8, follow_off: u8, flag: u8, immortal_taken: u8) -> Smoke {
     Smoke {
@@ -768,7 +768,7 @@ pub fn smoke_draw_state(
     Some(initiate_lighting(dif, amb, color))
 }
 
-/// `dPa_smokeEcallBack::draw` (`d_particle.cpp:430-432`): the draw is the lighting block above with
+/// `dPa_smokeEcallBack::draw` (`d_particle.cpp:437-439`): the draw is the lighting block above with
 /// this callback's own colour and its own colour source. The setup info it also passes is read by
 /// nothing there.
 pub fn smoke_draw(callback: &Smoke, emitter: &Emitter, actor: ActorLight) -> Option<Lighting> {
@@ -1147,7 +1147,7 @@ pub fn follow_draw(_emitter: &Emitter) {}
 /// `executeAfter` drains: `mPos` at `0x00`, `mPrmColor` at `0x0C`, `mEnvColor` at `0x10` and
 /// `mbAffectedByWind` at `0x13`.
 ///
-/// `dPa_simpleData_c::dPa_simpleData_c` (`d_particle.cpp:480`) writes nothing, so retail's entries
+/// `dPa_simpleData_c::dPa_simpleData_c` (`d_particle.cpp:549`) writes nothing, so retail's entries
 /// are clear until a `set` fills them.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SimpleData {
@@ -1181,17 +1181,17 @@ pub struct Simple {
     pub data: [SimpleData; SIMPLE_DATA],
 }
 
-/// `dPa_simpleEcallBack::dPa_simpleEcallBack` (`d_particle.cpp:474-477`).
+/// `dPa_simpleEcallBack::dPa_simpleEcallBack` (`d_particle.cpp:543-546`).
 pub fn simple_new() -> Simple {
     Simple::default()
 }
 
-/// `dPa_simpleData_c::dPa_simpleData_c` (`d_particle.cpp:480`).
+/// `dPa_simpleData_c::dPa_simpleData_c` (`d_particle.cpp:549`).
 pub fn simple_data_new() -> SimpleData {
     SimpleData::default()
 }
 
-/// `dPa_simpleEcallBack::set` (`d_particle.cpp:564-580`): queue one spawn, taking the alpha as the
+/// `dPa_simpleEcallBack::set` (`d_particle.cpp:633-649`): queue one spawn, taking the alpha as the
 /// primary colour's own alpha, and refuse once the queue is full.
 pub fn simple_set(
     callback: &mut Simple,
@@ -1274,7 +1274,7 @@ pub fn simple_create(
     Some(emitter)
 }
 
-/// `dPa_simpleEcallBack::executeAfter` (`d_particle.cpp:483-513`): drain the queue. With nothing to
+/// `dPa_simpleEcallBack::executeAfter` (`d_particle.cpp:552-582`): drain the queue. With nothing to
 /// create this frame the queue is simply emptied; otherwise the emitter is un-stopped, and for each
 /// queued spawn that survives a [`SPAWN_CLIP_RADIUS`] sphere test against the view frustum the
 /// emitter is moved and recoloured there and [`Emitter::current_create_number`] particles are
@@ -1326,7 +1326,7 @@ pub fn simple_execute_after(
     emitter.stop_create_particle();
 }
 
-/// `dPa_simpleEcallBack::draw` (`d_particle.cpp:516-522`): a smoke-flagged emitter takes the same
+/// `dPa_simpleEcallBack::draw` (`d_particle.cpp:585-591`): a smoke-flagged emitter takes the same
 /// lighting block with the shared colour and no colour source of its own, and a projection-group
 /// emitter takes its alpha from the register alone.
 ///
@@ -1880,7 +1880,7 @@ pub struct Jpa {
     pub model_control: ModelControl,
     /// `mSimpleCallbacks[25]` (`d/d_particle.h:563`), the registry `getSimple` searches.
     pub simple: Vec<Simple>,
-    /// `dPa_control_c::mSmokeEcallback` (`d_particle.cpp:609`), built from `(0, 1, 1, 1)`. A smoke
+    /// `dPa_control_c::mSmokeEcallback` (`d_particle.cpp:678`), built from `(0, 1, 1, 1)`. A smoke
     /// emitter's `end` reinstalls this instance rather than clearing the callback, so it is held
     /// here and copied into the emitter.
     pub smoke_callback: Smoke,

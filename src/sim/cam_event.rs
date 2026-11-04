@@ -2974,7 +2974,7 @@ fn stoker(camera: &mut Camera, player: &Player, feed: &mut Feed<'_>) -> bool {
     !hold
 }
 
-/// `dCamera_c::directionOf`, `d_camera.cpp:1579-1581`.
+/// `dCamera_c::directionOf`, `d_camera.cpp:1779-1781`.
 fn facing_of(player: &Player) -> SAngle {
     SAngle::from_radians(player.face)
 }

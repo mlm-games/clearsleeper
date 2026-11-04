@@ -81,7 +81,7 @@ const SETTLE_COORD: [f32; 3] = [0.0, 1.0, 0.0]; // <- d_a_obj_ohatch.cpp:261
 /// stage string `Ohatch`.
 ///
 /// (a) inbound damage: NONE. (b) outbound damage: NONE. `daObjOhatch_c` is a plain `fopAc_ac_c`
-/// (`d_a_obj_ohatch.h:16`) holding one `J3DModel*`, two `dBgW*` and an `Mtx` (`:38-42`); it registers
+/// (`d_a_obj_ohatch.h:7`) holding one `J3DModel*`, two `dBgW*` and an `Mtx` (`:38-42`); it registers
 /// no `dCcD` collider of any kind. The two `dBgW` are moving backgrounds (RULE 3b) built from the
 /// `OH_CLS` / `OH_OPN` DZBs (`:120-121`), and the gate the player walks through is that
 /// background's collision, not a `dCcD` collider. The profile `Group` is `fopAc_ACTOR_e` (`:367`).
@@ -189,7 +189,7 @@ impl Ohatch {
     fn create_init(&mut self, switches: &Switches) {
         // `if (m29C != 0xff && fopAcM_isSwitch(this, m29C) == TRUE) { m2D8 = -0x4000;
         // mActionFunc = &open_wait_act_proc; ... } else { mActionFunc = &close_wait_act_proc; ... }`
-        // (:137-148). `fopAcM_isSwitch` (`f_op_actor_mng.h:374-376`) is `Switches::test`, and the `&&`
+        // (:137-148). `fopAcM_isSwitch` (`f_op_actor_mng.h:390-392`) is `Switches::test`, and the `&&`
         // short-circuits first, so index 0xFF never reaches it - the same FALSE
         // `dSv_info_c::isSwitch` would have returned (`d_save.cpp:1591-1593`).
         //

@@ -218,7 +218,7 @@ impl Esa {
     ///
     /// NOTE the convention: `d_a_esa.cpp` writes every random draw as `cM_rndF(range) + low`
     /// (`:98-99`, `:108`, `:120`, `:125`, `:136`), which is the same arithmetic as
-    /// `cLib_getRndValue(low, range) = low + cM_rndF(range)` (`c_lib.h:79-81`). No line of
+    /// `cLib_getRndValue(low, range) = low + cM_rndF(range)` (`c_lib.h:96-98`). No line of
     /// `d_a_esa.cpp` calls `cLib_getRndValue`, and none of these draws is a constant - every one
     /// has `cM_rndF` with a non-zero range, including `getRndValue(x, x)`-shaped pairs.
     fn rnd(&mut self, range: f32) -> f32 {

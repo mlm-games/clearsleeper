@@ -624,7 +624,7 @@ impl Jnt {
         settled == 2
     }
 
-    fn look_at_target(
+    pub fn look_at_target(
         &mut self,
         out_y: &mut i16,
         dst: Option<Vec3>,
@@ -779,7 +779,7 @@ impl Text<'_> {
         }
     }
 
-    fn status(&self) -> Option<u8> {
+    pub fn status(&self) -> Option<u8> {
         match self.proc_name() {
             Some(FPC_NM_MSG) => Some(self.one.status),
             Some(FPC_NM_MSG2) => Some(self.two.status),
@@ -787,7 +787,7 @@ impl Text<'_> {
         }
     }
 
-    fn set_status(&mut self, status: u8) {
+    pub fn set_status(&mut self, status: u8) {
         match self.proc_name() {
             Some(FPC_NM_MSG) => self.one.status = status,
             Some(FPC_NM_MSG2) => self.two.status = status,
@@ -802,15 +802,15 @@ impl Text<'_> {
         }
     }
 
-    fn mesg_anime(&self) -> u8 {
+    pub fn mesg_anime(&self) -> u8 {
         self.info.mesg_anime
     }
 
-    fn clear_mesg_anime(&mut self) {
+    pub fn clear_mesg_anime(&mut self) {
         self.info.set_mesg_anime_attr_info(0xFF);
     }
 
-    fn message_set(&mut self, msg_no: u32, look_at: Vec3) -> u32 {
+    pub fn message_set(&mut self, msg_no: u32, look_at: Vec3) -> u32 {
         let Some(archive) = self.archive else {
             return FPC_M_ERROR_PROCESS_ID;
         };
@@ -825,7 +825,7 @@ impl Text<'_> {
         )
     }
 
-    fn bound(&self) -> bool {
+    pub fn bound(&self) -> bool {
         self.proc_name().is_some()
     }
 }

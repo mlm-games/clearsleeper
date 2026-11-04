@@ -65,7 +65,7 @@ impl Bg {
     }
 }
 
-/// `cLib_calcTimer(T* value)` (`c_lib.h:85-90`): decrement unless already zero, then return the
+/// `cLib_calcTimer(T* value)` (`c_lib.h:100-105`): decrement unless already zero, then return the
 /// stored value. The decomp tests the RETURN (`d_a_bg.cpp:298`), so the despawn lands on the tick
 /// the counter reaches zero.
 fn calc_timer(value: &mut i32) -> i32 {

@@ -107,7 +107,7 @@ impl Warpfo {
         Self { timer: 0 }
     }
 
-    /// `cLib_calcTimer` (`c_lib.h:85-90`), as `actWarp1`/`actWarp2`/`actWarp3` call it.
+    /// `cLib_calcTimer` (`c_lib.h:100-105`), as `actWarp1`/`actWarp2`/`actWarp3` call it.
     fn calc_timer(&mut self) -> bool {
         if self.timer != 0 {
             self.timer -= 1;

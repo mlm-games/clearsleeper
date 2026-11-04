@@ -23,7 +23,7 @@ pub const HOLE_ACTORS: [&str; 2] = ["Ypit00", "Pitfall"];
 const HIO_M08: f32 = 65.0; // <- d_a_obj_hole.cpp:32 (daObj_Hole_HIO_c::m08)
 /// The remaining `daObj_Hole_HIO_c` constructor values are all PROVEN and all unused here:
 /// `m0C = 0` (`d_a_obj_hole.cpp:33`) is what makes `modeWait` take the `mScaleLocal` arm at `:105`
-/// rather than `l_HIO.m0C * 10` at `:102`; `m10 = 2.0f` (`:34`) is only the `adjustPos.y +=` lift in
+/// rather than `l_HIO.m0C * 10` at `:102`; `m10 = 2.0f` (`:19`) is only the `adjustPos.y +=` lift in
 /// `setMtx` (`:43`) and `debugDraw`'s only statement (`:182`); `m05 = 0` (`:31`) gates that debug
 /// draw (`:187-189`); `mNo = -1` (`:30`) is the HIO handle, which `daObj_Hole_c` never uses. None is
 /// stored, because each has no surviving reader (RULE 12b).
@@ -266,7 +266,7 @@ impl Hole {
         } else {
             // `dComIfGp_setNextStage(dComIfGp_getStartStageName(), 0, current.roomNo);` (:131) -
             // the 4th..8th arguments all take their defaults (`d_com_inf_game.h:2237-2239`), and
-            // `dComIfGp_getStartStageName()` (`d_com_inf_game.h:2247-2249`) is the current DZS stage
+            // `dComIfGp_getStartStageName()` (`d_com_inf_game.h:2255-2257`) is the current DZS stage
             // name, which `super::area::StageName` carries.
             ctx.next.target = Some(Target {
                 stage: ctx.stage.0.clone(),

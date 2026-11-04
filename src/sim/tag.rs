@@ -26,17 +26,17 @@ const MINIGAME_TYPE: u32 = 1; // <- d_a_tag_so.h:10
 /// The struct has ONE field, `minigame`, which is `isMinigame()` / `mType == 1`. The other two
 /// decoded parameters are deliberately not stored - see `spawn`.
 ///
-/// `daTag_So_c::_execute` (`d_a_tag_so.cpp:31-33`) is `return TRUE;` and NOTHING else: there is no
+/// `daTag_So_c::_execute` (`d_a_tag_so.cpp:19-21`) is `return TRUE;` and NOTHING else: there is no
 /// statement, no timer, no state and no mode in the whole 127-line translation unit, so no
 /// `control` system is derivable. The rest of the class is equally empty:
 ///
-/// * `daTag_So_c::_draw` (`d_a_tag_so.cpp:44-48`) is
+/// * `daTag_So_c::_draw` (`d_a_tag_so.cpp:32-36`) is
 ///   `if (l_HIO.m05) debugDraw(); return TRUE;`, and `daTag_So_HIO_c`'s constructor
 ///   (`d_a_tag_so.cpp:23-26`) leaves `m05 = 0`, so `debugDraw` (`:36-41`) never runs in retail and
 ///   is a `dLib_debugDrawFan` debug primitive besides - renderer work.
 /// * `daTag_So_c::_create` (`:68-72`) is `fopAcM_ct` + `getArg()` + `cPhs_COMPLEATE_e`: it can
 ///   never refuse creation, so there is no spawn-then-despawn path.
-/// * `daTag_So_c::_delete` (`:75-77`) and `daTag_SoIsDelete` (`:100-102`) are both the bare
+/// * `daTag_So_c::_delete` (`:75-77`) and `daTag_SoIsDelete` (`:88-90`) are both the bare
 ///   "accepts a delete request" form of RULE 6b.
 ///
 /// There is no `cull()` here either, and that is a deliberate refusal rather than an omission:

@@ -104,7 +104,7 @@ impl Dragon {
     /// `case 0` of `move` (`d_a_dr.cpp:72-77`): `anm_init(BCK_DR_WAIT1_e, l_HIO.mWait1Morf,
     /// EMode_LOOP, 1.0f, -1)` - `anm_init` (`:48-66`) is entirely `mpMorf->setAnm` plus the
     /// `mCurrBckIdx` bookkeeping that only feeds `anm_init`'s own blend rate, so it is renderer
-    /// work. `l_HIO.mWait1Morf = 10.0f` (`:24`) is a blend rate and goes with it. What remains is
+    /// work. `l_HIO.mWait1Morf = 10.0f` (`:16`) is a blend rate and goes with it. What remains is
     /// `mMode++` and the randomised idle timer.
     fn case_idle(&mut self) {
         self.mode = Mode::IdleWait;

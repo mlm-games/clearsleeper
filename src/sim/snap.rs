@@ -80,7 +80,7 @@ pub const CULL_ANGLE_NONE: i16 = 0x7FFF;
 /// writes `col * 4` there (`:1901`), so the six bits are the registry row.
 const LABEL_SHIFT: u32 = 26;
 
-/// The cylinder's unit-circle vertices (`cylvtx`, `d_snap.cpp:1398-1404`). `SetInf`'s `r7` is
+/// The cylinder's unit-circle vertices (`cylvtx`, `d_snap.cpp:1706-1712`). `SetInf`'s `r7` is
 /// `4` at the only call site (`:2243`), and `CalcArea2D` walks `i` and `i + 1`, so the closed
 /// loop needs the fifth entry.
 const CYL_VERTS: [[f32; 3]; 5] = [

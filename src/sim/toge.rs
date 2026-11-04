@@ -211,7 +211,7 @@ impl Toge {
             // ```
             // (:245-254)
             STATE_PENDING => {
-                // `cLib_calcTimer(&unk486)` (`c_lib.h:85-91`) decrements a non-zero value by one
+                // `cLib_calcTimer(&unk486)` (`c_lib.h:100-105`) decrements a non-zero value by one
                 // and returns it.
                 if self.delay != 0 {
                     self.delay -= 1;

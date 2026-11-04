@@ -341,7 +341,7 @@ impl GyCtrl {
     /// if (m3E8 == 0 || m344 == 0) { m35C = 0; }
     /// ```
     ///
-    /// `cLib_calcTimer` (`c_lib.h:85-91`) DECREMENTS a nonzero timer and RETURNS THE NEW VALUE, so
+    /// `cLib_calcTimer` (`c_lib.h:100-105`) DECREMENTS a nonzero timer and RETURNS THE NEW VALUE, so
     /// `== 0` means "just expired" - and it also fires when the timer was already 0, because the
     /// `*value != 0` guard skips the decrement and the stale 0 is returned.
     ///
@@ -750,7 +750,7 @@ struct Ctx<'a, 'w, 's> {
     commands: &'a mut Commands<'w, 's>,
 }
 
-/// `cLib_calcTimer` (`c_lib.h:85-91`) paired with its reload: decrement a nonzero timer and return
+/// `cLib_calcTimer` (`c_lib.h:100-105`) paired with its reload: decrement a nonzero timer and return
 /// the NEW value; `reload` fires when the result is 0, exactly as `if (... == 0) { t = reload; }`.
 fn calc_timer(value: i32, reload: i32) -> i32 {
     if value != 0 {

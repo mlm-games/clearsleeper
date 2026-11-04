@@ -103,7 +103,7 @@ pub struct DekuItem {
 
 impl DekuItem {
     /// `_create` (`:107-131`), minus `fopAcM_ct` (`:108`), the omitted `fopAcM_isItem` refusal
-    /// (`:112-114`), `dComIfG_resLoad` (`:120`), `fopAcM_entrySolidHeap` / `CheckCreateHeap` /
+    /// (`:56-58`), `dComIfG_resLoad` (`:120`), `fopAcM_entrySolidHeap` / `CheckCreateHeap` /
     /// `CreateHeap` (`:123-125`, `:56-86`) and `CreateInit` (`:127`) - archive and heap work. What
     /// survives is the parameter decode and the `UNK_1801` refusal.
     pub fn spawn(parameters: u32, flags: &EventFlags) -> Self {

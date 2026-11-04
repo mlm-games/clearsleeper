@@ -22,6 +22,7 @@ pub mod atttag;
 pub mod auzu;
 pub mod aygr;
 pub mod ba1;
+pub mod balancelift;
 pub mod balloon;
 pub mod barrel;
 pub mod barricade;
@@ -137,6 +138,7 @@ pub mod hami4;
 pub mod hammer;
 pub mod hammerhit;
 pub mod hbrf1;
+pub mod hcbh;
 pub mod health;
 pub mod helmaroc;
 pub mod hfuck1;
@@ -187,6 +189,7 @@ pub const FLOORMASTER_ARCHIVE: &str = "fm";
 pub const FLOORMASTER_MODEL_ENTRY: &str = "fm.bdl";
 pub mod andsw0;
 pub mod andsw2;
+pub mod event_cut;
 pub mod jpa;
 pub mod jpa_bank;
 pub mod jstudio;
@@ -219,6 +222,7 @@ pub mod layer;
 pub mod leaflift;
 pub mod leaves;
 pub mod lenzo;
+pub mod light;
 pub mod link_move;
 pub mod link_proc;
 pub mod lock;
@@ -262,6 +266,7 @@ pub mod npc_jb1;
 pub mod npc_km1;
 pub mod npc_mt;
 pub mod npc_p1;
+pub mod npc_p2;
 pub mod npc_pf1;
 pub mod npc_tc;
 pub mod npc_tt;
@@ -347,6 +352,7 @@ pub mod stone;
 pub mod stream;
 pub mod swatk;
 pub mod swc00;
+pub mod swflat;
 pub mod swhammer;
 pub mod swhit0;
 pub mod swim;
@@ -393,6 +399,7 @@ pub mod volcano;
 pub mod vrbox;
 pub mod vrbox2;
 pub mod vteng;
+pub mod vtil;
 pub mod walk;
 pub mod wall;
 pub mod warpf;
@@ -739,6 +746,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if npc_p1::is_npc_p1(&source.name) {
         let npcP1 = npc_p1::NpcP1::spawn(source.parameters);
         world.spawn((actor, npcP1)).id()
+    } else if npc_p2::is_npc_p2(&source.name) {
+        let npcP2 = npc_p2::NpcP2::spawn(
+            source.parameters,
+            glam::Vec3::from_array(source.pos),
+            source.angle[1],
+        );
+        world.spawn((actor, npcP2)).id()
     } else if amos_knight::is_amos_knight(&source.name) {
         let amosKnight = amos_knight::AmosKnight::spawn(source.parameters);
         world.spawn((actor, amosKnight)).id()
@@ -846,6 +860,14 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
         world
             .spawn((actor, hlift::Hlift::spawn(source.parameters)))
             .id()
+    } else if swflat::is_swflat(&source.name) {
+        world
+            .spawn((actor, swflat::Swflat::spawn(source.parameters)))
+            .id()
+    } else if balancelift::is_balancelift(&source.name) {
+        world.spawn((actor, balancelift::Balancelift::spawn())).id()
+    } else if light::is_light(&source.name) {
+        world.spawn((actor, light::Light::spawn())).id()
     } else if lstair::is_lstair(&source.name) {
         world
             .spawn((actor, lstair::Lstair::spawn(source.parameters)))
@@ -1101,6 +1123,9 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if koisi::is_koisi(&source.name) {
         let boulder = koisi::Koisi::spawn(source.parameters);
         world.spawn((actor, boulder, carry::Carryable::Stone)).id()
+    } else if vtil::is_vtil(&source.name) {
+        let statue = vtil::Vtil::spawn(actor.pos);
+        world.spawn((actor, statue, carry::Carryable::Vtil)).id()
     } else if door::Door::is_shutter(&source.name) {
         let hatch = door::Door::spawn(source.parameters, source.angle, door::Kind::Shutter);
         world.spawn((actor, hatch)).id()
@@ -1162,6 +1187,13 @@ pub(crate) fn spawn_actor(world: &mut World, source: &crate::dzs::StageActor) ->
     } else if leaves::is_leaves(&source.name) {
         let pile = leaves::Leaves::spawn(source.parameters, world.resource::<flags::Switches>());
         world.spawn((actor, pile)).id()
+    } else if hcbh::is_hcbh(&source.name) {
+        let pillar = hcbh::Hcbh::spawn(
+            source.parameters,
+            world.resource::<flags::Switches>(),
+            actor.pos,
+        );
+        world.spawn((actor, pillar)).id()
     } else if volcano::is_volcano(&source.name) {
         let crater = volcano::Volcano::spawn(
             source.parameters,
@@ -1984,6 +2016,7 @@ pub fn build(
     sim.world.insert_resource(att::AttNonPos::default());
     sim.world.insert_resource(bwdg::BwdgStatics::default());
     sim.world.insert_resource(npc_p1::StageStart::default());
+    sim.world.insert_resource(light::LightGlobal::default());
     // `daPy_lk_c::create`'s start demo (`d_a_player_main.cpp:12328`) is resolved from the spawn
     // row the stage was entered through, so it is staged here and ordered once play begins.
     let start = stage
@@ -2113,6 +2146,11 @@ pub fn build(
                         wall::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
+                    // The idol reads the previous step's contact records, as `hit_co` does ahead of
+                    // `dComIfG_Ccsp()->Set(&mCyl)` (`tww/src/d/actor/d_a_obj_vtil.cpp:473`).
+                    (vtil::control
+                        .in_set(WwSimSet::Execute)
+                        .before(contact_run::run),),
                     (hookshot::control.in_set(WwSimSet::Execute),).chain(),
                     (
                         barrier::control.in_set(WwSimSet::Execute),
@@ -2232,6 +2270,7 @@ pub fn build(
                         kamome::control.in_set(WwSimSet::Execute),
                         npc_mt::control.in_set(WwSimSet::Execute),
                         npc_p1::control.in_set(WwSimSet::Execute),
+                        npc_p2::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
                     (
@@ -2383,7 +2422,9 @@ pub fn build(
                         wind::control.in_set(WwSimSet::Execute),
                         homen::control.in_set(WwSimSet::Execute),
                         leaves::control.in_set(WwSimSet::Execute),
+                        hcbh::control.in_set(WwSimSet::Execute),
                         swpush::control.in_set(WwSimSet::Execute),
+                        swflat::control.in_set(WwSimSet::Execute),
                         mflft::control.in_set(WwSimSet::Execute),
                         ojtree::control.in_set(WwSimSet::Execute),
                         hmlif::control.in_set(WwSimSet::Execute),
@@ -2482,9 +2523,13 @@ pub fn build(
                 (bodies::attach_spawned
                     .in_set(WwSimSet::Execute)
                     .before(contact_run::run),),
-                (bodies::follow
-                    .in_set(WwSimSet::Execute)
-                    .before(contact_run::run),),
+                (
+                    bodies::follow.in_set(WwSimSet::Execute),
+                    (balancelift::control
+                        .in_set(WwSimSet::Execute)
+                        .before(contact_run::run),),
+                )
+                    .chain(),
                 (
                     ship::control.in_set(WwSimSet::Execute),
                     area::clamp_to_area.in_set(WwSimSet::Execute),
@@ -2545,6 +2590,7 @@ pub fn build(
                     bita::control.in_set(WwSimSet::Execute),
                     coming3::control.in_set(WwSimSet::Execute),
                     grid::control.in_set(WwSimSet::Execute),
+                    light::control.in_set(WwSimSet::Execute),
                 ),
             )
                 .chain(),

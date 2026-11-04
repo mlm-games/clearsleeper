@@ -231,7 +231,7 @@ impl Lbridge {
             chase_alpha(&mut self.alpha, ALPHA_HIDDEN, ALPHA_STEP);
         } else {
             // `fopAcM_onDraw(this);` (:179)
-            // `cLib_calcTimer(&mTimer);` (:181) - `c_lib.h:85-91`.
+            // `cLib_calcTimer(&mTimer);` (:181) - `c_lib.h:100-105`.
             if self.timer != 0 {
                 self.timer -= 1;
             }

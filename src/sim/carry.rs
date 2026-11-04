@@ -25,7 +25,9 @@ pub struct Carry {
 
 /// `fopAcStts_CARRY_e` actors the player can pick up. The `Boss` arm is the hookshot-only
 /// latch, retail's `fopAcStts_UNK80000_e`: bosses never join the carry stack, but the
-/// hookshot bit-pins them and they read `fopAcStts_HOOK_CARRY_e` while pinned.
+/// hookshot bit-pins them and they read `fopAcStts_HOOK_CARRY_e` while pinned. `Vtil` is the
+/// stone idol, which buys its carry cursor through `attention_info`
+/// (`tww/src/d/actor/d_a_obj_vtil.cpp:101-102`).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Carryable {
     Tsubo,
@@ -33,6 +35,7 @@ pub enum Carryable {
     Pig,
     Barrel,
     Boss,
+    Vtil,
 }
 
 impl Carryable {
@@ -49,6 +52,7 @@ pub fn is_carryable(name: &str) -> bool {
     super::tsubo::is_tsubo(name)
         || super::koisi::is_koisi(name)
         || super::barrel::is_barrel(name)
+        || super::vtil::is_vtil(name)
         || name == PIG_ACTOR
 }
 
@@ -96,6 +100,7 @@ pub fn control(
     mut pots: Query<&mut super::tsubo::Tsubo>,
     mut rocks: Query<&mut super::koisi::Koisi>,
     mut casks: Query<&mut super::barrel::Barrel>,
+    mut statues: Query<&mut super::vtil::Vtil>,
     players: Query<&Player>,
 ) {
     let pressed = do_intent.0 && !carry.held_press;
@@ -138,6 +143,12 @@ pub fn control(
                         if let Ok(mut cask) = casks.get_mut(entity) {
                             cask.carry_step(false);
                         }
+                        // `d_a_player_grab.inc:572-573` writes the thrown `speedF` into the carried
+                        // actor; the idol only reads its sign (`d_a_obj_vtil.cpp:272`) and then
+                        // overwrites it with its own launch.
+                        if let Ok(mut statue) = statues.get_mut(entity) {
+                            statue.toss();
+                        }
                     }
                 }
             }
@@ -166,6 +177,12 @@ pub fn control(
                 }
                 if let Ok(mut cask) = casks.get_mut(entity) {
                     cask.pick_up(angle_of(yaw));
+                }
+                // `mode_carry_init`'s `prm_off_stick()` (`d_a_tsubo.cpp:1911`): the pot comes off
+                // whatever it was stuck to, which is what the acorn's leaf reads as a shake
+                // (`d_a_acorn_leaf.cpp:157-159`, `:176-179`).
+                if let Ok(mut pot) = pots.get_mut(entity) {
+                    pot.stick = false;
                 }
                 carry.held = Some(entity);
             }

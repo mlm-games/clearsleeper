@@ -45,7 +45,7 @@ const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:558 (fo
 /// Those five fields drive EVERY live branch of `_execute` (`d_a_obj_stair.cpp:216-328`):
 /// `field_0x2E0 == l_HIO.m18` (`:218`), `l_HIO.m10 * 0.5f` / `l_HIO.m14` (`:224`, `:234-246`),
 /// `field_0x2E0 > l_HIO.m18` (`:253`), `field_0x2E0 > l_HIO.m18 + 0xf0` (`:257`),
-/// `field_0x2E0 = l_HIO.m18 - (s16)(...)` (`:303`), `l_HIO.m18 - 2` (`:316`) and the trailing bob
+/// `field_0x2E0 = l_HIO.m18 - (s16)(...)` (`:303`), `l_HIO.m18 - 2` (`:58`) and the trailing bob
 /// `((temp5 - l_HIO.m18) + 10) & 0x3` (`:323-325`). Folding them to the constructor values would be
 /// inventing data, which RULE 1 forbids, so this module carries ONLY the create-time refusal - the
 /// one piece of `create` that needs no HIO. A module with a spawn guard and no `control`-driven

@@ -2012,6 +2012,12 @@ impl App {
                 }
                 let (half, top) = pile.cull();
                 (view::ActorKind::Scenery, 0, top, half)
+            } else if let Some(pillar) = entity.get::<sim::hcbh::Hcbh>() {
+                if !pillar.drawn() {
+                    continue;
+                }
+                let (_, max) = pillar.cull();
+                (view::ActorKind::Scenery, 0, max[1], max[0])
             } else if let Some(crater) = entity.get::<sim::volcano::Volcano>() {
                 if !crater.visible() {
                     continue;
@@ -2587,6 +2593,22 @@ impl App {
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
             } else if let Some(x) = entity.get::<sim::hlift::Hlift>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::swflat::Swflat>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::balancelift::Balancelift>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::light::Light>() {
+                let (min, max) = x.cull();
+                lift = min[1];
+                (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])
+            } else if let Some(x) = entity.get::<sim::vtil::Vtil>() {
                 let (min, max) = x.cull();
                 lift = min[1];
                 (view::ActorKind::Scenery, 0, max[1] - min[1], max[0])

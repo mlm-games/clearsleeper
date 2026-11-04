@@ -123,7 +123,7 @@ fn line_bg_check(from: Vec3, to: Vec3, solid: Option<&Collision>) -> Option<Hit>
     })
 }
 
-/// `dCamera_c::compWallMargin`, `d_camera.cpp:1907-1922`: a sphere of `radius` around
+/// `dCamera_c::compWallMargin`, `d_camera.cpp:2122-2137`: a sphere of `radius` around
 /// `point`, and every triangle plane the camera's centre faces within that distance pushes
 /// the point out along its normal by the shortfall. `Collision` exposes no sphere query, so
 /// the push is the same intent taken along the ray the cross point was found on: back off
@@ -141,7 +141,7 @@ fn comp_wall_margin(solid: Option<&Collision>, origin: Vec3, point: Vec3, radius
     }
 }
 
-/// `dCamera_c::groundHeight`, `d_camera.cpp:1770-1791`: the higher of the object-layer and
+/// `dCamera_c::groundHeight`, `d_camera.cpp:1985-2006`: the higher of the object-layer and
 /// the camera-layer ground cross, or the query's own height when neither has ground. The
 /// port has the one ground query where retail has the pair.
 pub fn ground_height(pos: Vec3, solid: Option<&Collision>) -> f32 {

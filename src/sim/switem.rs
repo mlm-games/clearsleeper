@@ -151,7 +151,7 @@ pub struct Watch<'w, 's> {
 /// `mCyl.GetTgHitObj()` (`tww/src/d/actor/d_a_switem.cpp:83`) hands back exactly one object per
 /// tick, so the sim collapses every live AT emitter down to the single highest-priority source:
 /// the order `iball::source_at` already uses (`src/sim/iball.rs:206`) with the bomb blast channel
-/// in the `leaves::control` slot (`src/sim/leaves.rs:231`).
+/// in the `leaves::control` slot (`src/sim/leaves.rs`, `hit_source`).
 fn source_at(watch: &Watch<'_, '_>) -> At {
     if watch
         .chains
@@ -271,7 +271,7 @@ fn life_percent(health: &Health) -> u8 {
 }
 
 /// `getItemNoByLife` (`tww/src/d/d_item.cpp:2860`): at full health a heart drops as a rupee.
-fn item_no_by_life(item: u8, health: &Health) -> u8 {
+pub(crate) fn item_no_by_life(item: u8, health: &Health) -> u8 {
     if life_percent(health) != 100 {
         return item;
     }
@@ -284,10 +284,10 @@ fn item_no_by_life(item: u8, health: &Health) -> u8 {
     item
 }
 
-/// `MAKE_ITEM_PARAMS(itemNo, itemBitNo, switchNo2, type, action)`
-/// (`tww/src/f_op/f_op_actor_mng.cpp:31`) as `fopAcM_fastCreateItem2` applies it at line 1022,
-/// with `switchNo2 = -1`, `daItemType_0_e` and `daItemAct_1_e`.
-fn item_parameters(item: u8, bit_no: u8) -> u32 {
+/// `MAKE_ITEM_PARAMS(itemNo, itemBitNo, switchNo2, type, action)` (`f_op_actor_mng.cpp:31`) is what
+/// `fopAcM_fastCreateItem2` expands (`tww/src/f_op/f_op_actor_mng.cpp:1024`) with `switchNo2 = -1`,
+/// `daItemType_0_e` and `daItemAct_1_e`.
+pub(crate) fn item_parameters(item: u8, bit_no: u8) -> u32 {
     (u32::from(item) & 0xFF)
         | ((u32::from(bit_no) & 0xFF) << ITEM_PARAM_BIT_SHIFT)
         | (ITEM_PARAM_SWITCH2 << ITEM_PARAM_SWITCH2_SHIFT)
@@ -334,7 +334,7 @@ impl Switem {
 
     /// `fopAcM_createItemFromTable` (`tww/src/f_op/f_op_actor_mng.cpp:805`) resolves
     /// `0x20..=0x3E` through `dComIfGp_getItemTable()`, whose `mpItemTable` pointer is only ever
-    /// written by absent per-stage data (`tww/include/d/d_com_inf_game.h:632`), and refuses
+    /// written by absent per-stage data (`tww/include/d/d_com_inf_game.h:4053`), and refuses
     /// `0x3F` at line 892. Only a literal item number is provable here.
     fn created_item(&self, health: &Health) -> Option<u8> {
         if (TABLE_LOW..=TABLE_HIGH).contains(&self.item_table) || self.item_table == TABLE_NONE {

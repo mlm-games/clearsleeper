@@ -228,7 +228,7 @@ impl Text {
                 // `setCenterLineWidth(486)` (`d_s_open_sub.cpp:89-90`).
                 data.line_width = 503;
                 data.center_line_width = 486;
-                // `g_msgHIO.field_0x70` is 23 on USA (`d_meter.cpp:430`), the box's line
+                // `g_msgHIO.field_0x70` is 23 on USA (`d_meter.cpp:39`), the box's line
                 // space is overridden to 28 (`d_s_open_sub.cpp:56-57`) and its char space is
                 // the box's 0 (`:79`).
                 data.font_size = MESSAGE_FONT_SIZE;

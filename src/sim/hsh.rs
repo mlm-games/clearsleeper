@@ -179,7 +179,7 @@ impl Cut {
     }
 }
 
-/// `cLib_calcTimer` (`c_lib.h:85-91`), as `actionAppearEvent` (`:664`) and `actionDeleteEvent`
+/// `cLib_calcTimer` (`c_lib.h:100-105`), as `actionAppearEvent` (`:664`) and `actionDeleteEvent`
 /// (`:685`) call it.
 fn calc_timer(timer: &mut i32) -> bool {
     if *timer != 0 {

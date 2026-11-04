@@ -118,7 +118,7 @@ pub struct Watch<'w, 's> {
 /// `mCyl.GetTgHitObj()` (`tww/src/d/actor/d_a_swattack.cpp:70`) hands back exactly one object per
 /// tick, so the sim collapses every live AT emitter down to the single highest-priority source:
 /// the order `iball::source_at` already uses (`src/sim/iball.rs:206`) with the bomb blast channel
-/// in the `leaves::control` slot (`src/sim/leaves.rs:231`).
+/// in the `leaves::control` slot (`src/sim/leaves.rs`, `hit_source`).
 fn source_at(watch: &Watch<'_, '_>) -> At {
     if watch
         .chains

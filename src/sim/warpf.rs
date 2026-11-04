@@ -167,7 +167,7 @@ impl Warpf {
         (CULL_MIN, CULL_MAX)
     }
 
-    /// `cLib_calcTimer` (`c_lib.h:85-91`), as `actWarpMode_1` / `2` / `3` call it.
+    /// `cLib_calcTimer` (`c_lib.h:100-105`), as `actWarpMode_1` / `2` / `3` call it.
     fn calc_timer(&mut self) -> bool {
         if self.timer != 0 {
             self.timer -= 1;

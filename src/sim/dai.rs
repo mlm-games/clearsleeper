@@ -113,7 +113,7 @@ const FACING_LIMIT: u16 = 12000;
 ///   `dComIfGs_checkReserveItemEmpty() && getRotenItemNumInBag() < 3` (`:311`) and `0xF0E` (`:326`)
 ///   otherwise; its `default` (`:337-341`) ends the box with `fopMsgStts_MSG_ENDS_e`
 ///   (`f_op_msg.h:26`).
-/// * `JA_SE_LK_W_DAIZA_TAKEOFF = 0x2871` (`JAZelAudio_SE.h:559`) plays at `:312`.
+/// * `JA_SE_LK_W_DAIZA_TAKEOFF = 0x2871` (`JAZelAudio_SE.h:559`) plays at `:559`.
 ///
 /// `isDaizaItem(itemNo)` (`d_item.cpp:2749-2759`) tests the twelve `dItemNo_*` statues from
 /// `dItemNo_TOWN_FLOWER_e = 0x8C` (`d_item_data.h:147`) to

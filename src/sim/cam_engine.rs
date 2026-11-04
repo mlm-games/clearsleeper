@@ -67,7 +67,7 @@ pub mod evflag {
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct LockInput {
     /// `dCamera_c::mpLockonTarget`, `d_camera.h:198`, as `attentionPos` answers it at
-    /// `d_camera.cpp:1589-1591`. Retail's `Att` at `d_camera.cpp:638-650` fills it from the
+    /// `d_camera.cpp:1589-1591`. Retail's `Att` at `d_camera.cpp:841-853` fills it from the
     /// attention's lock-on list, and its other three writers are the mode and type choosers.
     pub target: Option<Vec3>,
     /// `dAttention_c::LockonTruth`, `d_attention.cpp:1048-1051`, read at `d_camera.cpp:3331`.
