@@ -247,10 +247,42 @@ const WARPF_WARP_23_TIMER: i16 = 5;
 #[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct StageEvents(pub Vec<String>);
 
+/// `dEvent_exception_c::getEventName`'s 201-213 table (`d_event_manager.cpp:55-69`,
+/// `wwhd/wwhd_src/d/d_event_manager.cpp:705-706`). A PLYR row can name one of these directly, so
+/// they resolve before the stage's own EVNT rows.
+const EXCEPTION_NAMES: [&str; 13] = [
+    "NORMAL_COMEBACK",
+    "MAGMA_COMEBACK",
+    "TORNADO_COMEBACK",
+    "TIMEWARP_COMEBACK",
+    "SHIP_COMEBACK",
+    "DEFAULT_START",
+    "SHUTTER_START",
+    "SHUTTER_START_STOP",
+    "BS_SHUTTER_START",
+    "KNOB_START",
+    "KNOB_START_B",
+    "FMASTER_START",
+    "FALL_START",
+];
+
 impl StageEvents {
     pub fn name(&self, id: u8) -> Option<&str> {
+        self.name_with_stage(id, 0)
+    }
+
+    /// `dEvent_exception_c::getEventName`, `d_event_manager.cpp:54-94`; HD
+    /// `wwhd/wwhd_src/d/d_event_manager.cpp:684-711`. Index 207 is the boss-stage shutter override.
+    pub fn name_with_stage(&self, id: u8, stage_type: u32) -> Option<&str> {
         if id == 0xFF {
             return None;
+        }
+        // `dStageType_BOSS_e` is 3 in both trees (`d_stage.h`, HD `StageInfo::mFlags >> 16 & 7`).
+        if id == 207 && stage_type == 3 {
+            return Some("BS_SHUTTER_START");
+        }
+        if (201..=213).contains(&id) {
+            return EXCEPTION_NAMES.get(usize::from(id - 201)).copied();
         }
         self.0.get(usize::from(id)).map(String::as_str)
     }

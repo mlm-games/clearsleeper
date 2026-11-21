@@ -820,11 +820,16 @@ impl App {
         if start.index == sim::event::NO_START_EVENT {
             return;
         }
+        let stage_type = self
+            .stage
+            .as_ref()
+            .and_then(|tables| tables.stag())
+            .map_or(0, |stag| stag.stage_type);
         let Some(name) = self
             .sim
             .world
             .get_resource::<sim::event::StageEvents>()
-            .and_then(|names| names.name(start.index))
+            .and_then(|names| names.name_with_stage(start.index, stage_type))
             .map(str::to_owned)
         else {
             return;
