@@ -367,6 +367,7 @@ pub mod swtact;
 pub mod swtdoor;
 pub mod syan;
 pub mod table;
+pub mod tact;
 pub mod tag;
 pub mod tag_msg;
 pub mod tag_volcano;
@@ -1748,6 +1749,7 @@ pub fn build(
     sim.world.insert_resource(intent::MoveIntent::default());
     sim.world.insert_resource(intent::CameraYaw::default());
     sim.world.insert_resource(intent::CStick::default());
+    sim.world.insert_resource(tact::Tact::default());
     sim.world.insert_resource(intent::PadButtons::default());
     sim.world.insert_resource(intent::DamageIntent::default());
     sim.world.insert_resource(intent::DoIntent::default());
@@ -2581,6 +2583,7 @@ pub fn build(
                     lamp::control.in_set(WwSimSet::Execute),
                     rflw::control.in_set(WwSimSet::Execute),
                     gtaki::control.in_set(WwSimSet::Execute),
+                    tact::control.in_set(WwSimSet::Execute),
                     swtact::control.in_set(WwSimSet::Execute),
                     warpfo::control.in_set(WwSimSet::Execute),
                     atdoor::control.in_set(WwSimSet::Execute),

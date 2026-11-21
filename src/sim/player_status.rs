@@ -110,6 +110,7 @@ pub fn control(
     item: Res<ItemIntent>,
     use_intent: Res<UseIntent>,
     equipped: Res<Equipped>,
+    tact: Res<super::tact::Tact>,
     scope: Res<super::scope::Scope>,
     mut status: ResMut<PlayerStatus>,
     mut info: ResMut<crate::text::msgproc::MsgGameInfo>,
@@ -148,9 +149,16 @@ pub fn control(
     info.player_status0 = bits;
     // `procTactWait_init`'s `setPlayerStatus1(0, daPyStts1_WIND_WAKER_CONDUCT_e)`
     // (`d_a_player_tact.inc:190,259`; `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1914`),
-    // held for the whole play the item-use cursor is on. The Tact switch and the talking
-    // signboard both read this bit and had no writer (`swtact.rs:119`, `kanban.rs:730`).
-    status.status1 = if use_intent.0 && equipped.item(WAKER_SLOT) == ITEM_WIND_WAKER {
+    // held for the whole performance and direction wheel, not just the Use press
+    // (`tww/src/d/actor/d_a_player_tact.inc:259,507,682`;
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1914,1995`).
+    // The Tact switch and the talking signboard both read this bit.
+    let conducting = matches!(
+        tact.phase,
+        super::tact::TactPhase::Play | super::tact::TactPhase::Direction
+    );
+    status.status1 = if (use_intent.0 || conducting) && equipped.item(WAKER_SLOT) == ITEM_WIND_WAKER
+    {
         STTS1_WIND_WAKER_CONDUCT
     } else {
         0

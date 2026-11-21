@@ -109,6 +109,7 @@ impl Swtact {
         switches: &mut Switches,
         info: &MsgGameInfo,
         events: &mut SimEvents,
+        music: i32,
     ) {
         let Some(player) = player else {
             return;
@@ -122,7 +123,7 @@ impl Swtact {
             if self.player_status != stts1 && stts1 != 0 {
                 events.list.push(SimEvent::Se(SE_PRE_TAKT));
             }
-            if self.listening(TACT_NONE) {
+            if self.listening(music) {
                 self.trigger = true;
             }
         }
@@ -140,6 +141,7 @@ pub fn is_swtact(name: &str) -> bool {
 
 pub fn control(
     status: Res<PlayerStatus>,
+    tact: Res<super::tact::Tact>,
     info: Res<MsgGameInfo>,
     mut switches: ResMut<Switches>,
     mut events: ResMut<SimEvents>,
@@ -155,6 +157,7 @@ pub fn control(
             &mut switches,
             &info,
             &mut events,
+            tact.music,
         );
     }
 }
