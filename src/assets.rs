@@ -506,11 +506,10 @@ impl PlayerIdle {
 }
 
 pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
-    let root = AssetRoot::from_env().ok()?;
-    let archive = root.read_archive(LINK_ANM_ARCHIVE).ok()?;
-    let path = root.path(LINK_ANM_ARCHIVE);
-    let under = link_morph(&archive, &path, LINK_IDLE_UNDER, mesh)?;
-    let upper = link_morph(&archive, &path, LINK_IDLE_UPPER, mesh)?;
+    let anms = AnmArchive::open(LINK_ANM_ARCHIVE).ok()?;
+    let parents = &mesh.joint_parents;
+    let under = anms.morph(AnmRef::Entry(LINK_IDLE_UNDER), parents)?;
+    let upper = anms.morph(AnmRef::Entry(LINK_IDLE_UPPER), parents)?;
     let upper_root = mesh
         .joint_names
         .iter()
@@ -529,14 +528,16 @@ pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
     }
     let mut demos = Vec::new();
     for stem in crate::sim::link_demo::STEMS {
-        match link_morph(&archive, &path, &format!("bcks/{stem}.bck"), mesh) {
+        let entry = format!("bcks/{stem}.bck");
+        match anms.morph(AnmRef::Entry(&entry), parents) {
             Some(morph) => demos.push((*stem, morph)),
             None => log::warn!("clearsleeper: missing link demo animation {stem}"),
         }
     }
     let mut gameplay = Vec::new();
     for stem in PLAYER_GAMEPLAY_STEMS {
-        match link_morph(&archive, &path, &format!("bcks/{stem}.bck"), mesh) {
+        let entry = format!("bcks/{stem}.bck");
+        match anms.morph(AnmRef::Entry(&entry), parents) {
             Some(morph) => gameplay.push((*stem, morph)),
             None => log::warn!("clearsleeper: missing link gameplay animation {stem}"),
         }
@@ -551,21 +552,6 @@ pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
     })
 }
 
-fn link_morph(
-    archive: &Archive,
-    path: &Path,
-    entry: &str,
-    mesh: &crate::j3d::bdl::RoomMesh,
-) -> Option<crate::j3d::bck::Morph> {
-    let data = archive.read(entry).ok()?;
-    let raw = if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
-        yaz0_decode(data, path).ok()?
-    } else {
-        data.to_vec()
-    };
-    crate::j3d::bck::Morph::parse(&raw, &mesh.joint_parents).ok()
-}
-
 pub fn load_link_anms() -> Option<crate::sim::event::LinkAnms> {
     match link_anms_from_assets() {
         Ok(anms) => Some(anms),
@@ -577,35 +563,16 @@ pub fn load_link_anms() -> Option<crate::sim::event::LinkAnms> {
 }
 
 fn link_anms_from_assets() -> Result<crate::sim::event::LinkAnms, AssetError> {
-    let root = AssetRoot::from_env()?;
-    let archive = root.read_archive(LINK_ANM_ARCHIVE)?;
-    let path = root.path(LINK_ANM_ARCHIVE);
+    let anms_archive = AnmArchive::open(LINK_ANM_ARCHIVE)?;
     let mut anms = crate::sim::event::LinkAnms::default();
     for stem in crate::sim::event::LINK_ANIM_STEMS {
-        let Ok(data) = archive.read(&format!("bcks/{stem}.bck")) else {
-            log::warn!("clearsleeper: missing link animation {stem}");
-            continue;
-        };
-        let raw = if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
-            let Ok(raw) = yaz0_decode(data, &path) else {
-                log::warn!("clearsleeper: failed to expand link animation {stem}");
-                continue;
-            };
-            raw
-        } else {
-            data.to_vec()
-        };
-        match bck_anm(&raw) {
+        let entry = format!("bcks/{stem}.bck");
+        match anms_archive.anm_fields(AnmRef::Entry(&entry), AnmKind::Bck) {
             Some((attribute, frames)) => anms.insert(stem, attribute, frames),
-            None => log::warn!("clearsleeper: unreadable link animation {stem}"),
+            None => log::warn!("clearsleeper: missing or unreadable link animation {stem}"),
         }
     }
     Ok(anms)
-}
-
-fn bck_anm(data: &[u8]) -> Option<(u8, u16)> {
-    let (attribute, frames) = anm_block(data, b"J3D1bck1", b"ANK1")?;
-    Some((attribute, frames.max(0) as u16))
 }
 
 /// The `ANK1` block of a `J3D1bck1` or the `TPT1` block of a `J3D1btp1`
@@ -633,6 +600,80 @@ fn anm_block(data: &[u8], magic: &[u8; 8], tag: &[u8; 4]) -> Option<(u8, i16)> {
     None
 }
 
+/// How an animation is addressed inside an object archive. Link's animations are named
+/// (`bcks/walk.bck`), an NPC's are indexed by the `dRes_ID_*` its anm table names
+/// (`dNpc_setAnmIDRes`, `d_npc.cpp:546-563`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnmRef<'a> {
+    Entry(&'a str),
+    Id(u16),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnmKind {
+    Bck,
+    Btp,
+}
+
+impl AnmKind {
+    fn header(self) -> (&'static [u8; 8], &'static [u8; 4]) {
+        match self {
+            Self::Bck => (b"J3D1bck1", b"ANK1"),
+            Self::Btp => (b"J3D1btp1", b"TPT1"),
+        }
+    }
+}
+
+/// One object archive opened for animation reads: the bytes are decoded the same way whether
+/// the archive came from the extracted tree or a disc image, and both the morph and the
+/// frame count come from the same decoded block.
+pub struct AnmArchive {
+    archive: Archive,
+    path: PathBuf,
+}
+
+impl AnmArchive {
+    pub fn open(name: &str) -> Result<Self, AssetError> {
+        let root = AssetRoot::from_env()?;
+        Ok(Self {
+            archive: root.read_archive(name)?,
+            path: root.path(name),
+        })
+    }
+
+    pub fn bytes(&self, reference: AnmRef<'_>) -> Result<Vec<u8>, AssetError> {
+        let data = match reference {
+            AnmRef::Entry(entry) => self.archive.read(entry)?,
+            AnmRef::Id(id) => self.archive.read_id(id)?,
+        };
+        if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
+            yaz0_decode(data, &self.path)
+        } else {
+            Ok(data.to_vec())
+        }
+    }
+
+    /// The `ANK1`/`TPT1` attribute and frame count both loaders copy
+    /// (`J3DAnmLoader.cpp:294-306`); Link keeps the attribute, NPCs keep the count.
+    pub fn anm_fields(&self, reference: AnmRef<'_>, kind: AnmKind) -> Option<(u8, u16)> {
+        let raw = self.bytes(reference).ok()?;
+        let (magic, tag) = kind.header();
+        let (attribute, frames) = anm_block(&raw, magic, tag)?;
+        Some((attribute, frames.max(0) as u16))
+    }
+
+    pub fn frame_count(&self, reference: AnmRef<'_>, kind: AnmKind) -> Option<u16> {
+        self.anm_fields(reference, kind).map(|(_, frames)| frames)
+    }
+
+    /// A BCK posed against a model's joint order, `mDoExt_McaMorf::setAnm`'s
+    /// `J3DAnmTransform` (`m_Do_ext.cpp:1412-1424`).
+    pub fn morph(&self, reference: AnmRef<'_>, parents: &[u16]) -> Option<crate::j3d::bck::Morph> {
+        let raw = self.bytes(reference).ok()?;
+        crate::j3d::bck::Morph::parse(&raw, parents).ok()
+    }
+}
+
 const BA_OBJECT_ARCHIVE: &str = "files/res/Object/Ba.arc";
 
 /// The `Ba` object archive's animation frame counts, `getFrameMax()`'s only source on this
@@ -651,37 +692,18 @@ pub fn load_ba_anms() -> Option<crate::sim::ba1::Ba1Anms> {
 /// `btpNum_toResID` (`d_a_npc_ba1.cpp:301-336`), read through the archive id that
 /// `dComIfG_getObjectIDRes("Ba", ...)` looks up.
 fn ba_anms_from_assets() -> Result<crate::sim::ba1::Ba1Anms, AssetError> {
-    let root = AssetRoot::from_env()?;
-    let archive = root.read_archive(BA_OBJECT_ARCHIVE)?;
-    let path = root.path(BA_OBJECT_ARCHIVE);
+    let archive = AnmArchive::open(BA_OBJECT_ARCHIVE)?;
     let mut anms = crate::sim::ba1::Ba1Anms::default();
     let ids = crate::sim::ba1::BCK
         .iter()
-        .map(|id| (*id, *b"J3D1bck1", *b"ANK1"))
-        .chain(
-            crate::sim::ba1::BTP
-                .iter()
-                .map(|id| (*id, *b"J3D1btp1", *b"TPT1")),
-        );
-    for (id, magic, tag) in ids {
+        .map(|id| (*id, AnmKind::Bck))
+        .chain(crate::sim::ba1::BTP.iter().map(|id| (*id, AnmKind::Btp)));
+    for (id, kind) in ids {
         let Ok(id) = u16::try_from(id) else {
             continue;
         };
-        let Ok(data) = archive.read_id(id) else {
-            log::warn!("clearsleeper: Ba.arc has no animation id {id:#06x}");
-            continue;
-        };
-        let raw = if data.len() >= 4 && data[..4] == YAZ0_MAGIC {
-            let Ok(raw) = yaz0_decode(data, &path) else {
-                log::warn!("clearsleeper: failed to expand Ba animation {id:#06x}");
-                continue;
-            };
-            raw
-        } else {
-            data.to_vec()
-        };
-        match anm_block(&raw, &magic, &tag) {
-            Some((_, frames)) => anms.insert(id, frames),
+        match archive.frame_count(AnmRef::Id(id), kind) {
+            Some(frames) => anms.insert(id, frames),
             None => log::warn!("clearsleeper: unreadable Ba animation {id:#06x}"),
         }
     }

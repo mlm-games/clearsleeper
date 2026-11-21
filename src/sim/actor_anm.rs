@@ -1,0 +1,64 @@
+use bevy_ecs::prelude::*;
+
+use super::anim_clock::Mode;
+use super::ba1::Ba1;
+
+/// One actor's animation as the view needs it: which object archive and resource id its own
+/// table named, plus where its frame cursor got to. `dNpc_setAnmIDRes` in both trees looks the
+/// BCK up in the actor's object archive (`tww/src/d/d_npc.cpp:546-563`,
+/// `wwhd/wwhd_src/d/d_npc.cpp:58-69`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActorAnm {
+    pub entity: Entity,
+    pub archive: &'static str,
+    pub bck: i32,
+    pub frame: f32,
+    pub looping: bool,
+}
+
+impl ActorAnm {
+    pub fn view(&self) -> crate::view::ActorAnm {
+        crate::view::ActorAnm {
+            archive: self.archive,
+            bck: self.bck,
+            frame: self.frame,
+            looping: self.looping,
+        }
+    }
+}
+
+#[derive(Resource, Debug, Default)]
+pub struct ActorAnms(pub Vec<ActorAnm>);
+
+pub const BA_ARCHIVE: &str = "Ba";
+
+/// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
+pub fn clear(mut anms: ResMut<ActorAnms>) {
+    anms.0.clear();
+}
+
+/// Grandma's cursor is the one non-Link animation already ported from its object archive:
+/// `morf_frame` is `mpMorf->getFrame()` and `morf` is the `FrameCtrl` `setAnm` initialised
+/// (`tww/src/d/actor/d_a_npc_ba1.cpp:280`, `m_Do_ext.cpp:1414-1437`;
+/// `wwhd/wwhd_src/d/actor/d_a_npc_ba1.cpp:402-419`).
+pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
+    for (entity, grandma) in &grandmas {
+        if !grandma.morf_live || !grandma.drawn() {
+            continue;
+        }
+        let Some(bck) = usize::try_from(grandma.anm_num)
+            .ok()
+            .and_then(|index| super::ba1::BCK.get(index))
+            .copied()
+        else {
+            continue;
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: BA_ARCHIVE,
+            bck,
+            frame: grandma.morf_frame,
+            looping: grandma.morf.attribute() == Mode::Loop,
+        });
+    }
+}

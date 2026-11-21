@@ -39,6 +39,19 @@ pub struct ActorView {
     pub item: u8,
     pub height: f32,
     pub half: f32,
+    /// The BCK an actor's own frame cursor is on. One field for every actor so the view can
+    /// skin any of them the same way it skins the player ([`PlayerAnm`]).
+    pub anm: Option<ActorAnm>,
+}
+
+/// The animation an actor's sim cursor is on: the object archive and resource id its own anm
+/// table named, then the frame and wrap the cursor reached (`dNpc_setAnmIDRes`, `d_npc.cpp:546-563`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActorAnm {
+    pub archive: &'static str,
+    pub bck: i32,
+    pub frame: f32,
+    pub looping: bool,
 }
 
 /// The bck a demo step put the player on, and the frame the demo has reached in it

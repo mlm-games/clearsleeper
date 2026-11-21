@@ -1490,6 +1490,12 @@ impl App {
 
     fn actor_views(&self) -> Vec<view::ActorView> {
         let mut out = Vec::new();
+        let anims: std::collections::HashMap<bevy_ecs::entity::Entity, view::ActorAnm> = self
+            .sim
+            .world
+            .get_resource::<sim::actor_anm::ActorAnms>()
+            .map(|anms| anms.0.iter().map(|anm| (anm.entity, anm.view())).collect())
+            .unwrap_or_default();
         for entity in self.sim.world.iter_entities() {
             if let Some(bomb) = entity.get::<sim::item::Bomb>() {
                 out.push(view::ActorView {
@@ -1498,6 +1504,7 @@ impl App {
                     item: 0,
                     height: 12.0,
                     half: 6.0,
+                    anm: None,
                 });
                 continue;
             }
@@ -1509,6 +1516,7 @@ impl App {
                         item: 0,
                         height: 3.0,
                         half: 3.0,
+                        anm: None,
                     });
                 }
                 continue;
@@ -1520,6 +1528,7 @@ impl App {
                     item: 0,
                     height: 10.0,
                     half: 10.0,
+                    anm: None,
                 });
                 continue;
             }
@@ -1530,6 +1539,7 @@ impl App {
                     item: 0,
                     height: 4.0,
                     half: 4.0,
+                    anm: None,
                 });
                 continue;
             }
@@ -1540,6 +1550,7 @@ impl App {
                     item: 0,
                     height: 24.0,
                     half: 24.0,
+                    anm: None,
                 });
                 continue;
             }
@@ -1556,6 +1567,7 @@ impl App {
                     item: 0,
                     height: 30.0,
                     half: 12.0,
+                    anm: None,
                 });
                 continue;
             }
@@ -3173,6 +3185,7 @@ impl App {
                 item,
                 height,
                 half,
+                anm: anims.get(&entity).copied(),
             });
         }
         out

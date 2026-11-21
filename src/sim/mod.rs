@@ -1,5 +1,6 @@
 pub mod acorn_leaf;
 pub mod actor;
+pub mod actor_anm;
 pub mod adnno;
 pub mod agb;
 pub mod agbsw0;
@@ -1759,6 +1760,7 @@ pub fn build(
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());
     sim.world.insert_resource(events::SimEvents::default());
+    sim.world.insert_resource(actor_anm::ActorAnms::default());
     sim.world.insert_resource(snap::SnapPacket::default());
     sim.world.insert_resource(shadow::ShadowControl::default());
     sim.world.insert_resource(fade::Fade::default());
@@ -2338,11 +2340,13 @@ pub fn build(
                     )
                         .chain(),
                     (
+                        actor_anm::clear.in_set(WwSimSet::Execute),
                         medli::control.in_set(WwSimSet::Execute),
                         makar::control.in_set(WwSimSet::Execute),
                         lenzo::control.in_set(WwSimSet::Execute),
                         zunari::control.in_set(WwSimSet::Execute),
                         ba1::control.in_set(WwSimSet::Execute),
+                        actor_anm::ba1.in_set(WwSimSet::Execute),
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )
