@@ -1425,7 +1425,16 @@ impl App {
                             pose.stem.map(|stem| view::PlayerAnm {
                                 stem,
                                 frame: pose.frame,
-                                looping: matches!(stem, "walk" | "dash" | "swimp" | "swimwait"),
+                                looping: matches!(
+                                    stem,
+                                    "walk"
+                                        | "dash"
+                                        | "swimp"
+                                        | "swimwait"
+                                        | "crouch"
+                                        | "lieforward"
+                                        | "hanging"
+                                ),
                             })
                         })
                 }),

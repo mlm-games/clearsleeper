@@ -103,6 +103,58 @@ pub fn control(
         advance(&mut pose, "jmped");
         return;
     }
+    // tww/src/d/actor/d_a_player_main.cpp:6508,6390 and d_a_player_crawl.inc:350;
+    // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:294,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_04b.cpp:675.
+    match current {
+        Some(Proc::CrouchDefense | Proc::CrouchDefenseSlip) => {
+            advance(&mut pose, "difence");
+            return;
+        }
+        Some(Proc::CrawlMove | Proc::CrawlAutoMove) => {
+            advance(&mut pose, "lieforward");
+            return;
+        }
+        Some(Proc::Crouch | Proc::CrawlStart | Proc::CrawlEnd) => {
+            advance(&mut pose, "crouch");
+            return;
+        }
+        _ => {}
+    }
+    // tww/src/d/actor/d_a_player_hang.inc:425 and d_a_player_ladder.inc:94,207;
+    // wwhd/wwhd_src/d/actor/d_a_player_main_04b.cpp:1150,1158.
+    match current {
+        Some(Proc::HangUp | Proc::HangClimb) => {
+            advance(&mut pose, "hangup");
+            return;
+        }
+        Some(
+            Proc::HangStart
+            | Proc::HangFallStart
+            | Proc::HangWait
+            | Proc::HangMove
+            | Proc::HangWallCatch,
+        ) => {
+            advance(&mut pose, "hanging");
+            return;
+        }
+        Some(
+            Proc::LadderUpStart
+            | Proc::LadderUpEnd
+            | Proc::LadderMove
+            | Proc::ClimbUpStart
+            | Proc::ClimbMoveUpDown
+            | Proc::ClimbMoveSide,
+        ) => {
+            advance(&mut pose, "ladderupst");
+            return;
+        }
+        Some(Proc::LadderDownStart | Proc::LadderDownEnd | Proc::ClimbDownStart) => {
+            advance(&mut pose, "ladderdwst");
+            return;
+        }
+        _ => {}
+    }
     // A moving body is WALK below the dash band and DASH above it; a standing body keeps its
     // WAITS/WAIT pair. tww/src/d/actor/d_a_player_main.cpp:2968-3045;
     // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:3567-3765.
@@ -110,12 +162,7 @@ pub fn control(
         && proc.as_deref().is_some_and(|proc| {
             matches!(
                 proc.current,
-                Proc::Move
-                    | Proc::AtnMove
-                    | Proc::AtnActorMove
-                    | Proc::CrawlMove
-                    | Proc::CrawlAutoMove
-                    | Proc::SideStep
+                Proc::Move | Proc::AtnMove | Proc::AtnActorMove | Proc::SideStep
             )
         });
     if moving {
