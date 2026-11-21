@@ -1,6 +1,9 @@
 use bevy_ecs::prelude::*;
 
+use super::boomerang::BoomCatch;
 use super::combat::{Combat, CutKind};
+use super::death::GameOver;
+use super::events::{SimEvent, SimEvents};
 use super::hammer::{Hammer, Swing};
 use super::hookshot::Hookshot;
 use super::item_use::ItemUse;
@@ -27,6 +30,20 @@ fn advance(pose: &mut PlayerPose, stem: &'static str) {
     }
 }
 
+const HURT_FRAMES: u32 = 12;
+
+/// Flinch frames set from the frame's `Hurt` event and read by the body pose on the next tick.
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct HurtReaction {
+    pub frames: u32,
+}
+
+pub fn hurt_reaction(events: Res<SimEvents>, mut reaction: ResMut<HurtReaction>) {
+    if events.list.contains(&SimEvent::Hurt) {
+        reaction.frames = HURT_FRAMES;
+    }
+}
+
 pub fn control(
     combat: Res<Combat>,
     proc: Option<Res<LinkProc>>,
@@ -34,22 +51,48 @@ pub fn control(
     swim: Res<Swim>,
     roll: Res<Roll>,
     jump: Res<Jump>,
+    game_over: Res<GameOver>,
+    hurt: ResMut<HurtReaction>,
+    boom_catch: ResMut<BoomCatch>,
     players: Query<(&Player, Option<&Hammer>)>,
     shots: Query<&Hookshot>,
     mut pose: ResMut<PlayerPose>,
 ) {
+    let hurt_left = hurt.frames;
+    if hurt.frames > 0 {
+        hurt.frames -= 1;
+    }
+    let catch_left = boom_catch.0;
+    if boom_catch.0 > 0 {
+        boom_catch.0 -= 1;
+    }
     let (speed, hammer) = players
         .iter()
         .next()
         .map_or((0.0, None), |(player, hammer)| (player.speed.abs(), hammer));
     let current = proc.as_deref().map(|proc| proc.current);
     let proc_frame = proc.as_ref().map_or(0, |proc| proc.frame) as f32 * 2.0;
+    // tww/src/d/actor/d_a_player_main_data.inc:1718-1738 and d_a_player_dproc.inc:1015-1028;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:111-113,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:2612-2629.
+    if game_over.active {
+        advance(&mut pose, if swim.active { "swimdie" } else { "dielong" });
+        return;
+    }
     // The player's named() dispatch checks swim before combat and the airborne states before the
     // move states (`link_move.rs:967-986`); mirror that order so one state cannot erase another.
     if swim.active {
         // tww/src/d/actor/d_a_player_swim.inc:343,422;
         // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:3071,3033.
         advance(&mut pose, if swim.surfaced { "swimwait" } else { "swimp" });
+        return;
+    }
+    // tww/src/d/actor/d_a_player_main_data.inc:1620-1710, d_a_player_main.cpp:7525-7554;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:97-110,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:3365-3376.
+    if hurt_left > 0 {
+        pose.stem = Some("damf");
+        pose.frame = (HURT_FRAMES - hurt_left) as f32 * 2.0;
         return;
     }
     // Each sword process installs one of these body animations for its whole run:
@@ -88,6 +131,14 @@ pub fn control(
     if let Some(stem) = item_use.stem {
         pose.stem = Some(stem);
         pose.frame = item_use.frame as f32 * 2.0;
+        return;
+    }
+    // tww/src/d/actor/d_a_player_main_data.inc:1900-1906, d_a_player_boomerang.inc:240-256;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:137,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:377.
+    if catch_left > 0 {
+        pose.stem = Some("boomcatch");
+        pose.frame = (super::boomerang::BOOMCATCH_FRAMES - catch_left) as f32 * 2.0;
         return;
     }
     // tww/src/d/actor/d_a_player_main_data.inc:2194-2200 and d_a_player_hook.inc:304-325;

@@ -1434,6 +1434,10 @@ impl App {
                                         | "crouch"
                                         | "lieforward"
                                         | "hanging"
+                                        | "grabwait"
+                                        | "walkpush"
+                                        | "walkpull"
+                                        | "hookshotjmp"
                                 ),
                             })
                         })

@@ -41,6 +41,12 @@ pub const TURN_CAP: f32 = 0.25 * core::f32::consts::TAU;
 pub const NOMINAL_RANGE: f32 = 0.1;
 pub const FLINCH: u32 = 6;
 
+pub const BOOMCATCH_FRAMES: u32 = 12;
+
+/// Catch frames set when the returning boomerang reaches the player, read by the body pose.
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct BoomCatch(pub u32);
+
 /// `mStts.Init`'s first argument for the boomerang's own status, `boomerang.cpp:802`.
 const AT_WEIGHT: u8 = 0x3C;
 
@@ -219,6 +225,7 @@ pub fn control(
         Option<&mut Hurt>,
         Option<&mut HitGate>,
     )>,
+    mut catch: ResMut<BoomCatch>,
     mut stop: ResMut<HitStop>,
     mut audio: ResMut<HitAudio>,
     mut events: ResMut<SimEvents>,
@@ -353,6 +360,9 @@ pub fn control(
         };
         zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(foe).despawn();
+    }
+    if caught {
+        catch.0 = BOOMCATCH_FRAMES;
     }
     if caught
         && let Some(mut held) = held

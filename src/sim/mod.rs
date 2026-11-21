@@ -1790,6 +1790,9 @@ pub fn build(
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
     sim.world.insert_resource(item_use::ItemUse::default());
+    sim.world
+        .insert_resource(player_pose::HurtReaction::default());
+    sim.world.insert_resource(boomerang::BoomCatch::default());
     sim.world.insert_resource(bombflower::Blasts::default());
     sim.world
         .insert_resource(crate::text::font::FontBank::default());
@@ -2550,6 +2553,7 @@ pub fn build(
                     sea::sea_tick.in_set(WwSimSet::Execute),
                     warship::control.in_set(WwSimSet::Execute),
                     health::apply_damage.in_set(WwSimSet::Execute),
+                    player_pose::hurt_reaction.in_set(WwSimSet::Execute),
                     death::check.in_set(WwSimSet::Execute),
                     cleared::control.in_set(WwSimSet::Execute),
                     (att::control
