@@ -1,6 +1,8 @@
 use bevy_ecs::prelude::*;
 
 use super::combat::{Combat, CutKind};
+use super::hammer::{Hammer, Swing};
+use super::hookshot::Hookshot;
 use super::item_use::ItemUse;
 use super::jump::Jump;
 use super::link_proc::{LinkProc, Proc};
@@ -32,13 +34,14 @@ pub fn control(
     swim: Res<Swim>,
     roll: Res<Roll>,
     jump: Res<Jump>,
-    players: Query<&Player>,
+    players: Query<(&Player, Option<&Hammer>)>,
+    shots: Query<&Hookshot>,
     mut pose: ResMut<PlayerPose>,
 ) {
-    let speed = players
+    let (speed, hammer) = players
         .iter()
         .next()
-        .map_or(0.0, |player| player.speed.abs());
+        .map_or((0.0, None), |(player, hammer)| (player.speed.abs(), hammer));
     let current = proc.as_deref().map(|proc| proc.current);
     let proc_frame = proc.as_ref().map_or(0, |proc| proc.frame) as f32 * 2.0;
     // The player's named() dispatch checks swim before combat and the airborne states before the
@@ -67,9 +70,38 @@ pub fn control(
         pose.frame = 4.0 + combat.frame as f32 * 2.0;
         return;
     }
+    // tww/src/d/actor/d_a_player_main_data.inc:2222-2250 and d_a_player_hammer.inc:171-177,241-247,
+    // 288-294,388-394; wwhd/wwhd_src/d/actor/d_a_player_main.cpp:183-186,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:237,255.
+    if let Some(hammer) = hammer.filter(|hammer| hammer.swing != Swing::Idle) {
+        let stem = match hammer.swing {
+            Swing::Side => "hamswinga",
+            Swing::FrontReady => "hamswingbpre",
+            Swing::Front => "hamswingbhit",
+            Swing::FrontEnd => "hamswingbend",
+            Swing::Idle => unreachable!(),
+        };
+        pose.stem = Some(stem);
+        pose.frame = hammer.frame;
+        return;
+    }
     if let Some(stem) = item_use.stem {
         pose.stem = Some(stem);
         pose.frame = item_use.frame as f32 * 2.0;
+        return;
+    }
+    // tww/src/d/actor/d_a_player_main_data.inc:2194-2200 and d_a_player_hook.inc:304-325;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:179,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:2333.
+    if shots.iter().any(|shot| {
+        matches!(
+            shot.phase,
+            super::hookshot::Phase::Shot
+                | super::hookshot::Phase::Pull
+                | super::hookshot::Phase::Return
+        )
+    }) {
+        advance(&mut pose, "hookshotjmp");
         return;
     }
     if roll.active || matches!(current, Some(Proc::FrontRoll | Proc::FrontRollCrash)) {
@@ -91,6 +123,18 @@ pub fn control(
         pose.frame = proc_frame;
         return;
     }
+    // tww/src/d/actor/d_a_player_main_data.inc:1368-1381, d_a_player_main.cpp:7258,7285;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:61,62,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_05.cpp:838,851.
+    if current == Some(Proc::LandDamage) {
+        let stem = if proc.as_deref().is_some_and(|proc| proc.land_stand) {
+            "landdamast"
+        } else {
+            "landdama"
+        };
+        advance(&mut pose, stem);
+        return;
+    }
     // Fall and land reuse the same paired bck as the jump's airborne phase in both trees:
     // tww/src/d/actor/d_a_player_main.cpp:7181,7325;
     // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:2237,2681.
@@ -98,12 +142,7 @@ pub fn control(
         || matches!(
             current,
             Some(
-                Proc::Fall
-                    | Proc::Land
-                    | Proc::LandDamage
-                    | Proc::BackJumpLand
-                    | Proc::SideStepLand
-                    | Proc::SlowFall
+                Proc::Fall | Proc::Land | Proc::BackJumpLand | Proc::SideStepLand | Proc::SlowFall
             )
         )
     {
@@ -158,6 +197,42 @@ pub fn control(
         }
         Some(Proc::LadderDownStart | Proc::LadderDownEnd | Proc::ClimbDownStart) => {
             advance(&mut pose, "ladderdwst");
+            return;
+        }
+        _ => {}
+    }
+    // tww/src/d/actor/d_a_player_main_data.inc:1921-1934 and d_a_player_pushpull.inc:129,172;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:140,141,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_07.cpp:4349,4361.
+    match current {
+        Some(Proc::PushMove) => {
+            advance(&mut pose, "walkpush");
+            return;
+        }
+        Some(Proc::PullMove) => {
+            advance(&mut pose, "walkpull");
+            return;
+        }
+        _ => {}
+    }
+    // tww/src/d/actor/d_a_player_main_data.inc:1403-1429, d_a_player_main.cpp:6693,6727,6756,6782;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:66-69,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:506,521.
+    match current {
+        Some(Proc::SlideFront) => {
+            advance(&mut pose, "slidef");
+            return;
+        }
+        Some(Proc::SlideFrontLand) => {
+            advance(&mut pose, "slidefland");
+            return;
+        }
+        Some(Proc::SlideBack) => {
+            advance(&mut pose, "slideb");
+            return;
+        }
+        Some(Proc::SlideBackLand) => {
+            advance(&mut pose, "slidebland");
             return;
         }
         _ => {}

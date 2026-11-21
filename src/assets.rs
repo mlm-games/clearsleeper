@@ -377,7 +377,9 @@ const LINK_UPPER_ROOT: &str = "body_chn";
 /// `tww/src/d/actor/d_a_player_main_data.inc:2446-2448` and
 /// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215`. Bottle and grab rows are in
 /// `tww/src/d/actor/d_a_player_main_data.inc:1746-1762,2306-2342` and
-/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:115,196,199`.
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:115,196,199`. The remaining body states use the rows
+/// in `tww/src/d/actor/d_a_player_main_data.inc:1368-1429,1921-1934,2194-2250` and
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:61-69,140-141,179,183-186`.
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "walk",
     "dash",
@@ -406,6 +408,19 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "binopena",
     "grabup",
     "grabwait",
+    "landdama",
+    "landdamast",
+    "hamswinga",
+    "hamswingbpre",
+    "hamswingbhit",
+    "hamswingbend",
+    "hookshotjmp",
+    "walkpush",
+    "walkpull",
+    "slidef",
+    "slidefland",
+    "slideb",
+    "slidebland",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks
