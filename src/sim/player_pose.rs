@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::combat::{Combat, CutKind};
+use super::item_use::ItemUse;
 use super::jump::Jump;
 use super::link_proc::{LinkProc, Proc};
 use super::player::Player;
@@ -27,6 +28,7 @@ fn advance(pose: &mut PlayerPose, stem: &'static str) {
 pub fn control(
     combat: Res<Combat>,
     proc: Option<Res<LinkProc>>,
+    item_use: Res<ItemUse>,
     swim: Res<Swim>,
     roll: Res<Roll>,
     jump: Res<Jump>,
@@ -63,6 +65,11 @@ pub fn control(
         // The cut's own tick counter is its frame control; the bck advances two frames per tick
         // at this sim rate, starting from the table's frame 4.
         pose.frame = 4.0 + combat.frame as f32 * 2.0;
+        return;
+    }
+    if let Some(stem) = item_use.stem {
+        pose.stem = Some(stem);
+        pose.frame = item_use.frame as f32 * 2.0;
         return;
     }
     if roll.active || matches!(current, Some(Proc::FrontRoll | Proc::FrontRollCrash)) {

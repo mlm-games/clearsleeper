@@ -371,7 +371,9 @@ const LINK_UPPER_ROOT: &str = "body_chn";
 /// same single-morph rows (`d_a_player_main_data.inc:1123,1382,1452,1935-1942`;
 /// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:26,63,73,142-143`). Crouch/crawl, hang and ladder
 /// rows are in `tww/src/d/actor/d_a_player_main_data.inc:1473-1492,1956-2011` and
-/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:76-78,145-152`.
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:76-78,145-152`. The Deku Leaf swing is
+/// `tww/src/d/actor/d_a_player_main_data.inc:2159-2164` and
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:161`.
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "walk",
     "dash",
@@ -394,6 +396,7 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "hangup",
     "ladderupst",
     "ladderdwst",
+    "usefana",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks

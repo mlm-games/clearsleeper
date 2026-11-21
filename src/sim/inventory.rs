@@ -8,6 +8,10 @@ pub const HAMMER_SLOT: usize = 20;
 pub const NO_ITEM: u8 = 0xFF;
 
 pub const ITEM_BOW: u8 = 0x27;
+/// `dItemNo_DEKU_LEAF_e`, `d_item_data.h:59`.
+pub const ITEM_DEKU_LEAF: u8 = 0x34;
+/// `dInvSlot_DEKU_LEAF_e`, `d_com_inf_game.h:1076`.
+pub const SLOT_DEKU_LEAF: usize = 6;
 pub const ITEM_WIND_WAKER: u8 = 0x22;
 pub const ITEM_SKULL_HAMMER: u8 = 0x33;
 pub const FIRST_BOMB: u8 = 0x0B;
@@ -16,6 +20,7 @@ const SLOT_ITEMS: &[(u8, usize)] = &[
     (0x20, 0),
     (0x78, 1),
     (0x22, 2),
+    (0x34, SLOT_DEKU_LEAF),
     (0x25, 3),
     (0x24, 4),
     (0x2D, 5),

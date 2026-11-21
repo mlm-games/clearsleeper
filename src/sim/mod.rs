@@ -162,6 +162,7 @@ pub mod intent;
 pub mod inventory;
 pub mod isle_timer;
 pub mod item;
+pub mod item_use;
 pub mod ivan;
 pub mod jbaba;
 pub mod jnt_hit;
@@ -1788,6 +1789,7 @@ pub fn build(
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
+    sim.world.insert_resource(item_use::ItemUse::default());
     sim.world.insert_resource(bombflower::Blasts::default());
     sim.world
         .insert_resource(crate::text::font::FontBank::default());
@@ -2406,6 +2408,7 @@ pub fn build(
                         qdghd::control.in_set(WwSimSet::Execute),
                         syan::control.in_set(WwSimSet::Execute),
                         item::control.in_set(WwSimSet::Execute),
+                        item_use::control.in_set(WwSimSet::Execute),
                         boomerang::control.in_set(WwSimSet::Execute),
                         enemy::control.in_set(WwSimSet::Execute),
                         balloon::control.in_set(WwSimSet::Execute),
