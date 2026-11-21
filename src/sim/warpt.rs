@@ -8,6 +8,7 @@ use super::flags::{EventFlags, EventReg, StoryBits, Switches};
 use super::ground;
 use super::player::Player;
 use super::stream;
+use super::transition::NextStage;
 
 /// Stage object names (`tww/src/d/d_stage.cpp:605-609`, which also lists `"Warpt"` at `:605`).
 /// `daObj_Warpt_c` is `fpcNm_OBJ_WARPT_e`, listed `0x0003`, draw prio
@@ -216,11 +217,13 @@ impl Warpt {
         regs.set_reg(id, value);
     }
 
-    /// `warp` (`d_a_obj_warpt.cpp:277-282`). `dLib_setNextStageBySclsNum` (`d_lib.cpp:237-256`)
-    /// needs the `.scls` table, which this sim does not load, so only the sound remains.
-    fn warp(&mut self, scls: u8, events: &mut SimEvents) {
+    /// `warp` (`d_a_obj_warpt.cpp:277-282`). The pair is resolved against the room's `SCLS`
+    /// table by the shell, the same path `warpls` uses (`warpls.rs:365-368`);
+    /// `dLib_setNextStageBySclsNum` is `d_lib.cpp:237-256`,
+    /// `wwhd/wwhd_src/d/actor/d_a_obj_warpt.cpp:271`.
+    fn warp(&mut self, scls: u8, room: i8, events: &mut SimEvents, next: &mut NextStage) {
         events.list.push(SimEvent::Se(SE_OTOSHIANA_OPEN));
-        let _ = scls;
+        next.set_by_scls(scls, room);
     }
 
     /// `openHuta` (`d_a_obj_warpt.cpp:389-399`).
@@ -237,17 +240,29 @@ impl Warpt {
     }
 
     /// `normalWarp` (`d_a_obj_warpt.cpp:543-551`).
-    fn normal_warp(&mut self, switches: &Switches, events: &mut SimEvents) -> bool {
+    fn normal_warp(
+        &mut self,
+        switches: &Switches,
+        room: i8,
+        events: &mut SimEvents,
+        next: &mut NextStage,
+    ) -> bool {
         if self.warp_switch == NO_SWITCH || !switches.test(self.warp_switch) {
             return false;
         }
         let scls = self.scls;
-        self.warp(scls, events);
+        self.warp(scls, room, events, next);
         true
     }
 
     /// `spWarp` (`d_a_obj_warpt.cpp:554-582`).
-    fn sp_warp(&mut self, regs: &EventReg, events: &mut SimEvents) -> bool {
+    fn sp_warp(
+        &mut self,
+        regs: &EventReg,
+        room: i8,
+        events: &mut SimEvents,
+        next: &mut NextStage,
+    ) -> bool {
         let picked = match self.sub {
             SUB_SP_2 => {
                 if self.is_warp_bit(regs, self.warp_bit) {
@@ -280,7 +295,7 @@ impl Warpt {
         };
         match picked {
             Some(scls) => {
-                self.warp(scls, events);
+                self.warp(scls, room, events, next);
                 true
             }
             None => false,
@@ -369,7 +384,9 @@ impl Warpt {
         flags: &mut EventFlags,
         switches: &Switches,
         regs: &EventReg,
+        room: i8,
         events: &mut SimEvents,
+        next: &mut NextStage,
     ) {
         if !accepted {
             return;
@@ -377,9 +394,9 @@ impl Warpt {
         let mut taken = true;
         if cut.is_some_and(|cut| list.cut_name(cut) == Some("WARP")) {
             taken = if self.is_sp() {
-                self.sp_warp(regs, events)
+                self.sp_warp(regs, room, events, next)
             } else {
-                self.normal_warp(switches, events)
+                self.normal_warp(switches, room, events, next)
             };
             active.end_staff_cut(list, flags, "Warpt");
         }
@@ -429,6 +446,7 @@ pub fn control(
     list: Res<EventList>,
     mut active: ResMut<ActiveEvent>,
     mut flags: ResMut<EventFlags>,
+    mut next: ResMut<NextStage>,
     players: Query<&Player>,
     mut events: ResMut<SimEvents>,
     mut pots: Query<(Entity, &mut Actor, &mut Warpt)>,
@@ -460,7 +478,9 @@ pub fn control(
                 &mut flags,
                 &switches,
                 &regs,
+                actor.room,
                 &mut events,
+                &mut next,
             ),
             Mode::EventOpen => pot.mode_event_open(accepted, &mut active, &list, &mut events),
         }
