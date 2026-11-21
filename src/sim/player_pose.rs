@@ -22,8 +22,9 @@ pub fn control(
         .iter()
         .next()
         .map_or(0.0, |player| player.speed.abs());
-    // tww/src/d/actor/d_a_player_sword.inc:561-562,663-664,765-766,866-867,965-966,1049-1050:
-    // each sword process installs one of these body animations for its whole run.
+    // Each sword process installs one of these body animations for its whole run:
+    // tww/src/d/actor/d_a_player_sword.inc:561-562,663-664,765-766,866-867,965-966,1049-1050;
+    // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:905-1064.
     if combat.active {
         let stem = match combat.kind {
             CutKind::A => "cuta",
@@ -39,8 +40,9 @@ pub fn control(
         pose.frame = 4.0 + combat.frame as f32 * 2.0;
         return;
     }
-    // tww/src/d/actor/d_a_player_main.cpp:2968-3045: a moving body is WALK below the dash band
-    // and DASH above it; a standing body keeps its WAITS/WAIT pair.
+    // A moving body is WALK below the dash band and DASH above it; a standing body keeps its
+    // WAITS/WAIT pair. tww/src/d/actor/d_a_player_main.cpp:2968-3045;
+    // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:3567-3765.
     let moving = speed > 0.05
         && proc.as_deref().is_some_and(|proc| {
             matches!(

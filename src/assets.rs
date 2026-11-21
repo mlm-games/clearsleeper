@@ -364,9 +364,10 @@ const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
 const LINK_IDLE_UNDER: &str = "bcks/waits.bck";
 const LINK_IDLE_UPPER: &str = "bcks/wait.bck";
 const LINK_UPPER_ROOT: &str = "body_chn";
-/// `mAnmDataTable[ANM_CUTA..ANM_CUTEB]` (`d_a_player_main_data.inc:1242-1282`): the six body
-/// animations the sword processes install; walk and dash are already in `link_demo::STEMS`, but
-/// they are loaded here too so gameplay sampling never depends on a demo being mounted.
+/// `mAnmDataTable[ANM_CUTA..ANM_CUTEB]` (`tww/src/d/actor/d_a_player_main_data.inc:1242-1282`,
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:43-48`): the six body animations the sword processes
+/// install; walk and dash are already in `link_demo::STEMS`, but they are loaded here too so
+/// gameplay sampling never depends on a demo being mounted.
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "walk", "dash", "cuta", "cutf", "cutr", "cutl", "cutea", "cuteb",
 ];

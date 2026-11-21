@@ -140,7 +140,7 @@ pub fn check(
         let room = room_set
             .as_ref()
             .and_then(|room| room.read_id)
-            .map(i32::from);
+            .and_then(|room| i8::try_from(room).ok());
         if let Some(exit) = collision.exit_below(player.pos + Vec3::Y * GROUND_PROBE)
             && exit != NO_EXIT
         {
