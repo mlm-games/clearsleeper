@@ -1,7 +1,9 @@
 use bevy_ecs::prelude::*;
 
+use super::ba1::{ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_EMPTY_BOTTLE};
 use super::events::{SimEvent, SimEvents};
-use super::intent::DamageIntent;
+use super::intent::{DamageIntent, UseIntent};
+use super::inventory::Equipped;
 
 /// Hearts in quarter-units: 12 = three hearts at boot, `max` is the container cap.
 ///
@@ -55,5 +57,41 @@ pub fn apply_damage(
         if health.units > 0 {
             events.list.push(SimEvent::Hurt);
         }
+    }
+}
+
+/// `dItemNo_*` (`tww/include/d/d_item_data.h:88-90`). Red refills life, green refills magic,
+/// blue refills both; the port has no magic meter, so green is a no-op for now.
+const RED_POTION: u8 = 0x51;
+const GREEN_POTION: u8 = 0x52;
+const BLUE_POTION: u8 = 0x53;
+
+#[derive(Resource, Debug, Default)]
+pub struct BottleDrink {
+    pressed: bool,
+}
+
+/// The point in the drink process where the reference applies the contents and empties the
+/// bottle (`d_a_player_bottle.inc:139-143` full life/magic, `:168-174` empty bottle;
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_07.cpp:4514-4539`). One use per `UseIntent` edge.
+pub fn drink(
+    intent: Res<UseIntent>,
+    mut equipped: ResMut<Equipped>,
+    mut health: ResMut<Health>,
+    mut bottle: ResMut<BottleDrink>,
+) {
+    let edge = intent.0 && !bottle.pressed;
+    bottle.pressed = intent.0;
+    if !edge {
+        return;
+    }
+    for slot in ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS {
+        match equipped.item(slot) {
+            RED_POTION | BLUE_POTION => health.units = health.max,
+            GREEN_POTION => {}
+            _ => continue,
+        }
+        equipped.set(slot, ITEM_EMPTY_BOTTLE);
+        break;
     }
 }

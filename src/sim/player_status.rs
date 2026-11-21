@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::intent::{ItemIntent, TargetIntent, UseIntent};
+use super::inventory::{Equipped, ITEM_WIND_WAKER, WAKER_SLOT};
 use super::player::Player;
 use super::ship::Ship;
 use super::swim::Swim;
@@ -108,6 +109,7 @@ pub fn control(
     targeting: Res<TargetIntent>,
     item: Res<ItemIntent>,
     use_intent: Res<UseIntent>,
+    equipped: Res<Equipped>,
     scope: Res<super::scope::Scope>,
     mut status: ResMut<PlayerStatus>,
     mut info: ResMut<crate::text::msgproc::MsgGameInfo>,
@@ -144,6 +146,15 @@ pub fn control(
 
     status.status0 = bits;
     info.player_status0 = bits;
+    // `procTactWait_init`'s `setPlayerStatus1(0, daPyStts1_WIND_WAKER_CONDUCT_e)`
+    // (`d_a_player_tact.inc:190,259`; `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1914`),
+    // held for the whole play the item-use cursor is on. The Tact switch and the talking
+    // signboard both read this bit and had no writer (`swtact.rs:119`, `kanban.rs:730`).
+    status.status1 = if use_intent.0 && equipped.item(WAKER_SLOT) == ITEM_WIND_WAKER {
+        STTS1_WIND_WAKER_CONDUCT
+    } else {
+        0
+    };
 }
 
 pub fn init(world: &mut World) {

@@ -542,6 +542,14 @@ impl Charts {
         Self::mark(&mut self.open, slot, true);
     }
 
+    /// `item_func_collectmap_common` (`wwhd/wwhd_src/d/d_item_3.cpp:319-326`): the item sets
+    /// the got bit and clears the open and complete bits, unlike the auction's `give`.
+    pub fn collect(&mut self, slot: usize) {
+        Self::mark(&mut self.got, slot, true);
+        Self::mark(&mut self.open, slot, false);
+        Self::mark(&mut self.done, slot, false);
+    }
+
     pub fn open(&mut self, slot: usize) {
         Self::mark(&mut self.open, slot, true);
     }

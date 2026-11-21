@@ -152,6 +152,7 @@ pub struct Award<'w> {
     equipped: ResMut<'w, super::inventory::Equipped>,
     got: ResMut<'w, super::inventory::Got>,
     collect: ResMut<'w, super::flags::Collect>,
+    charts: ResMut<'w, super::flags::Charts>,
     dungeon: ResMut<'w, super::flags::MemBits>,
 }
 
@@ -190,6 +191,10 @@ impl Award<'_> {
             0x61..=0x68 => self.collect.on_triforce(item - 0x61),
             0x69..=0x6b => self.collect.on_symbol(item - 0x69),
             0x6d..=0x72 => self.collect.on_tact(item - 0x6d),
+            // `item_func_collectmap01..64` (`d_item.cpp:207-270`, item `0xFF - n` for chart n),
+            // which writes the chart flags rather than the inventory
+            // (`wwhd/wwhd_src/d/d_item_3.cpp:319-320`).
+            0xBF..=0xFE => self.charts.collect(usize::from(0xFF - item)),
             _ => {}
         }
     }

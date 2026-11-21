@@ -2194,6 +2194,16 @@ pub struct DemoNotices {
     pub item_gets: Vec<DemoItemGet>,
 }
 
+/// `PRM_ACTION_ITEM` is the cut's stand-in for `daDitem_c::Delete`'s `execItemGet(m_itemNo)`
+/// (`tww/src/d/actor/d_a_demo_item.cpp:440`,
+/// `wwhd/wwhd_src/d/actor/d_a_demo_item.cpp:202-204`), the write that actually puts the item in
+/// the inventory. Forward the queued number to the same grant the demo-item actor uses.
+pub fn drain_item_gets(mut notices: ResMut<DemoNotices>, mut gets: ResMut<super::event::ItemGets>) {
+    for get in notices.item_gets.drain(..) {
+        gets.0.push(get.item);
+    }
+}
+
 /// One actor a lookup can address, resolved at step start: `fopAcM_searchFromName`'s table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StageActorRow {

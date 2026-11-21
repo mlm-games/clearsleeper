@@ -1756,6 +1756,7 @@ pub fn build(
     sim.world.insert_resource(intent::UseIntent::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
+    sim.world.insert_resource(health::BottleDrink::default());
     sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());
@@ -2333,7 +2334,11 @@ pub fn build(
                     // `daDitem_c::Delete`'s `execItemGet` (`d_a_demo_item.cpp:432-435`) runs as
                     // the item cut removes the actor, so the grant lands in the same tick the cut
                     // ends; the actors that ordered the cut read it on their next execute.
-                    (event::grant_items.in_set(WwSimSet::Execute),).chain(),
+                    (
+                        demo::drain_item_gets.in_set(WwSimSet::Execute),
+                        event::grant_items.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
                     (
                         aryll::control.in_set(WwSimSet::Execute),
                         aryll::grant_sword.in_set(WwSimSet::Execute),
@@ -2557,6 +2562,7 @@ pub fn build(
                     sea::sea_tick.in_set(WwSimSet::Execute),
                     warship::control.in_set(WwSimSet::Execute),
                     health::apply_damage.in_set(WwSimSet::Execute),
+                    health::drink.in_set(WwSimSet::Execute),
                     player_pose::hurt_reaction.in_set(WwSimSet::Execute),
                     death::check.in_set(WwSimSet::Execute),
                     cleared::control.in_set(WwSimSet::Execute),
