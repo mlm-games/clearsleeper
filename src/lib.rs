@@ -351,8 +351,10 @@ impl App {
         self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         self.stage = assets::load_stage_tables(stage);
-        // tww/src/d/d_stage.cpp:2246; tww/src/d/d_event_manager.cpp:347-348: the stage's event-info
-        // table names the demo a PLYR row starts, and the new-game boot path must carry it too.
+        // The stage's event-info table names the demo a PLYR row starts, and the new-game boot
+        // path must carry it too. tww/src/d/d_stage.cpp:2246,
+        // tww/src/d/d_event_manager.cpp:347-348; wwhd/wwhd_src/d/d_stage_3.cpp:172-175,
+        // wwhd/wwhd_src/d/d_stage_4.cpp:226.
         self.sim.world.insert_resource(sim::event::StageEvents(
             self.stage
                 .as_ref()

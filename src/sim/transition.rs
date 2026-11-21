@@ -134,9 +134,11 @@ pub fn check(
             next.exit = None;
             continue;
         }
-        // tww/src/d/d_stage.cpp:2345-2365: a ground exit resolves through the room whose ground
-        // polygon the player stands on, not through the stage's own exit table. The room read id
-        // is already on the room-set request from `dStage_RoomCheck` above.
+        // A ground exit resolves through the room whose ground polygon the player stands on, not
+        // through the stage's own exit table. The room read id is already on the room-set request
+        // filled in above. tww/src/d/d_stage.cpp:2345-2365,
+        // tww/src/d/d_lib.cpp:237-256; wwhd/wwhd_src/d/d_stage_4.cpp:326-345,
+        // wwhd/wwhd_src/d/d_lib.cpp:644-675.
         let room = room_set
             .as_ref()
             .and_then(|room| room.read_id)
