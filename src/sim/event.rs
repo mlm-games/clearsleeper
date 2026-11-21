@@ -3933,6 +3933,12 @@ fn package(
                         match data {
                             Some(bytes) => {
                                 let file = DemoFile { name, bytes };
+                                // The player a `JACT Link` block names: retail's
+                                // `fopAcM_searchFromName("Link", 0, 0)` (`f_op_actor_mng.cpp:1430-1436`)
+                                // answers the player process, which this port holds outside the
+                                // actor query.
+                                let player =
+                                    props.players.iter_mut().next().map(|(entity, _)| entity);
                                 match props.demo.create(file, offset, props.readers) {
                                     // `create` runs `mControl->forward(0)` itself (`d_demo.cpp:730`);
                                     // the reader has no stage while parsing, so the mount site is
@@ -3948,6 +3954,7 @@ fn package(
                                             msg,
                                             table,
                                             jpa,
+                                            player,
                                         ) {
                                             log::warn!("clearsleeper: demo mount failed ({gap})");
                                         }

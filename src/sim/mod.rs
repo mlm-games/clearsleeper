@@ -94,7 +94,6 @@ pub mod drift;
 pub mod dummy;
 pub mod eayogn;
 pub mod ebomzo;
-pub mod ending;
 pub mod enemy;
 pub mod ep;
 pub mod esa;
@@ -223,6 +222,7 @@ pub mod leaflift;
 pub mod leaves;
 pub mod lenzo;
 pub mod light;
+pub mod link_demo;
 pub mod link_move;
 pub mod link_proc;
 pub mod lock;
@@ -1905,6 +1905,7 @@ pub fn build(
     gy_ctrl::init(&mut sim.world);
     event_manager::init(&mut sim.world);
     demo::init(&mut sim.world);
+    link_demo::init(&mut sim.world);
     shape::init(&mut sim.world);
     stage_data::init(&mut sim.world);
     vibration::init(&mut sim.world);
@@ -1927,7 +1928,6 @@ pub fn build(
     sim.world.insert_resource(flags::Switches::default());
     sim.world.insert_resource(flags::Charts::default());
     sim.world.insert_resource(flags::Arrivals::default());
-    sim.world.insert_resource(ending::Ending::default());
     let event_list = tables
         .and_then(|tables| crate::assets::load_event_list(tables.name()))
         .unwrap_or_default();
@@ -2076,6 +2076,12 @@ pub fn build(
                         (
                             flags::clear_order_flags.in_set(WwSimSet::Execute),
                             event::begin.in_set(WwSimSet::Execute),
+                            // `dScnPly_Execute` runs `dComIfGp_demo_update` ahead of
+                            // `dComIfGp_evmng_execute` (`d_s_play.cpp:1100-1101`), and the camera
+                            // pass follows both: the frame `store()` overlays is this step's
+                            // (`d_camera.cpp:7883-7908`), so the demo steps before `camera::track`
+                            // rather than after it.
+                            demo::control.in_set(WwSimSet::Execute),
                             // The telescope's item arm runs before the view and the status word it
                             // feeds: `procScope_init` raises `daPyStts0_TELESCOPE_LOOK_e`
                             // (`d_a_player_main.cpp:5915`), and the same frame's camera
@@ -2294,7 +2300,6 @@ pub fn build(
                         clock::control.in_set(WwSimSet::Execute),
                         ghostship::control.in_set(WwSimSet::Execute),
                         volcano::control.in_set(WwSimSet::Execute),
-                        demo::control.in_set(WwSimSet::Execute),
                         event::control.in_set(WwSimSet::Execute),
                         // The mount happens inside `event::control` and retail's `daDemo00_c::execute`
                         // runs after `dComIfGp_evmng_execute` in the same frame (`d_s_play.cpp:1100-1101`
@@ -2356,7 +2361,6 @@ pub fn build(
                     )
                         .chain(),
                     (
-                        ending::control.in_set(WwSimSet::Execute),
                         tagkk1::control.in_set(WwSimSet::Execute),
                         steamtag::control.in_set(WwSimSet::Execute),
                         warpt::control.in_set(WwSimSet::Execute),

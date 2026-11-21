@@ -128,6 +128,13 @@ impl AssetRoot {
         open_archive(bytes, path)
     }
 
+    pub fn stream(&self, rel: &str) -> anyhow::Result<Box<dyn crate::disc::AssetStream>> {
+        match &self.source {
+            Source::Files(root) => Ok(Box::new(std::fs::File::open(root.join(rel))?)),
+            Source::Disc(image) => Ok(image.stream(rel)?),
+        }
+    }
+
     pub fn read_rel(&self, rel: &str) -> Result<Rel, AssetError> {
         let path = self.path(rel);
         let bytes = self.read(rel)?;
@@ -358,13 +365,16 @@ const LINK_IDLE_UNDER: &str = "bcks/waits.bck";
 const LINK_IDLE_UPPER: &str = "bcks/wait.bck";
 const LINK_UPPER_ROOT: &str = "body_chn";
 
-/// The standing animation pair, sampled with the player model's joint order. A missing pair
-/// leaves the player on the bind pose rather than substituting a made-up motion.
+/// The standing animation pair, sampled with the player model's joint order, plus the demo bcks
+/// a cutscene can switch the player onto. A missing pair leaves the player on the bind pose
+/// rather than substituting a made-up motion, and a demo stem that failed to load leaves it on
+/// the standing pair.
 pub struct PlayerIdle {
     under: crate::j3d::bck::Morph,
     upper: crate::j3d::bck::Morph,
     upper_mask: Vec<bool>,
     parents: Vec<u16>,
+    demos: Vec<(&'static str, crate::j3d::bck::Morph)>,
 }
 
 impl PlayerIdle {
@@ -399,6 +409,23 @@ impl PlayerIdle {
         }
         world
     }
+
+    /// The pose for the bck a demo step selected - [`crate::sim::link_demo::PlayerAnm`] - with
+    /// `idle_frame` falling back to the standing pair. `None` is the reference's morf still on
+    /// `ANM_WAITS`, either because no demo drives the player or because the mode named no stem.
+    ///
+    /// A demo bck plays once and holds its last frame: `setAnm`'s end frame is `-1.0f`
+    /// (`d_demo.cpp:229`), the value that stops the controller at the animation's last frame
+    /// rather than wrapping, which is why this clamps instead of the idle pose's modulo.
+    pub fn pose_stem(&self, demo: Option<(&str, f32)>, idle_frame: f32) -> Vec<glam::Mat4> {
+        let posed = demo.and_then(|(stem, frame)| {
+            self.demos
+                .iter()
+                .find(|(name, _)| *name == stem)
+                .map(|(_, morph)| morph.joint_matrices(frame.min(morph.frame_max().max(1.0))))
+        });
+        posed.unwrap_or_else(|| self.pose(idle_frame))
+    }
 }
 
 pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
@@ -423,11 +450,19 @@ pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
             upper_mask[joint] = true;
         }
     }
+    let mut demos = Vec::new();
+    for stem in crate::sim::link_demo::STEMS {
+        match link_morph(&archive, &path, &format!("bcks/{stem}.bck"), mesh) {
+            Some(morph) => demos.push((*stem, morph)),
+            None => log::warn!("clearsleeper: missing link demo animation {stem}"),
+        }
+    }
     Some(PlayerIdle {
         under,
         upper,
         upper_mask,
         parents: mesh.joint_parents.clone(),
+        demos,
     })
 }
 

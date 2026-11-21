@@ -821,6 +821,19 @@ pub struct Modes<'w> {
     pub lock: Res<'w, Lock>,
 }
 
+/// The optional resources the move tick reads when the stage has them: the move it asked
+/// for, the collision the sweep found, the pad's buttons, the push and pull polygons and
+/// the demo that drives the player. They travel as one param because a system's own arity
+/// runs out at sixteen.
+#[derive(SystemParam)]
+pub struct Extras<'w> {
+    pub from: Option<Res<'w, MoveFrom>>,
+    pub collision: Option<Res<'w, Collision>>,
+    pub pad: Option<Res<'w, PadButtons>>,
+    pub polys: Option<Res<'w, PushPulls>>,
+    pub demo: Option<Res<'w, super::demo::DemoManager>>,
+}
+
 /// The push and pull state a player stands in front of: the polygon `mPolyInfo` holds, the actor
 /// the stage's dispatch answers with behind it, the wall's own facing `m352C` and the ledge point
 /// `m3724` the two counts their stand-off from.
@@ -2435,15 +2448,12 @@ fn settle(
 /// reports a gap does not enter its process, and a tick that reports one leaves whatever owned
 /// process was standing, because a state with no behaviour to run is worse than the fallback.
 pub fn control(
-    from: Option<Res<MoveFrom>>,
+    extras: Extras<'_>,
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
-    collision: Option<Res<Collision>>,
-    pad: Option<Res<PadButtons>>,
-    mut health: ResMut<Health>,
+    health: ResMut<Health>,
     modes: Modes<'_>,
-    polys: Option<Res<PushPulls>>,
-    mut reach: pushable::Call<'_, '_>,
+    reach: pushable::Call<'_, '_>,
     ships: Query<&Ship>,
     mut proc: ResMut<LinkProc>,
     mut state: ResMut<MoveState>,
@@ -2452,6 +2462,15 @@ pub fn control(
     mut events: ResMut<SimEvents>,
     mut vibration: ResMut<Vibration>,
 ) {
+    // `checkPlayerDemoMode()` (`d_a_player_main.h:1913`) is the arm that takes the pad away from
+    // the player while a demo drives it; retail reads it beside `dComIfGp_event_runCheck()`
+    // (`d_a_player_main.cpp:2979`). A `JACT Link` block has bound the player to a demo actor slot
+    // and `demo::control` has already written this step's position and angle, so the tick here
+    // would only overwrite them with stick input and gravity. The process is left standing, which
+    // is the state the player's own demo cuts expect to come back to.
+    if extras.demo.as_deref().is_some_and(|demo| demo.drives_player()) {
+        return;
+    }
     let Modes {
         swim,
         jump,
@@ -2467,11 +2486,11 @@ pub fn control(
     let player = &mut *player;
     let clock = clocks.under_mut(Under::Move0);
     let entered_air = proc.changed && proc.current.in_group(super::link_proc::AIRBORNE);
-    let solid = collision.as_deref();
+    let solid = extras.collision.as_deref();
     let mut probe = Probe {
         camera: &camera,
         collision: solid,
-        pad: pad.as_deref(),
+        pad: extras.pad.as_deref(),
         swim: &swim,
         jump: &jump,
         roll: *roll,
@@ -2479,9 +2498,9 @@ pub fn control(
         combat: &combat,
         lock: &lock,
         intent: &intent,
-        pushpull: polys.as_deref(),
+        pushpull: extras.polys.as_deref(),
         wall: wall_probe(player, solid, !grounded(solid, player.pos), swim.active),
-        from: from.as_deref().map_or(player.pos, |from| from.0),
+        from: extras.from.as_deref().map_or(player.pos, |from| from.0),
         drop: proc.takeoff_y - player.pos.y,
         dead: health.units == 0,
         riding,

@@ -522,6 +522,10 @@ pub struct CamSetup {
     pub leaf_fovy: f32,
     /// `m07C`: how fast that field of view comes and goes.
     pub leaf_fovy_rate: f32,
+    /// `m048`, the reach under which the camera calls the player its attention subject,
+    /// `dCamSetup_c::SubjectDistance()` (`d_cam_param.h:361`), read at `d_camera.cpp:1100`.
+    /// `d_cam_param.cpp:326` seeds it at 70.0.
+    pub subject_distance: f32,
 }
 
 impl Default for CamSetup {
@@ -536,6 +540,7 @@ impl Default for CamSetup {
             fan_bank_wind: 4.0,
             leaf_fovy: 0.5,
             leaf_fovy_rate: 0.4,
+            subject_distance: 70.0,
         }
     }
 }

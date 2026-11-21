@@ -1352,7 +1352,9 @@ impl FileSelect {
                     }
                     self.change_extra_color(index);
 
-                    let progress = self.progress[index];
+                    // tww/src/d/d_file_select.cpp:533-547: file details use this slot's collectibles.
+                    let progress = SlotProgress { triforce: save.progress.collect.triforce, symbol: save.progress.collect.symbol };
+                    self.progress[index] = progress;
                     let mut summary = SlotSummary::from_parts(
                         save,
                         progress.triforce,
@@ -4156,8 +4158,7 @@ impl FileSelect {
             let from = usize::from(self.flag_3924);
             let to = usize::from(self.flag_3926);
             if let Some(save) = card.slots[from].clone() {
-                card.slots[to] = Some(save);
-                card.clear_count[to] = card.clear_count[from];
+                card.set_memory_to_card(to, save);
                 card.owl_link[to] = card.owl_link[from];
             }
             card.set_checksum_game_data(to);
@@ -5642,7 +5643,8 @@ impl TitleScene {
         self.scene = scene;
         self.requests.menu_open = false;
         self.requests.stop_status = false;
-        self.requests.enable_next_stage = true;
+        // tww/src/d/d_s_title.cpp:116-122
+        self.requests.enable_next_stage = false;
         self.movie_id = u32::from(scene != SceneName::Title);
     }
 

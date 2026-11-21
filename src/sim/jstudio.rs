@@ -2815,7 +2815,11 @@ impl Timeline {
                     let header = object_block(&file, at)?;
                     control = Some(SequenceState::new(header.content_at));
                 }
-                BLOCK_FVB => parse_fvb(&file, at, &mut fvb, &mut gaps)?,
+                // `parseBlock_block_fvb_` reads the `JFVB` block's own content
+                // (`jstudio-control.cpp:103`) and hands that to `fvb::TParse::parse`
+                // (`:114`), so the `FVB\0` header starts past the block's 8-byte size and
+                // type, not at it.
+                BLOCK_FVB => parse_fvb(&file, at + 8, &mut fvb, &mut gaps)?,
                 BLOCK_ACTOR | BLOCK_CAMERA | BLOCK_AMBIENT | BLOCK_LIGHT | BLOCK_FOG
                 | BLOCK_MESSAGE | BLOCK_SOUND | BLOCK_PARTICLE => {
                     let header = object_block(&file, at)?;
@@ -3407,6 +3411,10 @@ struct FvbBlock {
 /// then every FVB block, each one appended to the bank. The flags `parseBlock_block_fvb_` passes
 /// (`jstudio-control.cpp:101-115`) are 0 for `d_demo`'s one `parse_next`, so an unknown type is a
 /// failure (`fvb.cpp:474-482`) and an existing ID is not deduplicated.
+///
+/// `at` is the FVB chunk itself - the `FVB\0` signature - which `parseBlock_block_fvb_` reaches
+/// through the `JFVB` block's `getContent()` (`jstudio-control.cpp:103`); the block header the
+/// stb walk reads is 8 bytes of size and type ahead of it.
 fn parse_fvb(
     file: &[u8],
     at: usize,

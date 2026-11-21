@@ -7,6 +7,10 @@ use super::cam_follow::{CamSetup, Follow, FollowInput, SAngle, ViewCache};
 use super::cam_room::CamRoom;
 use super::cam_style::{self, CamEngine, STYLE_COUNT, param};
 use super::cam_type::{TYPE_FIELD, TYPES, type_index};
+use super::demo::{
+    CAMERA_ENABLE_PROJ_FOVY, CAMERA_ENABLE_VIEW_POS, CAMERA_ENABLE_VIEW_ROLL,
+    CAMERA_ENABLE_VIEW_TARG_POS, CAMERA_ENABLE_VIEW_UP_VEC, DemoCamera,
+};
 
 const DEFAULT_FOVY: f32 = 0.7853982;
 const DEFAULT_ASPECT: f32 = 4.0 / 3.0;
@@ -24,6 +28,9 @@ const DEPTH_CLAMP: f32 = 500000.0;
 /// The pair bounds a magnification the port's `9.0` scale cannot leave: 45 degrees down to 2.
 const SCOPE_FOVY_MIN: f32 = 0.0349066;
 const SCOPE_FOVY_MAX: f32 = 0.7853982;
+/// `dCamAttnStts_SUBJECT_e`, `d_com_inf_game.h:104`: the camera is watching the player as its
+/// subject. `checkPlayerNoDraw()` reads the bit (`d_a_player_main.h:1980`).
+pub const ATTN_SUBJECT: u32 = 0x2;
 
 /// `view_port_class` from `f_op_view.h`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -205,6 +212,10 @@ pub struct Camera {
     /// `StickUseless` and `ScopeViewMsgModeOff`, `d_camera.cpp:5220-5272`, none of which the port
     /// runs, so the value starts at zero and every bit is set by the engine that owns it.
     pub event_flags: u32,
+    /// `dComIfGp`'s camera attention word for this camera, the `mComStat` retail reaches through
+    /// `setComStat` / `clrComStat` (`d_camera.h:626-632`). [`Camera::publish_attention`] raises the
+    /// subject bit and [`Camera::attention`] answers `checkCameraAttentionStatus`.
+    pub com_stat: u32,
     /// `dCamera_c::mWork`, the per-engine cross-frame state the engines other than follow keep.
     pub work: cam_engine::Work,
     /// `dCamera_c::m548` through `mBankShake`, the screen shake `shakeCamera` runs each frame.
@@ -235,6 +246,7 @@ impl Default for Camera {
             orbit_yaw: 0.0,
             bump: Bump::default(),
             event_flags: 0,
+            com_stat: 0,
             work: cam_engine::Work::default(),
             shake: cam_engine::Shake::default(),
         };
@@ -300,6 +312,29 @@ impl Camera {
     /// `dCamParam_c::CheckFlag` against the current style.
     pub fn has_flag(&self, mask: u16) -> bool {
         cam_style::style_by_id(self.current_style).is_some_and(|s| s.flag & mask != 0)
+    }
+
+    /// `dComIfGp_checkCameraAttentionStatus` (`d_com_inf_game.h:2573-2575`): the bits the camera
+    /// has raised on its attention word.
+    pub fn attention(&self, mask: u32) -> bool {
+        self.com_stat & mask != 0
+    }
+
+    /// The last block of `dCamera_c::Run`, `d_camera.cpp:1095-1103`: the subject bit goes up when
+    /// the event asked for it (`chkFlag(0x40000)`), or when the direction has pulled in under
+    /// `mCamSetup.SubjectDistance()` with the style's `UNK080` bit up. Retail only sets here; the
+    /// word's clear is `dComIfGp_offCameraAttentionStatus` at `d_camera.cpp:7835`, which the port's
+    /// camera pass does not reach, so a raised bit stays raised.
+    pub fn publish_attention(&mut self) {
+        // `chkFlag(0x40000)`, `d_camera.cpp:1095`: the event named the player as its subject.
+        const FORCED: u32 = 0x0004_0000;
+        if self.event_flags & FORCED != 0 {
+            self.com_stat |= ATTN_SUBJECT;
+        } else if self.bump.direction.radius() < self.setup.subject_distance
+            && self.event_flags & cam_engine::evflag::SUBJECT != 0
+        {
+            self.com_stat |= ATTN_SUBJECT;
+        }
     }
 
     /// The current style's four-character tag.
@@ -440,6 +475,7 @@ pub fn track(
     scope: Option<Res<super::scope::Scope>>,
     mut events: Option<ResMut<super::event_manager::EventManager>>,
     mut paths: ResMut<super::cam_event::SplinePaths>,
+    demo: Option<Res<super::demo::DemoManager>>,
     mut camera: ResMut<Camera>,
 ) {
     let Some(player) = players.iter().next() else {
@@ -512,4 +548,46 @@ pub fn track(
     );
     camera.shake_pass();
     camera.bump_check(player, solid.as_deref(), sea.as_deref());
+    // `d_camera.cpp:1095-1103`, the last block of `Run`: the attention word `store()` reads.
+    camera.publish_attention();
+    // `store()`'s demo-camera overlay (`d_camera.cpp:7883-7908`) is the last write to the frame,
+    // after the engine and the shake have placed it. `dComIfGp_demo_update` leads
+    // `dComIfGp_evmng_execute` (`d_s_play.cpp:1100-1101`) and the camera pass follows both, which
+    // is why [`control`] in [`super::demo`] is scheduled ahead of this system: the camera this
+    // reads is the one the demo set on this step, not the previous step's.
+    if let Some(demo) = demo.as_deref().and_then(|demo| demo.camera()) {
+        store_demo_view(demo, &mut camera);
+    }
+}
+
+/// `store()`'s demo-camera half - `d_camera.cpp:7883-7908`: each channel the mounted
+/// `dDemo_camera_c` has enabled replaces the one the engine left and every channel it has not
+/// stays. The centre, the eye and the up vector are `mCenter`, `mEye` and `mUp`; the roll is the
+/// negative of the demo's degrees, which is the sign `fopCamM_SetBank` takes it with.
+///
+/// Retail reads the five channels off the camera process and writes all five back; the port's
+/// view already holds them, so an untouched channel is simply left in place.
+fn store_demo_view(demo: &DemoCamera, camera: &mut Camera) {
+    let Some(view) = camera.view.as_mut() else {
+        return;
+    };
+    let (mut eye, mut center, mut up) = (view.lookat.eye, view.lookat.center, view.lookat.up);
+    let mut fovy = view.fovy;
+    let mut bank = 0.0;
+    if demo.check(CAMERA_ENABLE_VIEW_TARG_POS) {
+        center = demo.target();
+    }
+    if demo.check(CAMERA_ENABLE_VIEW_POS) {
+        eye = demo.trans();
+    }
+    if demo.check(CAMERA_ENABLE_VIEW_UP_VEC) {
+        up = demo.up();
+    }
+    if demo.check(CAMERA_ENABLE_VIEW_ROLL) {
+        bank = -demo.roll().to_radians();
+    }
+    if demo.check(CAMERA_ENABLE_PROJ_FOVY) {
+        fovy = demo.fovy();
+    }
+    view.aim_rolled(eye, center, up, fovy, bank);
 }

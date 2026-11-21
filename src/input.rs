@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use glam::Vec2;
-use repose_core::input::PhysicalKey;
+use repose_core::input::{GamepadAxis, GamepadButton, GamepadEvent, PhysicalKey};
 
 /// The keys the shell reads, in the order the input log numbers them. The log writes the
 /// held set as one bit per key, so a logged session replays through the same key path
@@ -135,6 +135,19 @@ pub struct ButtonBits {
 }
 
 impl ButtonBits {
+    pub fn union(self, other: Self) -> Self {
+        Self {
+            a: self.a || other.a,
+            b: self.b || other.b,
+            x: self.x || other.x,
+            y: self.y || other.y,
+            z: self.z || other.z,
+            l: self.l || other.l,
+            r: self.r || other.r,
+            start: self.start || other.start,
+        }
+    }
+
     /// Every button but START released. A menu owns the screen, and START is both the edge
     /// that opens one and the edge that closes it, so it stays readable through a menu.
     pub fn except_start(self) -> Self {
@@ -225,4 +238,170 @@ pub fn c_stick_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> V
         axis += Vec2::new(1.0, -1.0);
     }
     axis.clamp_length_max(1.0)
+}
+
+/// The trigger level that counts as the shoulder button down, and the level it has to
+/// fall under to count as released. Retail locks a trigger once it crosses the high
+/// threshold and only frees it under the low one, so a trigger held at the threshold
+/// does not chatter (`m_Do_controller_pad.cpp:104-132`).
+pub const TRIGGER_ON: f32 = 0.5;
+pub const TRIGGER_OFF: f32 = 0.25;
+
+/// One poll of the pad, in the retail pad's shape: the face buttons' levels, the main
+/// stick and the sub-stick.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct PadSnapshot {
+    pub hold: ButtonBits,
+    pub move_axis: Vec2,
+    pub c_axis: Vec2,
+}
+
+/// Folds hardware gamepad events into the retail pad's shape. The button mapping is
+/// aurora's standard one (`aurora/lib/dolphin/pad/pad.cpp:21-35`): the face buttons
+/// carry A, B, X and Y, the right shoulder carries Z, and L and R are the analog
+/// triggers, which is what the retail pad has.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PadBridge {
+    hold: ButtonBits,
+    move_axis: Vec2,
+    c_axis: Vec2,
+    dpad_up: bool,
+    dpad_down: bool,
+    dpad_left: bool,
+    dpad_right: bool,
+}
+
+impl PadBridge {
+    pub fn feed(&mut self, event: &GamepadEvent) {
+        match event {
+            GamepadEvent::Button {
+                button, pressed, ..
+            } => {
+                let down = *pressed;
+                match button {
+                    GamepadButton::South => self.hold.a = down,
+                    GamepadButton::East => self.hold.b = down,
+                    GamepadButton::West => self.hold.x = down,
+                    GamepadButton::North => self.hold.y = down,
+                    GamepadButton::RightShoulder => self.hold.z = down,
+                    GamepadButton::Start => self.hold.start = down,
+                    GamepadButton::DPadUp => self.dpad_up = down,
+                    GamepadButton::DPadDown => self.dpad_down = down,
+                    GamepadButton::DPadLeft => self.dpad_left = down,
+                    GamepadButton::DPadRight => self.dpad_right = down,
+                    _ => {}
+                }
+            }
+            GamepadEvent::Axis { axis, value, .. } => match axis {
+                GamepadAxis::LeftStickX => self.move_axis.x = *value,
+                GamepadAxis::LeftStickY => self.move_axis.y = *value,
+                GamepadAxis::RightStickX => self.c_axis.x = *value,
+                GamepadAxis::RightStickY => self.c_axis.y = *value,
+                GamepadAxis::LeftTrigger => {
+                    self.hold.l = Self::trigger(self.hold.l, *value);
+                }
+                GamepadAxis::RightTrigger => {
+                    self.hold.r = Self::trigger(self.hold.r, *value);
+                }
+            },
+            _ => {}
+        }
+    }
+
+    fn trigger(held: bool, value: f32) -> bool {
+        if held {
+            value > TRIGGER_OFF
+        } else {
+            value >= TRIGGER_ON
+        }
+    }
+
+    /// The poll's pad state. The D-pad rides the main stick: the retail pad reports the
+    /// cross as a main-stick direction (`m_Do_controller_pad.cpp:47-49` reads the stick
+    /// the hardware reports, and the cross lands in it).
+    pub fn snapshot(&self) -> PadSnapshot {
+        let mut move_axis = self.move_axis;
+        if self.dpad_up {
+            move_axis.y = 1.0;
+        }
+        if self.dpad_down {
+            move_axis.y = -1.0;
+        }
+        if self.dpad_left {
+            move_axis.x = -1.0;
+        }
+        if self.dpad_right {
+            move_axis.x = 1.0;
+        }
+        PadSnapshot {
+            hold: self.hold,
+            move_axis: move_axis.clamp_length_max(1.0),
+            c_axis: self.c_axis.clamp_length_max(1.0),
+        }
+    }
+}
+
+/// The pad state one frame stages: the hardware pad when it says something, the keys
+/// otherwise. A button held on either source is held, and a stick that moved on one
+/// source wins over the other's rest position.
+pub fn merge_pad(keyboard: PadSnapshot, pad: PadSnapshot) -> PadSnapshot {
+    PadSnapshot {
+        hold: keyboard.hold.union(pad.hold),
+        move_axis: if pad.move_axis != Vec2::ZERO {
+            pad.move_axis
+        } else {
+            keyboard.move_axis
+        },
+        c_axis: if pad.c_axis != Vec2::ZERO {
+            pad.c_axis
+        } else {
+            keyboard.c_axis
+        },
+    }
+}
+
+/// The pad state the keys alone give: the face buttons from the key bindings, the main
+/// stick from WASD and the arrows, the sub-stick from the keypad's cluster.
+pub fn pad_snapshot_from_keys(held: &HashSet<PhysicalKey>, window_focused: bool) -> PadSnapshot {
+    PadSnapshot {
+        hold: pad_held_from_keys(held, window_focused),
+        move_axis: axis_from_keys(held, window_focused),
+        c_axis: c_stick_from_keys(held, window_focused),
+    }
+}
+
+/// The stylus: the mouse pointer over the canvas. The position is in the 640x480
+/// canvas's own pixels, which is what the screens draw in, so a pointer over the
+/// letterboxed canvas lands where the letter is.
+pub fn stylus(
+    canvas: [f32; 2],
+    window: (u32, u32),
+    pointer: Option<(f32, f32)>,
+    mouse_down: bool,
+) -> Option<(Vec2, bool)> {
+    let (x, y) = pointer?;
+    let pos = canvas_point_in(canvas, window, x, y)?;
+    Some((pos, mouse_down))
+}
+
+/// A window position in the canvas's own pixels, or nothing when the position is
+/// outside the letterboxed canvas.
+pub fn canvas_point_in(canvas: [f32; 2], window: (u32, u32), x: f32, y: f32) -> Option<Vec2> {
+    let (width, height) = (window.0 as f32, window.1 as f32);
+    if width <= 0.0 || height <= 0.0 {
+        return None;
+    }
+    let fit = (width / canvas[0]).min(height / canvas[1]);
+    let offset_x = (width - canvas[0] * fit) * 0.5;
+    let offset_y = (height - canvas[1] * fit) * 0.5;
+    let pos = Vec2::new((x - offset_x) / fit, (y - offset_y) / fit);
+    if pos.x < 0.0 || pos.y < 0.0 || pos.x > canvas[0] || pos.y > canvas[1] {
+        return None;
+    }
+    Some(pos)
+}
+
+/// The retail screen's own pixels, for a window position.
+pub fn canvas_point(window: (u32, u32), x: f32, y: f32) -> Option<Vec2> {
+    canvas_point_in([640.0, 480.0], window, x, y)
 }

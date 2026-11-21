@@ -35,6 +35,8 @@ pub enum Screen {
     FileSelect,
     Playing,
     GameOver,
+    Movie,
+    ClearSave,
     Settings,
     QuitConfirm,
 }
@@ -112,7 +114,12 @@ impl Menu {
     /// Binds the J2D screen, reads the card and pushes it into the panes so the
     /// file select compositor has something to draw.
     pub fn open_file_select(&mut self) {
+        self.open_file_select_mode(crate::ui_file_select::MODE_NORMAL);
+    }
+
+    pub(crate) fn open_file_select_mode(&mut self, mode: u8) {
         self.fs.delete();
+        self.fs.set_use_type(mode);
         let Some(assets) = crate::panes::load() else {
             return;
         };
@@ -122,9 +129,9 @@ impl Menu {
         let archives = crate::assets::load_msg_archives();
         self.fs.set_message_archive(&archives, 0);
         self.fs.create(assets.screen.clone());
-        for slot in 0..SLOTS {
-            self.card.slots[slot] = crate::save::read_slot_in(&self.card.dir, slot);
-        }
+        // tww/src/d/d_s_name.cpp:964-972: the pane reads the card, including its per-slot checksums.
+        self.card.restore();
+        self.slots = self.card.slots.iter().map(|slot| slot.as_ref().filter(|s| !s.name.is_empty()).map_or(SlotInfo::Empty, SlotInfo::from_save)).collect();
         self.fs.set_save_data(&self.card);
         self.fs.select_num = self.slot as u8;
     }
@@ -210,8 +217,10 @@ impl Menu {
     /// `dComIfGs_setInitDataToCard`, `d_menu_save.cpp:840`).
     pub fn file_select_pick(&mut self, slot: usize) -> Action {
         self.card.set_data_num(slot as u8);
-        match self.slots.get(slot) {
-            Some(SlotInfo::File { .. }) => Action::Load(slot),
+        self.slot = slot;
+        // tww/src/d/d_s_name.cpp:1165-1173: copy and erase change the same card the next pick reads.
+        match self.card.slots.get(slot).and_then(Option::as_ref) {
+            Some(save) if !save.name.is_empty() => Action::Load(slot),
             _ => {
                 self.card
                     .set_memory_to_card(slot, crate::ui_menu_save::blank_save());

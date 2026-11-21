@@ -101,7 +101,7 @@ impl TmpBits {
     }
 }
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Collect {
     bytes: [u8; COLLECT_SLOTS],
     pub tact: u8,
@@ -489,7 +489,7 @@ pub const CHART_GREAT_SEA_B: usize = 36;
 pub const CHART_MIN_SECRET: usize = 52;
 pub const TRIFORCE_SLOTS: u8 = 8;
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Charts {
     got: [u32; CHART_WORDS],
     open: [u32; CHART_WORDS],

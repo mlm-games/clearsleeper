@@ -123,6 +123,7 @@ pub struct StageCameras {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StageHeader {
+    pub save_table: u8,
     pub time_h: i8,
     pub stage_type: u32,
     pub schbit_sec: u8,
@@ -550,6 +551,8 @@ fn parse_stag(data: &[u8], offset: u32) -> Result<StageHeader, DzsError> {
     let type_and_schbit = read_u32(data, at + 0x0C)?;
     let enable_and_far = read_u32(data, at + 0x10)?;
     Ok(StageHeader {
+        // tww/src/d/d_stage.cpp:1676-1677; d_stage.h:1035-1037.
+        save_table: read_u8(data, at + 9)? >> 1,
         time_h: ((type_and_schbit >> 8) & 0xFF) as u8 as i8,
         stage_type: (type_and_schbit >> 16) & 7,
         schbit_sec: (type_and_schbit & 0xFF) as u8,

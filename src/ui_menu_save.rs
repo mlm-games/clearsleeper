@@ -770,6 +770,7 @@ pub struct MemCard {
     pub format_frames: u8,
     pub format_result: i32,
     pub written: Vec<usize>,
+    dirty: [bool; SLOTS],
     /// What each slot's file held when the card was read, which is what separates a slot the card
     /// has never been written to from one whose file will not parse. The card's `status` names one
     /// state for the whole card, `CARD_STAT_CREATE`, and retail reaches it from
@@ -826,6 +827,7 @@ impl Default for MemCard {
             format_frames: 0,
             format_result: 1,
             written: Vec::new(),
+            dirty: [false; SLOTS],
             slot_state: [SlotState::Absent; SLOTS],
         }
     }
@@ -959,6 +961,7 @@ impl MemCard {
     /// reaches three only through `mDoMemCdRWm_Restore`, which is in `m_Do_MemCardRWmng.cpp` and
     /// which the port's per-slot read stands in for.
     pub fn restore(&mut self) {
+        self.dirty = [false; SLOTS];
         self.slots = std::array::from_fn(|_| None);
         self.checksum = [0; SLOTS];
         self.slot_state = [SlotState::Absent; SLOTS];
@@ -982,9 +985,13 @@ impl MemCard {
         let Some(slot) = usize::try_from(slot).ok().filter(|&slot| slot < SLOTS) else {
             return;
         };
+        self.slots[slot] = None;
+        self.checksum[slot] = 0;
+        self.clear_count[slot] = 0;
         let state = match crate::save::read_slot_state_in(&self.dir, slot) {
             SlotRead::Missing => SlotState::Absent,
             SlotRead::Loaded(save) => {
+                self.clear_count[slot] = save.progress.clear_count;
                 self.slots[slot] = Some(save);
                 SlotState::Loaded
             }
@@ -999,23 +1006,16 @@ impl MemCard {
         }
     }
 
-    /// The status the card reports once every slot has been read.
-    ///
-    /// `CARD_STAT_CREATE` is a per-card truth, not a per-slot one, and retail reaches it from one
-    /// `CARDOpen` of `gczelda`, `m_Do_MemCard.cpp:143-144`. It means the card holds no game file,
-    /// and the name scene's answer to it is not an error: it sets the picture pointer and loads,
-    /// `d_s_name.cpp:748-751`, so the screen proceeds to offer a new game. So a card with no
-    /// readable save in it is in the create state and one holding any save is not; a card whose
-    /// slots are all unreadable is still a card with no readable save in it.
+    /// tww/src/m_Do/m_Do_MemCard.cpp:270-276,328-334: status 2 has a game file; 1 can create one.
     pub fn status_after_read(&self) -> u8 {
         if self
             .slot_state
             .iter()
-            .all(|state| *state != SlotState::Loaded)
+            .all(|state| *state == SlotState::Absent)
         {
-            CARD_STAT_CREATE
+            CARD_STAT_RESTORE
         } else {
-            CARD_STAT_WAIT
+            CARD_STAT_CREATE
         }
     }
 
@@ -1036,7 +1036,12 @@ impl MemCard {
         if self.save_result == 2 {
             return 2;
         }
-        self.flush();
+        // tww/src/m_Do/m_Do_MemCard.cpp:205-218: only a completed write reports success.
+        if self.flush().is_err() {
+            self.restore();
+            return 2;
+        }
+        self.status = CARD_STAT_CREATE;
         1
     }
 
@@ -1057,34 +1062,38 @@ impl MemCard {
         if self.format_result == 2 {
             return 2;
         }
-        for slot in self.slots.iter_mut() {
-            *slot = None;
-        }
-        self.checksum = [0; SLOTS];
-        self.clear_count = [0; SLOTS];
-        self.owl_link = [0; SLOTS];
+        for slot in 0..SLOTS { self.erase_slot(slot); }
+        if self.flush().is_err() { self.restore(); return 2; }
+        self.status = CARD_STAT_CREATE;
         1
     }
 
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self) -> anyhow::Result<()> {
         for slot in 0..SLOTS {
-            let Some(save) = self.slots[slot].clone() else {
-                continue;
-            };
-            if crate::save::write_slot_in(&self.dir, slot, &save).is_ok() {
+            if self.dirty[slot] {
+                // tww/src/d/d_file_select.cpp:1915-1936: erasure writes an initialized slot.
+                let blank;
+                let payload = match &self.slots[slot] {
+                    Some(save) => save,
+                    None => { blank = blank_save(); &blank }
+                };
+                crate::save::write_slot_in(&self.dir, slot, payload).inspect_err(|err| log::warn!("clearsleeper: {err}"))?;
+                self.dirty[slot] = false;
                 self.written.push(slot);
             }
         }
+        Ok(())
     }
 
     pub fn set_init_data_to_card(&mut self, slot: usize) {
-        if slot < SLOTS {
-            self.slots[slot] = None;
-        }
+        self.erase_slot(slot);
     }
 
     pub fn set_memory_to_card(&mut self, slot: usize, save: SaveGame) {
         if slot < SLOTS {
+            self.dirty[slot] = true;
+            self.slot_state[slot] = SlotState::Loaded;
+            self.clear_count[slot] = save.progress.clear_count;
             self.slots[slot] = Some(save);
         }
     }
@@ -1121,6 +1130,8 @@ impl MemCard {
 
     pub fn erase_slot(&mut self, slot: usize) {
         if slot < SLOTS {
+            self.dirty[slot] = true;
+            self.slot_state[slot] = SlotState::Absent;
             self.slots[slot] = None;
             self.checksum[slot] = 0;
             self.clear_count[slot] = 0;
@@ -1185,6 +1196,7 @@ pub fn blank_save() -> SaveGame {
         time: 0.0,
         date: 0,
         get_bag: 0,
+        progress: Default::default(),
     }
 }
 

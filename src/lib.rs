@@ -26,6 +26,7 @@ pub mod bti;
 pub mod config;
 pub mod dff;
 pub mod disc;
+mod end_scene;
 pub mod dzs;
 pub mod game_over_screen;
 pub mod gx_decode;
@@ -37,6 +38,7 @@ pub mod j3d;
 pub mod menus;
 pub mod meter_hud;
 pub mod movie;
+pub mod pad_source;
 pub mod panes;
 pub mod quit;
 pub mod report;
@@ -46,6 +48,7 @@ pub mod sim;
 pub mod source;
 pub mod text;
 pub mod title_screen;
+pub mod touch_controls;
 pub mod ui_file_select;
 pub mod ui_file_select_parts;
 pub mod ui_menu_collect;
@@ -81,6 +84,7 @@ pub struct App {
     dff: Option<j3d::present::Presented>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
+    stage_progress: std::collections::BTreeMap<u8, save::StageProgress>,
     rooms: Vec<u8>,
     /// The mounted room set's own `SCLS` tables, keyed by room: the table
     /// `dLib_setNextStageBySclsNum` reads through `dComIfG_roomControl_getStatusRoomDt(room)`
@@ -96,6 +100,13 @@ pub struct App {
     name: String,
     menu_prev: HashSet<PhysicalKey>,
     pad_prev: input::ButtonBits,
+    sampled_pad: input::PadSnapshot,
+    menu_clock: Duration,
+    ending: Option<end_scene::Scene>,
+    /// The hardware pad, polled every frame.
+    pad_source: pad_source::PadSource,
+    /// The on-screen controls a finger drives, and the overlay they are drawn on.
+    touch: touch_controls::TouchControls,
     /// The input log the session writes, when `CS_INPUT_LOG` names a file. Each line is a
     /// tape line, so the session replays through `CS_INPUT`.
     input_log: Option<std::fs::File>,
@@ -104,7 +115,8 @@ pub struct App {
     /// The frames the session has drawn, the retrace the input log numbers.
     frame: u64,
     /// The last input the web build logged, so the console gets a line per change.
-    input_state: u64,
+    #[cfg(target_arch = "wasm32")]
+    input_state: Option<(u64, u16, [i8; 4])>,
     intro_clock: f32,
     pub intro: Option<IntroStage>,
     /// True once an asset source (disc image or the development tree) is installed. The shell's
@@ -175,6 +187,19 @@ fn open_input_log() -> Option<std::fs::File> {
     Some(file)
 }
 
+/// The held keys with the on-screen controls' keys added, or nothing when the controls
+/// are not standing in for a key.
+fn virtual_keys(held: &HashSet<PhysicalKey>, keys: &[PhysicalKey]) -> Option<HashSet<PhysicalKey>> {
+    if keys.is_empty() {
+        return None;
+    }
+    let mut held = held.clone();
+    for key in keys {
+        held.insert(*key);
+    }
+    Some(held)
+}
+
 impl App {
     /// Headless construction: silent audio, no device. Tests and tools.
     /// The headless session: what the tests and headless runs drive. A session exists only with
@@ -217,6 +242,7 @@ impl App {
             dff: None,
             menu: menus::Menu::new(),
             stage: None,
+            stage_progress: Default::default(),
             rooms: Vec::new(),
             room_exits: Vec::new(),
             start_layer: sim::transition::LAYER_NONE,
@@ -227,10 +253,16 @@ impl App {
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
             pad_prev: input::ButtonBits::default(),
+            sampled_pad: input::PadSnapshot::default(),
+            menu_clock: Duration::ZERO,
+            ending: None,
+            pad_source: pad_source::PadSource::new(),
+            touch: touch_controls::TouchControls::new(),
             input_log: open_input_log(),
             input_keys: 0,
             frame: 0,
-            input_state: 0,
+            #[cfg(target_arch = "wasm32")]
+            input_state: None,
             intro_clock: 0.0,
             intro: None,
             assets_installed: assets::AssetRoot::from_env().is_ok(),
@@ -314,6 +346,7 @@ impl App {
 
     fn reset_world_at(&mut self, stage: &str, spawn_point: u8) {
         self.title_actor = None;
+        self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         self.stage = assets::load_stage_tables(stage);
         sim::build(
@@ -352,26 +385,87 @@ impl App {
 
     /// Frame boundary: poll the shell into the sim's intent resources.
     pub fn stage_polled(&mut self, sched: &repose_core::runtime::Scheduler) {
-        let held = &sched.held_keys;
-        self.stage_keys(held, sched.window_focused);
+        let frame = touch_controls::read(sched.size, &sched.touch_points);
+        self.touch.update(&frame, sched.size);
+        let pad = self.pad_source.poll();
+        match virtual_keys(&sched.held_keys, &frame.keys) {
+            Some(held) => self.stage_keys_with(&held, sched.window_focused, pad, frame.pad),
+            None => self.stage_keys_with(&sched.held_keys, sched.window_focused, pad, frame.pad),
+        }
+        self.stage_stylus(sched, frame.stylus);
     }
 
     /// The shell's keys as the game reads them: the move axis, the debug and action keys, the
     /// pad's face buttons and the menus' commands. The input log replays a session through
     /// this path, so a logged frame and a live frame stage the same thing.
     pub fn stage_keys(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
-        self.input_keys = input::key_mask(held);
-        self.stage_axis(input::axis_from_keys(held, window_focused));
-        self.stage_damage(input::damage_from_keys(held, window_focused));
-        self.stage_do(input::do_from_keys(held, window_focused));
-        self.stage_target(input::target_from_keys(held, window_focused));
-        self.stage_item(input::item_from_keys(held, window_focused));
-        self.stage_use(input::use_from_keys(held, window_focused));
-        self.stage_pad(
-            input::pad_held_from_keys(held, window_focused),
-            input::c_stick_from_keys(held, window_focused),
+        self.stage_keys_with(
+            held,
+            window_focused,
+            input::PadSnapshot::default(),
+            input::PadSnapshot::default(),
         );
+    }
+
+    /// The same as [`App::stage_keys`], with the hardware pad and the on-screen controls
+    /// folded in: a button held on any source is held, and a stick that moved on a pad
+    /// wins over the keys' rest.
+    pub fn stage_keys_with(
+        &mut self,
+        held: &HashSet<PhysicalKey>,
+        window_focused: bool,
+        pad: input::PadSnapshot,
+        touch: input::PadSnapshot,
+    ) {
+        self.input_keys = if window_focused { input::key_mask(held) } else { 0 };
+        let mut keyboard = input::pad_snapshot_from_keys(held, window_focused);
+        let menu = self.menu.screen != menus::Screen::Playing || self.intro.is_some();
+        if menu && window_focused {
+            keyboard.hold.a |= held.contains(&PhysicalKey::Space) || held.contains(&PhysicalKey::Enter);
+            if self.menu.screen != menus::Screen::Title && held.contains(&PhysicalKey::Escape) {
+                keyboard.hold.b = true;
+                keyboard.hold.start = false;
+            }
+        }
+        // tww/src/m_Do/m_Do_controller_pad.cpp:20-54; tww/src/d/actor/d_a_player_main.cpp:10568-10632.
+        let merged = if window_focused {
+            input::merge_pad(keyboard, input::merge_pad(touch, pad))
+        } else {
+            self.sim.world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
+            input::PadSnapshot::default()
+        };
+        self.sampled_pad = merged;
+        self.stage_axis(merged.move_axis);
+        self.stage_damage(input::damage_from_keys(held, window_focused && !menu));
+        self.stage_do(!menu && (merged.hold.a || input::do_from_keys(held, window_focused)));
+        self.stage_target(!menu && (merged.hold.l || input::target_from_keys(held, window_focused)));
+        self.stage_item(!menu && (merged.hold.b || input::item_from_keys(held, window_focused)));
+        self.stage_use(!menu && (merged.hold.x || input::use_from_keys(held, window_focused)));
+        self.stage_pad(merged.hold, merged.c_axis);
         self.stage_menu(held, window_focused);
+    }
+
+    /// The pointer or the finger that is not on a control, in the canvas's pixels.
+    fn stage_stylus(&mut self, sched: &repose_core::runtime::Scheduler, touch: Option<glam::Vec2>) {
+        let stylus = touch.map(|pos| (pos, true)).or_else(|| {
+            input::stylus(
+                [640.0, 480.0],
+                sched.size,
+                sched.pointer_pos_px,
+                sched.mouse_primary,
+            )
+        });
+        let mut intent = self
+            .sim
+            .world
+            .get_resource_or_insert_with(sim::intent::Stylus::default);
+        match stylus {
+            Some((pos, down)) => {
+                intent.pos = pos;
+                intent.down = down;
+            }
+            None => intent.down = false,
+        }
     }
 
     /// One tape line for the frame's input, written to the log `CS_INPUT_LOG` names. The
@@ -379,15 +473,12 @@ impl App {
     /// stage the same frame again.
     fn log_input(&mut self) {
         use std::io::Write;
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.input_log.is_none() {
+            return;
+        }
         let tick = self.frame;
-        let hold = *self
-            .sim
-            .world
-            .get_resource_or_insert_with(sim::intent::PadButtons::default);
-        let stick = *self
-            .sim
-            .world
-            .get_resource_or_insert_with(sim::intent::CStick::default);
+        let hold = self.sampled_pad;
         let mut word = 0_u16;
         if hold.hold.a {
             word |= input_tape::BUTTON_A;
@@ -413,26 +504,22 @@ impl App {
         if hold.hold.start {
             word |= input_tape::BUTTON_START;
         }
-        let axis = self
-            .sim
-            .world
-            .get_resource_or_insert_with(sim::intent::MoveIntent::default)
-            .axis;
+        let axis = hold.move_axis;
         let stick_x = (axis.x * 127.0).round() as i8;
         let stick_y = (axis.y * 127.0).round() as i8;
-        let c_x = (stick.axis.x * 127.0).round() as i8;
-        let c_y = (stick.axis.y * 127.0).round() as i8;
+        let c_x = (hold.c_axis.x * 127.0).round() as i8;
+        let c_y = (hold.c_axis.y * 127.0).round() as i8;
         let line = format!(
-            "retrace={tick} button={word:#06x} stick={stick_x},{stick_y} c={c_x},{stick_y} l=0 r=0 keys={:#x}\n",
+            "retrace={tick} button={word:#06x} stick={stick_x},{stick_y} c={c_x},{c_y} l=0 r=0 keys={:#x}\n",
             self.input_keys
         );
         #[cfg(target_arch = "wasm32")]
         {
             // The console gets the line when the input changes, so a session's log stays
             // readable; the desktop's file gets every frame, so a replay is exact.
-            let state = (word as u64) << 32 | self.input_keys;
-            if state != self.input_state {
-                self.input_state = state;
+            let state = (self.input_keys, word, [stick_x, stick_y, c_x, c_y]);
+            if Some(state) != self.input_state {
+                self.input_state = Some(state);
                 crate::web::log_line(&line);
             }
         }
@@ -448,13 +535,13 @@ impl App {
     /// the edge against the previous poll, the way `mDoCPd_Convert` splits the pad's hold and
     /// trigger words (`m_Do/m_Do_controller_pad.cpp:20-45`).
     pub fn stage_pad_state(&mut self, state: &input_tape::PadState) {
-        if state.keys_given {
-            let held = input::keys_from_mask(state.keys);
-            self.stage_keys(&held, true);
-            return;
-        }
-        self.stage_axis(state.move_axis());
-        self.stage_pad(state.hold(), state.c_axis());
+        let sticks = |x: i8, y: i8| (glam::Vec2::new(f32::from(x), f32::from(y)) / 127.0).clamp_length_max(1.0);
+        let pad = input::PadSnapshot {
+            hold: state.hold(),
+            move_axis: if state.keys_given { sticks(state.stick_x, state.stick_y) } else { state.move_axis() },
+            c_axis: if state.keys_given { sticks(state.c_stick_x, state.c_stick_y) } else { state.c_axis() },
+        };
+        self.stage_keys_with(&input::keys_from_mask(state.keys), true, pad, Default::default());
     }
 
     /// Stage the pad's face buttons and C-stick. The trigger word is the edge against the
@@ -462,14 +549,9 @@ impl App {
     /// held button never reads as a fresh press.
     fn stage_pad(&mut self, held: input::ButtonBits, c_stick: glam::Vec2) {
         let prev = std::mem::replace(&mut self.pad_prev, held);
-        *self
-            .sim
-            .world
-            .get_resource_or_insert_with(sim::intent::PadButtons::default) =
-            sim::intent::PadButtons {
-                trig: input::pad_trig(held, prev),
-                hold: held,
-            };
+        let mut buttons = self.sim.world.resource_mut::<sim::intent::PadButtons>();
+        buttons.trig = buttons.trig.union(input::pad_trig(held, prev));
+        buttons.hold = held;
         self.sim
             .world
             .get_resource_or_insert_with(sim::intent::CStick::default)
@@ -481,45 +563,17 @@ impl App {
     /// (the title actor, the game-over sequence) or through the ported menu state machine
     /// behind the file select panes.
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
-        if self.intro.is_some() || self.menu.screen != menus::Screen::Playing {
-            self.stage_axis(glam::Vec2::ZERO);
-            self.stage_damage(0);
-            self.stage_do(false);
-            self.stage_target(false);
-            self.stage_item(false);
-            self.stage_use(false);
-            if self.menu.screen != menus::Screen::GameOver {
-                self.stage_pad_menu();
-            }
-            if self.menu.screen == menus::Screen::Title
-                && self.assets_installed
-                && self.intro.is_none()
-            {
-                self.stage_pad_title(held, window_focused);
-            }
-        }
-        if self.intro.is_some() {
-            self.menu_prev.clone_from(held);
-            return;
-        }
-        let cmds = if window_focused {
+        let cmds = if !self.assets_installed && window_focused {
             menus::cmds_from(held, &self.menu_prev)
         } else {
             Vec::new()
         };
-        let file_select_pad =
-            if self.menu.screen == menus::Screen::FileSelect && self.intro.is_none() {
-                Some(self.file_select_pad(held, &self.menu_prev, window_focused))
-            } else {
-                None
-            };
         self.menu_prev.clone_from(held);
         if !self.assets_installed {
             self.stage_host_screens(&cmds);
             return;
         }
         match self.menu.screen {
-            menus::Screen::FileSelect => self.stage_file_select(file_select_pad),
             menus::Screen::Settings | menus::Screen::QuitConfirm => {
                 // Only the pre-boot shell enters these; return to the retail title instead of
                 // drawing the shell over a session that has the disc.
@@ -556,21 +610,13 @@ impl App {
     /// The retail file select is a pad-driven state machine (`d_file_select.cpp`), so the
     /// shell's keys are folded into the pad it reads: Space and Enter are A, Escape is B and
     /// the main stick is the cursor.
-    fn file_select_pad(
-        &self,
-        held: &HashSet<PhysicalKey>,
-        previous: &HashSet<PhysicalKey>,
-        window_focused: bool,
-    ) -> crate::ui_file_select::PadInput {
+    fn menu_pad(&self) -> ui_menu_save::PadInput {
         let buttons = *self.sim.world.resource::<sim::intent::PadButtons>();
-        let axis = self.sim.world.resource::<sim::intent::MoveIntent>().axis;
-        let down = |key: PhysicalKey| window_focused && held.contains(&key);
-        let pressed = |key: PhysicalKey| down(key) && !previous.contains(&key);
-        let confirm = pressed(PhysicalKey::Space) || pressed(PhysicalKey::Enter);
-        let cancel = pressed(PhysicalKey::Escape);
-        let save_pad = ui_menu_save::PadInput {
-            trig_a: confirm || buttons.trig.a,
-            trig_b: cancel || buttons.trig.b,
+        // tww/src/d/d_file_select.cpp:498-505: the cursor reads the main stick.
+        let axis = self.sampled_pad.move_axis;
+        ui_menu_save::PadInput {
+            trig_a: buttons.trig.a,
+            trig_b: buttons.trig.b,
             trig_x: buttons.trig.x,
             trig_y: buttons.trig.y,
             trig_z: buttons.trig.z,
@@ -579,22 +625,24 @@ impl App {
             trig_start: buttons.trig.start,
             stick_value: axis.length(),
             stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
-        };
-        let mut pad = crate::ui_file_select::PadInput::from(&save_pad);
-        pad.hold_a = down(PhysicalKey::Space) || down(PhysicalKey::Enter) || buttons.hold.a;
-        pad.hold_b = down(PhysicalKey::Escape) || buttons.hold.b;
+        }
+    }
+
+    fn file_select_pad(&self) -> ui_file_select::PadInput {
+        let mut pad = ui_file_select::PadInput::from(&self.menu_pad());
+        pad.hold_a = self.sampled_pad.hold.a;
+        pad.hold_b = self.sampled_pad.hold.b;
         pad
     }
 
     /// One frame of the retail file select: the ported state machine (`d_file_select.cpp`)
     /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
     /// save.
-    fn stage_file_select(&mut self, pad: Option<crate::ui_file_select::PadInput>) {
-        self.menu.tick_file_select();
-        if let Some(pad) = pad {
-            let menus::Menu { fs, card, .. } = &mut self.menu;
-            fs.move_step(&pad, card, None);
-        }
+    fn stage_file_select(&mut self) {
+        if !self.menu.tick_file_select() { return; }
+        let pad = self.file_select_pad();
+        let menus::Menu { fs, card, .. } = &mut self.menu;
+        fs.move_step(&pad, card, None);
         if let Some(slot) = self.menu.fs.slot_picked.take() {
             let action = self.menu.file_select_pick(slot);
             self.apply_menu_action(Some(action));
@@ -610,7 +658,7 @@ impl App {
 
     fn apply_menu_action(&mut self, action: Option<menus::Action>) {
         match action {
-            Some(menus::Action::Load(slot)) => match self.read_slot(slot) {
+            Some(menus::Action::Load(slot)) => match self.menu.card.slots.get(slot).cloned().flatten() {
                 Some(saved) => match self.load(&saved) {
                     Ok(()) => {
                         self.name = saved.name;
@@ -618,7 +666,7 @@ impl App {
                     }
                     Err(e) => log::warn!("clearsleeper: slot {slot} load failed ({e})"),
                 },
-                None => self.start_new(slot),
+                None => log::warn!("clearsleeper: selected slot {slot} could not be read"),
             },
             Some(menus::Action::New(slot)) => self.start_new(slot),
             Some(menus::Action::Quit) => self.quit.request(),
@@ -631,6 +679,7 @@ impl App {
             self.menu.screen = menus::Screen::Title;
             return;
         }
+        self.name = save::DEFAULT_NAME.to_owned();
         self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
         self.pending_slot = Some(slot);
         self.begin_intro();
@@ -811,6 +860,11 @@ impl App {
         let Some(request) = request else {
             return;
         };
+        // tww/src/d/actor/d_a_title.cpp:651-675; tww/src/d/d_s_title.cpp:85-89.
+        if request.scene_proc == sim::title::FPC_NM_TITLE_SCENE {
+            self.begin_movie(ui_file_select::SceneName::Title);
+            return;
+        }
         if request.scene_proc != sim::title::FPC_NM_NAME_SCENE {
             return;
         }
@@ -819,13 +873,6 @@ impl App {
             .resource_mut::<sim::title::TitleScene>()
             .request = None;
         self.menu.screen = menus::Screen::FileSelect;
-        let slots = (0..save::SLOTS)
-            .map(|slot| match self.read_slot(slot) {
-                Some(saved) => menus::SlotInfo::from_save(&saved),
-                None => menus::SlotInfo::Empty,
-            })
-            .collect();
-        self.menu.slots = slots;
         self.menu.open_file_select();
         self.menu.sync_file_select_cursor();
     }
@@ -908,7 +955,8 @@ impl App {
 
     /// Stage the orbit view yaw into the sim's camera-relative walk frame.
     pub fn stage_camera(&mut self) {
-        let cam_yaw = self.cam.get().yaw;
+        // tww/src/d/actor/d_a_player_main.cpp:10568: movement follows the active camera.
+        let cam_yaw = self.game_camera().unwrap_or_else(|| self.cam.get()).yaw;
         self.stage_camera_yaw(view::sim_yaw_for_camera(cam_yaw));
     }
 
@@ -941,46 +989,6 @@ impl App {
 
     pub fn stage_target(&mut self, held: bool) {
         self.sim.world.resource_mut::<sim::intent::TargetIntent>().0 = held;
-    }
-
-    /// Release the pad and centre the C-stick while a menu owns the screen, leaving START
-    /// readable: retail's START is both the edge that opens a pause menu and the edge that
-    /// closes it. The previous poll is left alone, so a button still down when the menu
-    /// closes does not report a fresh press.
-    fn stage_pad_menu(&mut self) {
-        {
-            let mut pad = self
-                .sim
-                .world
-                .get_resource_or_insert_with(sim::intent::PadButtons::default);
-            let hold = pad.hold.except_start();
-            let trig = pad.trig.except_start();
-            pad.hold = hold;
-            pad.trig = trig;
-        }
-        self.sim
-            .world
-            .get_resource_or_insert_with(sim::intent::CStick::default)
-            .poll(glam::Vec2::ZERO);
-    }
-
-    /// The retail title checks pad A, B and START (`d_a_title.cpp:638-659`): the menu's
-    /// Space/Enter confirm keys read as A for one frame, and Escape is already `PAD_START`.
-    fn stage_pad_title(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
-        if self.title_actor.is_none() {
-            return;
-        }
-        let pressed = window_focused
-            && (held.contains(&PhysicalKey::Space) || held.contains(&PhysicalKey::Enter));
-        let previous = window_focused
-            && (self.menu_prev.contains(&PhysicalKey::Space)
-                || self.menu_prev.contains(&PhysicalKey::Enter));
-        let mut pad = self
-            .sim
-            .world
-            .get_resource_or_insert_with(sim::intent::PadButtons::default);
-        pad.hold.a |= pressed;
-        pad.trig.a |= pressed && !previous;
     }
 
     /// Load the game over sequence's assets: `Gover.arc` for the letters and
@@ -1032,22 +1040,7 @@ impl App {
         if self.game_over.is_none() && !self.game_over_failed && !self.open_game_over() {
             self.game_over_failed = true;
         }
-        let pad = {
-            let buttons = *self.sim.world.resource::<sim::intent::PadButtons>();
-            let stick = *self.sim.world.resource::<sim::intent::CStick>();
-            ui_menu_save::PadInput {
-                trig_a: buttons.trig.a,
-                trig_b: buttons.trig.b,
-                trig_x: buttons.trig.x,
-                trig_y: buttons.trig.y,
-                trig_z: buttons.trig.z,
-                trig_l: buttons.trig.l,
-                trig_r: buttons.trig.r,
-                trig_start: buttons.trig.start,
-                stick_value: stick.value(),
-                stick_angle: stick.angle,
-            }
-        };
+        let pad = self.menu_pad();
         let mut vibration = *self.sim.world.resource::<sim::vibration::Vibration>();
         let mut health = *self.sim.world.resource::<sim::health::Health>();
         // The save the game-over screen writes is the state at the death, not the save the
@@ -1346,6 +1339,22 @@ impl App {
             player_pos,
             player_yaw,
             player_face,
+            player_anm: self
+                .sim
+                .world
+                .get_resource::<sim::link_demo::PlayerAnm>()
+                .and_then(|anm| {
+                    anm.stem.map(|stem| view::PlayerAnm {
+                        stem,
+                        frame: anm.frame,
+                    })
+                }),
+            player_no_draw: player.is_some_and(|player| player.no_draw)
+                || self
+                    .sim
+                    .world
+                    .get_resource::<sim::camera::Camera>()
+                    .is_some_and(|camera| camera.attention(sim::camera::ATTN_SUBJECT)),
             bounds_min: area.bounds_min,
             bounds_max: area.bounds_max,
             ground_y,
@@ -3099,37 +3108,78 @@ impl App {
     pub fn advance(&mut self, dt: Duration) -> u32 {
         self.frame += 1;
         self.log_input();
-        let intro_running = self.intro.is_some();
-        if intro_running {
+        if self.intro.is_some() {
             self.step_intro(dt);
+            self.clear_pad_edges();
+            return 0;
         }
-        let held = sim::pause::advance(&mut self.sim.world, dt, self.sim.step)
-            && self.menu.screen == menus::Screen::Playing;
-        // The opening demo is its own scene, `d_s_open`; the prologue stage is loaded for the
-        // handoff but does not run a tick until `enter_play` hands it to the player.
-        let steps = if held || intro_running {
-            0
-        } else {
-            self.sim.step(dt)
-        };
+        // tww/src/d/d_s_name.cpp:1130-1153; tww/src/d/d_gameover.cpp:109-166.
+        if self.menu.screen != menus::Screen::Playing {
+            if self.assets_installed {
+                self.advance_scene(dt);
+            } else {
+                self.clear_pad_edges();
+            }
+            return 0;
+        }
+        if sim::pause::advance(&mut self.sim.world, dt, self.sim.step) {
+            return 0;
+        }
+        let steps = self.sim.step_with(dt, |world| {
+            world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
+        });
+        if steps == 0 { return 0; }
         self.drain_demo_creates();
         self.drain_demo_gaps();
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
         if game_over && self.menu.screen == menus::Screen::Playing {
             self.menu.screen = menus::Screen::GameOver;
-            self.menu.slot = 0;
             self.game_over = None;
             self.game_over_failed = false;
+            return steps;
         }
-        self.step_game_over();
         self.apply_exit();
+        if self.menu.screen != menus::Screen::Playing { return steps; }
         self.sync_rooms();
         self.pump_dialogue();
-        self.handle_title_request();
-        self.sync_title_actor();
-        self.step_title();
         self.step_meter();
         steps
+    }
+
+    fn clear_pad_edges(&mut self) {
+        self.sim.world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
+    }
+
+    fn advance_scene(&mut self, dt: Duration) {
+        if self.menu.screen == menus::Screen::Movie {
+            self.step_movie(dt);
+            self.clear_pad_edges();
+            return;
+        }
+        let step = self.sim.step;
+        self.menu_clock = (self.menu_clock + dt).min(step * self.sim.max_steps.max(1));
+        while self.menu_clock >= step {
+            self.menu_clock -= step;
+            let before = self.menu.screen;
+            match before {
+                menus::Screen::Title => {
+                    self.sync_title_actor();
+                    self.sim.world.run_system_cached(sim::title::control).expect("registered title resources");
+                    self.handle_title_request();
+                    self.step_title();
+                }
+                menus::Screen::FileSelect => self.stage_file_select(),
+                menus::Screen::GameOver => self.step_game_over(),
+                menus::Screen::ClearSave => self.step_clear_save(),
+                _ => {}
+            }
+            self.clear_pad_edges();
+            if self.menu.screen != before || self.intro.is_some() {
+                self.menu_clock = Duration::ZERO;
+                self.sync_title_actor();
+                break;
+            }
+        }
     }
 
     pub fn stage(&self) -> Option<&dzs::StageTables> {
@@ -3226,6 +3276,11 @@ impl App {
             }
             (None, None, None) => return,
         };
+        // tww/src/d/d_s_play.cpp:325-329: ENDING is a movie scene, not a stage archive.
+        if dest.stage == "ENDING" {
+            self.begin_movie(ui_file_select::SceneName::Ending);
+            return;
+        }
         let Some(tables) = assets::load_stage_tables(&dest.stage) else {
             return;
         };
@@ -3251,6 +3306,14 @@ impl App {
         spawn: glam::Vec3,
         yaw: f32,
         layer: i8,
+    ) {
+        self.store_stage_progress();
+        self.restore_stage_progress(tables.stag().map_or(0, |s| s.save_table));
+        self.mount_stage(tables, rooms, spawn, yaw, layer);
+    }
+
+    fn mount_stage(
+        &mut self, tables: dzs::StageTables, rooms: Vec<u8>, spawn: glam::Vec3, yaw: f32, layer: i8,
     ) {
         // A stage mount with no spawn row of its own - a save load - must not inherit the start
         // event the previous mount asked for. The entry paths that do have a row replace this.
@@ -3660,7 +3723,10 @@ pub fn root_view(
         return intro_view(app, ctx);
     }
     if app.menu.screen == menus::Screen::Title {
-        return title_screen_view(app, ctx);
+        return ZStack(Modifier::new().fill_max_size()).child([title_screen_view(app, ctx), app.touch.view(ctx)]);
+    }
+    if matches!(app.menu.screen, menus::Screen::Movie | menus::Screen::ClearSave) {
+        return ZStack(Modifier::new().fill_max_size()).child([app.ending_view(ctx), app.touch.view(ctx)]);
     }
     let snapshot = app.snapshot();
     let mut camera = app.game_camera().unwrap_or_else(|| app.cam.get());
@@ -3704,9 +3770,14 @@ pub fn root_view(
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
-        menus::Screen::Title | menus::Screen::Settings | menus::Screen::QuitConfirm => Spacer(),
+        menus::Screen::Title | menus::Screen::Settings | menus::Screen::QuitConfirm | menus::Screen::Movie | menus::Screen::ClearSave => Spacer(),
     };
-    ZStack(Modifier::new().fill_max_size()).child([viewport, overlay, dialogue_view(app, ctx)])
+    ZStack(Modifier::new().fill_max_size()).child([
+        viewport,
+        overlay,
+        dialogue_view(app, ctx),
+        app.touch.view(ctx),
+    ])
 }
 
 /// The host shell, and the only place it exists: with no asset source installed there is no
@@ -3719,7 +3790,7 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
         // A session only starts with an asset source (`start_new`), and the retail file
         // select needs the disc's panes, so neither belongs to the pre-boot shell.
-        menus::Screen::FileSelect | menus::Screen::Playing | menus::Screen::GameOver => Spacer(),
+        menus::Screen::FileSelect | menus::Screen::Playing | menus::Screen::GameOver | menus::Screen::Movie | menus::Screen::ClearSave => Spacer(),
     }
 }
 

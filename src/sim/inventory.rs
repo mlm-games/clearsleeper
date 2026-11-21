@@ -41,7 +41,7 @@ pub fn slot_of(item: u8) -> Option<usize> {
         .map(|(_, slot)| *slot)
 }
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Equipped {
     slots: [u8; SLOT_COUNT],
 }
@@ -83,7 +83,7 @@ impl Equipped {
     }
 }
 
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Got {
     flags: [u8; SLOT_COUNT],
 }

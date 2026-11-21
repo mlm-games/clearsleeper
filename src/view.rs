@@ -41,11 +41,24 @@ pub struct ActorView {
     pub half: f32,
 }
 
+/// The bck a demo step put the player on, and the frame the demo has reached in it
+/// ([`crate::sim::link_demo::PlayerAnm`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlayerAnm {
+    pub stem: &'static str,
+    pub frame: f32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
     pub player_yaw: f32,
     pub player_face: f32,
+    pub player_anm: Option<PlayerAnm>,
+    /// `checkPlayerNoDraw()` (`d_a_player_main.h:1980`), the gate the player's own draw takes
+    /// before it submits its model: something raised `daPyFlg0_NO_DRAW`, or the camera carries
+    /// `dCamAttnStts_SUBJECT_e` ([`crate::sim::camera::Camera::publish_attention`]).
+    pub player_no_draw: bool,
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
     pub ground_y: f32,
@@ -294,7 +307,9 @@ pub fn build_frame_with_actor(
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
     }
-    if let Some(mesh) = actor {
+    // `checkPlayerNoDraw()` (`d_a_player_main.h:1980`): a raised `daPyFlg0_NO_DRAW` keeps the
+    // player's model out of the frame.
+    if let Some(mesh) = actor.filter(|_| !snapshot.player_no_draw) {
         let page_base = room.map_or(0, |room| room.textures.len() as u32);
         let pages = used_pages(mesh);
         for (slot, page) in pages.iter().enumerate() {
@@ -311,7 +326,12 @@ pub fn build_frame_with_actor(
             });
         }
         let pose = match actor_anim {
-            Some(anim) => anim.pose(snapshot.tick as f32),
+            Some(anim) => anim.pose_stem(
+                snapshot.player_anm.map(|anm| (anm.stem, anm.frame)),
+                // The bck tracks are keyed at 60 Hz and this sim steps at 30 Hz
+                // ([`crate::SIM_HZ`]), so a sim tick is two animation frames.
+                snapshot.tick as f32 * 2.0,
+            ),
             None => mesh.joint_matrices.clone(),
         };
         let placed = place_actor(pose.clone(), snapshot);

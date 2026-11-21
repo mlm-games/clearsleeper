@@ -36,7 +36,7 @@
 //! `tww` spec's README lists); any other image is a typed error rather than a session without
 //! assets.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -433,6 +433,9 @@ pub struct DiscImage {
     data: ImageData,
 }
 
+pub trait AssetStream: Read + Seek + Send {}
+impl<T: Read + Seek + Send> AssetStream for T {}
+
 impl DiscImage {
     /// Read a disc image: an ISO/GCM as it is, or an RVZ through `nod`.
     pub fn open(bytes: Vec<u8>) -> Result<Self, DiscError> {
@@ -642,6 +645,23 @@ impl DiscImage {
                 let mut out = Vec::new();
                 stream.read_to_end(&mut out).map_err(container_error)?;
                 Ok(out)
+            }
+        }
+    }
+
+    pub fn stream(&self, rel: &str) -> Result<Box<dyn AssetStream>, DiscError> {
+        let (index, (offset, size)) = self.fst.find(fst_path(rel))
+            .and_then(|i| Some((i, self.fst.file(i)?)))
+            .ok_or_else(|| DiscError::MissingFile { path: rel.to_owned() })?;
+        // tww/src/d/actor/d_a_movie_player.cpp:2704-2724: read each frame within the DVD file.
+        match &self.data {
+            ImageData::Raw { bytes } => {
+                let stream = BufReader::new(ImageStream::new(Arc::clone(bytes)));
+                Ok(Box::new(nod::WindowedStream::new(stream, offset, size).map_err(container_error)?))
+            }
+            ImageData::Rvz { partition, nodes } => {
+                let partition = partition.lock().map_err(container_error)?.clone();
+                Ok(Box::new(partition.into_open_file(nodes[index]).map_err(container_error)?))
             }
         }
     }

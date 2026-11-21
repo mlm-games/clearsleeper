@@ -205,15 +205,22 @@ pub(super) fn turn_toward(value: i16, target: i16) -> i16 {
     add_calc_angle_s(value, target, TURN_SCALE, TURN_PARAM, TURN_RATE)
 }
 
+/// The player's own mode resources the walk tick reads. They travel as one param because
+/// a system's own arity runs out at sixteen.
+#[derive(SystemParam)]
+pub struct WalkModes<'w> {
+    pub swim: Res<'w, Swim>,
+    pub hop: Res<'w, Hop>,
+    pub roll: Res<'w, Roll>,
+    pub jump: Res<'w, Jump>,
+    pub combat: Res<'w, Combat>,
+    pub lock: Res<'w, Lock>,
+}
+
 pub fn walk(
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
-    swim: Res<Swim>,
-    hop: Res<Hop>,
-    roll: Res<Roll>,
-    jump: Res<Jump>,
-    combat: Res<Combat>,
-    lock: Res<Lock>,
+    modes: WalkModes<'_>,
     mut partner: ResMut<ItemPartner>,
     collision: Option<Res<Collision>>,
     water: Res<Water>,
@@ -222,19 +229,43 @@ pub fn walk(
     mut players: Query<&mut Player>,
     mut stride: ResMut<Stride>,
     mut events: ResMut<SimEvents>,
+    demo: Option<Res<super::demo::DemoManager>>,
 ) {
+    // The position integration below is the player's own tick, and while a demo drives it
+    // (`checkPlayerDemoMode()`, `d_a_player_main.h:1913`) that tick is not the player's: the demo
+    // step's transform is what places it, and a stick or gravity pass would drag it off.
+    //
+    // The walk cuts are the exception. `changeDemoProc`'s `DEMO_N_WALK`/`DEMO_N_DASH` arm falls
+    // through to `checkNextMode(0)` (`d_a_player_main.cpp:5528-5534`), i.e. retail runs the
+    // ordinary move proc with the demo's own stick (`mDemo.getStick()`), and the walk's anime is
+    // picked from the speed it reaches. The port's carrier for that stick is
+    // [`ItemPartner::demo_stick`], set by the event staff's `LINK` command, so a stick is exactly
+    // the case where the transform is not what places the player.
+    if demo.as_deref().is_some_and(|demo| demo.drives_player()) && partner.demo_stick.is_none() {
+        return;
+    }
     if ships.iter().any(|ship| ship.riding) {
         return;
     }
     // `setSpeedAndAngleNormal`, `main.cpp:2833`: the model only turns onto the stick while the
     // player is not locked on and is not in the turn that drives the model itself.
+    let WalkModes {
+        swim,
+        hop,
+        roll,
+        jump,
+        combat,
+        lock,
+    } = modes;
     let model_turns = lock.target.is_none()
         && proc
             .as_ref()
             .map_or(true, |state| state.current != Proc::MoveTurn);
     for mut player in &mut players {
         let player = &mut *player;
-        if !allows(proc.as_deref(), WALK_ALLOWED) {
+        // The demo walk is not the player's own proc: `checkNextMode(0)` runs the move proc
+        // whatever the player was left standing in, so the allow list does not gate it.
+        if partner.demo_stick.is_none() && !allows(proc.as_deref(), WALK_ALLOWED) {
             continue;
         }
         if partner.demo_fall {

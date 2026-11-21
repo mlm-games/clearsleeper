@@ -82,3 +82,11 @@ pub enum GameOverChoice {
     Continue,
     Quit,
 }
+
+/// The stylus: a pointer or a finger over the screen, in the 640x480 canvas's own
+/// pixels, and whether it is down. The PictoBox draws with it.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct Stylus {
+    pub pos: Vec2,
+    pub down: bool,
+}

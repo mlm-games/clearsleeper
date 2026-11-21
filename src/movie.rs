@@ -20,11 +20,18 @@ pub const SAMPLE_RATE: u32 = 32000;
 const MAX_BLOCK_SAMPLES: usize = 0x10000;
 
 const DEFAULT_RATE: f32 = 29.97;
-const SOI: [u8; 3] = [0xFF, 0xD8, 0xFF];
 const EOI: [u8; 2] = [0xFF, 0xD9];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MovieError;
+
+impl std::fmt::Display for MovieError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("invalid or unreadable THP movie")
+    }
+}
+
+impl std::error::Error for MovieError {}
 
 struct Frame {
     at: u64,
@@ -32,31 +39,8 @@ struct Frame {
     audio: usize,
 }
 
-enum Source {
-    File(File),
-    Bytes(Cursor<Vec<u8>>),
-}
-
-impl Read for Source {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            Self::File(file) => file.read(buf),
-            Self::Bytes(bytes) => bytes.read(buf),
-        }
-    }
-}
-
-impl Seek for Source {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        match self {
-            Self::File(file) => file.seek(pos),
-            Self::Bytes(bytes) => bytes.seek(pos),
-        }
-    }
-}
-
 pub struct Movie {
-    source: Source,
+    source: Box<dyn crate::disc::AssetStream>,
     frames: Vec<Frame>,
     rate: f32,
     declared: usize,
@@ -73,41 +57,35 @@ fn i16_at(data: &[u8], at: usize) -> i16 {
     }
 }
 
-fn find(data: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    if from >= data.len() {
-        return None;
-    }
-    data[from..]
-        .windows(needle.len())
-        .position(|window| window == needle)
-        .map(|at| at + from)
-}
-
 impl Movie {
     pub fn open(path: &Path) -> Result<Self, MovieError> {
-        let source = Source::File(File::open(path).map_err(|_| MovieError)?);
-        Self::parse(source)
+        Self::parse(Box::new(File::open(path).map_err(|_| MovieError)?))
     }
 
     /// A movie over bytes already in memory, which a disc image has and a file path does not.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, MovieError> {
-        Self::parse(Source::Bytes(Cursor::new(bytes)))
+        Self::parse(Box::new(Cursor::new(bytes)))
     }
 
-    fn parse(mut source: Source) -> Result<Self, MovieError> {
+    pub(crate) fn parse(mut source: Box<dyn crate::disc::AssetStream>) -> Result<Self, MovieError> {
         let mut header = [0_u8; HEADER_LEN];
         source.read_exact(&mut header).map_err(|_| MovieError)?;
-        if &header[..4] != b"THP\0" {
+        if &header[..4] != b"THP\0" || be32(&header, 4) != 0x11000 {
             return Err(MovieError);
         }
         let rate = f32::from_bits(be32(&header, FRAME_RATE));
         let declared = be32(&header, FRAME_COUNT) as usize;
-        let first = be32(&header, FIRST_OFFSET) as usize;
-        let last = be32(&header, LAST_OFFSET) as usize;
-        let frames = index(&mut source, first, last, declared)?;
-        if frames.is_empty() {
+        let first = u64::from(be32(&header, FIRST_OFFSET));
+        let last = u64::from(be32(&header, LAST_OFFSET));
+        let end = source.seek(SeekFrom::End(0)).map_err(|_| MovieError)?;
+        // tww/src/d/actor/d_a_movie_player.cpp:3482-3526: the retail reels have video then stereo audio.
+        let mut components = [0; 6];
+        source.seek(SeekFrom::Start(u64::from(be32(&header, 0x20)))).map_err(|_| MovieError)?;
+        source.read_exact(&mut components).map_err(|_| MovieError)?;
+        if components != [0, 0, 0, 2, 0, 1] || !rate.is_finite() || rate <= 0.0 || declared == 0 {
             return Err(MovieError);
         }
+        let frames = index(&mut source, first, last, end, declared, be32(&header, 0x18))?;
         Ok(Self {
             source,
             frames,
@@ -328,7 +306,10 @@ fn restuff(frame: &[u8]) -> Vec<u8> {
         out.extend_from_slice(segment);
         at += length;
         if marker == 0xDA {
-            for byte in &frame[at..] {
+            // tww/src/d/actor/d_a_movie_player.cpp:377-385: stuffing applies to the scan, not the end marker.
+            let end = frame.iter().rposition(|&b| b != 0 && b != 0xff).unwrap_or(0);
+            let scan_end = if end > at && frame.get(end-1..=end) == Some(EOI.as_slice()) { end-1 } else { frame.len() };
+            for byte in &frame[at..scan_end] {
                 out.push(*byte);
                 if *byte == 0xFF {
                     out.push(0x00);
@@ -356,56 +337,34 @@ fn channel(span: &[u8], from: usize, filter: usize, previous: usize, to: usize) 
 
 fn index<R: Read + Seek>(
     file: &mut R,
-    first: usize,
-    last: usize,
+    mut at: u64,
+    last: u64,
+    end: u64,
     declared: usize,
+    mut size: u32,
 ) -> Result<Vec<Frame>, MovieError> {
-    let mut marks = Vec::with_capacity(declared.min(8192));
-    let mut at = first as u64;
-    let end = (last as u64).max(at);
-    let mut window = vec![0_u8; 1 << 16];
-    while marks.len() < declared && at < end {
-        let want = usize::try_from(end - at)
-            .unwrap_or(window.len())
-            .min(window.len());
-        file.seek(SeekFrom::Start(at)).map_err(|_| MovieError)?;
-        let read = file.read(&mut window[..want]).map_err(|_| MovieError)?;
-        if read < SOI.len() {
-            break;
-        }
-        match find(&window[..read], 0, &SOI) {
-            Some(hit) => {
-                marks.push(at + hit as u64);
-                at += hit as u64 + SOI.len() as u64;
-            }
-            None => at += (read - SOI.len() + 1) as u64,
-        }
-    }
-
+    // tww/src/d/actor/d_a_movie_player.cpp:2719-2729,2788-2795: the final offset is a frame start.
     let mut header = [0_u8; FRAME_HEADER];
-    let mut frames = Vec::with_capacity(marks.len());
-    for (index, at) in marks.iter().enumerate() {
-        let bound = marks
-            .get(index + 1)
-            .copied()
-            .unwrap_or(last as u64)
-            .min(last as u64);
-        if *at < FRAME_HEADER as u64 || *at + FRAME_HEADER as u64 > bound {
-            continue;
+    let mut frames = Vec::with_capacity(declared.min(8192));
+    for n in 0..declared {
+        let next = at + u64::from(size);
+        if size < FRAME_HEADER as u32 || next > end || at > last || (n + 1 == declared) != (at == last) {
+            return Err(MovieError);
         }
-        file.seek(SeekFrom::Start(at - FRAME_HEADER as u64))
-            .map_err(|_| MovieError)?;
+        file.seek(SeekFrom::Start(at)).map_err(|_| MovieError)?;
         file.read_exact(&mut header).map_err(|_| MovieError)?;
         let image = u64::from(be32(&header, 8));
         let audio = u64::from(be32(&header, 12));
-        if image == 0 || *at + image + audio > bound {
-            continue;
+        if image == 0 || FRAME_HEADER as u64 + image + audio > u64::from(size) {
+            return Err(MovieError);
         }
         frames.push(Frame {
-            at: *at,
+            at: at + FRAME_HEADER as u64,
             image: image as usize,
             audio: audio as usize,
         });
+        at = next;
+        size = be32(&header, 0);
     }
     Ok(frames)
 }
@@ -423,6 +382,8 @@ fn index<R: Read + Seek>(
 /// A disc image has no path to hand a file handle, so the app reads the same entry through
 /// [`crate::assets::AssetRoot::read`] and builds the movie with [`Movie::from_bytes`].
 pub const TITLE_PATH: &str = "files/thpdemo/title_loop.thp";
+// tww/src/d/actor/d_a_movie_player.cpp:4225-4228
+pub const ENDING_PATH: &str = "files/thpdemo/end_st_epilogue.thp";
 
 pub fn title_path() -> Option<PathBuf> {
     Some(

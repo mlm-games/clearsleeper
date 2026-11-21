@@ -69,6 +69,7 @@ use super::door::StayRoom;
 use super::events::SimEvents;
 use super::jpa::Jpa;
 use super::msg::{MsgBox, MsgTable};
+use super::player::Player;
 use super::stage_data::ActorTable;
 
 /// `dDemo_manager_c::mMode`'s three values: the constructor and `remove` write `0`
@@ -2215,6 +2216,13 @@ pub struct DemoStage<'a> {
     pub object: &'a mut DemoObject,
     actors: &'a mut Vec<StageActorRow>,
     assigned: &'a mut Vec<(Entity, u8)>,
+    /// The player's entity: retail's player process is the actor a `JACT` block names `"Link"`
+    /// resolves to (`f_op_actor_mng.cpp:1430-1436`), and this port's is a [`Player`] outside the
+    /// actor query, so the name binds here.
+    pub player: Option<Entity>,
+    /// The slot the player was appended to, `0` for none - `dDemo_object_c::appendActor`
+    /// (`d_demo.cpp:545-562`): [`control`] reads it back to apply the step's transform.
+    pub player_id: &'a mut u8,
     pub table: &'a ActorTable,
     pub creates: &'a mut DemoCreates,
     /// `dComIfGp_roomControl_getStayNo()`, the room a fast-created actor is placed in.
@@ -2239,7 +2247,7 @@ pub struct DemoStage<'a> {
 }
 
 impl DemoStage<'_> {
-    /// `fopAcM_searchFromName(name, 0, 0)` - `f_op_actor_mng.cpp:4081-4103`: the first actor whose
+    /// `fopAcM_searchFromName(name, 0, 0)` - `f_op_actor_mng.cpp:1430-1436`: the first actor whose
     /// name-table row resolves to the same profile name and argument.
     ///
     /// The port's name table decodes the argument column but not the profile-name column, so
@@ -2281,6 +2289,19 @@ impl DemoStage<'_> {
             ObjectKind::Actor | ObjectKind::ActorUnk => {
                 if let Some(row) = self.search_from_name(name) {
                     return self.append_actor(row).map(DemoObjectRef::Actor);
+                }
+                if name == super::damage_resolve::NAME_PLAYER
+                    && let Some(player) = self.player
+                {
+                    // `appendActor`'s existing-slot early return (`d_demo.cpp:545-548`): a second
+                    // `JACT Link` block names the same process again, and the file's actor table
+                    // only has room for each process once.
+                    if *self.player_id != 0 {
+                        return Ok(DemoObjectRef::Actor(*self.player_id));
+                    }
+                    let id = self.object.push_actor(Some(player))?;
+                    *self.player_id = id;
+                    return Ok(DemoObjectRef::Actor(id));
                 }
                 if kind == ObjectKind::Actor && name.starts_with(DEMO_ACTOR_PREFIX) {
                     return self.fast_create_demo_actor(name);
@@ -2460,6 +2481,10 @@ pub struct DemoManager {
     /// [`DemoCommandGap`]s the timeline recorded since the shell last read them.
     command_gaps: Vec<DemoCommandGap>,
     last_mount: Option<DemoMount>,
+    /// The demo-actor slot a `JACT Link` block bound the player to, `0` for none. Retail finds
+    /// the player by name and writes through the process; this port's player is a [`Player`], so
+    /// the slot is what says a step's transform lands on it.
+    player_id: u8,
 }
 
 impl DemoManager {
@@ -2492,6 +2517,15 @@ impl DemoManager {
 
     pub fn cur_file(&self) -> Option<&str> {
         self.cur_file.as_deref()
+    }
+
+    /// `checkPlayerDemoMode()` - `d_a_player_main.h:1913`: the player's own demo mode is on, i.e.
+    /// something other than the player is writing its position and angle this step. Retail
+    /// answers it from `mDemo.getDemoType()`, which the player's demo cuts set; the port keeps the
+    /// state on the manager - a mounted file on the [`MODE_PLAY`] step whose `JACT Link` block
+    /// bound the player to a demo actor slot - because that is who writes the transform.
+    pub fn drives_player(&self) -> bool {
+        self.mode == MODE_PLAY && self.cur_file.is_some() && self.player_id != 0
     }
 
     pub fn origin(&self) -> Option<(Vec3, f32)> {
@@ -2589,11 +2623,13 @@ impl DemoManager {
         messages: &mut MsgBox,
         msg_table: &MsgTable,
         particles: &mut Jpa,
+        player: Option<Entity>,
     ) -> Result<(), DemoGap> {
         if self.started || self.cur_file.is_none() {
             return Ok(());
         }
         let mut rows = actor_rows(actors);
+        let mut player_id = self.player_id;
         let empty = ActorTable::default();
         let table = table.unwrap_or(&empty);
         let mut assigned: Vec<(Entity, u8)> = Vec::new();
@@ -2607,6 +2643,8 @@ impl DemoManager {
                 object: &mut self.object,
                 actors: &mut rows,
                 assigned: &mut assigned,
+                player,
+                player_id: &mut player_id,
                 table,
                 creates,
                 stay_room,
@@ -2622,6 +2660,7 @@ impl DemoManager {
             gaps = timeline.take_gaps();
         }
         self.started = true;
+        self.player_id = player_id;
         self.command_gaps.extend(gaps);
         apply_assigned(actors, assigned);
         match outcome {
@@ -2632,6 +2671,7 @@ impl DemoManager {
                 self.origin = None;
                 self.started = false;
                 self.mode = MODE_NONE;
+                self.player_id = 0;
                 self.last_mount = Some(DemoMount {
                     name,
                     outcome: Err(gap.clone()),
@@ -2663,6 +2703,7 @@ impl DemoManager {
         self.origin = None;
         self.started = false;
         self.mode = MODE_NONE;
+        self.player_id = 0;
     }
 
     /// `update()` - `d_demo.cpp:756-769`. `false` is the reference's "no file mounted" answer and
@@ -2704,6 +2745,7 @@ impl DemoManager {
             self.origin = None;
             self.started = false;
             self.mode = MODE_NONE;
+            self.player_id = 0;
             self.last_mount = Some(DemoMount {
                 name,
                 outcome: Err(gap),
@@ -2762,12 +2804,40 @@ pub fn apply_transform(actor: &mut Actor, demo: &DemoActor, mask: u16) -> u8 {
     flags
 }
 
+/// `dDemo_setDemoData`'s transform half for the player - `d_demo.cpp:186-204`, the same
+/// `current.pos` and angle stores [`apply_transform`] makes on an [`Actor`], for the process
+/// retail finds by name and this port keeps in its own component. The mask is the one
+/// `actPerformance` passes (`d_a_demo00.cpp:398`), `TRANS|ROTATE|ANM`, of which the player's own
+/// pose takes the first two; the animation id has no morph here to own it.
+///
+/// `current.angle.y` is the yaw the body follows, which the player keeps as [`Player::yaw`] and
+/// its facing as [`Player::face`].
+pub fn apply_player_transform(player: &mut Player, demo: &DemoActor) -> bool {
+    let flags = demo.check(ACTOR_ENABLE_TRANS | ACTOR_ENABLE_ROTATE) as u8;
+    if flags & ACTOR_ENABLE_TRANS as u8 != 0 {
+        player.pos = demo.trans();
+    }
+    if flags & ACTOR_ENABLE_ROTATE as u8 != 0 {
+        // The demo's rotation is a turn on an `s16` (`JSGSetRotation`, `d_demo.cpp:278-281`);
+        // the player keeps its own yaw in radians.
+        let yaw = f32::from(demo.rotate()[1]) * (std::f32::consts::TAU / 65536.0);
+        player.yaw = yaw;
+        player.face = yaw;
+    }
+    flags != 0
+}
+
 /// `dDemo_setDemoData(...)` - `d_demo.cpp:186-256`.
 ///
 /// The transform writes land straight on the actor through [`apply_transform`]. The animation half
 /// needs the caller's morph, which this port's actors own themselves, so it comes back as
-/// [`DemoAnm`] for whoever owns the animation step instead of being written here; `morf` is the
-/// reference's `i_morf == NULL` early return (`:206-207`), its second statement.
+/// [`DemoAnm`] instead of being written here; `morf` is the reference's `i_morf == NULL` early
+/// return (`:206-207`), its second statement.
+///
+/// Nothing calls this yet. [`super::demo00`] stages its own bck straight off
+/// [`DemoActor::anm_id`], and the player's cutscene animation is read off the same id by
+/// [`super::link_demo`] rather than through this function, so the animation half of an actor's
+/// `setDemoData` still has no receiver to hand [`DemoAnm`] to.
 ///
 /// The animation id's `0x10000` bit selects the room's demo archive and the reference reads it as
 /// `anmID & 0xFFFF` either way (`:215-224`); `arc_name` is the caller's own archive, `"Ba"` in
@@ -2819,7 +2889,9 @@ pub enum DemoApplied {
     TransformAnm(DemoAnm),
 }
 
-/// The animation half of `dDemo_setDemoData`'s application. The key is
+/// The animation half of `dDemo_setDemoData`'s application, a value no system in this port reads
+/// yet - the player's demo animation is the mode [`super::link_demo`] maps, not this - see
+/// [`set_demo_data`]. The key is
 /// `setAnm(i_key, -1, f1, 1.0f, 0.0f, -1.0f, i_sound)`'s (`d_demo.cpp:229`): the
 /// `dComIfG_getObjectIDRes(a_name, anmID & 0xFFFF)` the id names, the `getPrm_Morf()` transition,
 /// and the optional frame.
@@ -2836,6 +2908,7 @@ pub struct DemoAnm {
 pub fn control(
     mut demo: ResMut<DemoManager>,
     mut actors: Query<(Entity, &mut Actor)>,
+    mut players: Query<(Entity, &mut Player)>,
     table: Option<Res<ActorTable>>,
     stay: Res<StayRoom>,
     mut creates: ResMut<DemoCreates>,
@@ -2843,13 +2916,18 @@ pub fn control(
     mut messages: ResMut<MsgBox>,
     msg_table: Res<MsgTable>,
     mut particles: ResMut<Jpa>,
+    mut link_anm: ResMut<super::link_demo::PlayerAnm>,
+    partner: Option<Res<super::event::ItemPartner>>,
 ) {
     // `update()`'s own first test (`d_demo.cpp:757-759`): with no file mounted the manager has
     // nothing to step, which also keeps the per-step actor sweep below off the frame.
     if demo.cur_file.is_none() {
+        link_anm.apply(None, false);
         return;
     }
     let mut rows = actor_rows(&mut actors);
+    let player = players.iter_mut().next().map(|(entity, _)| entity);
+    let mut player_id = demo.player_id;
     let live: Vec<Entity> = rows.iter().map(|row| row.entity).collect();
     demo.object.forget_actors(&live);
     let empty = ActorTable::default();
@@ -2875,6 +2953,8 @@ pub fn control(
                 object,
                 actors: &mut rows,
                 assigned: &mut assigned,
+                player,
+                player_id: &mut player_id,
                 table,
                 creates: &mut creates,
                 stay_room: stay.0,
@@ -2905,6 +2985,29 @@ pub fn control(
             command_gaps.extend(timeline.take_gaps());
         }
     }
+    demo.player_id = player_id;
+    // `dComIfGp_demo_getActor(demoActorID)` for the slot a `JACT Link` block bound: retail writes
+    // through the player process, and the port's [`Player`] is where the same transform lands.
+    if let Some(entity) = player
+        && demo.player_id != 0
+        && let Some(slot) = demo.object().get_actor(demo.player_id).cloned()
+        && let Ok((_, mut body)) = players.get_mut(entity)
+    {
+        apply_player_transform(&mut body, &slot);
+    }
+    // The player's demo process plays the bck its mode names: `demo_mode =
+    // demo_actor_p->getAnmId()` (`d_a_player_main.cpp:10325`) is the `daPy_demo_c::Mode_e`
+    // value `changeDemoProc` dispatches on (`:5379-5400`), and each process init selects the
+    // `mAnmDataTable` row behind the stem [`super::link_demo::stem`] answers.
+    let mode = demo.drives_player().then(|| {
+        demo.object()
+            .get_actor(demo.player_id)
+            .map(|slot| slot.anm_id() as i32)
+    });
+    let moving = partner
+        .as_deref()
+        .is_some_and(|partner| partner.demo_stick.is_some_and(|stick| stick > 0.0));
+    link_anm.apply(mode.flatten(), moving);
     apply_assigned(&mut actors, assigned);
 }
 

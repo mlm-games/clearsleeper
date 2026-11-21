@@ -49,7 +49,8 @@ pub struct SaveAssets {
 
 impl SaveAssets {
     pub fn load(root: &AssetRoot) -> Option<Self> {
-        Assets::load_from(root, SCREEN_ARCHIVE, None, SCREEN_LABEL).map(|assets| Self { assets })
+        // tww/src/d/d_menu_save.cpp:56-59
+        Assets::load_from(root, crate::ui_menu_save::SCREEN_ARCHIVE, None, crate::ui_menu_save::SCREEN_LABEL).map(|assets| Self { assets })
     }
 
     pub fn from_parts(screen: Screen, textures: HashMap<String, Image>) -> Self {
