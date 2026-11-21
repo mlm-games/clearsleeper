@@ -375,7 +375,9 @@ const LINK_UPPER_ROOT: &str = "body_chn";
 /// `tww/src/d/actor/d_a_player_main_data.inc:2159-2164` and
 /// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:161`; the Wind Waker play animation is
 /// `tww/src/d/actor/d_a_player_main_data.inc:2446-2448` and
-/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215`.
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215`. Bottle and grab rows are in
+/// `tww/src/d/actor/d_a_player_main_data.inc:1746-1762,2306-2342` and
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:115,196,199`.
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "walk",
     "dash",
@@ -400,6 +402,10 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "ladderdwst",
     "usefana",
     "taktdge",
+    "bindrinking",
+    "binopena",
+    "grabup",
+    "grabwait",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks

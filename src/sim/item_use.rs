@@ -1,28 +1,40 @@
 use bevy_ecs::prelude::*;
 
+use super::ba1::{ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_EMPTY_BOTTLE};
+use super::carry::Carry;
 use super::combat::Combat;
 use super::intent::UseIntent;
 use super::inventory::{Equipped, ITEM_DEKU_LEAF, ITEM_WIND_WAKER, SLOT_DEKU_LEAF, SLOT_WAKER};
 
-/// Presentation-only state for the body animation an item starts in normal play. The decomp
-/// installs a single bck for the whole item process (`d_a_player_fan.inc:183-191`), which this
-/// keeps separate from the sim's own item cooldowns so a fan swing cannot overwrite a sword cut.
+/// Presentation-only state for the body animation an item or a carried object starts in normal
+/// play. The decomp installs one bck for the whole process (`d_a_player_fan.inc:183-191`), which
+/// this keeps separate from the sim's own cooldowns so it cannot overwrite a sword cut.
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct ItemUse {
     pub stem: Option<&'static str>,
     pub frame: u32,
     pressed: bool,
+    grabbed: bool,
 }
 
-/// `ANM_USEFANA` runs about 0x22 bck frames at 60 Hz, so a 30 Hz sim spends 17 ticks on it.
 const FAN_TICKS: u32 = 17;
-/// `ANM_TAKTDGE` is another one-shot body animation; hold it long enough to read as a play.
 const TACT_TICKS: u32 = 24;
+const BOTTLE_TICKS: u32 = 28;
+const GRAB_LIFT_TICKS: u32 = 8;
+
+fn limit(stem: Option<&'static str>) -> u32 {
+    match stem {
+        Some("taktdge") => TACT_TICKS,
+        Some("bindrinking" | "binopena") => BOTTLE_TICKS,
+        _ => FAN_TICKS,
+    }
+}
 
 pub fn control(
     intent: Res<UseIntent>,
     equipped: Res<Equipped>,
     combat: Res<Combat>,
+    carry: Res<Carry>,
     mut state: ResMut<ItemUse>,
 ) {
     let edge = intent.0 && !state.pressed;
@@ -30,31 +42,63 @@ pub fn control(
     if combat.active {
         state.stem = None;
         state.frame = 0;
+        state.grabbed = carry.held.is_some();
         return;
     }
-    if edge && equipped.item(SLOT_DEKU_LEAF) == ITEM_DEKU_LEAF {
-        // tww/src/d/actor/d_a_player_fan.inc:183-191;
-        // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1435,1440.
-        state.stem = Some("usefana");
-        state.frame = 0;
+    // tww/src/d/actor/d_a_player_grab.inc:572-573, d_a_player_main_data.inc:1746-1762;
+    // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:115,
+    // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:606.
+    let carrying = carry.held.is_some();
+    let lifted = carrying && !state.grabbed;
+    state.grabbed = carrying;
+    if carrying {
+        if lifted {
+            state.stem = Some("grabup");
+            state.frame = 0;
+        } else if state.stem == Some("grabup") && state.frame < GRAB_LIFT_TICKS {
+            state.frame += 1;
+        } else {
+            state.stem = Some("grabwait");
+            state.frame = state.frame.wrapping_add(1);
+        }
         return;
     }
-    if edge && equipped.item(SLOT_WAKER) == ITEM_WIND_WAKER {
-        // tww/src/d/actor/d_a_player_dproc.inc:2084, d_a_player_main_data.inc:2446-2448;
-        // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215,
-        // wwhd/wwhd_src/d/actor/d_a_player_main_06.cpp:455.
-        state.stem = Some("taktdge");
+    if matches!(state.stem, Some("grabup" | "grabwait")) {
+        state.stem = None;
         state.frame = 0;
-        return;
+    }
+    if edge {
+        // tww/src/d/actor/d_a_player_bottle.inc:95,135,267 and d_a_player_main_data.inc:2306-2342;
+        // wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:606,
+        // wwhd/wwhd_src/d/actor/d_a_player_main_07.cpp:4521,4853.
+        let bottle = (ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS)
+            .map(|slot| equipped.item(slot))
+            .find(|&item| item != 0xFF);
+        let mut stem = match bottle {
+            Some(ITEM_EMPTY_BOTTLE) => Some("binopena"),
+            Some(0x50..=0x59) => Some("bindrinking"),
+            _ => None,
+        };
+        if stem.is_none() && equipped.item(SLOT_DEKU_LEAF) == ITEM_DEKU_LEAF {
+            // tww/src/d/actor/d_a_player_fan.inc:183-191;
+            // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1435,1440.
+            stem = Some("usefana");
+        }
+        if stem.is_none() && equipped.item(SLOT_WAKER) == ITEM_WIND_WAKER {
+            // tww/src/d/actor/d_a_player_dproc.inc:2084, d_a_player_main_data.inc:2446-2448;
+            // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215,
+            // wwhd/wwhd_src/d/actor/d_a_player_main_06.cpp:455.
+            stem = Some("taktdge");
+        }
+        if let Some(stem) = stem {
+            state.stem = Some(stem);
+            state.frame = 0;
+            return;
+        }
     }
     if state.stem.is_some() {
         state.frame += 1;
-        let limit = if state.stem == Some("taktdge") {
-            TACT_TICKS
-        } else {
-            FAN_TICKS
-        };
-        if state.frame >= limit {
+        if state.frame >= limit(state.stem) {
             state.stem = None;
             state.frame = 0;
         }
