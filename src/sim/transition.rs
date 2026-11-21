@@ -135,13 +135,13 @@ pub fn check(
             continue;
         }
         // A ground exit resolves through the room whose ground polygon the player stands on, not
-        // through the stage's own exit table. The room read id is already on the room-set request
-        // filled in above. tww/src/d/d_stage.cpp:2345-2365,
+        // through the stage's own exit table. dStage_changeScene takes GetRoomId's `m_room_id`
+        // (the polygon's grandparent group), not the group-inf read id used to load the room set.
+        // tww/src/d/d_stage.cpp:2345-2365, tww/src/d/d_bg_s.cpp:278-297,
         // tww/src/d/d_lib.cpp:237-256; wwhd/wwhd_src/d/d_stage_4.cpp:326-345,
-        // wwhd/wwhd_src/d/d_lib.cpp:644-675.
-        let room = room_set
-            .as_ref()
-            .and_then(|room| room.read_id)
+        // wwhd/wwhd_src/d/d_bg_s.cpp:668-685, wwhd/wwhd_src/d/d_lib.cpp:644-675.
+        let room = collision
+            .ground_room_id(player.pos.x, player.pos.z)
             .and_then(|room| i8::try_from(room).ok());
         if let Some(exit) = collision.exit_below(player.pos + Vec3::Y * GROUND_PROBE)
             && exit != NO_EXIT

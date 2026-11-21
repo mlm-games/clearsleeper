@@ -130,6 +130,10 @@ pub struct Collision {
     /// (`c_bg_w.h:179`) and `dBgS::GetGrpRoomInfId` (`d_bg_s.cpp:120-136`): the room read id
     /// each polygon carries, `0xFF` for a polygon whose group names none.
     room_read: Vec<u8>,
+    /// `cBgD_Grp_t::m_room_id` (`c_bg_w.h:67`) resolved the way `cBgW::GetGrpToRoomIndex`
+    /// (`c_bg_w.cpp:730-737`) resolves it: the grandparent group's room, `0xFF` when there is
+    /// none. `dBgS::GetRoomId` (`d_bg_s.cpp:278-297`) hands this to `dStage_changeScene`.
+    room_id: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -704,15 +708,40 @@ impl Collision {
         let group_count = u32_at(data, 0x20).ok_or(DzbError::Truncated)?;
         let group_offset = u32_at(data, 0x24).ok_or(DzbError::Truncated)?;
         let mut group_info = Vec::with_capacity(group_count as usize);
+        let mut group_parent = Vec::with_capacity(group_count as usize);
+        let mut group_room = Vec::with_capacity(group_count as usize);
         for index in 0..group_count as usize {
             let at = group_offset as usize + index * GROUP_STRIDE;
             group_info.push(u32_at(data, at + 0x30).ok_or(DzbError::Truncated)?);
+            group_parent.push(u16_at(data, at + 0x24).ok_or(DzbError::Truncated)?);
+            group_room.push(u16_at(data, at + 0x2A).ok_or(DzbError::Truncated)?);
         }
 
+        // tww/src/d/d_bg_s.cpp:278-297 and wwhd/wwhd_src/d/d_bg_s.cpp:668-685: a static room's
+        // dBgW has no mRoomNo, so GetRoomId walks two group parents up to m_room_id.
+        let grp_room = |group: u16| -> u8 {
+            let Some(&parent) = group_parent.get(usize::from(group)) else {
+                return NO_ROOM_READ;
+            };
+            if parent == 0xFFFF {
+                return NO_ROOM_READ;
+            }
+            let Some(&grandparent) = group_parent.get(usize::from(parent)) else {
+                return NO_ROOM_READ;
+            };
+            if grandparent == 0xFFFF {
+                return NO_ROOM_READ;
+            }
+            group_room
+                .get(usize::from(grandparent))
+                .and_then(|&id| u8::try_from(id).ok())
+                .unwrap_or(NO_ROOM_READ)
+        };
         let mut tris = Vec::with_capacity(tri_count as usize);
         let mut planes = Vec::with_capacity(tri_count as usize);
         let mut codes = Vec::with_capacity(tri_count as usize);
         let mut room_read = Vec::with_capacity(tri_count as usize);
+        let mut room_id = Vec::with_capacity(tri_count as usize);
         for index in 0..tri_count as usize {
             let at = tri_offset as usize + index * TRI_STRIDE;
             let ids = [
@@ -738,6 +767,7 @@ impl Collision {
                     .get(usize::from(group))
                     .map_or(NO_ROOM_READ, |info| (info & 0xFF) as u8),
             );
+            room_id.push(grp_room(group));
             tris.push(ids);
             planes.push(plane(
                 verts[usize::from(ids[0])],
@@ -752,6 +782,7 @@ impl Collision {
             planes,
             codes,
             room_read,
+            room_id,
         })
     }
 
@@ -791,6 +822,7 @@ impl Collision {
         self.planes.extend(other.planes);
         self.codes.extend(other.codes);
         self.room_read.extend(other.room_read);
+        self.room_id.extend(other.room_id);
         self.verts.extend(other.verts);
         Ok(())
     }
@@ -1602,6 +1634,20 @@ impl Collision {
     pub fn ground_room_read_id(&self, x: f32, z: f32) -> Option<u8> {
         let (_, index) = self.ground_hit(x, z)?;
         self.room_read_id(index)
+    }
+
+    /// `dBgS::GetRoomId`, `d_bg_s.cpp:278-297`: the room the ground polygon names, which is the
+    /// `room_no` argument `dStage_changeScene` (`d_stage.cpp:2345-2365`) uses to pick the room SCLS.
+    /// `None` is that function's `-1`, the stage-level table.
+    /// `wwhd/wwhd_src/d/d_bg_s.cpp:668-685` in HD.
+    pub fn room_id(&self, tri: usize) -> Option<u8> {
+        let id = *self.room_id.get(tri)?;
+        (id != NO_ROOM_READ).then_some(id)
+    }
+
+    pub fn ground_room_id(&self, x: f32, z: f32) -> Option<u8> {
+        let (_, index) = self.ground_hit(x, z)?;
+        self.room_id(index)
     }
 
     fn wall(surface: Plane) -> bool {
