@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use super::combat::Combat;
 use super::intent::UseIntent;
-use super::inventory::{Equipped, ITEM_DEKU_LEAF, SLOT_DEKU_LEAF};
+use super::inventory::{Equipped, ITEM_DEKU_LEAF, ITEM_WIND_WAKER, SLOT_DEKU_LEAF, SLOT_WAKER};
 
 /// Presentation-only state for the body animation an item starts in normal play. The decomp
 /// installs a single bck for the whole item process (`d_a_player_fan.inc:183-191`), which this
@@ -16,6 +16,8 @@ pub struct ItemUse {
 
 /// `ANM_USEFANA` runs about 0x22 bck frames at 60 Hz, so a 30 Hz sim spends 17 ticks on it.
 const FAN_TICKS: u32 = 17;
+/// `ANM_TAKTDGE` is another one-shot body animation; hold it long enough to read as a play.
+const TACT_TICKS: u32 = 24;
 
 pub fn control(
     intent: Res<UseIntent>,
@@ -37,9 +39,22 @@ pub fn control(
         state.frame = 0;
         return;
     }
+    if edge && equipped.item(SLOT_WAKER) == ITEM_WIND_WAKER {
+        // tww/src/d/actor/d_a_player_dproc.inc:2084, d_a_player_main_data.inc:2446-2448;
+        // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215,
+        // wwhd/wwhd_src/d/actor/d_a_player_main_06.cpp:455.
+        state.stem = Some("taktdge");
+        state.frame = 0;
+        return;
+    }
     if state.stem.is_some() {
         state.frame += 1;
-        if state.frame >= FAN_TICKS {
+        let limit = if state.stem == Some("taktdge") {
+            TACT_TICKS
+        } else {
+            FAN_TICKS
+        };
+        if state.frame >= limit {
             state.stem = None;
             state.frame = 0;
         }

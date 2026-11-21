@@ -373,7 +373,9 @@ const LINK_UPPER_ROOT: &str = "body_chn";
 /// rows are in `tww/src/d/actor/d_a_player_main_data.inc:1473-1492,1956-2011` and
 /// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:76-78,145-152`. The Deku Leaf swing is
 /// `tww/src/d/actor/d_a_player_main_data.inc:2159-2164` and
-/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:161`.
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:161`; the Wind Waker play animation is
+/// `tww/src/d/actor/d_a_player_main_data.inc:2446-2448` and
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215`.
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "walk",
     "dash",
@@ -397,6 +399,7 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "ladderupst",
     "ladderdwst",
     "usefana",
+    "taktdge",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks
