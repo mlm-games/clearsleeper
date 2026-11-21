@@ -4,7 +4,8 @@ use glam::Vec3;
 use super::actor::Actor;
 use super::daynight::DayNight;
 use super::event::{ActiveEvent, EventList, Stage};
-use super::flags::{Charts, EventFlags, Switches};
+use super::events::{SimEvent, SimEvents};
+use super::flags::{Charts, EventFlags, Switches, TmpBits};
 use super::inventory::Equipped;
 use super::player::Player;
 use super::walk;
@@ -183,6 +184,8 @@ struct Ctx<'a, 'w, 's> {
     active: &'a mut ActiveEvent,
     switches: &'a Switches,
     flags: &'a mut EventFlags,
+    tmp: &'a mut TmpBits,
+    events: &'a mut SimEvents,
     day: &'a DayNight,
     player: Option<Player>,
     commands: &'a mut Commands<'w, 's>,
@@ -501,15 +504,22 @@ impl Tagmk {
         }
     }
 
-    /// `actionDaichi` (`:358-399`) - the two-step switch-cascade that gates the Wind's Requiem BGM.
-    /// Only the two `dComIfGs_isSwitch` arms and the timer drain survive; the four
-    /// `dSv_event_tmp_flag_c` reads and the three audio calls that hang off them are omitted.
+    /// `actionDaichi`: the temp bits and switch cascade that arms the Wind's Requiem boss BGM.
+    /// `dSv_event_tmp_flag_c::UNK_0440/0420/0410` are `0x440/0x420/0x410`
+    /// (`d_a_tag_mk.cpp:362,382,393`; `wwhd/wwhd_src/d/actor/d_a_tag_mk.cpp:305,323-325,335-337`).
     fn daichi(&mut self, ctx: &mut Ctx<'_, '_, '_>) {
+        const TMP_0440: u16 = 0x0440;
+        const TMP_0420: u16 = 0x0420;
+        const TMP_0410: u16 = 0x0410;
+        const BGM_MBOSS: u32 = 0x8000_0019;
         match self.stage {
-            // `if (dComIfGs_isTmpBit(dSv_event_tmp_flag_c::UNK_0440)) { m296++; mDoAud_bgmAllMute(30); }`
-            // (`:362-365`) - the gate has no channel, so the arm is fed `false` and stages 0 and 10
-            // never advance on their own.
-            0 | 10 => {}
+            // `if (isTmpBit(0x440)) { m296++; mDoAud_bgmAllMute(30); }` (`:362-365`).
+            0 | 10 => {
+                if ctx.tmp.test(TMP_0440) {
+                    self.stage += 1;
+                    ctx.events.list.push(SimEvent::Bgm(0));
+                }
+            }
             // `if (dComIfGs_isSwitch(getSwbit(), roomNo)) { m296++; }` (`:369-371`)
             1 => {
                 if ctx.switches.test(self.swbit) {
@@ -526,6 +536,10 @@ impl Tagmk {
                     self.timer -= 1;
                 } else {
                     self.stage += 1;
+                    if ctx.tmp.test(TMP_0440) {
+                        ctx.events.list.push(SimEvent::Bgm(BGM_MBOSS));
+                        ctx.tmp.set(TMP_0420);
+                    }
                 }
             }
             // ```
@@ -538,6 +552,10 @@ impl Tagmk {
             3 | 12 => {
                 if ctx.switches.test(self.swbit2) {
                     self.stage += 1;
+                    if ctx.tmp.test(TMP_0420) {
+                        ctx.events.list.push(SimEvent::Bgm(0));
+                        ctx.tmp.set(TMP_0410);
+                    }
                 }
             }
             _ => {}
@@ -712,6 +730,8 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     switches: Res<Switches>,
     mut flags: ResMut<EventFlags>,
+    mut tmp: ResMut<TmpBits>,
+    mut events: ResMut<SimEvents>,
     day: Res<DayNight>,
     equipped: Res<Equipped>,
     charts: Res<Charts>,
@@ -729,6 +749,8 @@ pub fn control(
             active: &mut active,
             switches: &switches,
             flags: &mut flags,
+            tmp: &mut tmp,
+            events: &mut events,
             day: &day,
             player,
             commands: &mut commands,

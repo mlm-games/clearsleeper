@@ -1022,6 +1022,7 @@ pub fn control(
     mut active: ResMut<ActiveEvent>,
     mut flags: ResMut<EventFlags>,
     mut story: ResMut<StoryBits>,
+    mut rupees: ResMut<super::pickup::Rupees>,
     mut next: ResMut<NextStage>,
     mut msg: ResMut<MsgBox>,
     mut partner: ResMut<ItemPartner>,
@@ -1131,6 +1132,7 @@ pub fn control(
                 &mut q.zeldas,
                 &mut q.commands,
                 &mut io.gets,
+                &mut rupees,
                 goal,
             );
         }
@@ -1185,6 +1187,7 @@ fn staff_cut(
     zeldas: &mut Query<&mut Zelda>,
     commands: &mut Commands,
     gets: &mut ItemGets,
+    rupees: &mut super::pickup::Rupees,
     goal: Option<Vec3>,
 ) {
     // The `goal` parameter is `dComIfGp_evmng_getGoal()` (`d_com_inf_game.h:3735-3737`), the
@@ -1284,7 +1287,7 @@ fn staff_cut(
     } else if staff.name == "Zl1" {
         zl1_cut(run, list, flags, owner, actors, zeldas);
     } else if staff.name == "Tc" {
-        tc_cut(run, list, flags);
+        tc_cut(run, list, flags, rupees);
     } else if staff.name == "Mk" {
         mk_cut(run, list, flags, owner, actors, talks, msg, table, commands);
     } else if staff.name == "Roten" {
@@ -1821,10 +1824,15 @@ fn zl1_init(
 /// OMITTED: `if (mpMorf->isStop()) dComIfGp_evmng_cutEnd(i_staffIdx);`
 /// (`d_a_npc_tc_cut.inc:225-227`) — `isStop()` reads the BCK archive, which this
 /// checkout does not ship, so a `SET_ANM` whose `Name` is not `GET` is left
-/// running rather than invented into ending. Also omitted: `cutPayStart`'s
-/// `dComIfGp_setItemRupeeCount(-398)` (`:308`), and the three door cuts' `seStart`
-/// calls (`:278`, `:288`, `:298`).
-fn tc_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
+/// running rather than invented into ending. The three door cuts' `seStart`
+/// calls are also omitted. `cutPayStart`'s relative rupee payment
+/// (`d_a_npc_tc_cut.inc:308`) is kept.
+fn tc_cut(
+    run: &mut StaffRun,
+    list: &EventList,
+    flags: &mut EventFlags,
+    rupees: &mut super::pickup::Rupees,
+) {
     let Some(cut) = list.cuts.get(run.cut as usize) else {
         return;
     };
@@ -1847,9 +1855,15 @@ fn tc_cut(run: &mut StaffRun, list: &EventList, flags: &mut EventFlags) {
                 cut_end(run, list, flags); // <- d_a_npc_tc_cut.inc:222-224
             }
         }
-        // EFFECT, DOOR_OPEN, DOOR_CLOSE, DOOR_CLOSE2, PAY and actIdx == -1 all end
+        // `cutPayStart`'s relative payment (`d_a_npc_tc_cut.inc:308`,
+        // `wwhd/wwhd_src/d/actor/d_a_npc_tc_cut.cpp:351-353`).
+        "PAY" => {
+            rupees.count = rupees.count.saturating_sub(398);
+            cut_end(run, list, flags);
+        }
+        // EFFECT, DOOR_OPEN, DOOR_CLOSE, DOOR_CLOSE2 and actIdx == -1 all end
         // the cut on their first run tick.
-        // <- d_a_npc_tc_cut.inc:272-274, :282-284, :291-293, :302-304, :312-314, :25-26
+        // <- d_a_npc_tc_cut.inc:272-274, :282-284, :291-293, :302-304, :25-26
         _ => cut_end(run, list, flags),
     }
 }
