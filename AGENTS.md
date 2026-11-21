@@ -9,6 +9,9 @@
 - If a build is needed to answer a question, say so in the report instead of running it. Do
   not work around a blocked or failing build (no symlinked target directories, no alternate
   target paths, no reduced checks to make a build pass).
-- Every behaviour change needs a decomp citation (`tww/src/...:line`) next to it, and the
-  decomp under `/home/ymsr/Documents/Games/repame/tww` is the only behaviour reference.
+- Every behaviour change needs decomp citations next to it. Treat the GameCube decomp under
+  `/home/ymsr/Documents/Games/repame/tww` and the HD decomp under
+  `/home/ymsr/Documents/Games/repame/wwhd` (`wwhd-main` in `/home/ymsr/Downloads/wwhd-main`) as
+  co-equal references, the way Dusklight does. Cite both when both describe the behaviour, and
+  state which one a decision follows when they differ. Neither tree is authoritative on its own.
 - Do not commit, push, stash, or reset; the coordinator commits the tree.

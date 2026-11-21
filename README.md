@@ -52,4 +52,5 @@ unreadable is a typed failure (stderr on desktop), never a silent empty world.
 game disc root (`files/`, `sys/`) when no image is installed. The data stays outside this
 repository.
 
-Mainly uses dusklight as a reference, and the code of tww for the decomp.
+Uses dusklight as a reference, and both the GameCube (`tww`) and HD (`wwhd-main` / `wwhd`)
+decomps as co-equal behavioural references, the way Dusklight does.
