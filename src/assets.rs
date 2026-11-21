@@ -367,9 +367,12 @@ const LINK_UPPER_ROOT: &str = "body_chn";
 /// `mAnmDataTable[ANM_CUTA..ANM_CUTEB]` (`tww/src/d/actor/d_a_player_main_data.inc:1242-1282`,
 /// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:43-48`): the six body animations the sword processes
 /// install; walk and dash are already in `link_demo::STEMS`, but they are loaded here too so
-/// gameplay sampling never depends on a demo being mounted.
+/// gameplay sampling never depends on a demo being mounted. Jump/fall, roll and swim use the
+/// same single-morph rows (`d_a_player_main_data.inc:1123,1382,1452,1935-1942`;
+/// `wwhd/wwhd_src/d/actor/d_a_player_main.cpp:26,63,73,142-143`).
 pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
-    "walk", "dash", "cuta", "cutf", "cutr", "cutl", "cutea", "cuteb",
+    "walk", "dash", "cuta", "cutf", "cutr", "cutl", "cutea", "cuteb", "jmped", "jmpst", "rollf",
+    "rollfmis", "swimp", "swimwait",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks
