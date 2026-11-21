@@ -99,6 +99,18 @@ impl TmpBits {
         let (cell, mask) = StoryBits::cell_of(id);
         self.bytes[cell] &= !mask;
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.bytes.to_vec()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut out = Self::default();
+        for (slot, byte) in out.bytes.iter_mut().enumerate() {
+            *byte = bytes.get(slot).copied().unwrap_or(0);
+        }
+        out
+    }
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -619,6 +631,18 @@ impl ZoneActors {
 
     pub fn clear(&mut self) {
         self.bits = [[0_u32; SET_ID_WORDS]; ROOM_COUNT];
+    }
+
+    pub fn words(&self) -> Vec<u32> {
+        self.bits.iter().flatten().copied().collect()
+    }
+
+    pub fn from_words(words: &[u32]) -> Self {
+        let mut out = Self::default();
+        for (slot, word) in out.bits.iter_mut().flatten().enumerate() {
+            *word = words.get(slot).copied().unwrap_or(0);
+        }
+        out
     }
 
     fn slot(&self, room: i8, set_id: u16) -> Option<(usize, u32)> {

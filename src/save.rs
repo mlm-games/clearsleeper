@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::sim::area::Area;
-use crate::sim::flags::{Arrivals, EventFlags, StoryBits, Switches};
+use crate::sim::flags::{Arrivals, EventFlags, StoryBits, Switches, TmpBits, ZoneActors};
 use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
@@ -95,6 +95,10 @@ pub struct SaveGame {
     pub arrivals: Vec<u8>,
     #[serde(default)]
     pub story: Vec<u8>,
+    #[serde(default)]
+    pub tmp: Vec<u8>,
+    #[serde(default)]
+    pub zone_actors: Vec<u32>,
     #[serde(default)]
     pub held_item: u8,
     #[serde(default)]
@@ -322,6 +326,8 @@ impl App {
         let events = world.resource::<EventFlags>().words().to_vec();
         let switches = world.resource::<Switches>().words();
         let story = world.resource::<StoryBits>().bytes.to_vec();
+        let tmp = world.resource::<TmpBits>().to_bytes();
+        let zone_actors = world.resource::<ZoneActors>().words();
         let arrivals = world.resource::<Arrivals>().bytes();
         let held = *world.resource::<Held>();
         let get_bag = world
@@ -351,6 +357,8 @@ impl App {
             rupees,
             events,
             story,
+            tmp,
+            zone_actors,
             switches,
             arrivals: arrivals.to_vec(),
             held_item: held.item,
@@ -429,6 +437,8 @@ impl App {
                 Arrivals::from_bytes(padded_arrivals(save.arrivals.as_slice()));
             let mut stories = world.resource_mut::<StoryBits>();
             stories.bytes = padded_bytes(save.story.as_slice());
+            *world.resource_mut::<TmpBits>() = TmpBits::from_bytes(&save.tmp);
+            *world.resource_mut::<ZoneActors>() = ZoneActors::from_words(&save.zone_actors);
             let mut held = world.resource_mut::<Held>();
             held.item = save.held_item;
             held.count = save.held_count;

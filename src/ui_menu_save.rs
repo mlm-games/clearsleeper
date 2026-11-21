@@ -1200,6 +1200,8 @@ pub fn blank_save() -> SaveGame {
         switches: [0; 4],
         arrivals: Vec::new(),
         story: Vec::new(),
+        tmp: Vec::new(),
+        zone_actors: Vec::new(),
         held_item: 0,
         held_count: 0,
         time: 0.0,
