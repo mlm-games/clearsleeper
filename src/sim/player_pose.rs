@@ -38,7 +38,7 @@ pub fn control(
         .next()
         .map_or(0.0, |player| player.speed.abs());
     let current = proc.as_deref().map(|proc| proc.current);
-    let proc_frame = proc.map_or(0, |proc| proc.frame) as f32 * 2.0;
+    let proc_frame = proc.as_ref().map_or(0, |proc| proc.frame) as f32 * 2.0;
     // The player's named() dispatch checks swim before combat and the airborne states before the
     // move states (`link_move.rs:967-986`); mirror that order so one state cannot erase another.
     if swim.active {
