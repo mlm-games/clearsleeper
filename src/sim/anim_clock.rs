@@ -302,6 +302,189 @@ impl FrameCtrl {
     }
 }
 
+/// `J3DFrameCtrl::Attribute_e`'s two values the actor tables actually name
+/// (`J3DAnimation.h:830-837`). These are the numeric values the actor-local cursors used, and
+/// keeping them on the public field lets a state assign `attribute` without a conversion.
+pub const ACTOR_EMODE_NONE: u8 = 0;
+pub const ACTOR_EMODE_LOOP: u8 = 2;
+
+/// The actor-side frame cursor. Armos, Helmaroc, Amos Knight, Floormaster, Gohdan, Phantom
+/// Ganon, Chuchu and Kalle's demos each carried a private copy of this same `J3DFrameCtrl`
+/// shape; one implementation lives here. The fields stay public because their states read and
+/// write `frame`, `end`, `attribute` and the morf weights directly; [`FrameCtrl`] is the
+/// canonical form a cursor converts to when it needs the shared wrap logic.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActorFrame {
+    pub attribute: u8,
+    pub state: u8,
+    pub start: i16,
+    pub end: i16,
+    pub loop_point: i16,
+    pub rate: f32,
+    pub frame: f32,
+    pub cur_morf: f32,
+    pub prev_morf: f32,
+    pub morf_step: f32,
+}
+
+impl Default for ActorFrame {
+    fn default() -> Self {
+        Self::idle()
+    }
+}
+
+impl ActorFrame {
+    pub fn idle() -> Self {
+        Self {
+            attribute: ACTOR_EMODE_LOOP,
+            state: 0,
+            start: 0,
+            end: 0,
+            loop_point: 0,
+            rate: 1.0,
+            frame: 0.0,
+            cur_morf: 1.0,
+            prev_morf: 1.0,
+            morf_step: 0.0,
+        }
+    }
+
+    pub fn init(&mut self, end: i16) {
+        self.attribute = ACTOR_EMODE_LOOP;
+        self.state = 0;
+        self.start = 0;
+        self.end = end;
+        self.loop_point = 0;
+        self.rate = 1.0;
+        self.frame = 0.0;
+    }
+
+    pub fn set_start(&mut self, start: i16) {
+        self.start = start;
+        self.frame = f32::from(start);
+    }
+
+    pub fn set_loop(&mut self, frame: f32) {
+        self.loop_point = frame as i16;
+    }
+
+    pub fn set_morf(&mut self, morf: f32) {
+        if self.prev_morf < 0.0 || morf <= 0.0 {
+            self.cur_morf = 1.0;
+        } else {
+            self.cur_morf = 0.0;
+            self.morf_step = 1.0 / morf;
+        }
+        self.prev_morf = self.cur_morf;
+    }
+
+    pub fn update(&mut self) {
+        self.state = 0;
+        self.frame += self.rate;
+        let start = f32::from(self.start);
+        let end = f32::from(self.end);
+        match self.attribute {
+            ACTOR_EMODE_NONE => {
+                if self.frame < start {
+                    self.frame = start;
+                    self.rate = 0.0;
+                    self.state |= STATE_STOP;
+                }
+                if self.frame >= end {
+                    self.frame = end - 0.001;
+                    self.rate = 0.0;
+                    self.state |= STATE_STOP;
+                }
+            }
+            ACTOR_EMODE_LOOP => {
+                let low = i32::from(self.loop_point) - i32::from(self.start);
+                let high = i32::from(self.end) - i32::from(self.loop_point);
+                while self.frame < start {
+                    self.state |= STATE_LOOP;
+                    if low <= 0 {
+                        break;
+                    }
+                    self.frame += low as f32;
+                }
+                while self.frame >= end {
+                    self.state |= STATE_LOOP;
+                    if high <= 0 {
+                        break;
+                    }
+                    self.frame -= high as f32;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn play(&mut self) {
+        if self.cur_morf < 1.0 {
+            self.prev_morf = self.cur_morf;
+            super::walk::chase_f(&mut self.cur_morf, 1.0, self.morf_step);
+        }
+        self.update();
+    }
+
+    pub fn is_stop(&self) -> bool {
+        self.state & STATE_STOP != 0 || self.rate == 0.0
+    }
+
+    pub fn check_pass(&self, pass: f32) -> bool {
+        let start = f32::from(self.start);
+        let end = f32::from(self.end);
+        let cur = self.frame;
+        let mut next = cur + self.rate;
+        if next < start {
+            next = start;
+        }
+        if next >= end {
+            next = end - 0.001;
+        }
+        if cur <= next {
+            cur <= pass && pass < next
+        } else {
+            next <= pass && pass < cur
+        }
+    }
+
+    /// The same cursor as a [`FrameCtrl`], for states that ask the shared wrap logic.
+    pub fn to_frame_ctrl(&self) -> FrameCtrl {
+        let mut ctrl = FrameCtrl::default();
+        ctrl.set_frame_ctrl(
+            if self.attribute == ACTOR_EMODE_LOOP {
+                Mode::Loop
+            } else {
+                Mode::None
+            },
+            self.start,
+            self.end,
+            self.rate,
+            self.frame,
+        );
+        ctrl.set_loop_point(self.loop_point);
+        ctrl
+    }
+
+    pub fn from_frame_ctrl(ctrl: &FrameCtrl) -> Self {
+        let morf = Self::idle();
+        Self {
+            attribute: if ctrl.attribute() == Mode::Loop {
+                ACTOR_EMODE_LOOP
+            } else {
+                ACTOR_EMODE_NONE
+            },
+            state: ctrl.state(),
+            start: ctrl.start(),
+            end: ctrl.end(),
+            loop_point: ctrl.loop_point(),
+            rate: ctrl.rate(),
+            frame: ctrl.frame(),
+            ..morf
+        }
+    }
+}
+
 /// The under slot enum, `main.h:879-882`: the two under-body cursors. `Move0` is the one every
 /// locomotion state reads; `Move1` carries the second under animation the sword, hammer and boat
 /// families blend in, and is stepped beside it.

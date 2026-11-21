@@ -703,7 +703,7 @@ fn ba_anms_from_assets() -> Result<crate::sim::ba1::Ba1Anms, AssetError> {
             continue;
         };
         match archive.frame_count(AnmRef::Id(id), kind) {
-            Some(frames) => anms.insert(id, frames),
+            Some(frames) => anms.insert(id, frames as i16),
             None => log::warn!("clearsleeper: unreadable Ba animation {id:#06x}"),
         }
     }

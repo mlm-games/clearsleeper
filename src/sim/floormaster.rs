@@ -1,3 +1,4 @@
+use super::anim_clock::ActorFrame as Frame;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use glam::Vec3;
@@ -689,113 +690,6 @@ pub struct Blow {
     pub blade: u8,
     pub soup: bool,
     pub hammer_side: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Frame {
-    pub attribute: u8,
-    pub state: u8,
-    pub start: i16,
-    pub end: i16,
-    pub loop_point: i16,
-    pub rate: f32,
-    pub frame: f32,
-    pub cur_morf: f32,
-    pub prev_morf: f32,
-    pub morf_step: f32,
-}
-
-impl Frame {
-    fn idle() -> Self {
-        Self {
-            attribute: EMODE_LOOP,
-            state: 0,
-            start: 0,
-            end: 0,
-            loop_point: 0,
-            rate: 1.0,
-            frame: 0.0,
-            cur_morf: 1.0,
-            prev_morf: 1.0,
-            morf_step: 0.0,
-        }
-    }
-
-    fn init(&mut self, end: i16) {
-        self.attribute = EMODE_LOOP;
-        self.state = 0;
-        self.start = 0;
-        self.end = end;
-        self.loop_point = 0;
-        self.rate = 1.0;
-        self.frame = 0.0;
-    }
-
-    fn set_loop(&mut self, frame: f32) {
-        self.loop_point = frame as i16;
-    }
-
-    fn set_morf(&mut self, morf: f32) {
-        if self.prev_morf < 0.0 || morf <= 0.0 {
-            self.cur_morf = 1.0;
-        } else {
-            self.cur_morf = 0.0;
-            self.morf_step = 1.0 / morf;
-        }
-        self.prev_morf = self.cur_morf;
-    }
-
-    fn update(&mut self) {
-        self.state = 0;
-        self.frame += self.rate;
-        let start = (self.start) as f32;
-        let end = (self.end) as f32;
-        match self.attribute {
-            EMODE_NONE => {
-                if self.frame < start {
-                    self.frame = start;
-                    self.rate = 0.0;
-                    self.state |= STATE_STOP;
-                }
-                if self.frame >= end {
-                    self.frame = end - 0.001;
-                    self.rate = 0.0;
-                    self.state |= STATE_STOP;
-                }
-            }
-            EMODE_LOOP => {
-                let low = i32::from(self.loop_point) - i32::from(self.start);
-                let high = i32::from(self.end) - i32::from(self.loop_point);
-                while self.frame < start {
-                    self.state |= STATE_LOOP;
-                    if low <= 0 {
-                        break;
-                    }
-                    self.frame += (low) as f32;
-                }
-                while self.frame >= end {
-                    self.state |= STATE_LOOP;
-                    if high <= 0 {
-                        break;
-                    }
-                    self.frame -= (high) as f32;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn play(&mut self) {
-        if self.cur_morf < 1.0 {
-            self.prev_morf = self.cur_morf;
-            walk::chase_f(&mut self.cur_morf, 1.0, self.morf_step);
-        }
-        self.update();
-    }
-
-    fn is_stop(&self) -> bool {
-        self.state & STATE_STOP != 0 || self.rate == 0.0
-    }
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]

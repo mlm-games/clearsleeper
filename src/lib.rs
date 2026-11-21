@@ -3185,7 +3185,7 @@ impl App {
                 item,
                 height,
                 half,
-                anm: anims.get(&entity).copied(),
+                anm: anims.get(&entity.id()).copied(),
             });
         }
         out
