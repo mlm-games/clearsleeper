@@ -1352,8 +1352,11 @@ impl FileSelect {
                     }
                     self.change_extra_color(index);
 
-                    // tww/src/d/d_file_select.cpp:533-547: file details use this slot's collectibles.
-                    let progress = SlotProgress { triforce: save.progress.collect.triforce, symbol: save.progress.collect.symbol };
+                    // tww/src/d/d_file_select.cpp:776-815: file details use this slot's collectibles.
+                    let progress = SlotProgress {
+                        triforce: save.progress.collect.triforce,
+                        symbol: save.progress.collect.symbol,
+                    };
                     self.progress[index] = progress;
                     let mut summary = SlotSummary::from_parts(
                         save,

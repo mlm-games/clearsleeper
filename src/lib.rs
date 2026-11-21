@@ -26,8 +26,8 @@ pub mod bti;
 pub mod config;
 pub mod dff;
 pub mod disc;
-mod end_scene;
 pub mod dzs;
+mod end_scene;
 pub mod game_over_screen;
 pub mod gx_decode;
 pub mod input;
@@ -103,6 +103,7 @@ pub struct App {
     sampled_pad: input::PadSnapshot,
     menu_clock: Duration,
     ending: Option<end_scene::Scene>,
+    scene_image: end_scene::SceneImage,
     /// The hardware pad, polled every frame.
     pad_source: pad_source::PadSource,
     /// The on-screen controls a finger drives, and the overlay they are drawn on.
@@ -256,6 +257,7 @@ impl App {
             sampled_pad: input::PadSnapshot::default(),
             menu_clock: Duration::ZERO,
             ending: None,
+            scene_image: Default::default(),
             pad_source: pad_source::PadSource::new(),
             touch: touch_controls::TouchControls::new(),
             input_log: open_input_log(),
@@ -417,11 +419,16 @@ impl App {
         pad: input::PadSnapshot,
         touch: input::PadSnapshot,
     ) {
-        self.input_keys = if window_focused { input::key_mask(held) } else { 0 };
+        self.input_keys = if window_focused {
+            input::key_mask(held)
+        } else {
+            0
+        };
         let mut keyboard = input::pad_snapshot_from_keys(held, window_focused);
         let menu = self.menu.screen != menus::Screen::Playing || self.intro.is_some();
         if menu && window_focused {
-            keyboard.hold.a |= held.contains(&PhysicalKey::Space) || held.contains(&PhysicalKey::Enter);
+            keyboard.hold.a |=
+                held.contains(&PhysicalKey::Space) || held.contains(&PhysicalKey::Enter);
             if self.menu.screen != menus::Screen::Title && held.contains(&PhysicalKey::Escape) {
                 keyboard.hold.b = true;
                 keyboard.hold.start = false;
@@ -431,14 +438,19 @@ impl App {
         let merged = if window_focused {
             input::merge_pad(keyboard, input::merge_pad(touch, pad))
         } else {
-            self.sim.world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
+            self.sim
+                .world
+                .resource_mut::<sim::intent::PadButtons>()
+                .trig = Default::default();
             input::PadSnapshot::default()
         };
         self.sampled_pad = merged;
         self.stage_axis(merged.move_axis);
         self.stage_damage(input::damage_from_keys(held, window_focused && !menu));
         self.stage_do(!menu && (merged.hold.a || input::do_from_keys(held, window_focused)));
-        self.stage_target(!menu && (merged.hold.l || input::target_from_keys(held, window_focused)));
+        self.stage_target(
+            !menu && (merged.hold.l || input::target_from_keys(held, window_focused)),
+        );
         self.stage_item(!menu && (merged.hold.b || input::item_from_keys(held, window_focused)));
         self.stage_use(!menu && (merged.hold.x || input::use_from_keys(held, window_focused)));
         self.stage_pad(merged.hold, merged.c_axis);
@@ -535,13 +547,28 @@ impl App {
     /// the edge against the previous poll, the way `mDoCPd_Convert` splits the pad's hold and
     /// trigger words (`m_Do/m_Do_controller_pad.cpp:20-45`).
     pub fn stage_pad_state(&mut self, state: &input_tape::PadState) {
-        let sticks = |x: i8, y: i8| (glam::Vec2::new(f32::from(x), f32::from(y)) / 127.0).clamp_length_max(1.0);
+        let sticks = |x: i8, y: i8| {
+            (glam::Vec2::new(f32::from(x), f32::from(y)) / 127.0).clamp_length_max(1.0)
+        };
         let pad = input::PadSnapshot {
             hold: state.hold(),
-            move_axis: if state.keys_given { sticks(state.stick_x, state.stick_y) } else { state.move_axis() },
-            c_axis: if state.keys_given { sticks(state.c_stick_x, state.c_stick_y) } else { state.c_axis() },
+            move_axis: if state.keys_given {
+                sticks(state.stick_x, state.stick_y)
+            } else {
+                state.move_axis()
+            },
+            c_axis: if state.keys_given {
+                sticks(state.c_stick_x, state.c_stick_y)
+            } else {
+                state.c_axis()
+            },
         };
-        self.stage_keys_with(&input::keys_from_mask(state.keys), true, pad, Default::default());
+        self.stage_keys_with(
+            &input::keys_from_mask(state.keys),
+            true,
+            pad,
+            Default::default(),
+        );
     }
 
     /// Stage the pad's face buttons and C-stick. The trigger word is the edge against the
@@ -610,7 +637,7 @@ impl App {
     /// The retail file select is a pad-driven state machine (`d_file_select.cpp`), so the
     /// shell's keys are folded into the pad it reads: Space and Enter are A, Escape is B and
     /// the main stick is the cursor.
-    fn menu_pad(&self) -> ui_menu_save::PadInput {
+    pub(crate) fn menu_pad(&self) -> ui_menu_save::PadInput {
         let buttons = *self.sim.world.resource::<sim::intent::PadButtons>();
         // tww/src/d/d_file_select.cpp:498-505: the cursor reads the main stick.
         let axis = self.sampled_pad.move_axis;
@@ -628,7 +655,7 @@ impl App {
         }
     }
 
-    fn file_select_pad(&self) -> ui_file_select::PadInput {
+    pub(crate) fn file_select_pad(&self) -> ui_file_select::PadInput {
         let mut pad = ui_file_select::PadInput::from(&self.menu_pad());
         pad.hold_a = self.sampled_pad.hold.a;
         pad.hold_b = self.sampled_pad.hold.b;
@@ -639,7 +666,9 @@ impl App {
     /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
     /// save.
     fn stage_file_select(&mut self) {
-        if !self.menu.tick_file_select() { return; }
+        if !self.menu.tick_file_select() {
+            return;
+        }
         let pad = self.file_select_pad();
         let menus::Menu { fs, card, .. } = &mut self.menu;
         fs.move_step(&pad, card, None);
@@ -658,16 +687,29 @@ impl App {
 
     fn apply_menu_action(&mut self, action: Option<menus::Action>) {
         match action {
-            Some(menus::Action::Load(slot)) => match self.menu.card.slots.get(slot).cloned().flatten() {
-                Some(saved) => match self.load(&saved) {
-                    Ok(()) => {
-                        self.name = saved.name;
-                        self.menu.screen = menus::Screen::Playing;
-                    }
-                    Err(e) => log::warn!("clearsleeper: slot {slot} load failed ({e})"),
-                },
-                None => log::warn!("clearsleeper: selected slot {slot} could not be read"),
-            },
+            Some(menus::Action::Load(slot)) => {
+                match self.menu.card.slots.get(slot).cloned().flatten() {
+                    Some(saved) => match self.load(&saved) {
+                        Ok(()) => {
+                            // tww/src/d/d_s_name.cpp:1165-1175,1213-1219: a fresh extra file enters the opening.
+                            if saved.progress.clear_count != 0
+                                && !self
+                                    .sim
+                                    .world
+                                    .resource::<sim::flags::StoryBits>()
+                                    .test(0x3510)
+                            {
+                                self.open_new_slot(slot);
+                            } else {
+                                self.menu.screen = menus::Screen::Playing;
+                                self.order_start_event();
+                            }
+                        }
+                        Err(e) => log::warn!("clearsleeper: slot {slot} load failed ({e})"),
+                    },
+                    None => log::warn!("clearsleeper: selected slot {slot} could not be read"),
+                }
+            }
             Some(menus::Action::New(slot)) => self.start_new(slot),
             Some(menus::Action::Quit) => self.quit.request(),
             None => {}
@@ -681,6 +723,10 @@ impl App {
         }
         self.name = save::DEFAULT_NAME.to_owned();
         self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
+        self.open_new_slot(slot);
+    }
+
+    fn open_new_slot(&mut self, slot: usize) {
         self.pending_slot = Some(slot);
         self.begin_intro();
         // A new game resets into the opening scene, `d_s_play.cpp:305`'s `dComIfG_resetToOpening`
@@ -879,7 +925,7 @@ impl App {
 
     /// The actor and its scene request are rebuilt on every entry, as the title scene is
     /// recreated after `dComIfG_resetToOpening` (`d_s_title.cpp:48`, `d_s_play.cpp:305`).
-    fn sync_title_actor(&mut self) {
+    pub(crate) fn sync_title_actor(&mut self) {
         let wanted = self.menu.screen == menus::Screen::Title
             && self.intro.is_none()
             && self.title_stage.is_some();
@@ -1010,7 +1056,7 @@ impl App {
         };
         let mut game = game_over_screen::GameOver::default();
         game.create(&assets.assets.screen);
-        game.create_save(save_assets.assets.screen.clone());
+        save_assets.bind(&mut game.save);
         self.menu.card.dir = self.save_dir.clone();
         self.menu.card.restore();
         self.game_over = Some(GameOverStage {
@@ -1046,6 +1092,11 @@ impl App {
         // The save the game-over screen writes is the state at the death, not the save the
         // session loaded (`d_gameover.cpp:109-166` writes the current state).
         let pending_save = Some(self.save());
+        let clears = self
+            .sim
+            .world
+            .resource::<text::driver::TextFlags>()
+            .clear_count;
         let mut outcome = None;
         if let Some(stage) = self.game_over.as_mut() {
             stage.fade = (stage.fade + 0.01).min(1.0);
@@ -1066,6 +1117,7 @@ impl App {
                 life_on_open: life,
             };
             outcome = stage.game.step(&mut env);
+            stage.save_assets.sync_text(&mut stage.game.save, clears);
             stage.revision = stage.revision.wrapping_add(1);
         }
         *self.sim.world.resource_mut::<sim::vibration::Vibration>() = vibration;
@@ -3128,7 +3180,9 @@ impl App {
         let steps = self.sim.step_with(dt, |world| {
             world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
         });
-        if steps == 0 { return 0; }
+        if steps == 0 {
+            return 0;
+        }
         self.drain_demo_creates();
         self.drain_demo_gaps();
         let game_over = self.sim.world.resource::<sim::death::GameOver>().active;
@@ -3139,15 +3193,20 @@ impl App {
             return steps;
         }
         self.apply_exit();
-        if self.menu.screen != menus::Screen::Playing { return steps; }
+        if self.menu.screen != menus::Screen::Playing {
+            return steps;
+        }
         self.sync_rooms();
         self.pump_dialogue();
         self.step_meter();
         steps
     }
 
-    fn clear_pad_edges(&mut self) {
-        self.sim.world.resource_mut::<sim::intent::PadButtons>().trig = Default::default();
+    pub(crate) fn clear_pad_edges(&mut self) {
+        self.sim
+            .world
+            .resource_mut::<sim::intent::PadButtons>()
+            .trig = Default::default();
     }
 
     fn advance_scene(&mut self, dt: Duration) {
@@ -3164,7 +3223,10 @@ impl App {
             match before {
                 menus::Screen::Title => {
                     self.sync_title_actor();
-                    self.sim.world.run_system_cached(sim::title::control).expect("registered title resources");
+                    self.sim
+                        .world
+                        .run_system_cached(sim::title::control)
+                        .expect("registered title resources");
                     self.handle_title_request();
                     self.step_title();
                 }
@@ -3313,7 +3375,12 @@ impl App {
     }
 
     fn mount_stage(
-        &mut self, tables: dzs::StageTables, rooms: Vec<u8>, spawn: glam::Vec3, yaw: f32, layer: i8,
+        &mut self,
+        tables: dzs::StageTables,
+        rooms: Vec<u8>,
+        spawn: glam::Vec3,
+        yaw: f32,
+        layer: i8,
     ) {
         // A stage mount with no spawn row of its own - a save load - must not inherit the start
         // event the previous mount asked for. The entry paths that do have a row replace this.
@@ -3400,6 +3467,12 @@ impl App {
         self.sim
             .world
             .insert_resource(assets::load_event_list(tables.name()).unwrap_or_default());
+        // tww/src/d/d_stage.cpp:2246; tww/src/d/d_event_manager.cpp:158-176.
+        let manager = assets::AssetRoot::from_env()
+            .ok()
+            .and_then(|root| sim::event_manager::load_stage_event_list(&root, tables.name()))
+            .unwrap_or_default();
+        self.sim.world.insert_resource(manager);
         self.sim
             .world
             .insert_resource(sim::event::StageEvents(tables.event_names().to_vec()));
@@ -3420,6 +3493,8 @@ impl App {
         );
         *self.sim.world.resource_mut::<sim::talk::Dialogue>() = sim::talk::Dialogue::default();
         sim::weight::init(&mut self.sim.world);
+        sim::link_proc::init(&mut self.sim.world);
+        sim::anim_clock::init(&mut self.sim.world);
         sim::spawn_actors(&mut self.sim.world, &tables);
         Self::install_tag_events(&mut self.sim.world, tables.actors());
         if let Some(set) = set {
@@ -3723,10 +3798,15 @@ pub fn root_view(
         return intro_view(app, ctx);
     }
     if app.menu.screen == menus::Screen::Title {
-        return ZStack(Modifier::new().fill_max_size()).child([title_screen_view(app, ctx), app.touch.view(ctx)]);
+        return ZStack(Modifier::new().fill_max_size())
+            .child([title_screen_view(app, ctx), app.touch.view(ctx)]);
     }
-    if matches!(app.menu.screen, menus::Screen::Movie | menus::Screen::ClearSave) {
-        return ZStack(Modifier::new().fill_max_size()).child([app.ending_view(ctx), app.touch.view(ctx)]);
+    if matches!(
+        app.menu.screen,
+        menus::Screen::Movie | menus::Screen::ClearSave
+    ) {
+        return ZStack(Modifier::new().fill_max_size())
+            .child([app.ending_view(ctx), app.touch.view(ctx)]);
     }
     let snapshot = app.snapshot();
     let mut camera = app.game_camera().unwrap_or_else(|| app.cam.get());
@@ -3770,7 +3850,11 @@ pub fn root_view(
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
-        menus::Screen::Title | menus::Screen::Settings | menus::Screen::QuitConfirm | menus::Screen::Movie | menus::Screen::ClearSave => Spacer(),
+        menus::Screen::Title
+        | menus::Screen::Settings
+        | menus::Screen::QuitConfirm
+        | menus::Screen::Movie
+        | menus::Screen::ClearSave => Spacer(),
     };
     ZStack(Modifier::new().fill_max_size()).child([
         viewport,
@@ -3790,7 +3874,11 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
         // A session only starts with an asset source (`start_new`), and the retail file
         // select needs the disc's panes, so neither belongs to the pre-boot shell.
-        menus::Screen::FileSelect | menus::Screen::Playing | menus::Screen::GameOver | menus::Screen::Movie | menus::Screen::ClearSave => Spacer(),
+        menus::Screen::FileSelect
+        | menus::Screen::Playing
+        | menus::Screen::GameOver
+        | menus::Screen::Movie
+        | menus::Screen::ClearSave => Spacer(),
     }
 }
 
@@ -3811,7 +3899,7 @@ fn game_over_overlay(app: &App, ctx: &repose_core::RenderContext) -> repose_core
     if stage.uploaded.get() != stage.revision {
         let mut canvas = text::raster::Canvas::new(640, 480);
         game_over_screen::render(&mut canvas, &stage.assets, &stage.game);
-        panes::draw_save_menu(&mut canvas, &stage.game.save.panes, &stage.save_assets);
+        stage.save_assets.draw(&mut canvas, &stage.game.save);
         ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
         stage.uploaded.set(stage.revision);
     }

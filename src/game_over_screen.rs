@@ -317,19 +317,6 @@ impl GameOver {
         self.anime_start = false;
     }
 
-    /// `dMenu_save_c::_create` (`d_menu_save.cpp:49-73`) binds `menu_save.blo`
-    /// from `saveres.arc`; the error panel's `errorres.arc` is not ported, so
-    /// an empty screen keeps its binding path alive without drawing it.
-    pub fn create_save(&mut self, screen: Screen) {
-        let error = Screen {
-            width: 640,
-            height: 480,
-            color: 0,
-            panes: Vec::new(),
-        };
-        self.save.create(screen, error);
-    }
-
     pub fn anime_start(&mut self) {
         self.anime_start = true;
     }

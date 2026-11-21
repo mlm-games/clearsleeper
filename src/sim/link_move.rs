@@ -2468,7 +2468,11 @@ pub fn control(
     // and `demo::control` has already written this step's position and angle, so the tick here
     // would only overwrite them with stick input and gravity. The process is left standing, which
     // is the state the player's own demo cuts expect to come back to.
-    if extras.demo.as_deref().is_some_and(|demo| demo.drives_player()) {
+    if extras
+        .demo
+        .as_deref()
+        .is_some_and(|demo| demo.drives_player())
+    {
         return;
     }
     let Modes {

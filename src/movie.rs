@@ -80,7 +80,9 @@ impl Movie {
         let end = source.seek(SeekFrom::End(0)).map_err(|_| MovieError)?;
         // tww/src/d/actor/d_a_movie_player.cpp:3482-3526: the retail reels have video then stereo audio.
         let mut components = [0; 6];
-        source.seek(SeekFrom::Start(u64::from(be32(&header, 0x20)))).map_err(|_| MovieError)?;
+        source
+            .seek(SeekFrom::Start(u64::from(be32(&header, 0x20))))
+            .map_err(|_| MovieError)?;
         source.read_exact(&mut components).map_err(|_| MovieError)?;
         if components != [0, 0, 0, 2, 0, 1] || !rate.is_finite() || rate <= 0.0 || declared == 0 {
             return Err(MovieError);
@@ -307,8 +309,15 @@ fn restuff(frame: &[u8]) -> Vec<u8> {
         at += length;
         if marker == 0xDA {
             // tww/src/d/actor/d_a_movie_player.cpp:377-385: stuffing applies to the scan, not the end marker.
-            let end = frame.iter().rposition(|&b| b != 0 && b != 0xff).unwrap_or(0);
-            let scan_end = if end > at && frame.get(end-1..=end) == Some(EOI.as_slice()) { end-1 } else { frame.len() };
+            let end = frame
+                .iter()
+                .rposition(|&b| b != 0 && b != 0xff)
+                .unwrap_or(0);
+            let scan_end = if end > at && frame.get(end - 1..=end) == Some(EOI.as_slice()) {
+                end - 1
+            } else {
+                frame.len()
+            };
             for byte in &frame[at..scan_end] {
                 out.push(*byte);
                 if *byte == 0xFF {
@@ -348,7 +357,11 @@ fn index<R: Read + Seek>(
     let mut frames = Vec::with_capacity(declared.min(8192));
     for n in 0..declared {
         let next = at + u64::from(size);
-        if size < FRAME_HEADER as u32 || next > end || at > last || (n + 1 == declared) != (at == last) {
+        if size < FRAME_HEADER as u32
+            || next > end
+            || at > last
+            || (n + 1 == declared) != (at == last)
+        {
             return Err(MovieError);
         }
         file.seek(SeekFrom::Start(at)).map_err(|_| MovieError)?;
@@ -394,7 +407,7 @@ pub fn title_path() -> Option<PathBuf> {
     )
 }
 
-fn wave(samples: &[i16]) -> Vec<u8> {
+pub(crate) fn wave(samples: &[i16]) -> Vec<u8> {
     let data = u32::try_from(samples.len() * 2).unwrap_or(u32::MAX);
     let mut out = Vec::with_capacity(44 + data as usize);
     out.extend_from_slice(b"RIFF");

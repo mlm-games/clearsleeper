@@ -1062,9 +1062,14 @@ impl MemCard {
         if self.format_result == 2 {
             return 2;
         }
-        for slot in 0..SLOTS { self.erase_slot(slot); }
-        if self.flush().is_err() { self.restore(); return 2; }
-        self.status = CARD_STAT_CREATE;
+        for slot in 0..SLOTS {
+            self.erase_slot(slot);
+        }
+        if self.flush().is_err() {
+            self.restore();
+            return 2;
+        }
+        self.status = CARD_STAT_RESTORE;
         1
     }
 
@@ -1075,9 +1080,13 @@ impl MemCard {
                 let blank;
                 let payload = match &self.slots[slot] {
                     Some(save) => save,
-                    None => { blank = blank_save(); &blank }
+                    None => {
+                        blank = blank_save();
+                        &blank
+                    }
                 };
-                crate::save::write_slot_in(&self.dir, slot, payload).inspect_err(|err| log::warn!("clearsleeper: {err}"))?;
+                crate::save::write_slot_in(&self.dir, slot, payload)
+                    .inspect_err(|err| log::warn!("clearsleeper: {err}"))?;
                 self.dirty[slot] = false;
                 self.written.push(slot);
             }
@@ -1428,6 +1437,7 @@ impl ErrorPanel {
         }
         self.yn_cursor_init();
         self.set_message(&buffer);
+        self.panes[2].set_string(&buffer);
         self.timer = 0;
         self.status = 1;
         self.state = 1;
@@ -1882,6 +1892,18 @@ impl Default for SaveMenu {
 }
 
 impl SaveMenu {
+    // tww/src/d/d_menu_save.cpp:631-635,940-950: the two labels alternate on a crossfade.
+    fn label(&mut self, next: bool, value: String) {
+        self.panes
+            .text_pane(usize::from(self.flag_536 ^ u8::from(next)))
+            .set_string(&value);
+        if next {
+            self.text_b = value;
+        } else {
+            self.text_a = value;
+        }
+    }
+
     pub fn get_data_buf_ptr(&self) -> String {
         self.text_a.clone()
     }
@@ -1935,8 +1957,8 @@ impl SaveMenu {
 
     pub fn initialize_ex(&mut self, msgs: &dyn MsgSource) {
         let msg = msgs.message(0x3A);
-        self.text_a = msg.clone();
-        self.text_b = msg;
+        self.label(false, msg.clone());
+        self.label(true, msg);
     }
 
     pub fn screen_set(&mut self) {
@@ -1997,9 +2019,8 @@ impl SaveMenu {
         } else {
             MSG_TITLE
         };
-        self.text_a = format!("\u{1}{msg}");
-
-        self.text_b.clear();
+        self.label(false, format!("\u{1}{msg}"));
+        self.label(true, String::new());
     }
 
     pub fn open(&mut self, env: &mut SaveEnv<'_>) -> bool {
@@ -2539,7 +2560,7 @@ impl SaveMenu {
             return;
         }
         if self.flag_52f == 0 {
-            self.text_b.clear();
+            self.label(true, String::new());
             self.proc = proc_mem_card_check;
         } else if self.flag_52f == 2 {
             self.proc = proc_save_wait;
@@ -2548,11 +2569,11 @@ impl SaveMenu {
             self.timer = 0;
             match self.use_type {
                 0 | 1 | 2 => {
-                    self.text_b = format!("\u{1}{}", MESSAGE_TABLE[0]);
+                    self.label(true, format!("\u{1}{}", MESSAGE_TABLE[0]));
                     self.proc = proc_game_continue;
                 }
                 3 => {
-                    self.text_b = format!("\u{1}{MSG_ENDING_CONTINUE}");
+                    self.label(true, format!("\u{1}{MSG_ENDING_CONTINUE}"));
                     self.proc = proc_ending_no_save;
                 }
                 _ => {}
@@ -2630,7 +2651,7 @@ impl SaveMenu {
             } else {
                 MSG_TITLE
             };
-            self.text_a = format!("\u{1}{msg}");
+            self.label(false, format!("\u{1}{msg}"));
             self.error.set_err_message(u32::from(self.flag_532), 0);
             self.proc = self.flag_52d;
         }
@@ -2821,17 +2842,17 @@ impl SaveMenu {
             let slot = usize::from(env.card.get_data_num());
             let test = env.card.test_checksum_game_data(slot);
             if test {
-                self.text_b = format!("\u{1}{MSG_SAVING}");
+                self.label(true, format!("\u{1}{MSG_SAVING}"));
                 self.data_write(env);
                 self.proc = proc_mem_card_data_save_wait;
             } else {
                 self.sound(SE_ALERT_DATA);
-                self.text_b = format!("\u{1}{MSG_BAD_CHECKSUM2}");
+                self.label(true, format!("\u{1}{MSG_BAD_CHECKSUM2}"));
                 self.proc = proc_mem_card_data_save_up_menu;
             }
         } else {
             self.sound(SE_ALERT_DATA);
-            self.text_b = format!("\u{1}{MSG_BAD_CHECKSUM}");
+            self.label(true, format!("\u{1}{MSG_BAD_CHECKSUM}"));
             self.proc = proc_can_not_save;
         }
     }
@@ -2862,7 +2883,7 @@ impl SaveMenu {
                 self.flag_52f = 0;
                 self.cursor_move();
                 self.panes.cursor.show();
-                self.text_b = format!("\u{1}{MSG_TITLE}");
+                self.label(true, format!("\u{1}{MSG_TITLE}"));
                 self.proc = proc_msg_wait;
                 self.flag_52d = proc_save_question;
             }
@@ -2877,7 +2898,7 @@ impl SaveMenu {
         if menu_rt && temp_r5 {
             self.timer = 0;
             self.flag_535 = 1;
-            self.text_b = format!("\u{1}{MSG_SAVING}");
+            self.label(true, format!("\u{1}{MSG_SAVING}"));
             self.data_write(env);
             self.proc = proc_mem_card_data_save_wait;
         }
@@ -2916,12 +2937,12 @@ impl SaveMenu {
                     .set_mem_card_check_id(env.card.get_card_serial_no());
                 env.card.set_new_file(0);
                 env.card.set_no_file(0);
-                self.text_b = format!("\u{1}{MSG_SAVED}");
+                self.label(true, format!("\u{1}{MSG_SAVED}"));
                 self.proc = proc_msg_wait;
                 self.flag_52d = proc_save_end_wait;
             } else if self.op_result == 2 {
                 self.sound(SE_ALERT_DATA);
-                self.text_b = format!("\u{1}{MSG_SAVE_FAILED}");
+                self.label(true, format!("\u{1}{MSG_SAVE_FAILED}"));
                 self.proc = proc_msg_wait2;
                 self.flag_52d = proc_mem_card_check;
             }
@@ -2964,7 +2985,7 @@ impl SaveMenu {
 
         if env.pad.any_confirm() || self.flag_534 == 0 {
             self.timer = 0;
-            self.text_b = format!("\u{1}{MSG_CONTINUE}");
+            self.label(true, format!("\u{1}{MSG_CONTINUE}"));
             self.proc = proc_game_continue;
         }
     }
@@ -2984,7 +3005,7 @@ impl SaveMenu {
             } else {
                 MSG_TITLE
             };
-            self.text_b = format!("\u{1}{msg}");
+            self.label(true, format!("\u{1}{msg}"));
 
             self.proc = proc_can_not_save2;
         }
@@ -3112,7 +3133,7 @@ impl SaveMenu {
                 self.proc = proc_save_wait;
                 self.save_status = 3;
             } else {
-                self.text_b = format!("\u{1}{MSG_ENDING_TITLE}");
+                self.label(true, format!("\u{1}{MSG_ENDING_TITLE}"));
                 self.proc = proc_ending_no_save3;
             }
         }
@@ -3148,7 +3169,7 @@ impl SaveMenu {
             self.save_status = 3;
         } else {
             self.sound(SE_ALERT_DATA);
-            self.text_b = format!("\u{1}{MSG_BAD_CHECKSUM}");
+            self.label(true, format!("\u{1}{MSG_BAD_CHECKSUM}"));
             self.proc = proc_can_not_save;
         }
     }

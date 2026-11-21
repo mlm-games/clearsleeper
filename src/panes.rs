@@ -45,17 +45,82 @@ fn build() -> Option<Assets> {
 
 pub struct SaveAssets {
     pub assets: Assets,
+    error: Option<Assets>,
+    messages: crate::assets::MsgArchives,
 }
 
 impl SaveAssets {
     pub fn load(root: &AssetRoot) -> Option<Self> {
         // tww/src/d/d_menu_save.cpp:56-59
-        Assets::load_from(root, crate::ui_menu_save::SCREEN_ARCHIVE, None, crate::ui_menu_save::SCREEN_LABEL).map(|assets| Self { assets })
+        Some(Self {
+            assets: Assets::load_from(
+                root,
+                crate::ui_menu_save::SCREEN_ARCHIVE,
+                None,
+                crate::ui_menu_save::SCREEN_LABEL,
+            )?,
+            // tww/src/d/d_file_error.cpp:44-48
+            error: Some(Assets::load_from(
+                root,
+                crate::ui_menu_save::ERROR_ARCHIVE,
+                None,
+                "file_error.blo",
+            )?),
+            messages: crate::assets::MsgArchives::load(root),
+        })
     }
 
     pub fn from_parts(screen: Screen, textures: HashMap<String, Image>) -> Self {
         Self {
             assets: Assets::from_parts(screen, textures),
+            error: None,
+            messages: crate::assets::MsgArchives {
+                normal: None,
+                hyrule: None,
+            },
+        }
+    }
+
+    pub(crate) fn bind(&self, menu: &mut crate::ui_menu_save::SaveMenu) {
+        let error = self
+            .error
+            .as_ref()
+            .map(|a| a.screen.clone())
+            .unwrap_or_else(|| Screen {
+                width: 640,
+                height: 480,
+                color: 0,
+                panes: Vec::new(),
+            });
+        menu.create(self.assets.screen.clone(), error);
+    }
+
+    pub(crate) fn sync_text(&self, menu: &mut crate::ui_menu_save::SaveMenu, clears: u8) {
+        for pane in menu.panes.base[3..5]
+            .iter_mut()
+            .chain(std::iter::once(&mut menu.error.panes[2]))
+        {
+            if let Some(id) = pane
+                .text
+                .strip_prefix('\u{1}')
+                .and_then(|id| id.parse().ok())
+            {
+                pane.set_string(&crate::ui_menu_save::message_get(
+                    &self.messages,
+                    clears,
+                    id,
+                ));
+            }
+        }
+    }
+
+    pub(crate) fn draw(&self, canvas: &mut Canvas, menu: &crate::ui_menu_save::SaveMenu) {
+        draw_save_menu(canvas, &menu.panes, self);
+        if let Some(error) = &self.error
+            && menu.error.status == 1
+        {
+            let live = menu.error.panes.iter().map(|p| (p.tag, p)).collect();
+            draw_screen(canvas, error, &live);
         }
     }
 }

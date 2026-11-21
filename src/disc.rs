@@ -650,18 +650,28 @@ impl DiscImage {
     }
 
     pub fn stream(&self, rel: &str) -> Result<Box<dyn AssetStream>, DiscError> {
-        let (index, (offset, size)) = self.fst.find(fst_path(rel))
+        let (index, (offset, size)) = self
+            .fst
+            .find(fst_path(rel))
             .and_then(|i| Some((i, self.fst.file(i)?)))
-            .ok_or_else(|| DiscError::MissingFile { path: rel.to_owned() })?;
+            .ok_or_else(|| DiscError::MissingFile {
+                path: rel.to_owned(),
+            })?;
         // tww/src/d/actor/d_a_movie_player.cpp:2704-2724: read each frame within the DVD file.
         match &self.data {
             ImageData::Raw { bytes } => {
                 let stream = BufReader::new(ImageStream::new(Arc::clone(bytes)));
-                Ok(Box::new(nod::WindowedStream::new(stream, offset, size).map_err(container_error)?))
+                Ok(Box::new(
+                    nod::WindowedStream::new(stream, offset, size).map_err(container_error)?,
+                ))
             }
             ImageData::Rvz { partition, nodes } => {
                 let partition = partition.lock().map_err(container_error)?.clone();
-                Ok(Box::new(partition.into_open_file(nodes[index]).map_err(container_error)?))
+                Ok(Box::new(
+                    partition
+                        .into_open_file(nodes[index])
+                        .map_err(container_error)?,
+                ))
             }
         }
     }

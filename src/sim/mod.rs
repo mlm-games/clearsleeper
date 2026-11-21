@@ -2068,6 +2068,8 @@ pub fn build(
         },
         hammer::Hammer::idle(),
     ));
+    // tww/src/d/actor/d_a_title.cpp:633-681: the title process runs while the sim clock is parked.
+    sim.world.register_system_cached(title::control);
     sim.add_chained_systems(
         (
             (

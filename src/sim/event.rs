@@ -489,16 +489,9 @@ pub struct ItemGets(pub Vec<u8>);
 /// `execItemGet`'s two writes: `dComIfGs_setCollect`/`setSelectEquip` through
 /// [`Equipped::collect`] and the item-screen "got" bit (`dComIfGs_onCollect`, read by
 /// `d_a_npc_fa1.cpp`'s fairy gift and the chest path).
-pub fn grant_items(
-    mut gets: ResMut<ItemGets>,
-    mut equipped: ResMut<super::inventory::Equipped>,
-    mut got: ResMut<super::inventory::Got>,
-) {
+pub fn grant_items(mut gets: ResMut<ItemGets>, mut award: super::pickup::Award) {
     for item in gets.0.drain(..) {
-        equipped.collect(item);
-        if let Some(slot) = super::inventory::slot_of(item) {
-            got.gain(slot, 0);
-        }
+        award.give(item);
     }
 }
 

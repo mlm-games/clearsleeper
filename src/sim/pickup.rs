@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use glam::Vec3;
 
 use super::actor::Actor;
@@ -102,6 +103,7 @@ impl Pickup {
                 | FIRST_BOMB..=LAST_BOMB
                 | FIRST_ARROW..=LAST_ARROW
                 | BOOMERANG
+                | 0x16 | 0x1a | 0x28 | 0x38..=0x3f | 0x42..=0x43 | 0x4c..=0x4e | 0x61..=0x6b | 0x6d..=0x72
         ) || super::inventory::slot_of(self.item).is_some()
     }
 }
@@ -122,7 +124,7 @@ fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
                 .saturating_add(RUPEE_VALUES[(item - FIRST_RUPEE) as usize]);
         }
         SILVER_RUPEE => rupees.count = rupees.count.saturating_add(200),
-        HEART_PIECE => {
+        HEART_PIECE | 0x3f => {
             health.max = health.max.saturating_add(1).min(MAX_LIFE);
             health.units = health.ceiling();
         }
@@ -130,20 +132,74 @@ fn apply(item: u8, health: &mut Health, rupees: &mut Rupees, held: &mut Held) {
             health.max = health.max.saturating_add(4).min(MAX_LIFE);
             health.units = health.ceiling();
         }
-        FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW | BOOMERANG => held.equip(item),
+        FIRST_BOMB..=LAST_BOMB | FIRST_ARROW..=LAST_ARROW | BOOMERANG | super::item::HOOKSHOT => {
+            held.equip(item)
+        }
+        // tww/src/d/d_item.cpp:669-676,733-738,792-797.
+        0x16 => health.heal(40),
+        0x1a => rupees.count = rupees.count.saturating_add(10),
+        0x27 => held.equip(LAST_ARROW),
+        0x31 => held.equip(LAST_BOMB),
         _ => {}
+    }
+}
+
+#[derive(SystemParam)]
+pub struct Award<'w> {
+    health: ResMut<'w, Health>,
+    rupees: ResMut<'w, Rupees>,
+    held: ResMut<'w, Held>,
+    equipped: ResMut<'w, super::inventory::Equipped>,
+    got: ResMut<'w, super::inventory::Got>,
+    collect: ResMut<'w, super::flags::Collect>,
+    dungeon: ResMut<'w, super::flags::MemBits>,
+}
+
+impl Award<'_> {
+    // tww/src/d/d_item.cpp:533-536: loose items, chest rewards and demo presents use one dispatch.
+    pub fn give(&mut self, item: u8) {
+        apply(item, &mut self.health, &mut self.rupees, &mut self.held);
+        if let Some(slot) = super::inventory::slot_of(item) {
+            // tww/src/d/d_item.cpp:616-641,708-737,817-835
+            let bit = match item {
+                0x26 | 0x35 => 1,
+                0x36 => 2,
+                _ => 0,
+            };
+            self.got.gain(slot, bit);
+            self.equipped.set(
+                slot,
+                if (0x0c..=0x0e).contains(&item) {
+                    0x31
+                } else {
+                    item
+                },
+            );
+        }
+        // tww/src/d/d_item.cpp:740-744,847-896,952-965,1030-1117
+        match item {
+            0x28 => self.collect.set(2, 0),
+            0x38..=0x3a => self.collect.set(0, item - 0x38),
+            0x3b..=0x3c => self.collect.set(1, item - 0x3b),
+            0x3d => self.collect.set(0, 0),
+            0x3e => self.collect.set(0, 3),
+            0x42..=0x43 => self.collect.set(3 + item - 0x42, 0),
+            0x4c => self.dungeon.on_map(),
+            0x4d => self.dungeon.on_compass(),
+            0x4e => self.dungeon.on_boss_key(),
+            0x61..=0x68 => self.collect.on_triforce(item - 0x61),
+            0x69..=0x6b => self.collect.on_symbol(item - 0x69),
+            0x6d..=0x72 => self.collect.on_tact(item - 0x6d),
+            _ => {}
+        }
     }
 }
 
 pub fn control(
     do_intent: Res<super::intent::DoIntent>,
-    mut health: ResMut<Health>,
+    mut award: Award,
     mut partner: ResMut<super::event::ItemPartner>,
-    mut rupees: ResMut<Rupees>,
-    mut held: ResMut<Held>,
     mut zones: ResMut<super::flags::ZoneActors>,
-    mut equipped: ResMut<super::inventory::Equipped>,
-    mut got: ResMut<super::inventory::Got>,
     mut chest_flags: ResMut<super::chest::Chests>,
     mut switches: ResMut<super::flags::Switches>,
     mut events: ResMut<SimEvents>,
@@ -157,11 +213,11 @@ pub fn control(
     )>,
     mut commands: Commands,
 ) {
-    partner.max_life = health.max;
+    partner.max_life = award.health.max;
     let Some(player) = players.iter().next() else {
         return;
     };
-    if health.units == 0 {
+    if award.health.units == 0 {
         return;
     }
     for (entity, mut pickup, actor) in &mut items {
@@ -175,11 +231,7 @@ pub fn control(
         if dx * dx + dz * dz > radius * radius {
             continue;
         }
-        apply(pickup.item, &mut health, &mut rupees, &mut held);
-        if let Some(slot) = super::inventory::slot_of(pickup.item) {
-            got.gain(slot, 0);
-        }
-        equipped.collect(pickup.item);
+        award.give(pickup.item);
         events.list.push(SimEvent::Collect);
         zones.mark_done(actor.room, actor.set_id);
         let _ = commands.entity(entity).despawn();
@@ -212,7 +264,7 @@ pub fn control(
         if chest.open_switch != super::flags::NO_SWITCH {
             switches.set(chest.open_switch);
         }
-        super::chest::loot(&chest, &mut rupees, &mut equipped, &mut got);
+        award.give(chest.item);
         events.list.push(SimEvent::Collect);
     }
 }

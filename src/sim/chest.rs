@@ -1,8 +1,6 @@
 use bevy_ecs::prelude::*;
 
 use super::flags::Switches;
-use super::inventory::{Equipped, Got};
-use super::pickup::Rupees;
 
 pub const FUNC_NORMAL: u8 = 0;
 pub const FUNC_EXTRA_SAVE_INFO: u8 = 7;
@@ -117,15 +115,4 @@ pub fn present(chest: &Chest, switches: &Switches) -> bool {
         return !switches.test(chest.switch_no);
     }
     true
-}
-
-pub fn loot(chest: &Chest, rupees: &mut Rupees, equipped: &mut Equipped, got: &mut Got) {
-    if chest.item == 0 {
-        rupees.count = rupees.count.saturating_add(50);
-    } else {
-        equipped.collect(chest.item);
-        if let Some(slot) = super::inventory::slot_of(chest.item) {
-            got.gain(slot, 0);
-        }
-    }
 }

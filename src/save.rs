@@ -11,10 +11,14 @@ use crate::sim::frame::CurrentFrame;
 use crate::sim::health::Health;
 use crate::sim::intent::CameraYaw;
 use crate::sim::item::Held;
-use crate::sim::{chest::Chests, flags::{Charts, Collect, MemBits}, inventory::{Equipped, Got}};
 use crate::sim::pickup::Rupees;
 use crate::sim::player::Player;
 use crate::sim::talk::Dialogue;
+use crate::sim::{
+    chest::Chests,
+    flags::{Charts, Collect, MemBits},
+    inventory::{Equipped, Got},
+};
 use crate::{App, assets};
 
 /// A slot's schema in the `repame-save` envelope. The payload keeps its own
@@ -123,6 +127,36 @@ pub struct StageProgress {
     pub dungeon: u8,
 }
 
+impl SaveGame {
+    pub(crate) fn prepare_second_quest(&mut self, previous: &StoryBits) {
+        // tww/src/d/d_save.cpp:1401-1428,1451-1489: only these registers survive reinitialization.
+        let mut story = StoryBits::default();
+        for register in [
+            0x95ff, 0x94ff, 0x93ff, 0x92ff, 0x91ff, 0x90ff, 0x8fff, 0x8eff, 0x8dff, 0x8cff, 0xb1ff,
+            0x9cff, 0x84ff, 0x83ff, 0x82ff, 0x81ff, 0x80ff, 0x89ff,
+        ] {
+            story.set_reg(register, previous.reg(register));
+        }
+        for bit in [0x2f08, 0x2f04, 0x2f02, 0x3a01, 0x3401] {
+            story.set(bit);
+        }
+        story.set_reg(0xc407, 7);
+        self.story = story.bytes.to_vec();
+        self.progress.clear_count = 1;
+        self.progress.stages.entry(11).or_default().opened[0] = true;
+        let mut sea = Switches::from_words(self.switches);
+        sea.set(0x47);
+        sea.set(0x5e);
+        self.switches = sea.words();
+        self.progress.stages.entry(0).or_default().switches = self.switches;
+        self.progress
+            .equipped
+            .set(8, crate::sim::lenzo::ITEM_DELUXE_PICTO_BOX);
+        self.progress.got.gain(8, 0);
+        self.progress.got.gain(8, 1);
+    }
+}
+
 /// What one slot's file held. `Missing` and `Corrupt` are different answers to the file select:
 /// the first offers a new file, the second offers an erase.
 #[derive(Debug, Clone, PartialEq)]
@@ -229,7 +263,10 @@ impl From<SavedHealth> for Health {
 
 impl App {
     fn stage_slot(&self) -> u8 {
-        self.stage.as_ref().and_then(|t| t.stag()).map_or(0, |s| s.save_table)
+        self.stage
+            .as_ref()
+            .and_then(|t| t.stag())
+            .map_or(0, |s| s.save_table)
     }
 
     // tww/src/d/d_stage.cpp:1676-1677,2257-2258; tww/src/d/d_save.cpp:1505-1515.
@@ -237,22 +274,39 @@ impl App {
         let slot = self.stage_slot();
         let world = &self.sim.world;
         let chests = world.resource::<Chests>();
-        self.stage_progress.insert(slot, StageProgress {
-            switches: world.resource::<Switches>().words(),
-            opened: chests.opened,
-            dungeon: world.resource::<MemBits>().byte(),
-        });
+        self.stage_progress.insert(
+            slot,
+            StageProgress {
+                switches: world.resource::<Switches>().words(),
+                opened: chests.opened,
+                dungeon: world.resource::<MemBits>().byte(),
+            },
+        );
         if slot != crate::sim::chest::SEA2_STAGE {
-            self.stage_progress.entry(crate::sim::chest::SEA2_STAGE).or_default().opened = chests.sea2_opened;
+            self.stage_progress
+                .entry(crate::sim::chest::SEA2_STAGE)
+                .or_default()
+                .opened = chests.sea2_opened;
         }
     }
 
     pub(crate) fn restore_stage_progress(&mut self, slot: u8) {
         let saved = self.stage_progress.get(&slot).copied().unwrap_or_default();
-        let other = self.stage_progress.get(&crate::sim::chest::SEA2_STAGE).copied().unwrap_or_default();
-        self.sim.world.insert_resource(Switches::from_words(saved.switches));
-        self.sim.world.insert_resource(MemBits::from_byte(saved.dungeon));
-        self.sim.world.insert_resource(Chests { opened: saved.opened, sea2_opened: other.opened });
+        let other = self
+            .stage_progress
+            .get(&crate::sim::chest::SEA2_STAGE)
+            .copied()
+            .unwrap_or_default();
+        self.sim
+            .world
+            .insert_resource(Switches::from_words(saved.switches));
+        self.sim
+            .world
+            .insert_resource(MemBits::from_byte(saved.dungeon));
+        self.sim.world.insert_resource(Chests {
+            opened: saved.opened,
+            sea2_opened: other.opened,
+        });
     }
 
     pub fn save(&mut self) -> SaveGame {
@@ -309,7 +363,9 @@ impl App {
                 got: *world.resource::<Got>(),
                 collect: *world.resource::<Collect>(),
                 charts: *world.resource::<Charts>(),
-                clear_count: world.resource::<crate::text::driver::TextFlags>().clear_count,
+                clear_count: world
+                    .resource::<crate::text::driver::TextFlags>()
+                    .clear_count,
                 stages: self.stage_progress.clone(),
             },
         }
@@ -326,11 +382,28 @@ impl App {
         let destination = if save.stage.is_empty() {
             None
         } else {
-            Some(assets::load_stage_tables(&save.stage).ok_or_else(|| anyhow::anyhow!("missing saved stage {}", save.stage))?)
+            Some(
+                assets::load_stage_tables(&save.stage)
+                    .ok_or_else(|| anyhow::anyhow!("missing saved stage {}", save.stage))?,
+            )
         };
         self.name = save.name.clone();
+        // tww/src/d/d_s_name.cpp:1165-1175: loading a slot starts a fresh play scene.
+        self.sim = repame_sim::Sim::new(self.sim.step);
+        crate::sim::build(&mut self.sim, None, None);
+        self.room = None;
+        self.room_actors.clear();
+        self.room_exits.clear();
+        self.room_tick = save.tick;
+        self.title_actor = None;
+        self.dialogue_live = false;
+        self.stage = None;
+        self.rooms.clear();
         self.stage_progress = save.progress.stages.clone();
-        let slot = destination.as_ref().and_then(|t| t.stag()).map_or_else(|| self.stage_slot(), |s| s.save_table);
+        let slot = destination
+            .as_ref()
+            .and_then(|t| t.stag())
+            .map_or_else(|| self.stage_slot(), |s| s.save_table);
         self.stage_progress.entry(slot).or_default().switches = save.switches;
         self.restore_stage_progress(slot);
         {
@@ -339,7 +412,9 @@ impl App {
             world.insert_resource(save.progress.got);
             world.insert_resource(save.progress.collect);
             world.insert_resource(save.progress.charts);
-            world.resource_mut::<crate::text::driver::TextFlags>().clear_count = save.progress.clear_count;
+            world
+                .resource_mut::<crate::text::driver::TextFlags>()
+                .clear_count = save.progress.clear_count;
             let mut text = world.resource_mut::<crate::text::driver::TextDriver>();
             text.flags.clear_count = save.progress.clear_count;
             text.set_player_name(&save.name);
@@ -365,13 +440,13 @@ impl App {
         }
         crate::sim::clear_shots(&mut self.sim.world);
         if let Some(tables) = destination {
-                self.mount_stage(
-                    tables,
-                    save.rooms.clone(),
-                    save.area.spawn.into(),
-                    save.area.yaw,
-                    crate::sim::transition::LAYER_NONE,
-                );
+            self.mount_stage(
+                tables,
+                save.rooms.clone(),
+                save.area.spawn.into(),
+                save.area.yaw,
+                crate::sim::transition::LAYER_NONE,
+            );
         } else {
             let rooms = save.rooms.clone();
             if !rooms.is_empty() {
@@ -410,8 +485,12 @@ impl App {
                 assets::PROLOGUE_SPAWN_POINT,
             );
             let here = glam::Vec3::from(save.area.spawn);
-            if prologue.is_some_and(|spawn| here.distance_squared(spawn.pos) < 1.0) {
+            if let Some(spawn) = prologue.filter(|s| here.distance_squared(s.pos) < 1.0) {
                 self.place_camera(save.area.spawn.into(), save.area.yaw, true);
+                let start = crate::sim::event::StartEvent::from_player(spawn.player, |i| {
+                    self.stage.as_ref()?.event_spawn_switch(i)
+                });
+                self.sim.world.insert_resource(start);
             }
         }
         Ok(())

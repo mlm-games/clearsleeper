@@ -131,7 +131,16 @@ impl Menu {
         self.fs.create(assets.screen.clone());
         // tww/src/d/d_s_name.cpp:964-972: the pane reads the card, including its per-slot checksums.
         self.card.restore();
-        self.slots = self.card.slots.iter().map(|slot| slot.as_ref().filter(|s| !s.name.is_empty()).map_or(SlotInfo::Empty, SlotInfo::from_save)).collect();
+        self.slots = self
+            .card
+            .slots
+            .iter()
+            .map(|slot| {
+                slot.as_ref()
+                    .filter(|s| !s.name.is_empty())
+                    .map_or(SlotInfo::Empty, SlotInfo::from_save)
+            })
+            .collect();
         self.fs.set_save_data(&self.card);
         self.fs.select_num = self.slot as u8;
     }
