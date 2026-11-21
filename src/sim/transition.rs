@@ -134,10 +134,26 @@ pub fn check(
             next.exit = None;
             continue;
         }
-        next.exit = match collision.exit_below(player.pos + Vec3::Y * GROUND_PROBE) {
-            Some(exit) if exit != NO_EXIT => Some(exit),
-            _ => None,
-        };
+        // tww/src/d/d_stage.cpp:2345-2365: a ground exit resolves through the room whose ground
+        // polygon the player stands on, not through the stage's own exit table. The room read id
+        // is already on the room-set request from `dStage_RoomCheck` above.
+        let room = room_set
+            .as_ref()
+            .and_then(|room| room.read_id)
+            .map(i32::from);
+        if let Some(exit) = collision.exit_below(player.pos + Vec3::Y * GROUND_PROBE)
+            && exit != NO_EXIT
+        {
+            match room {
+                Some(room) => {
+                    next.exit = None;
+                    next.set_by_scls(exit, room);
+                }
+                None => next.exit = Some(exit),
+            }
+        } else {
+            next.exit = None;
+        }
     }
 }
 

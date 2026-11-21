@@ -364,6 +364,12 @@ const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
 const LINK_IDLE_UNDER: &str = "bcks/waits.bck";
 const LINK_IDLE_UPPER: &str = "bcks/wait.bck";
 const LINK_UPPER_ROOT: &str = "body_chn";
+/// `mAnmDataTable[ANM_CUTA..ANM_CUTEB]` (`d_a_player_main_data.inc:1242-1282`): the six body
+/// animations the sword processes install; walk and dash are already in `link_demo::STEMS`, but
+/// they are loaded here too so gameplay sampling never depends on a demo being mounted.
+pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
+    "walk", "dash", "cuta", "cutf", "cutr", "cutl", "cutea", "cuteb",
+];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks
 /// a cutscene can switch the player onto. A missing pair leaves the player on the bind pose
@@ -375,6 +381,7 @@ pub struct PlayerIdle {
     upper_mask: Vec<bool>,
     parents: Vec<u16>,
     demos: Vec<(&'static str, crate::j3d::bck::Morph)>,
+    gameplay: Vec<(&'static str, crate::j3d::bck::Morph)>,
 }
 
 impl PlayerIdle {
@@ -418,11 +425,25 @@ impl PlayerIdle {
     /// (`d_demo.cpp:229`), the value that stops the controller at the animation's last frame
     /// rather than wrapping, which is why this clamps instead of the idle pose's modulo.
     pub fn pose_stem(&self, demo: Option<(&str, f32)>, idle_frame: f32) -> Vec<glam::Mat4> {
-        let posed = demo.and_then(|(stem, frame)| {
-            self.demos
+        self.pose_named(demo.map(|(stem, frame)| (stem, frame, false)), idle_frame)
+    }
+
+    /// The bck gameplay put the body on. `looping` wraps walk and dash the way the retail move
+    /// controller does, while a sword cut holds its last frame like a demo (`d_demo.cpp:229`).
+    pub fn pose_named(&self, named: Option<(&str, f32, bool)>, idle_frame: f32) -> Vec<glam::Mat4> {
+        let posed = named.and_then(|(stem, frame, looping)| {
+            self.gameplay
                 .iter()
+                .chain(self.demos.iter())
                 .find(|(name, _)| *name == stem)
-                .map(|(_, morph)| morph.joint_matrices(frame.min(morph.frame_max().max(1.0))))
+                .map(|(_, morph)| {
+                    let frame = if looping {
+                        frame % morph.frame_max().max(1.0)
+                    } else {
+                        frame.min(morph.frame_max().max(1.0))
+                    };
+                    morph.joint_matrices(frame)
+                })
         });
         posed.unwrap_or_else(|| self.pose(idle_frame))
     }
@@ -457,12 +478,20 @@ pub fn load_link_idle(mesh: &crate::j3d::bdl::RoomMesh) -> Option<PlayerIdle> {
             None => log::warn!("clearsleeper: missing link demo animation {stem}"),
         }
     }
+    let mut gameplay = Vec::new();
+    for stem in PLAYER_GAMEPLAY_STEMS {
+        match link_morph(&archive, &path, &format!("bcks/{stem}.bck"), mesh) {
+            Some(morph) => gameplay.push((*stem, morph)),
+            None => log::warn!("clearsleeper: missing link gameplay animation {stem}"),
+        }
+    }
     Some(PlayerIdle {
         under,
         upper,
         upper_mask,
         parents: mesh.joint_parents.clone(),
         demos,
+        gameplay,
     })
 }
 

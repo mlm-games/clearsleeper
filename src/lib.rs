@@ -351,6 +351,14 @@ impl App {
         self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
         self.stage = assets::load_stage_tables(stage);
+        // tww/src/d/d_stage.cpp:2246; tww/src/d/d_event_manager.cpp:347-348: the stage's event-info
+        // table names the demo a PLYR row starts, and the new-game boot path must carry it too.
+        self.sim.world.insert_resource(sim::event::StageEvents(
+            self.stage
+                .as_ref()
+                .map(|tables| tables.event_names().to_vec())
+                .unwrap_or_default(),
+        ));
         sim::build(
             &mut self.sim,
             assets::load_stage_at(stage, spawn_point),
@@ -1399,7 +1407,20 @@ impl App {
                     anm.stem.map(|stem| view::PlayerAnm {
                         stem,
                         frame: anm.frame,
+                        looping: false,
                     })
+                })
+                .or_else(|| {
+                    self.sim
+                        .world
+                        .get_resource::<sim::player_pose::PlayerPose>()
+                        .and_then(|pose| {
+                            pose.stem.map(|stem| view::PlayerAnm {
+                                stem,
+                                frame: pose.frame,
+                                looping: matches!(stem, "walk" | "dash"),
+                            })
+                        })
                 }),
             player_no_draw: player.is_some_and(|player| player.no_draw)
                 || self

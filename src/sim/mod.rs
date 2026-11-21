@@ -296,6 +296,7 @@ pub mod pickup;
 pub mod pirateship;
 pub mod plant;
 pub mod player;
+pub mod player_pose;
 pub mod player_status;
 pub mod pscnchg;
 pub mod puppet_ganon;
@@ -1772,6 +1773,8 @@ pub fn build(
     sim.world.insert_resource(camera::Camera::default());
     sim.world.insert_resource(jump::Jump::default());
     sim.world.insert_resource(combat::Combat::default());
+    sim.world
+        .insert_resource(player_pose::PlayerPose::default());
     sim.world.insert_resource(combat::Slain::default());
     sim.world
         .insert_resource(damage_resolve::HitStop::default());
@@ -2521,6 +2524,7 @@ pub fn build(
                     ygawa::control.in_set(WwSimSet::Execute),
                     collision::remember_move_from.in_set(WwSimSet::Execute),
                     link_move::control.in_set(WwSimSet::Execute),
+                    player_pose::control.in_set(WwSimSet::Execute),
                     anim_clock::advance.in_set(WwSimSet::Execute),
                     walk::walk.in_set(WwSimSet::Execute),
                     swim::surface.in_set(WwSimSet::Execute),

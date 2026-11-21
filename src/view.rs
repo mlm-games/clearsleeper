@@ -47,6 +47,8 @@ pub struct ActorView {
 pub struct PlayerAnm {
     pub stem: &'static str,
     pub frame: f32,
+    /// Walk and dash loop; a cutscene morf and a sword cut hold their last frame.
+    pub looping: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -326,8 +328,10 @@ pub fn build_frame_with_actor(
             });
         }
         let pose = match actor_anim {
-            Some(anim) => anim.pose_stem(
-                snapshot.player_anm.map(|anm| (anm.stem, anm.frame)),
+            Some(anim) => anim.pose_named(
+                snapshot
+                    .player_anm
+                    .map(|anm| (anm.stem, anm.frame, anm.looping)),
                 // The bck tracks are keyed at 60 Hz and this sim steps at 30 Hz
                 // ([`crate::SIM_HZ`]), so a sim tick is two animation frames.
                 snapshot.tick as f32 * 2.0,
