@@ -390,7 +390,7 @@ impl App {
             return;
         };
         stage.input = self.album_input();
-        let pad = self.sampled_pad.unwrap_or_default();
+        let pad = &self.sampled_pad;
         let menu_pad = PadInput {
             a: pad.a,
             b: pad.b,
