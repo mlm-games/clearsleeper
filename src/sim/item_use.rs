@@ -17,7 +17,7 @@ pub struct ItemUse {
     grabbed: bool,
 }
 
-const FAN_TICKS: u32 = 17;
+pub const FAN_TICKS: u32 = 17;
 const TACT_TICKS: u32 = 24;
 const BOTTLE_TICKS: u32 = 28;
 const GRAB_LIFT_TICKS: u32 = 8;

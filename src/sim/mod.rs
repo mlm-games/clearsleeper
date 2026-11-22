@@ -82,6 +82,7 @@ pub mod damage_fx;
 pub mod damage_resolve;
 pub mod daynight;
 pub mod death;
+pub mod deku_leaf;
 pub mod demo;
 pub mod demo00;
 pub mod demodk;
@@ -1763,6 +1764,7 @@ pub fn build(
     sim.world.insert_resource(health::BottleDrink::default());
     sim.world.insert_resource(health::Magic::default());
     sim.world.insert_resource(guard::Guard::default());
+    sim.world.insert_resource(deku_leaf::Fan::default());
     sim.world.insert_resource(spin::Spin::default());
     sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
@@ -2146,6 +2148,7 @@ pub fn build(
                         omensmk::control.in_set(WwSimSet::Execute),
                         mmusic::control.in_set(WwSimSet::Execute),
                         ygush::control.in_set(WwSimSet::Execute),
+                        deku_leaf::control.in_set(WwSimSet::Execute),
                         guard::control.in_set(WwSimSet::Execute),
                         spin::control.in_set(WwSimSet::Execute),
                         player_status::control.in_set(WwSimSet::Execute),

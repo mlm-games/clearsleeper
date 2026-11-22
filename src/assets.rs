@@ -403,6 +403,7 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "ladderupst",
     "ladderdwst",
     "usefana",
+    "usefanb",
     "taktdge",
     "bindrinking",
     "binopena",
