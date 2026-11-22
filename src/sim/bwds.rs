@@ -331,6 +331,7 @@ pub struct Bwds {
     pub max_health: i32,
     pub m02b4: u8,
     pub morph: Frame,
+    pub curr_bck: i32,
     pub m02f4: i16,
     pub m02f6: i16,
     pub m02f8: i16,
@@ -666,6 +667,7 @@ impl Bwds {
             max_health: 4,
             m02b4: (parameters & 0xFF) as u8,
             morph: Frame::idle(),
+            curr_bck: 0x4,
             m02f4: 0,
             m02f6: 0,
             m02f8: 0,
@@ -734,6 +736,7 @@ impl Bwds {
     }
 
     fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32) {
+        self.curr_bck = bck;
         self.morph.set_morf(morf);
         self.morph.start = 0;
         self.morph.end = frame_max(bck);

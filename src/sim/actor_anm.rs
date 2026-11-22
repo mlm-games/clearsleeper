@@ -241,6 +241,17 @@ publish_actor!(
     0x16
 );
 
+publish_actor!(
+    bwds,
+    super::bwds::Bwds,
+    "Bwds",
+    |c: &super::bwds::Bwds| c.curr_bck,
+    |c: &super::bwds::Bwds| c.morph.frame,
+    |c: &super::bwds::Bwds| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0x4,
+    0x5
+);
+
 /// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
     for (entity, bird) in &birds {
