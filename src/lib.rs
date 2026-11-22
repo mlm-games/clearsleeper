@@ -199,6 +199,7 @@ pub struct App {
     dff: Option<j3d::present::Presented>,
     pub menu: menus::Menu,
     stage: Option<dzs::StageTables>,
+    stage_name: String,
     stage_progress: std::collections::BTreeMap<u8, save::StageProgress>,
     rooms: Vec<u8>,
     /// The mounted room set's own `SCLS` tables, keyed by room: the table
@@ -392,16 +393,16 @@ impl App {
         stage.input = self.album_input();
         let pad = &self.sampled_pad;
         let menu_pad = PadInput {
-            a: pad.a,
-            b: pad.b,
-            x: pad.x,
-            y: pad.y,
-            z: pad.z,
-            l: pad.l,
-            r: pad.r,
-            start: pad.start,
-            stick_value: 0.0,
-            stick_angle: 0,
+            a: pad.hold.a,
+            b: pad.hold.b,
+            x: pad.hold.x,
+            y: pad.hold.y,
+            z: pad.hold.z,
+            l: pad.hold.l,
+            r: pad.hold.r,
+            start: pad.hold.start,
+            stick_value: pad.move_axis.length(),
+            stick_angle: sim::walk::to_s16(pad.move_axis.x.atan2(-pad.move_axis.y)),
             ..PadInput::default()
         };
         let mut out = AlbumOutput::default();
@@ -584,6 +585,7 @@ impl App {
             dff: None,
             menu: menus::Menu::new(),
             stage: None,
+            stage_name: String::new(),
             stage_progress: Default::default(),
             rooms: Vec::new(),
             room_exits: Vec::new(),
@@ -703,7 +705,7 @@ impl App {
             app.tip_stab_model = assets::object_model(&archive, 0x3E);
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
-        app.weather_textures = assets::load_weather_textures(&app.stage);
+        app.weather_textures = assets::load_weather_textures(&app.stage_name);
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
@@ -842,6 +844,7 @@ impl App {
     }
 
     fn reset_world_at(&mut self, stage: &str, spawn_point: u8) {
+        self.stage_name = stage.to_owned();
         self.title_actor = None;
         self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
