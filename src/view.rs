@@ -258,10 +258,10 @@ pub fn batch_desc_with_actor(
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
-    npc: Option<&NpcDraw<'_>>,
+    npcs: &[NpcDraw<'_>],
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) if held.is_empty() && npc.is_none() => BatchDesc::default(),
+        (None, None, None, None) if held.is_empty() && npcs.is_empty() => BatchDesc::default(),
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
@@ -273,10 +273,13 @@ pub fn batch_desc_with_actor(
                         .iter()
                         .map(|part| used_pages(part.mesh).len())
                         .sum::<usize>()
-                    + npc.map_or(0, |npc| {
-                        used_pages(npc.mesh).len()
-                            + npc.cloth.map_or(0, |(_, mesh)| used_pages(mesh).len())
-                    }),
+                    + npcs
+                        .iter()
+                        .map(|npc| {
+                            used_pages(npc.mesh).len()
+                                + npc.cloth.map_or(0, |(_, mesh)| used_pages(mesh).len())
+                        })
+                        .sum::<usize>(),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -379,7 +382,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], None)
+    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], &[])
 }
 
 pub fn build_frame_with_actor(
@@ -391,12 +394,12 @@ pub fn build_frame_with_actor(
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
-    npc: Option<&NpcDraw<'_>>,
+    npcs: &[NpcDraw<'_>],
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair, hands, held, npc),
+        desc: batch_desc_with_actor(room, actor, hair, hands, held, npcs),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -435,7 +438,7 @@ pub fn build_frame_with_actor(
         frame.push(walls_group(snapshot, eye));
     }
     if !snapshot.actors.is_empty() {
-        frame.push(actors_group(snapshot, eye, npc.is_some()));
+        frame.push(actors_group(snapshot, eye, !npcs.is_empty()));
     }
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
@@ -613,17 +616,19 @@ pub fn build_frame_with_actor(
             held_page += part_pages.len() as u32;
         }
     }
-    if let Some(npc) = npc {
-        // The NPC's pages sit after every player page, the same order the batch counted them.
-        let npc_page_base = room.map_or(0, |room| room.textures.len() as u32)
-            + actor.map_or(0, |mesh| used_pages(mesh).len() as u32)
-            + hair.map_or(0, |mesh| used_pages(mesh).len() as u32)
-            + hands.map_or(0, |mesh| used_pages(mesh).len() as u32)
-            + held
-                .iter()
-                .map(|part| used_pages(part.mesh).len() as u32)
-                .sum::<u32>();
+    // NPC pages sit after every player page, in the same order the batch counted them.
+    let mut npc_page = room.map_or(0, |room| room.textures.len() as u32)
+        + actor.map_or(0, |mesh| used_pages(mesh).len() as u32)
+        + hair.map_or(0, |mesh| used_pages(mesh).len() as u32)
+        + hands.map_or(0, |mesh| used_pages(mesh).len() as u32)
+        + held
+            .iter()
+            .map(|part| used_pages(part.mesh).len() as u32)
+            .sum::<u32>();
+    for npc in npcs {
+        let npc_page_base = npc_page;
         let pages = used_pages(npc.mesh);
+        npc_page += pages.len() as u32;
         for (slot, page) in pages.iter().enumerate() {
             let Some(texture) = npc.mesh.textures.get(*page as usize) else {
                 continue;
@@ -655,8 +660,9 @@ pub fn build_frame_with_actor(
             frame.push(group);
         }
         if let Some((joint, mesh)) = npc.cloth {
-            let cloth_base = npc_page_base + pages.len() as u32;
+            let cloth_base = npc_page;
             let cloth_pages = used_pages(mesh);
+            npc_page += cloth_pages.len() as u32;
             for (slot, page) in cloth_pages.iter().enumerate() {
                 let Some(texture) = mesh.textures.get(*page as usize) else {
                     continue;

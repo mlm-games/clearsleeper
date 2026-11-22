@@ -4384,54 +4384,55 @@ pub fn root_view(
     // Grandma is the one actor whose animation is already published to the view. Place her model
     // with the ECS actor's own transform and pose it with the BCK its cursor named
     // (tww/src/d/actor/d_a_npc_ba1.cpp:273-299, HD `d_a_npc_ba1.cpp:393-423`).
-    let npc = app
+    let npcs: Vec<view::NpcDraw<'_>> = app
         .sim
         .world
         .get_resource::<sim::actor_anm::ActorAnms>()
-        .and_then(|anms| {
+        .map(|anms| {
             anms.0
                 .iter()
-                .find(|anm| anm.archive == sim::actor_anm::BA_ARCHIVE)
+                .filter(|anm| anm.archive == sim::actor_anm::BA_ARCHIVE)
+                .filter_map(|anm| {
+                    let model = app.ba1_model.as_ref()?;
+                    let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
+                    let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
+                    let end = morph.frame_max().max(1.0);
+                    let frame = anm.frame * 2.0;
+                    let frame = if anm.looping {
+                        frame % end
+                    } else {
+                        frame.min(end)
+                    };
+                    let ba1 = app.sim.world.get::<sim::ba1::Ba1>(anm.entity);
+                    let joint_control = match (
+                        model.mesh.find_node_id(b"head"),
+                        model.mesh.find_node_id(b"backbone"),
+                        ba1,
+                    ) {
+                        (Some(head), Some(backbone), Some(ba1)) => Some((
+                            head as u16,
+                            -sim::walk::from_s16(ba1.joint_head_y),
+                            backbone as u16,
+                            sim::walk::from_s16(ba1.joint_backbone_y),
+                        )),
+                        _ => None,
+                    };
+                    let cloth = model
+                        .mesh
+                        .find_node_id(b"footL")
+                        .zip(model.cloth.as_ref())
+                        .map(|(joint, mesh)| (joint as u16, mesh));
+                    Some(view::NpcDraw {
+                        mesh: &model.mesh,
+                        anim: Some((morph, frame)),
+                        pos: actor.pos,
+                        yaw: sim::walk::from_s16(actor.shape_angle[1]),
+                        joint_control,
+                        cloth,
+                    })
+                })
         })
-        .and_then(|anm| {
-            let model = app.ba1_model.as_ref()?;
-            let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
-            let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
-            let end = morph.frame_max().max(1.0);
-            let frame = anm.frame * 2.0;
-            let frame = if anm.looping {
-                frame % end
-            } else {
-                frame.min(end)
-            };
-            let ba1 = app.sim.world.get::<sim::ba1::Ba1>(anm.entity);
-            let joint_control = match (
-                model.mesh.find_node_id(b"head"),
-                model.mesh.find_node_id(b"backbone"),
-                ba1,
-            ) {
-                (Some(head), Some(backbone), Some(ba1)) => Some((
-                    head as u16,
-                    -sim::walk::from_s16(ba1.joint_head_y),
-                    backbone as u16,
-                    sim::walk::from_s16(ba1.joint_backbone_y),
-                )),
-                _ => None,
-            };
-            let cloth = model
-                .mesh
-                .find_node_id(b"footL")
-                .zip(model.cloth.as_ref())
-                .map(|(joint, mesh)| (joint as u16, mesh));
-            Some(view::NpcDraw {
-                mesh: &model.mesh,
-                anim: Some((morph, frame)),
-                pos: actor.pos,
-                yaw: sim::walk::from_s16(actor.shape_angle[1]),
-                joint_control,
-                cloth,
-            })
-        });
+        .unwrap_or_default();
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, camera),
         None => view::build_frame_with_actor(
@@ -4443,7 +4444,7 @@ pub fn root_view(
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
             &held,
-            npc.as_ref(),
+            &npcs,
         ),
     };
     let desc = match &app.dff {
@@ -4454,7 +4455,7 @@ pub fn root_view(
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
             &held,
-            npc.as_ref(),
+            &npcs,
         ),
     };
     let cam = app.cam.clone();
