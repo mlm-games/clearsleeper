@@ -935,6 +935,269 @@ pub fn homen_bodies(entities: Query<(Entity, &super::homen::Homen)>, mut anms: R
     }
 }
 
+/// Stage actor names for shared scenery bodies, mapped to the archive key in `ACTOR_ARCHIVES`
+/// and a BCK id (`-1` = bind pose). The name arrays are the `*_ACTORS` constants in `src/sim/*`;
+/// the ids and cited headers are on the matching rows in `src/assets.rs`. One publisher covers
+/// all of them so the system schedule does not grow with every scenery type.
+fn scenery_model(name: &str) -> Option<(&'static str, i32)> {
+    let found = match name {
+        // Ships and ferries.
+        "Ship" => ("Ship", 0xB),
+        "Oship" => ("Oship", -1),
+        "Ayush" => ("Ayush", -1),
+        "Pirates" => ("Kaizokusen", -1),
+        "Gaship1" => ("GaShip", -1),
+        "Gaship2" => ("YakeRom", -1),
+        "Skanran" => ("Ferris", -1),
+        // Doors and barriers.
+        "door10" | "door11" | "door20" | "door21" | "Zenshut" | "keyshut" | "K_Zshut"
+        | "doorKD" | "ZenshKD" | "K_ZshKD" | "doorSH" | "doorSZ" => ("DoorBs", -1),
+        "door12" | "door12M" | "door12B" | "door13" | "door13M" | "door13B" | "keyS12"
+        | "ZenS12" => ("Door12", -1),
+        "Turu2" | "Turu3" => ("Ssk", -1),
+        "Mori1" => ("Mdoor", -1),
+        "SWTdoor" => ("Swtdoor", -1),
+        "MjDoor" => ("MjDoor", -1),
+        "SMBdor" | "KGBdor" => ("Mbdoor", -1),
+        "ATdoor" => ("Atdoor", -1),
+        "Ashut" => ("Ashut", -1),
+        "VgnFD" => ("VgnFD", -1),
+        "Wall" => ("Hbw1", -1),
+        "Ycage00" => ("Ycage", -1),
+        "ky_tag3" => ("M_door", -1),
+        // Containers and pickups.
+        "Ktarux" => ("Barrel", -1),
+        "Ktarur" => ("BarrelSea", -1),
+        "Kanban" => ("Kanban", -1),
+        "STBox" => ("SalvageBox", -1),
+        "SalvFM" | "Salvag2" | "SalvagE" | "SalvagN" | "Salvage" | "SwSlvg" => ("SalvageItem", -1),
+        "Ospbox" => ("Ospbox", -1),
+        "Table" => ("Table", -1),
+        "Otana" | "OtanaG" => ("Table", -1),
+        // Lights, rocks and trees.
+        "Ep" | "bonbori" => ("Ep", -1),
+        "Kantera" => ("Kantera", -1),
+        "Lamp" => ("LampBody", -1),
+        "Stoudai" => ("Skanran", -1),
+        "Ebrock" | "Ebrock2" => ("Ebrock", -1),
+        "Ekao" => ("Ekao", -1),
+        "VigaH" => ("VigaH", 0x0),
+        "lwood" => ("Lwood", -1),
+        "Oyashi" => ("Oyashi", -1),
+        "Ojtree" => ("Ojtree", -1),
+        "Plant" => ("Plant", -1),
+        "Vochi" => ("Vochi", -1),
+        "Kita" => ("Kita", -1),
+        // Platforms, bridges and lifts.
+        "Hbrf1" => ("Hbrf1", -1),
+        "Hlift" | "Hliftb" => ("Hlift", -1),
+        "Olift" => ("Olift", -1),
+        "Blift" => ("Hten1", -1),
+        "Hmlif" | "Hyuf1" | "Hyuf2" => ("Hmlif", -1),
+        "Gkai00" => ("Gkai00", 0x0),
+        "Gbrg00" => ("Gbrg00", -1),
+        "bridge" => ("Bridge", -1),
+        "GiceL" => ("Ylsic", -1),
+        "Msdan" | "MsdanSb" | "MsdanS2" => ("Msdan", -1),
+        // Switches with a body.
+        "Hfbot1A" | "Hfbot1B" | "Hfbot1C" => ("Hfbot", -1),
+        "MhmrSW0" => ("MhmrSW", -1),
+        "Hhbot1" | "Hhbot1N" => ("Hhbot", -1),
+        "Kbota_A" | "Kbota_B" | "KbotaC" => ("Kbota", -1),
+        "MsuSW" | "MsuSWB" => ("Mmirror", 0x0),
+        "Hpbot1" | "Vpbot" => ("Hpbot1", -1),
+        "SWtact" | "SWtactB" => ("Itact", -1),
+        "SW_HIT0" => ("SwHit", -1),
+        // Windmills, fans and pedestals.
+        "Hsen1" | "Hsen2" | "Hsen3" => ("Hsen1", -1),
+        "Hpu1" | "Hpu2" => ("Hpu1", -1),
+        "Kokiie" => ("Kokiie", -1),
+        "Hdai1" | "Hdai2" | "Hdai3" => ("Hdai1", -1),
+        "Vtil1" | "Vtil2" | "Vtil3" | "Vtil4" | "Vtil5" => ("Vtil", -1),
+        "WindTag" | "Ybgaf00" => ("Yaflw00", 0x0),
+        "LTag0" | "LTag1" | "LTagR0" => ("Mspot", -1),
+        _ => return None,
+    };
+    Some(found)
+}
+
+/// One publisher for all shared scenery bodies; the model lookup keeps a body only when its
+/// archive and (for animated entries) BCK actually loaded.
+pub fn scenery_bodies(
+    entities: Query<(Entity, &super::actor::Actor)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, actor) in &entities {
+        let Some((archive, bck)) = scenery_model(&actor.name) else {
+            continue;
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive,
+            bck,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+/// Treasure chests pick their body from the chest shape and their animation from the open
+/// action (`tww/src/d/actor/d_a_tbox.cpp:35-90`).
+pub fn chest_bodies(entities: Query<(Entity, &super::tbox::Tbox)>, mut anms: ResMut<ActorAnms>) {
+    use super::tbox::Action;
+    for (entity, chest) in &entities {
+        let archive = match chest.shape {
+            0 => "Tbox0",
+            1 => "Tbox1",
+            2 => "Tbox2",
+            _ => "Tbox3",
+        };
+        let bck = if matches!(chest.action, Action::OpenWait) {
+            0x8
+        } else {
+            -1
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive,
+            bck,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+publish_actor!(
+    bomb_bodies,
+    super::item::Bomb,
+    "BombBody",
+    |_c: &super::item::Bomb| 0xB,
+    |_c: &super::item::Bomb| 0.0,
+    |_c: &super::item::Bomb| false,
+    0xB,
+    0xB
+);
+publish_actor!(
+    arrow_bodies,
+    super::arrow::Arrow,
+    "ArrowBody",
+    |_c: &super::arrow::Arrow| -1,
+    |_c: &super::arrow::Arrow| 0.0,
+    |_c: &super::arrow::Arrow| false,
+    -1,
+    0
+);
+publish_actor!(
+    boomerang_bodies,
+    super::boomerang::Boomerang,
+    "BoomerangBody",
+    |_c: &super::boomerang::Boomerang| -1,
+    |_c: &super::boomerang::Boomerang| 0.0,
+    |_c: &super::boomerang::Boomerang| false,
+    -1,
+    0
+);
+publish_actor!(
+    spear_bodies,
+    super::enemy::Spear,
+    "SpearBody",
+    |_c: &super::enemy::Spear| -1,
+    |_c: &super::enemy::Spear| 0.0,
+    |_c: &super::enemy::Spear| false,
+    -1,
+    0
+);
+publish_actor!(
+    cannon_bodies,
+    super::warship::Cannon,
+    "BombBody",
+    |_c: &super::warship::Cannon| 0xB,
+    |_c: &super::warship::Cannon| 0.0,
+    |_c: &super::warship::Cannon| false,
+    0xB,
+    0xB
+);
+publish_actor!(
+    fgmahou_bodies,
+    super::fgmahou::FgMahou,
+    "FgMahou",
+    |_c: &super::fgmahou::FgMahou| -1,
+    |_c: &super::fgmahou::FgMahou| 0.0,
+    |_c: &super::fgmahou::FgMahou| false,
+    -1,
+    0
+);
+publish_actor!(
+    ff_bodies,
+    super::ff::Ff,
+    "FfBody",
+    |_c: &super::ff::Ff| -1,
+    |_c: &super::ff::Ff| 0.0,
+    |_c: &super::ff::Ff| false,
+    -1,
+    0
+);
+publish_actor!(
+    jbaba_bodies,
+    super::jbaba::Baba,
+    "JboBody",
+    |_c: &super::jbaba::Baba| 0x4,
+    |_c: &super::jbaba::Baba| 0.0,
+    |_c: &super::jbaba::Baba| false,
+    0x4,
+    0x6
+);
+publish_actor!(
+    bombflower_bodies,
+    super::bombflower::Bombflower,
+    "VbakH",
+    |_c: &super::bombflower::Bombflower| 0x6,
+    |_c: &super::bombflower::Bombflower| 0.0,
+    |_c: &super::bombflower::Bombflower| false,
+    0x5,
+    0x8
+);
+publish_actor!(
+    esa_bodies,
+    super::esa::Esa,
+    "EsaBody",
+    |_c: &super::esa::Esa| -1,
+    |_c: &super::esa::Esa| 0.0,
+    |_c: &super::esa::Esa| false,
+    -1,
+    0
+);
+publish_actor!(
+    tornado_bodies,
+    super::tornado::Tornado,
+    "Trnd",
+    |_c: &super::tornado::Tornado| 0x6,
+    |_c: &super::tornado::Tornado| 0.0,
+    |_c: &super::tornado::Tornado| false,
+    0x6,
+    0x7
+);
+publish_actor!(
+    nh_bodies,
+    super::nh::Nh,
+    "NhBody",
+    |_c: &super::nh::Nh| -1,
+    |_c: &super::nh::Nh| 0.0,
+    |_c: &super::nh::Nh| false,
+    -1,
+    0
+);
+publish_actor!(
+    syan_bodies,
+    super::syan::Syan,
+    "SyanBody",
+    |_c: &super::syan::Syan| 0x4,
+    |_c: &super::syan::Syan| 0.0,
+    |_c: &super::syan::Syan| false,
+    0x4,
+    0x5
+);
+
 /// Darknut (`d_a_tn.cpp`, not Tingle — the sim module name is a misnomer). The action maps to
 /// the A-series BCKs in `tww/assets/GZLE01/res/Object/Tn.h:178-179,178-179`.
 publish_actor!(

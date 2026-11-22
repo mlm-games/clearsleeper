@@ -2460,6 +2460,24 @@ pub fn build(
                             actor_anm::ivan_bodies.in_set(WwSimSet::Execute),
                             actor_anm::doguu_bodies.in_set(WwSimSet::Execute),
                             actor_anm::homen_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::scenery_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::chest_bodies.in_set(WwSimSet::Execute),
+                        )
+                            .chain(),
+                        (
+                            actor_anm::bomb_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::arrow_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::boomerang_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::spear_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::cannon_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::fgmahou_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::ff_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::jbaba_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::bombflower_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::esa_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::tornado_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::nh_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::syan_bodies.in_set(WwSimSet::Execute),
                         )
                             .chain(),
                     )

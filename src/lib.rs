@@ -2439,64 +2439,89 @@ impl App {
             .unwrap_or_default();
         for entity in self.sim.world.iter_entities() {
             if let Some(bomb) = entity.get::<sim::item::Bomb>() {
+                let anm = anims.get(&entity.id()).copied();
+                let modeled = anm
+                    .as_ref()
+                    .and_then(|a| actor_model(self, a.archive))
+                    .is_some();
                 out.push(view::ActorView {
                     pos: bomb.pos,
                     kind: view::ActorKind::Bomb,
                     item: 0,
                     height: 12.0,
                     half: 6.0,
-                    anm: None,
-                    modeled: false,
+                    anm,
+                    modeled,
                 });
                 continue;
             }
             if let Some(arrow) = entity.get::<sim::arrow::Arrow>() {
                 if arrow.visible {
+                    let anm = anims.get(&entity.id()).copied();
+                    let modeled = anm
+                        .as_ref()
+                        .and_then(|a| actor_model(self, a.archive))
+                        .is_some();
                     out.push(view::ActorView {
                         pos: arrow.pos,
                         kind: view::ActorKind::Arrow,
                         item: 0,
                         height: 3.0,
                         half: 3.0,
-                        anm: None,
-                        modeled: false,
+                        anm,
+                        modeled,
                     });
                 }
                 continue;
             }
             if let Some(boom) = entity.get::<sim::boomerang::Boomerang>() {
+                let anm = anims.get(&entity.id()).copied();
+                let modeled = anm
+                    .as_ref()
+                    .and_then(|a| actor_model(self, a.archive))
+                    .is_some();
                 out.push(view::ActorView {
                     pos: boom.pos,
                     kind: view::ActorKind::Boomerang,
                     item: 0,
                     height: 10.0,
                     half: 10.0,
-                    anm: None,
-                    modeled: false,
+                    anm,
+                    modeled,
                 });
                 continue;
             }
             if let Some(spear) = entity.get::<sim::enemy::Spear>() {
+                let anm = anims.get(&entity.id()).copied();
+                let modeled = anm
+                    .as_ref()
+                    .and_then(|a| actor_model(self, a.archive))
+                    .is_some();
                 out.push(view::ActorView {
                     pos: spear.pos,
                     kind: view::ActorKind::Spear,
                     item: 0,
                     height: 4.0,
                     half: 4.0,
-                    anm: None,
-                    modeled: false,
+                    anm,
+                    modeled,
                 });
                 continue;
             }
             if let Some(shot) = entity.get::<sim::warship::Cannon>() {
+                let anm = anims.get(&entity.id()).copied();
+                let modeled = anm
+                    .as_ref()
+                    .and_then(|a| actor_model(self, a.archive))
+                    .is_some();
                 out.push(view::ActorView {
                     pos: shot.pos,
                     kind: view::ActorKind::Cannon,
                     item: 0,
                     height: 24.0,
                     half: 24.0,
-                    anm: None,
-                    modeled: false,
+                    anm,
+                    modeled,
                 });
                 continue;
             }
@@ -4790,6 +4815,28 @@ pub fn run() {
     }
 }
 
+/// The model an `ActorAnm` resolves to, shared by the actor view list and `root_view` so a
+/// body only counts as modelled when the archive and its morph are actually loaded.
+fn actor_model(app: &App, archive: &str) -> Option<&assets::ActorModel> {
+    if archive == sim::actor_anm::BA_ARCHIVE {
+        app.ba1_model.as_ref()
+    } else if archive == sim::actor_anm::CC_ARCHIVE {
+        app.chuchu_model.as_ref()
+    } else if archive == sim::actor_anm::AM_ARCHIVE {
+        app.armos_model.as_ref()
+    } else if archive == sim::actor_anm::FM_ARCHIVE {
+        app.floormaster_model.as_ref()
+    } else if archive == sim::actor_anm::AM2_ARCHIVE {
+        app.amos_knight_model.as_ref()
+    } else if archive == sim::actor_anm::BDK_ARCHIVE {
+        app.helmaroc_model.as_ref()
+    } else if archive == sim::actor_anm::FGANON_ARCHIVE {
+        app.phantom_ganon_model.as_ref()
+    } else {
+        app.actor_models.get(archive)
+    }
+}
+
 pub fn root_view(
     app: &App,
     _sched: &mut repose_core::runtime::Scheduler,
@@ -5226,23 +5273,7 @@ pub fn root_view(
             anms.0
                 .iter()
                 .filter_map(|anm| {
-                    let model = if anm.archive == sim::actor_anm::BA_ARCHIVE {
-                        app.ba1_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::CC_ARCHIVE {
-                        app.chuchu_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::AM_ARCHIVE {
-                        app.armos_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::FM_ARCHIVE {
-                        app.floormaster_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::AM2_ARCHIVE {
-                        app.amos_knight_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::BDK_ARCHIVE {
-                        app.helmaroc_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::FGANON_ARCHIVE {
-                        app.phantom_ganon_model.as_ref()
-                    } else {
-                        app.actor_models.get(anm.archive)
-                    }?;
+                    let model = actor_model(app, anm.archive)?;
                     // A negative bck is the static-pose sentinel for bodies with no animation
                     // (`NpcDraw::anim == None` draws the bind pose).
                     let anim = if anm.bck < 0 {
