@@ -291,6 +291,7 @@ pub mod ohatch;
 pub mod ojtree;
 pub mod omensmk;
 pub mod otble;
+pub mod part_btk;
 pub mod particle;
 pub mod pause;
 pub mod pbco;
@@ -1766,6 +1767,7 @@ pub fn build(
     sim.world.insert_resource(health::Magic::default());
     sim.world
         .insert_resource(magic_armor::MagicArmor::default());
+    sim.world.insert_resource(part_btk::PartBtk::default());
     sim.world.insert_resource(guard::Guard::default());
     sim.world.insert_resource(deku_leaf::Fan::default());
     sim.world.insert_resource(spin::Spin::default());
@@ -2419,6 +2421,7 @@ pub fn build(
                         guard::control.in_set(WwSimSet::Execute),
                         // Publishes `Health::no_damage` before any actor damage system runs.
                         magic_armor::control.in_set(WwSimSet::Execute),
+                        part_btk::control.in_set(WwSimSet::Execute),
                         jump::control.in_set(WwSimSet::Execute),
                         roll::control.in_set(WwSimSet::Execute),
                         hop::control.in_set(WwSimSet::Execute),

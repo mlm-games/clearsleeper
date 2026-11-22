@@ -93,6 +93,9 @@ pub struct AttachedPart<'a> {
     /// (`tww/src/d/actor/d_a_player_main.cpp:1222-1254`,
     /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3141-3169`).
     pub color: Option<(u16, [f32; 3])>,
+    /// A material slot and texture matrix from a BTK, applied to that material's UVs
+    /// (`tww/src/d/actor/d_a_player_main.cpp:1261-1268,1283-1294`).
+    pub uv: Option<(u16, crate::j3d::btk::UvMatrix)>,
 }
 
 impl<'a> AttachedPart<'a> {
@@ -104,6 +107,7 @@ impl<'a> AttachedPart<'a> {
             local: Mat4::IDENTITY,
             sway: 0.0,
             color: None,
+            uv: None,
         }
     }
 
@@ -116,6 +120,7 @@ impl<'a> AttachedPart<'a> {
                 * Mat4::from_rotation_z(-std::f32::consts::FRAC_PI_2),
             sway: 0.0,
             color: None,
+            uv: None,
         }
     }
 
@@ -131,6 +136,7 @@ impl<'a> AttachedPart<'a> {
                 * Mat4::from_rotation_z(-0x1C71 as f32 * std::f32::consts::TAU / 65536.0),
             sway: 0.0,
             color: None,
+            uv: None,
         }
     }
 }
@@ -591,6 +597,7 @@ pub fn build_frame_with_actor(
                     body,
                     &locals,
                     part.color,
+                    part.uv,
                 ) {
                     frame.push(group);
                 }
@@ -788,6 +795,35 @@ fn tinted(group: &RoomGroup, tint: Option<(u16, [f32; 3])>) -> Vec<[f32; 3]> {
         .collect()
 }
 
+fn btk_uvs(
+    part: &RoomMesh,
+    group: &RoomGroup,
+    anim: Option<(u16, crate::j3d::btk::UvMatrix)>,
+) -> Vec<[f32; 2]> {
+    let Some((slot, matrix)) = anim.filter(|(slot, _)| group.material == Some(*slot)) else {
+        return group.uvs.clone();
+    };
+    let placement = group
+        .texture_page
+        .and_then(|page| part.uv_placements.get(page as usize));
+    group
+        .uvs
+        .iter()
+        .map(|uv| {
+            let (u, v) = match placement {
+                Some(p) => (uv[0] / p[0] + p[2], uv[1] / p[1] + p[3]),
+                None => (uv[0], uv[1]),
+            };
+            let mapped_u = matrix.a * u + matrix.b * v + matrix.tx;
+            let mapped_v = matrix.c * u + matrix.d * v + matrix.ty;
+            match placement {
+                Some(p) => [(mapped_u - p[2]) * p[0], (mapped_v - p[3]) * p[1]],
+                None => [mapped_u, mapped_v],
+            }
+        })
+        .collect()
+}
+
 fn attached_groups(
     part: &RoomMesh,
     snapshot: &SceneSnapshot,
@@ -796,6 +832,7 @@ fn attached_groups(
     body: Mat4,
     locals: &[Mat4],
     tint: Option<(u16, [f32; 3])>,
+    uv_anim: Option<(u16, crate::j3d::btk::UvMatrix)>,
 ) -> Vec<MeshGroup> {
     if locals.len() != part.joints.len() {
         return Vec::new();
@@ -827,8 +864,8 @@ fn attached_groups(
             let mesh = SkinnedMesh {
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),
-                uvs: group.uvs.clone(),
                 colors: tinted(group, tint),
+                uvs: btk_uvs(part, group, uv_anim),
                 indices,
                 joints: group.joint_indices.clone(),
                 weights: group.joint_weights.clone(),
@@ -887,7 +924,7 @@ fn attached_groups(
             positions,
             colors: tinted(group, tint),
             normals,
-            uvs: group.uvs.clone(),
+            uvs: btk_uvs(part, group, uv_anim),
             indices,
             texture_page: actor_page(group, pages, page_base),
             alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),

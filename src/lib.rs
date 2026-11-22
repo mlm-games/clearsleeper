@@ -94,6 +94,8 @@ pub struct PartAnims {
     pub leaf_open: Option<j3d::bck::Morph>,
     pub hammer: Option<j3d::bck::Morph>,
     pub grip_brk: Option<j3d::brk::TevRegKey>,
+    pub grip_btk: Option<j3d::btk::TextureAnimation>,
+    pub shield_btk: Option<j3d::btk::TextureAnimation>,
 }
 
 pub struct App {
@@ -465,6 +467,15 @@ impl App {
             // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3141-3169`).
             if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x56)) {
                 app.part_anims.grip_brk = j3d::brk::parse(&raw).ok();
+            }
+            // The grip's wing scroll and the mirror shield's face scroll
+            // (`tww/src/d/actor/d_a_player_main.cpp:1261-1268,1283-1294`,
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3167-3169,3191-3201`).
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x67)) {
+                app.part_anims.grip_btk = j3d::btk::parse(&raw).ok();
+            }
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x66)) {
+                app.part_anims.shield_btk = j3d::btk::parse(&raw).ok();
             }
         }
         if let (Ok(anms), Some(model)) = (
@@ -4163,6 +4174,18 @@ pub fn root_view(
     } else {
         None
     };
+    // Texture-scroll matrices for the grip and mirror shield, keyed to their material slots
+    // (`tww/src/d/actor/d_a_player_main.cpp:1261-1268,1283-1294`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3167-3169,3191-3201`).
+    let part_btk = app.sim.world.get_resource::<sim::part_btk::PartBtk>();
+    let grip_uv = app.part_anims.grip_btk.as_ref().and_then(|anim| {
+        let track = anim.track("SWGripMSBMAT", 0)?;
+        Some((0u16, anim.uv_transform(track, part_btk?.grip)?))
+    });
+    let shield_uv = app.part_anims.shield_btk.as_ref().and_then(|anim| {
+        let track = anim.track("SHMSBMAT", 0)?;
+        Some((1u16, anim.uv_transform(track, part_btk?.shield)?))
+    });
     // The shield bck follows the under-body frame while guarding, frame 0 at rest
     // (`tww/src/d/actor/d_a_player_main.cpp:1341,6469-6471`,
     // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3259-3260`).
@@ -4220,6 +4243,7 @@ pub fn root_view(
                     part.anim = Some((morph, grip_frame));
                 }
                 part.color = grip_tint.map(|tint| (0, tint));
+                part.uv = grip_uv;
                 held.push(part);
             }
         }
@@ -4245,6 +4269,7 @@ pub fn root_view(
                     };
                     part.anim = shield_anim;
                     part.sway = shield_sway;
+                    part.uv = shield_uv;
                     held.push(part);
                 }
             }
