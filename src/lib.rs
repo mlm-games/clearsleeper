@@ -181,6 +181,8 @@ pub struct App {
     pub armos_model: Option<assets::ActorModel>,
     pub floormaster_model: Option<assets::ActorModel>,
     pub amos_knight_model: Option<assets::ActorModel>,
+    pub helmaroc_model: Option<assets::ActorModel>,
+    pub phantom_ganon_model: Option<assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
     pub weather_texture: Option<(Vec<u8>, u32, u32)>,
@@ -373,6 +375,8 @@ impl App {
             armos_model: None,
             floormaster_model: None,
             amos_knight_model: None,
+            helmaroc_model: None,
+            phantom_ganon_model: None,
             blur_texture: None,
             weather_texture: None,
             bottle_liquid_model: None,
@@ -507,6 +511,8 @@ impl App {
         app.armos_model = assets::load_armos_model();
         app.floormaster_model = assets::load_floormaster_model();
         app.amos_knight_model = assets::load_amos_knight_model();
+        app.helmaroc_model = assets::load_helmaroc_model();
+        app.phantom_ganon_model = assets::load_phantom_ganon_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -4684,6 +4690,10 @@ pub fn root_view(
                         app.floormaster_model.as_ref()
                     } else if anm.archive == sim::actor_anm::AM2_ARCHIVE {
                         app.amos_knight_model.as_ref()
+                    } else if anm.archive == sim::actor_anm::OQ_ARCHIVE {
+                        app.helmaroc_model.as_ref()
+                    } else if anm.archive == sim::actor_anm::FGANON_ARCHIVE {
+                        app.phantom_ganon_model.as_ref()
                     } else {
                         None
                     }?;

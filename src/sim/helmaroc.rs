@@ -944,6 +944,9 @@ pub struct Helmaroc {
     pub speed_walk: f32,
     pub battle_mode: u8,
     pub morph: Frame,
+    /// The BCK `anm_init` last selected, published so the view can pose the model
+    /// (`tww/src/d/d_npc.cpp:546-563`).
+    pub curr_bck: i32,
     pub frame_count: i32,
     pub action: Action,
     pub state: i16,
@@ -1078,6 +1081,7 @@ impl Helmaroc {
         Self {
             battle_mode: 1,
             morph,
+            curr_bck: BCK_FLY1,
             frame_count: 0,
             action: Action::TFly,
             state: 0,
@@ -1225,6 +1229,7 @@ impl Helmaroc {
     }
 
     fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32, bas: i32, param7: u8) {
+        self.curr_bck = bck;
         if param7 == 0 {
             self.resume_bck = bck;
             self.resume_bas = bas;

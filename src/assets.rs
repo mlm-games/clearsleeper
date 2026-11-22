@@ -315,6 +315,16 @@ pub const FM_MODEL_ID: u16 = 0x15;
 pub const AM2_ARCHIVE: &str = "AM2";
 pub const AM2_OBJECT_ARCHIVE: &str = "files/res/Object/Am2.arc";
 pub const AM2_MODEL_ID: u16 = 0x12;
+/// Helmaroc's `OQ_BMD_OQ` body (id 0x1A) and the port's BCK id range 0x1C..=0x42 in `Oq.arc`
+/// (the port follows the HD id table; `tww/assets/GZLE01/res/Object/Oq.h:29`).
+pub const OQ_ARCHIVE: &str = "Oq";
+pub const OQ_OBJECT_ARCHIVE: &str = "files/res/Object/Oq.arc";
+pub const OQ_MODEL_ID: u16 = 0x1A;
+/// Phantom Ganon's `FGANON_BDL_BPG` body (id 0x1A) and BCK ids 0x6..=0x16 in `Fganon.arc`
+/// (`tww/assets/GZLE01/res/Object/Fganon.h:11-30`).
+pub const FGANON_ARCHIVE: &str = "Fganon";
+pub const FGANON_OBJECT_ARCHIVE: &str = "files/res/Object/Fganon.arc";
+pub const FGANON_MODEL_ID: u16 = 0x1A;
 
 pub fn load_chuchu_model() -> Option<ActorModel> {
     let archive = load_object_archive(CC_ARCHIVE)?;
@@ -322,6 +332,40 @@ pub fn load_chuchu_model() -> Option<ActorModel> {
     let anms = AnmArchive::open(CC_OBJECT_ARCHIVE).ok()?;
     let mut morphs = Vec::new();
     for id in 0x14..=0x22u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
+
+pub fn load_helmaroc_model() -> Option<ActorModel> {
+    let archive = load_object_archive(OQ_ARCHIVE)?;
+    let mesh = object_model(&archive, OQ_MODEL_ID)?;
+    let anms = AnmArchive::open(OQ_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x1C..=0x42u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
+
+pub fn load_phantom_ganon_model() -> Option<ActorModel> {
+    let archive = load_object_archive(FGANON_ARCHIVE)?;
+    let mesh = object_model(&archive, FGANON_MODEL_ID)?;
+    let anms = AnmArchive::open(FGANON_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x6..=0x16u16 {
         if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
             morphs.push((id as i32, morph));
         }

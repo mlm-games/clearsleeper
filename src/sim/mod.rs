@@ -2375,6 +2375,8 @@ pub fn build(
                         actor_anm::armos.in_set(WwSimSet::Execute),
                         actor_anm::floormaster.in_set(WwSimSet::Execute),
                         actor_anm::amos_knight.in_set(WwSimSet::Execute),
+                        actor_anm::helmaroc.in_set(WwSimSet::Execute),
+                        actor_anm::phantom_ganon.in_set(WwSimSet::Execute),
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )

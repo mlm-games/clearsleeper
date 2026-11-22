@@ -614,6 +614,9 @@ pub struct PhantomGanon {
     pub action: i16,
     pub mode: i16,
     pub morph: Frame,
+    /// The BCK `anm_init` last selected, published so the view can pose the model
+    /// (`tww/src/d/d_npc.cpp:546-563`).
+    pub curr_bck: i32,
     pub home_pos: Vec3,
     pub home_angle: i16,
     pub old_pos: Vec3,
@@ -721,6 +724,7 @@ impl PhantomGanon {
             action: ACTION_STANDBY,
             mode: 0,
             morph,
+            curr_bck: BCK_WAIT1,
             home_pos: Vec3::ZERO,
             home_angle: 0,
             old_pos: Vec3::ZERO,
@@ -865,6 +869,7 @@ impl PhantomGanon {
     }
 
     fn anm_init(&mut self, bck: i32, morf: f32, loop_mode: u8, speed: f32) {
+        self.curr_bck = bck;
         self.morph.init(frame_max(bck));
         self.morph.attribute = loop_mode;
         self.morph.rate = speed;

@@ -35,6 +35,8 @@ pub const CC_ARCHIVE: &str = crate::assets::CC_ARCHIVE;
 pub const AM_ARCHIVE: &str = crate::assets::AM_ARCHIVE;
 pub const FM_ARCHIVE: &str = crate::assets::FM_ARCHIVE;
 pub const AM2_ARCHIVE: &str = crate::assets::AM2_ARCHIVE;
+pub const OQ_ARCHIVE: &str = crate::assets::OQ_ARCHIVE;
+pub const FGANON_ARCHIVE: &str = crate::assets::FGANON_ARCHIVE;
 
 /// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
 pub fn clear(mut anms: ResMut<ActorAnms>) {
@@ -63,6 +65,43 @@ pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
             bck,
             frame: grandma.morf_frame,
             looping: grandma.morf.attribute() == Mode::Loop,
+        });
+    }
+}
+
+/// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
+pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
+    for (entity, bird) in &birds {
+        let bck = bird.curr_bck;
+        if !(0x1C..=0x42).contains(&bck) {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: OQ_ARCHIVE,
+            bck,
+            frame: bird.morph.frame,
+            looping: bird.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
+        });
+    }
+}
+
+/// Phantom Ganon's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_fganon.cpp:56-63`).
+pub fn phantom_ganon(
+    ganons: Query<(Entity, &super::phantom_ganon::PhantomGanon)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, ganon) in &ganons {
+        let bck = ganon.curr_bck;
+        if !(0x6..=0x16).contains(&bck) {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: FGANON_ARCHIVE,
+            bck,
+            frame: ganon.morph.frame,
+            looping: ganon.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
         });
     }
 }
