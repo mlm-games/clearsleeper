@@ -68,6 +68,17 @@ pub mod view;
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
 pub const SIM_HZ: f64 = 30.0;
 
+/// BCK poses for the held parts. The blade bcks come from `LkAnm.arc` and are sampled at the
+/// body cut's frame; the grip/shield bcks come from `Link.arc` (`tww/src/d/actor/d_a_player_main.cpp:11939-11950`,
+/// HD `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3424-3439`).
+#[derive(Default)]
+pub struct PartAnims {
+    pub blade: Option<j3d::bck::Morph>,
+    pub master_blade: Option<j3d::bck::Morph>,
+    pub grip: Option<j3d::bck::Morph>,
+    pub shield: Option<j3d::bck::Morph>,
+}
+
 pub struct App {
     pub sim: Sim,
     pub cam: Signal<OrbitCamera>,
@@ -88,6 +99,7 @@ pub struct App {
     pub mirror_shield_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
+    pub part_anims: PartAnims,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
     /// are its own, so it is presented alone rather than mixed into a room.
     dff: Option<j3d::present::Presented>,
@@ -256,6 +268,7 @@ impl App {
             shield_model: None,
             mirror_shield_model: None,
             player_anim: None,
+            part_anims: PartAnims::default(),
             dff: None,
             menu: menus::Menu::new(),
             stage: None,
@@ -355,6 +368,39 @@ impl App {
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
+        }
+        // Part-local BCK poses. Blade bcks (LkAnm.arc) are keyed to the blade model's own joint
+        // tree (tww/src/d/actor/d_a_player_sword.inc:60-67); the grip and shield bcks are entries
+        // in Link.arc (tww/src/d/actor/d_a_player_main.cpp:11939-11950).
+        if let (Ok(anms), Some(model)) = (
+            assets::AnmArchive::open(assets::LINK_ANM_ARCHIVE),
+            app.sword_model.as_ref(),
+        ) {
+            app.part_anims.blade = anms.morph(
+                assets::AnmRef::Entry("bcks/cutaa.bck"),
+                &model.joint_parents,
+            );
+        }
+        if let (Ok(anms), Some(model)) = (
+            assets::AnmArchive::open(assets::LINK_ANM_ARCHIVE),
+            app.master_sword_model.as_ref(),
+        ) {
+            app.part_anims.master_blade = anms.morph(
+                assets::AnmRef::Entry("bcks/cutams.bck"),
+                &model.joint_parents,
+            );
+        }
+        if let (Ok(anms), Some(model)) = (
+            assets::AnmArchive::open("files/res/Object/Link.arc"),
+            app.master_grip_model.as_ref(),
+        ) {
+            app.part_anims.grip = anms.morph(assets::AnmRef::Id(0x0F), &model.joint_parents);
+        }
+        if let (Ok(anms), Some(model)) = (
+            assets::AnmArchive::open("files/res/Object/Link.arc"),
+            app.shield_model.as_ref(),
+        ) {
+            app.part_anims.shield = anms.morph(assets::AnmRef::Id(0x0A), &model.joint_parents);
         }
         app.reset_world();
         app.sync_title_actor();
@@ -1513,6 +1559,24 @@ impl App {
                     shield: sim::inventory::shield(collect),
                 }
             },
+            // The shield sits in hand while wielding the sword or guarding, otherwise on the back
+            // (`tww/src/d/actor/d_a_player_main.cpp:1301-1319`,
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3206-3234`).
+            shield_on_back: !self
+                .sim
+                .world
+                .get_resource::<sim::combat::Combat>()
+                .is_some_and(|combat| combat.active)
+                && !self
+                    .sim
+                    .world
+                    .get_resource::<sim::guard::Guard>()
+                    .is_some_and(|guard| guard.raised)
+                && !self
+                    .sim
+                    .world
+                    .get_resource::<sim::link_proc::LinkProc>()
+                    .is_some_and(|proc| proc.current == sim::link_proc::Proc::GuardCrash),
             bounds_min: area.bounds_min,
             bounds_max: area.bounds_max,
             ground_y,
@@ -3933,61 +3997,103 @@ pub fn root_view(
         camera = app.fallback_camera(&snapshot);
     }
     // The held sword/grip/shield follow `getSelectEquip(0/1)` (tww/src/d/actor/d_a_player_main.cpp:1945-1964).
-    // The blade/grip use the left hand, the shield the right. A missing model or NO_ITEM
-    // simply contributes nothing.
-    let lhand = app
-        .actor_model
-        .as_ref()
-        .map_or(8, |m| m.find_node_id(b"cl_LhandA").unwrap_or(8) as usize);
-    let rhand = app
-        .actor_model
-        .as_ref()
-        .map_or(12, |m| m.find_node_id(b"cl_RhandA").unwrap_or(12) as usize);
+    // The blade/grip use the left hand, the shield the right or the back. A missing model or
+    // NO_ITEM simply contributes nothing.
+    let body_node = |name: &[u8], fallback: usize| {
+        app.actor_model.as_ref().map_or(fallback, |m| {
+            m.find_node_id(name).unwrap_or(fallback as u16) as usize
+        })
+    };
+    let lhand = body_node(b"cl_LhandA", 8);
+    let rhand = body_node(b"cl_RhandA", 12);
+    let poda = body_node(b"cl_podA", 13);
+    // The blade bck is sampled at the body cut frame during a cut, and at frame 0 at rest
+    // (`tww/src/d/actor/d_a_player_main.cpp:5877`, HD equivalent resets m35EC to 0).
+    let is_cut = matches!(
+        snapshot.player_anm.map(|anm| anm.stem),
+        Some("cuta" | "cutf" | "cutr" | "cutl" | "cutea" | "cuteb" | "cutturnb")
+    );
+    let blade_frame = if is_cut {
+        snapshot.player_anm.map_or(0.0, |anm| anm.frame)
+    } else {
+        0.0
+    };
+    // The master grip's wing bck takes frame 1 for the final two sword tiers
+    // (`tww/src/d/actor/d_a_player_main.cpp:1243-1248`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3153-3159`).
+    let grip_frame = if matches!(
+        snapshot.equipment.sword,
+        sim::damage::MASTER_SWORD_2 | sim::damage::MASTER_SWORD_3
+    ) {
+        1.0
+    } else {
+        0.0
+    };
+    // The shield bck follows the under-body frame while guarding, frame 0 at rest
+    // (`tww/src/d/actor/d_a_player_main.cpp:1341,6469-6471`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3259-3260`).
+    let is_guard = matches!(
+        snapshot.player_anm.map(|anm| anm.stem),
+        Some("difence" | "difencea" | "atng")
+    );
+    let shield_frame = if is_guard {
+        snapshot.player_anm.map_or(0.0, |anm| anm.frame % 12.0)
+    } else {
+        0.0
+    };
     let mut held: Vec<view::AttachedPart<'_>> = Vec::new();
     if !snapshot.player_no_draw {
         let sword = snapshot.equipment.sword;
         if sword == sim::damage::ITEM_SWORD {
-            if let Some(model) = app.sword_model.as_ref() {
-                held.push(view::AttachedPart {
-                    mesh: model,
-                    body_joint: lhand,
-                });
+            if let (Some(model), Some(morph)) =
+                (app.sword_model.as_ref(), app.part_anims.blade.as_ref())
+            {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                part.anim = Some((morph, blade_frame));
+                held.push(part);
             }
             if let Some(model) = app.sword_grip_model.as_ref() {
-                held.push(view::AttachedPart {
-                    mesh: model,
-                    body_joint: lhand,
-                });
+                held.push(view::AttachedPart::hand(model, lhand));
             }
         } else if sword != sim::inventory::NO_ITEM {
-            if let Some(model) = app.master_sword_model.as_ref() {
-                held.push(view::AttachedPart {
-                    mesh: model,
-                    body_joint: lhand,
-                });
+            if let (Some(model), Some(morph)) = (
+                app.master_sword_model.as_ref(),
+                app.part_anims.master_blade.as_ref(),
+            ) {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                part.anim = Some((morph, blade_frame));
+                held.push(part);
             }
-            if let Some(model) = app.master_grip_model.as_ref() {
-                held.push(view::AttachedPart {
-                    mesh: model,
-                    body_joint: lhand,
-                });
+            if let (Some(model), Some(morph)) =
+                (app.master_grip_model.as_ref(), app.part_anims.grip.as_ref())
+            {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                part.anim = Some((morph, grip_frame));
+                held.push(part);
             }
         }
+        let shield_anim = app.part_anims.shield.as_ref().map(|m| (m, shield_frame));
         match snapshot.equipment.shield {
             sim::inventory::ITEM_SHIELD => {
                 if let Some(model) = app.shield_model.as_ref() {
-                    held.push(view::AttachedPart {
-                        mesh: model,
-                        body_joint: rhand,
-                    });
+                    let mut part = if snapshot.shield_on_back {
+                        view::AttachedPart::back(model, poda, false)
+                    } else {
+                        view::AttachedPart::hand(model, rhand)
+                    };
+                    part.anim = shield_anim;
+                    held.push(part);
                 }
             }
             sim::inventory::ITEM_MIRROR_SHIELD => {
                 if let Some(model) = app.mirror_shield_model.as_ref() {
-                    held.push(view::AttachedPart {
-                        mesh: model,
-                        body_joint: rhand,
-                    });
+                    let mut part = if snapshot.shield_on_back {
+                        view::AttachedPart::back(model, poda, true)
+                    } else {
+                        view::AttachedPart::hand(model, rhand)
+                    };
+                    part.anim = shield_anim;
+                    held.push(part);
                 }
             }
             _ => {}

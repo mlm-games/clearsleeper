@@ -79,6 +79,33 @@ pub struct PlayerEquipment {
 pub struct AttachedPart<'a> {
     pub mesh: &'a RoomMesh,
     pub body_joint: usize,
+    /// A part-local BCK pose and the frame to sample it at. `None` uses the model's bind pose.
+    pub anim: Option<(&'a crate::j3d::bck::Morph, f32)>,
+    /// Joint-local offset applied before the body joint matrix: the back-mount transform for a
+    /// shield that is not being wielded (`tww/src/d/actor/d_a_player_main.cpp:1312-1319`,
+    /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3231-3234`).
+    pub local: Mat4,
+}
+
+impl<'a> AttachedPart<'a> {
+    pub fn hand(mesh: &'a RoomMesh, body_joint: usize) -> Self {
+        Self {
+            mesh,
+            body_joint,
+            anim: None,
+            local: Mat4::IDENTITY,
+        }
+    }
+
+    pub fn back(mesh: &'a RoomMesh, body_joint: usize, mirror: bool) -> Self {
+        Self {
+            mesh,
+            body_joint,
+            anim: None,
+            local: Mat4::from_translation(Vec3::new(15.5, 4.75, if mirror { -0.2 } else { 0.0 }))
+                * Mat4::from_rotation_z(-std::f32::consts::FRAC_PI_2),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +119,9 @@ pub struct SceneSnapshot {
     /// `dCamAttnStts_SUBJECT_e` ([`crate::sim::camera::Camera::publish_attention`]).
     pub player_no_draw: bool,
     pub equipment: PlayerEquipment,
+    /// Whether the shield sits on the back (`podA`) rather than the hand: retail places it in
+    /// hand while wielding the sword or guarding (tww `d_a_player_main.cpp:1301-1319`).
+    pub shield_on_back: bool,
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
     pub ground_y: f32,
@@ -491,7 +521,18 @@ pub fn build_frame_with_actor(
                 });
             }
             if let Some(body) = pose.get(part.body_joint).copied() {
-                for group in attached_groups(part.mesh, snapshot, held_page, &part_pages, body) {
+                let locals: Vec<Mat4> = part.anim.map_or_else(
+                    || part.mesh.joint_matrices.clone(),
+                    |(m, f)| m.joint_matrices(f),
+                );
+                for group in attached_groups(
+                    part.mesh,
+                    snapshot,
+                    held_page,
+                    &part_pages,
+                    body * part.local,
+                    &locals,
+                ) {
                     frame.push(group);
                 }
             }
@@ -643,8 +684,9 @@ fn attached_groups(
     page_base: u32,
     pages: &[u32],
     body: Mat4,
+    locals: &[Mat4],
 ) -> Vec<MeshGroup> {
-    if part.joint_matrices.len() != part.joints.len() {
+    if locals.len() != part.joints.len() {
         return Vec::new();
     }
     let origin = Vec3::new(
@@ -654,11 +696,7 @@ fn attached_groups(
     );
     let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
     let base = to_world * body;
-    let part_pose: Vec<Mat4> = part
-        .joint_matrices
-        .iter()
-        .map(|bind| base * *bind)
-        .collect();
+    let part_pose: Vec<Mat4> = locals.iter().map(|local| base * *local).collect();
     let inverse_bind: Vec<Mat4> = if part.inverse_bind.len() == part.joint_matrices.len() {
         part.inverse_bind.clone()
     } else {

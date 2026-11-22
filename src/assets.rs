@@ -373,7 +373,7 @@ pub fn load_event_list(stage: &str) -> Option<crate::sim::event::EventList> {
     }
 }
 
-const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
+pub const LINK_ANM_ARCHIVE: &str = "files/res/Object/LkAnm.arc";
 /// `mAnmDataTable[ANM_WAITS]` (`d_a_player_main_data.inc:1031-1037`): the standing pose is the
 /// `WAITS` lower body under the `WAIT` upper body. [`PlayerIdle`] applies the second one only to
 /// the `BODY_CHN` subtree, which is the calc split at `d_a_player_main.cpp:11574-11576`.
