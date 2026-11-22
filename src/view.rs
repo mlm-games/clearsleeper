@@ -4,6 +4,7 @@ use repame_view3d::{
     SkinnedMesh,
 };
 
+use crate::assets::WeatherPage;
 use crate::j3d::bdl::{LAYER_SIZE, RoomGroup, RoomMesh, SKIN_INFLUENCES};
 
 pub const LINK_ARCHIVE: &str = "Link";
@@ -229,8 +230,8 @@ pub struct BillboardView {
     pub color: Rgb,
     pub alpha: f32,
     pub roll: f32,
-    /// Index into `App::weather_textures`; stars and flare rays are untextured.
-    pub page: usize,
+    /// Page of `App::weather_textures`; stars and flare rays are untextured.
+    pub page: WeatherPage,
     pub textured: bool,
     pub depth_test: bool,
 }
@@ -242,7 +243,7 @@ pub struct OrientedWeatherView {
     pub corners: [[f32; 3]; 4],
     pub color: Rgb,
     pub alpha: f32,
-    pub page: usize,
+    pub page: WeatherPage,
     pub textured: bool,
     pub depth_test: bool,
 }
@@ -852,7 +853,7 @@ pub fn build_frame_with_actor(
             let d = board.pos - axis_u * board.half.x + axis_v * board.half.y;
             let mut group = MeshGroup {
                 alpha: board.alpha,
-                texture_page: weather_base + board.page as u32,
+                texture_page: weather_base + board.page.index() as u32,
                 transparent: true,
                 depth_test: board.depth_test,
                 cull_mode: CullMode::None,
@@ -881,7 +882,7 @@ pub fn build_frame_with_actor(
         for quad in &snapshot.oriented_weather {
             let mut group = MeshGroup {
                 alpha: quad.alpha,
-                texture_page: weather_base + quad.page as u32,
+                texture_page: weather_base + quad.page.index() as u32,
                 transparent: true,
                 depth_test: quad.depth_test,
                 cull_mode: CullMode::None,

@@ -35,7 +35,7 @@ pub const CC_ARCHIVE: &str = crate::assets::CC_ARCHIVE;
 pub const AM_ARCHIVE: &str = crate::assets::AM_ARCHIVE;
 pub const FM_ARCHIVE: &str = crate::assets::FM_ARCHIVE;
 pub const AM2_ARCHIVE: &str = crate::assets::AM2_ARCHIVE;
-pub const OQ_ARCHIVE: &str = crate::assets::OQ_ARCHIVE;
+pub const BDK_ARCHIVE: &str = crate::assets::BDK_ARCHIVE;
 pub const FGANON_ARCHIVE: &str = crate::assets::FGANON_ARCHIVE;
 
 /// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
@@ -426,7 +426,8 @@ publish_actor!(
     0x11
 );
 
-/// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
+/// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_bdk.cpp:214`; HD
+/// `wwhd/wwhd_src/d/actor/d_a_bdk.cpp:212-219`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
     for (entity, bird) in &birds {
         let bck = bird.curr_bck;
@@ -435,7 +436,7 @@ pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: Re
         }
         anms.0.push(ActorAnm {
             entity,
-            archive: OQ_ARCHIVE,
+            archive: BDK_ARCHIVE,
             bck,
             frame: bird.morph.frame,
             looping: bird.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
@@ -537,3 +538,138 @@ pub fn chuchu(chuchus: Query<(Entity, &super::chuchu::Chuchu)>, mut anms: ResMut
         });
     }
 }
+
+/// Molgera's `mDoExt_McaMorf` clip and cursor (`tww/src/d/actor/d_a_bwd.cpp:139-147`;
+/// `wwhd/wwhd_src/d/actor/d_a_bwd.cpp:101-113`); the ids are
+/// `tww/assets/GZLE01/res/Object/Bwd.h:62-78`.
+pub fn molgera(bosses: Query<(Entity, &super::molgera::Molgera)>, mut anms: ResMut<ActorAnms>) {
+    use super::molgera::Clip;
+    for (entity, boss) in &bosses {
+        let bck = match boss.clip {
+            Clip::Attack => 0x7,
+            Clip::AttackEat => 0x8,
+            Clip::AttackShippai => 0x9,
+            Clip::Dead1 => 0xC,
+            Clip::Dead2 => 0xD,
+            Clip::Dead3 => 0xE,
+            Clip::Fly => 0xF,
+            Clip::Jattack1 => 0x10,
+            Clip::Jattack2 => 0x11,
+            Clip::Jattack3 => 0x12,
+            Clip::Wait => 0x17,
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: "Bwd",
+            bck,
+            frame: boss.frame,
+            looping: boss.looping,
+        });
+    }
+}
+
+/// Tetra's arc name is chosen per type (sleeping `"Zl2"`, awake `"Zl"`;
+/// `tww/src/d/actor/d_a_npc_zl1.cpp:1330-1337`). `_draw` returns early for the demo flags
+/// (`:2654`), so those instances have no body to pose.
+pub fn tetra(girls: Query<(Entity, &super::zelda::Zelda)>, mut anms: ResMut<ActorAnms>) {
+    for (entity, zelda) in &girls {
+        if zelda.hidden_demo || zelda.draw_off {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: zelda.arc,
+            bck: 0x0,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+/// The remaining actors publish the bind pose of their wait BCK: the sim stores no frame
+/// cursor for them, but a posed body is still closer than the box fallback. The ids come from
+/// `tww/assets/GZLE01/res/Object/Sss.h:21-24`, `tww/assets/GZLE01/res/Object/Bs.h:48`,
+/// `tww/assets/GZLE01/res/Object/Ac.h:48`, `tww/assets/GZLE01/res/Object/Co.h:71`,
+/// `tww/assets/GZLE01/res/Object/Uk.h:53`, `tww/assets/GZLE01/res/Object/Gp.h:34`,
+/// `tww/assets/GZLE01/res/Object/Pf.h:36` and `tww/assets/GZLE01/res/Object/Always.h:137,155`
+/// (`tww/src/d/actor/d_a_npc_fa1.cpp:951-955`).
+publish_actor!(
+    dexivine,
+    super::sss::Sss,
+    "Sss",
+    |c: &super::sss::Sss| if c.anm == 0 { 0x5 } else { 0x6 },
+    |_c: &super::sss::Sss| 0.0,
+    |_c: &super::sss::Sss| false,
+    0x5,
+    0x6
+);
+publish_actor!(
+    beedle,
+    super::shop::Shop,
+    "Bs",
+    |_c: &super::shop::Shop| 0x0,
+    |_c: &super::shop::Shop| 0.0,
+    |_c: &super::shop::Shop| false,
+    0x0,
+    0x10
+);
+publish_actor!(
+    komali,
+    super::npc_ac1::NpcAc1,
+    "Ac",
+    |_c: &super::npc_ac1::NpcAc1| 0x0,
+    |_c: &super::npc_ac1::NpcAc1| 0.0,
+    |_c: &super::npc_ac1::NpcAc1| false,
+    0x0,
+    0xE
+);
+publish_actor!(
+    komali_young,
+    super::npc_co1::NpcCo1,
+    "Co",
+    |_c: &super::npc_co1::NpcCo1| 0x0,
+    |_c: &super::npc_co1::NpcCo1| 0.0,
+    |_c: &super::npc_co1::NpcCo1| false,
+    0x0,
+    0x1D
+);
+publish_actor!(
+    roberto,
+    super::npc_uk::NpcUk,
+    "Uk",
+    |_c: &super::npc_uk::NpcUk| 0x7,
+    |_c: &super::npc_uk::NpcUk| 0.0,
+    |_c: &super::npc_uk::NpcUk| false,
+    0x7,
+    0x11
+);
+publish_actor!(
+    gp1,
+    super::npc_gp1::NpcGp1,
+    "Gp",
+    |_c: &super::npc_gp1::NpcGp1| 0x0,
+    |_c: &super::npc_gp1::NpcGp1| 0.0,
+    |_c: &super::npc_gp1::NpcGp1| false,
+    0x0,
+    0x8
+);
+publish_actor!(
+    pf1,
+    super::npc_pf1::NpcPf1,
+    "Pf",
+    |_c: &super::npc_pf1::NpcPf1| 0x0,
+    |_c: &super::npc_pf1::NpcPf1| 0.0,
+    |_c: &super::npc_pf1::NpcPf1| false,
+    0x0,
+    0x7
+);
+publish_actor!(
+    great_fairy,
+    super::npc_fa1::NpcFa1,
+    "Always",
+    |_c: &super::npc_fa1::NpcFa1| 0xC,
+    |_c: &super::npc_fa1::NpcFa1| 0.0,
+    |_c: &super::npc_fa1::NpcFa1| false,
+    0xC,
+    0xC
+);

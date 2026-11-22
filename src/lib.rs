@@ -2146,7 +2146,7 @@ impl App {
                 [1.0, 1.0, 1.0],
                 (drop.alpha * 14.0).clamp(0.0, 1.0),
                 0.0,
-                0,
+                assets::WeatherPage::Rain,
                 true,
                 true,
             ));
@@ -2166,7 +2166,7 @@ impl App {
                 [1.0, 1.0, 1.0],
                 120.0 / 255.0,
                 0.0,
-                0,
+                assets::WeatherPage::Rain,
                 true,
                 true,
             ));
@@ -2184,7 +2184,7 @@ impl App {
                 ],
                 alpha.clamp(0.0, 1.0),
                 0.0,
-                0,
+                assets::WeatherPage::Rain,
                 true,
                 true,
             ));
@@ -2202,9 +2202,9 @@ impl App {
                     continue;
                 }
                 let page = match index {
-                    1 => 2,
-                    2 => 1,
-                    _ => 0,
+                    1 => assets::WeatherPage::LenzB,
+                    2 => assets::WeatherPage::LenzA,
+                    _ => assets::WeatherPage::Rain,
                 };
                 let fade = if index >= 2 { lens.dist_falloff } else { 1.0 };
                 out.push(board(
@@ -2239,7 +2239,7 @@ impl App {
                 color,
                 1.0,
                 0.0,
-                0,
+                assets::WeatherPage::Rain,
                 false,
                 true,
             ));
@@ -2260,7 +2260,7 @@ impl App {
                 [229.0 / 255.0, 1.0, 200.0 / 255.0],
                 puff.alpha * housi.m5ddc,
                 0.0,
-                3,
+                assets::WeatherPage::Smoke,
                 true,
                 true,
             ));
@@ -2276,7 +2276,7 @@ impl App {
                 [95.0 / 255.0, 186.0 / 255.0, 226.0 / 255.0],
                 eff.alpha,
                 0.0,
-                4,
+                assets::WeatherPage::Poison,
                 true,
                 true,
             ));
@@ -2297,7 +2297,7 @@ impl App {
                 ],
                 cloud.alpha,
                 cloud.anim_counter as f32 * -0.02617994,
-                5,
+                assets::WeatherPage::CloudShadow,
                 true,
                 false,
             ));
@@ -2343,7 +2343,7 @@ impl App {
                     color: [180.0 / 255.0, 200.0 / 255.0, 220.0 / 255.0],
                     alpha: (weather.rain.sibuki_alpha / 255.0 * weather.rain.fwd_fade1)
                         .clamp(0.0, 1.0),
-                    page: 2,
+                    page: assets::WeatherPage::LenzB,
                     textured: true,
                     depth_test: true,
                 });
@@ -2377,7 +2377,7 @@ impl App {
                     ],
                     color: [0.12, 0.35, 0.45],
                     alpha: crest.alpha.clamp(0.0, 1.0),
-                    page: 0,
+                    page: assets::WeatherPage::Rain,
                     textured: true,
                     depth_test: true,
                 });
@@ -2420,7 +2420,7 @@ impl App {
                     ],
                     color: [0.85, 0.87, 0.92],
                     alpha: cloud.alpha.clamp(0.0, 1.0),
-                    page: 6 + index % 3,
+                    page: assets::WeatherPage::vrkumo(index % 3),
                     textured: true,
                     depth_test: false,
                 });
@@ -5236,7 +5236,7 @@ pub fn root_view(
                         app.floormaster_model.as_ref()
                     } else if anm.archive == sim::actor_anm::AM2_ARCHIVE {
                         app.amos_knight_model.as_ref()
-                    } else if anm.archive == sim::actor_anm::OQ_ARCHIVE {
+                    } else if anm.archive == sim::actor_anm::BDK_ARCHIVE {
                         app.helmaroc_model.as_ref()
                     } else if anm.archive == sim::actor_anm::FGANON_ARCHIVE {
                         app.phantom_ganon_model.as_ref()

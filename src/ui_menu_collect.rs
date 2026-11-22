@@ -7122,7 +7122,7 @@ impl AlbumHost {
                 }
             }
             STATE_CLOSED => {
-                if self.status == STATUS_MSG_DESTROYED {
+                if self.status == STATUS_BOX_CLOSED {
                     self.status = STATUS_MSG_DESTROYED;
                 }
             }

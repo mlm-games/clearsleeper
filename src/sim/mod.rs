@@ -2421,6 +2421,19 @@ pub fn build(
                     )
                         .chain(),
                     (
+                        actor_anm::molgera.in_set(WwSimSet::Execute),
+                        actor_anm::tetra.in_set(WwSimSet::Execute),
+                        actor_anm::dexivine.in_set(WwSimSet::Execute),
+                        actor_anm::beedle.in_set(WwSimSet::Execute),
+                        actor_anm::komali.in_set(WwSimSet::Execute),
+                        actor_anm::komali_young.in_set(WwSimSet::Execute),
+                        actor_anm::roberto.in_set(WwSimSet::Execute),
+                        actor_anm::gp1.in_set(WwSimSet::Execute),
+                        actor_anm::pf1.in_set(WwSimSet::Execute),
+                        actor_anm::great_fairy.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )

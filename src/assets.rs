@@ -315,11 +315,12 @@ pub const FM_MODEL_ID: u16 = 0x15;
 pub const AM2_ARCHIVE: &str = "AM2";
 pub const AM2_OBJECT_ARCHIVE: &str = "files/res/Object/Am2.arc";
 pub const AM2_MODEL_ID: u16 = 0x12;
-/// Helmaroc's `OQ_BMD_OQ` body (id 0x1A) and the port's BCK id range 0x1C..=0x42 in `Oq.arc`
-/// (the port follows the HD id table; `tww/assets/GZLE01/res/Object/Oq.h:29`).
-pub const OQ_ARCHIVE: &str = "Oq";
-pub const OQ_OBJECT_ARCHIVE: &str = "files/res/Object/Oq.arc";
-pub const OQ_MODEL_ID: u16 = 0x1A;
+/// Helmaroc King's `BDK_BDL_DK` body (id 0x4A) and BCK ids 0x1C..=0x42 in `Bdk.arc`
+/// (`tww/assets/GZLE01/res/Object/Bdk.h:114-152,159`; HD `wwhd_src/d/actor/d_a_bdk.cpp:217`).
+/// `Oq.arc` is the Octorok, not this boss.
+pub const BDK_ARCHIVE: &str = "Bdk";
+pub const BDK_OBJECT_ARCHIVE: &str = "files/res/Object/Bdk.arc";
+pub const BDK_MODEL_ID: u16 = 0x4A;
 /// Phantom Ganon's `FGANON_BDL_BPG` body (id 0x1A) and BCK ids 0x6..=0x16 in `Fganon.arc`
 /// (`tww/assets/GZLE01/res/Object/Fganon.h:11-30`).
 pub const FGANON_ARCHIVE: &str = "Fganon";
@@ -351,7 +352,7 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Btd", "files/res/Object/Btd.arc", 0x40, 0x8, 0x39),
     ("Bmd", "files/res/Object/Bmd.arc", 0x2B, 0x8, 0x25),
     ("Kamome", "files/res/Object/Kamome.arc", 0x17, 0xC, 0x14),
-    ("P1", "files/res/Object/P1.arc", 0x11, 0x1A, 0x29),
+    ("P1", "files/res/Object/P1.arc", 0x31, 0x1A, 0x29),
     ("Tc", "files/res/Object/Tc.arc", 0x19, 0x6, 0x16),
     ("Bgn", "files/res/Object/Bgn.arc", 0x13, 0x6, 0x10),
     ("Bwds", "files/res/Object/Bwds.arc", 0x8, 0x4, 0x5),
@@ -378,6 +379,24 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Rd", "files/res/Object/Rd.arc", 0x17, 0x6, 0x14),
     ("St", "files/res/Object/St.arc", 0x38, 0x4, 0x35),
     ("Bmdhand", "files/res/Object/Bmdhand.arc", 0x9, 0x5, 0x6),
+    // Molgera (`tww/assets/GZLE01/res/Object/Bwd.h:62-84`), Dexivine
+    // (`tww/assets/GZLE01/res/Object/Sss.h:21-24`), Beedle (`tww/assets/GZLE01/res/Object/Bs.h:48`),
+    // Komali (`tww/assets/GZLE01/res/Object/Ac.h:48`, `tww/assets/GZLE01/res/Object/Co.h:71`),
+    // the Roberto brothers (`tww/assets/GZLE01/res/Object/Uk.h:53`), Maggie's parents
+    // (`tww/assets/GZLE01/res/Object/Gp.h:34`, `tww/assets/GZLE01/res/Object/Pf.h:36`),
+    // Tetra (`tww/assets/GZLE01/res/Object/Zl.h:84`, `tww/assets/GZLE01/res/Object/Zl2.h:24`) and
+    // the Great Fairy (`tww/assets/GZLE01/res/Object/Always.h:155`).
+    ("Bwd", "files/res/Object/Bwd.arc", 0x1E, 0x7, 0x19),
+    ("Sss", "files/res/Object/Sss.arc", 0x9, 0x5, 0x6),
+    ("Bs", "files/res/Object/Bs.arc", 0x5, 0x0, 0x10),
+    ("Ac", "files/res/Object/Ac.arc", 0x5, 0x0, 0xE),
+    ("Co", "files/res/Object/Co.arc", 0x13, 0x0, 0x1D),
+    ("Uk", "files/res/Object/Uk.arc", 0x18, 0x7, 0x11),
+    ("Gp", "files/res/Object/Gp.arc", 0x6, 0x0, 0x8),
+    ("Pf", "files/res/Object/Pf.arc", 0x8, 0x0, 0x7),
+    ("Zl", "files/res/Object/Zl.arc", 0xF, 0x0, 0x2A),
+    ("Zl2", "files/res/Object/Zl2.arc", 0x1, 0x0, 0x0),
+    ("Always", "files/res/Object/Always.arc", 0x1F, 0xC, 0xC),
 ];
 
 /// All data-driven actor bodies, keyed by archive name.
@@ -416,9 +435,9 @@ pub fn load_actor_models() -> std::collections::HashMap<&'static str, ActorModel
 }
 
 pub fn load_helmaroc_model() -> Option<ActorModel> {
-    let archive = load_object_archive(OQ_ARCHIVE)?;
-    let mesh = object_model(&archive, OQ_MODEL_ID)?;
-    let anms = AnmArchive::open(OQ_OBJECT_ARCHIVE).ok()?;
+    let archive = load_object_archive(BDK_ARCHIVE)?;
+    let mesh = object_model(&archive, BDK_MODEL_ID)?;
+    let anms = AnmArchive::open(BDK_OBJECT_ARCHIVE).ok()?;
     let mut morphs = Vec::new();
     for id in 0x1C..=0x42u16 {
         if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
@@ -1241,15 +1260,53 @@ pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<StageSpawn> 
     }
 }
 
-/// Weather texture pages in `Always.arc`, in the order the draw passes consume them.
+/// Index into the weather texture array: the six `Always.arc` entries followed by three
+/// stage-archive cloud layers. Every producer and consumer uses this so the order cannot drift
+/// (`tww/src/d/d_kankyo_rain.cpp:3947`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum WeatherPage {
+    /// `Always.arc` 0x81 (`tx_snow01`): rain, snow, sun, stars and wave caps.
+    Rain = 0,
+    /// `Always.arc` 0x82: the second lens-flare layer.
+    LenzA = 1,
+    /// `Always.arc` 0x85: the first lens-flare layer and the sibuki splash.
+    LenzB = 2,
+    /// `Always.arc` 0x6D: housi smoke.
+    Smoke = 3,
+    /// `Always.arc` 0x6E: poison gas.
+    Poison = 4,
+    /// `Always.arc` 0x84: cloud shadows.
+    CloudShadow = 5,
+    Vrkumo0 = 6,
+    Vrkumo1 = 7,
+    Vrkumo2 = 8,
+}
+
+impl WeatherPage {
+    pub const COUNT: usize = Self::Vrkumo2 as usize + 1;
+
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+
+    pub const fn vrkumo(layer: usize) -> Self {
+        match layer {
+            0 => Self::Vrkumo0,
+            1 => Self::Vrkumo1,
+            _ => Self::Vrkumo2,
+        }
+    }
+}
+
 pub const WEATHER_IDS: [u16; 6] = [0x81, 0x82, 0x85, 0x6D, 0x6E, 0x84];
 
 pub fn load_weather_textures(stage: &str) -> Vec<Option<(Vec<u8>, u32, u32)>> {
     let Some(root) = AssetRoot::from_env().ok() else {
-        return vec![None; WEATHER_IDS.len() + 3];
+        return vec![None; WeatherPage::COUNT];
     };
     let Ok(archive) = root.read_archive(OBJECT_ALWAYS) else {
-        return vec![None; WEATHER_IDS.len() + 3];
+        return vec![None; WeatherPage::COUNT];
     };
     let mut pages = WEATHER_IDS
         .iter()
@@ -1286,7 +1343,7 @@ pub fn load_weather_textures(stage: &str) -> Vec<Option<(Vec<u8>, u32, u32)>> {
             pages.push(image);
         }
     } else {
-        pages.resize(WEATHER_IDS.len() + 3, None);
+        pages.resize(WeatherPage::COUNT, None);
     }
     pages
 }
