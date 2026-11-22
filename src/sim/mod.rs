@@ -2478,6 +2478,7 @@ pub fn build(
                             actor_anm::tornado_bodies.in_set(WwSimSet::Execute),
                             actor_anm::nh_bodies.in_set(WwSimSet::Execute),
                             actor_anm::syan_bodies.in_set(WwSimSet::Execute),
+                            actor_anm::pickup_bodies.in_set(WwSimSet::Execute),
                         )
                             .chain(),
                     )
