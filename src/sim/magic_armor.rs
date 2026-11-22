@@ -13,6 +13,7 @@ use super::inventory::{Equipped, check_get_item};
 pub struct MagicArmor {
     pub equipped: bool,
     pub drain: u32,
+    pressed: bool,
 }
 
 pub const ITEM_MAGIC_ARMOR: u8 = 0x2A;
@@ -43,7 +44,12 @@ pub fn control(
 ) {
     // The C button that selects the item in retail is the port's Z button; the C-button-to-item
     // map the port does not keep is why this is an explicit toggle instead of `checkNewItemChange`.
-    if pad.trig.z && check_get_item(&equipped, &collect, ITEM_MAGIC_ARMOR) {
+    // Take the edge from the held level here: `pad.trig` is per drawn frame while this system may
+    // run several sim ticks for one frame, which would toggle twice on a single press.
+    let pressed = pad.hold.z;
+    let edge = pressed && !armor.pressed;
+    armor.pressed = pressed;
+    if edge && check_get_item(&equipped, &collect, ITEM_MAGIC_ARMOR) {
         if armor.equipped {
             armor.unequip();
         } else if magic.units > 0 {
