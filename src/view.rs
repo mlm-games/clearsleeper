@@ -31,6 +31,8 @@ pub enum ActorKind {
     Fire,
     Gull,
     Scenery,
+    /// Procedural wooden boxes (`d_wood.cpp` has no J3D model, just GX display lists).
+    Wood,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1453,6 +1455,7 @@ fn actor_look(actor: &ActorView) -> Rgb {
         ActorKind::Gull => SEAGULL,
         ActorKind::Pickup => pickup_look(actor.item).0,
         ActorKind::Scenery => SCENERY,
+        ActorKind::Wood => [0.42, 0.27, 0.13],
     }
 }
 

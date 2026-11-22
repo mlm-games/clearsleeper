@@ -2089,7 +2089,11 @@ impl App {
             actors: self.actor_views(),
             particles: self.particle_views(),
             billboards: self.billboard_views(),
-            oriented_weather: self.oriented_weather_views(),
+            oriented_weather: {
+                let mut quads = self.oriented_weather_views();
+                quads.extend(self.hookshot_chain_views());
+                quads
+            },
         }
     }
 
@@ -2302,6 +2306,52 @@ impl App {
                 false,
             ));
         }
+        // Fire has no J3D model: `d_a_fire.cpp:222-224` draws only particle emitters. Give the
+        // lit source a warm untextured quad so the brazier reads as burning rather than a box.
+        for entity in self.sim.world.iter_entities() {
+            let Some(fire) = entity.get::<sim::fire::Fire>() else {
+                continue;
+            };
+            if !fire.lit {
+                continue;
+            }
+            let Some(actor) = entity.get::<sim::actor::Actor>() else {
+                continue;
+            };
+            out.push(board(
+                actor.pos + glam::Vec3::Y * 8.0,
+                glam::Vec2::new(10.0, 18.0),
+                [1.0, 0.55, 0.18],
+                0.9,
+                0.0,
+                assets::WeatherPage::Rain,
+                false,
+                false,
+            ));
+        }
+        // The Windfall music cue is an `ID_AK_SN_MACOREMUSIC00` emitter in the decomp
+        // (`d_a_mmusic.cpp:151-153`), not a model; show a small untextured note while active.
+        for entity in self.sim.world.iter_entities() {
+            let Some(music) = entity.get::<sim::mmusic::Mmusic>() else {
+                continue;
+            };
+            if !music.want {
+                continue;
+            }
+            let Some(actor) = entity.get::<sim::actor::Actor>() else {
+                continue;
+            };
+            out.push(board(
+                actor.pos + glam::Vec3::Y * 30.0,
+                glam::Vec2::splat(7.0),
+                [1.0, 0.92, 0.45],
+                0.8,
+                0.0,
+                assets::WeatherPage::Rain,
+                false,
+                false,
+            ));
+        }
         out
     }
 
@@ -2425,6 +2475,53 @@ impl App {
                     depth_test: false,
                 });
             }
+        }
+        out
+    }
+
+    /// The hookshot chain has no J3D model in either tree: GC draws a hard-coded GX display
+    /// list (`tww/src/d/actor/d_a_hookshot.cpp:21,68`) and HD builds a runtime primitive from
+    /// guest-memory vertices (`wwhd_src/d/actor/d_a_hookshot_shape.cpp:580-612`). The sim keeps
+    /// the two endpoints and the link count, so draw the chain as one world-space ribbon.
+    fn hookshot_chain_views(&self) -> Vec<view::OrientedWeatherView> {
+        let mut out = Vec::new();
+        for entity in self.sim.world.iter_entities() {
+            let Some(hook) = entity.get::<sim::hookshot::Hookshot>() else {
+                continue;
+            };
+            if hook.phase == sim::hookshot::Phase::Wait || hook.chain <= 0.0 {
+                continue;
+            }
+            let from = hook.root;
+            let to = hook.pos;
+            let along = to - from;
+            let length = along.length();
+            if length < 1e-3 {
+                continue;
+            }
+            let dir = along / length;
+            let eye = self
+                .sim
+                .world
+                .get_resource::<sim::camera::Camera>()
+                .and_then(|c| c.view)
+                .map(|v| v.lookat.eye)
+                .unwrap_or(from + glam::Vec3::Y * 100.0);
+            let side = dir.cross(eye - from).normalize_or(glam::Vec3::X) * 1.6;
+            let corner = |p: glam::Vec3| [p.x, p.y, p.z];
+            out.push(view::OrientedWeatherView {
+                corners: [
+                    corner(from - side),
+                    corner(from + side),
+                    corner(to + side),
+                    corner(to - side),
+                ],
+                color: [0.62, 0.64, 0.68],
+                alpha: 1.0,
+                page: assets::WeatherPage::Rain,
+                textured: false,
+                depth_test: true,
+            });
         }
         out
     }
@@ -4128,6 +4225,10 @@ impl App {
                     max[1] - min[1],
                     (max[0] - min[0]) * 0.5,
                 )
+            } else if entity.contains::<sim::woodbox::WoodBox>() {
+                // `d_wood.cpp` builds these from GX display lists, not a J3D model, so the
+                // port keeps its box primitive but gives it the wood colour.
+                (view::ActorKind::Wood, 0, 36.0, 18.0)
             } else if entity.contains::<sim::spotbox::SpotBox>() {
                 lift = -(sim::spotbox::HALF);
                 (
@@ -4817,7 +4918,7 @@ pub fn run() {
 
 /// The model an `ActorAnm` resolves to, shared by the actor view list and `root_view` so a
 /// body only counts as modelled when the archive and its morph are actually loaded.
-fn actor_model(app: &App, archive: &str) -> Option<&assets::ActorModel> {
+fn actor_model<'a>(app: &'a App, archive: &str) -> Option<&'a assets::ActorModel> {
     if archive == sim::actor_anm::BA_ARCHIVE {
         app.ba1_model.as_ref()
     } else if archive == sim::actor_anm::CC_ARCHIVE {
