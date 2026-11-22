@@ -213,7 +213,9 @@ pub fn control(
                             Some((hit, collision)) if collision.hook_stick(hit.tri) => {
                                 hook.bite(hit.point);
                             }
-                            _ => hook.step(),
+                            _ => {
+                                hook.step();
+                            }
                         }
                     }
                 }

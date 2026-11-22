@@ -313,7 +313,13 @@ fn finish(enemy: &mut Enemy, actor: &Actor, player: &Player, dist: f32) {
     }
 }
 
-fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Health) {
+fn tick(
+    enemy: &mut Enemy,
+    actor: &mut Actor,
+    player: &Player,
+    health: &mut Health,
+    guard: &mut super::guard::Guard,
+) {
     let profile = enemy.profile;
     let dx = player.pos.x - actor.pos.x;
     let dz = player.pos.z - actor.pos.z;
@@ -384,7 +390,7 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
                     enemy.struck = true;
                     // A frontal melee blow is guardable (`main.cpp:5151-5205`);
                     // `hurt` returns true when the shield absorbed it.
-                    super::guard::hurt(&mut health, &mut guard, player, actor.pos, ATTACK_POWER, 0);
+                    super::guard::hurt(health, guard, player, actor.pos, ATTACK_POWER, 0);
                 }
             }
             enemy.step_tick += 1;
@@ -441,7 +447,7 @@ pub fn control(
             };
             enemy.closing = false;
         } else if floored {
-            tick(&mut enemy, &mut actor, player, &mut health);
+            tick(&mut enemy, &mut actor, player, &mut health, &mut guard);
         } else {
             enemy.speed = 0.0;
         }
