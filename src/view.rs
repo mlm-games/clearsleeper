@@ -195,6 +195,7 @@ pub struct SceneSnapshot {
     pub sea: Option<SeaView>,
     pub actors: Vec<ActorView>,
     pub particles: Vec<ParticleView>,
+    pub billboards: Vec<BillboardView>,
 }
 
 /// One live emitter as the draw layer needs it: where it is, how big, what
@@ -210,6 +211,18 @@ pub struct ParticleView {
     pub pos: Vec3,
     /// Half-extents in the quad's own plane, x across and y up.
     pub half: Vec3,
+    pub color: Rgb,
+    pub alpha: f32,
+    pub roll: f32,
+}
+
+/// One camera-facing weather quad, built from the already-simulated rain/sun state
+/// (`tww/src/d/d_kankyo_rain.cpp:3946-4117`,
+/// `wwhd/wwhd_src/d/d_kankyo_rain_drawRain.cpp:9-156`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BillboardView {
+    pub pos: Vec3,
+    pub half: Vec2,
     pub color: Rgb,
     pub alpha: f32,
     pub roll: f32,
@@ -269,9 +282,10 @@ pub fn batch_desc_with_actor(
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
     blur: bool,
+    weather: bool,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) if held.is_empty() && npcs.is_empty() && !blur => {
+        (None, None, None, None) if held.is_empty() && npcs.is_empty() && !blur && !weather => {
             BatchDesc::default()
         }
         _ => BatchDesc {
@@ -292,7 +306,8 @@ pub fn batch_desc_with_actor(
                                 + npc.cloth.map_or(0, |(_, mesh)| used_pages(mesh).len())
                         })
                         .sum::<usize>()
-                    + usize::from(blur),
+                    + usize::from(blur)
+                    + usize::from(weather),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -395,7 +410,19 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], &[], None)
+    build_frame_with_actor(
+        snapshot,
+        cam,
+        room,
+        None,
+        None,
+        None,
+        None,
+        &[],
+        &[],
+        None,
+        None,
+    )
 }
 
 pub fn build_frame_with_actor(
@@ -409,11 +436,21 @@ pub fn build_frame_with_actor(
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
     blur: Option<&SwordBlurDraw<'_>>,
+    weather_texture: Option<&(Vec<u8>, u32, u32)>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair, hands, held, npcs, blur.is_some()),
+        desc: batch_desc_with_actor(
+            room,
+            actor,
+            hair,
+            hands,
+            held,
+            npcs,
+            blur.is_some(),
+            weather_texture.is_some() && !snapshot.billboards.is_empty(),
+        ),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -755,6 +792,53 @@ pub fn build_frame_with_actor(
                 depth_test: false,
                 ..MeshGroup::default()
             });
+        }
+    }
+    if let (Some((rgba, width, height)), true) = (weather_texture, !snapshot.billboards.is_empty())
+    {
+        let page = npc_page + u32::from(blur.is_some());
+        frame.uploads.push(SceneUpload {
+            page,
+            x: 0,
+            y: 0,
+            w: *width,
+            h: *height,
+            rgba: rgba.clone(),
+        });
+        let eye = cam.eye();
+        for board in &snapshot.billboards {
+            let forward = (eye - board.pos).normalize_or(Vec3::Z);
+            let right = Vec3::Y.cross(forward);
+            let right = if right.length_squared() < 1e-6 {
+                Vec3::X
+            } else {
+                right.normalize()
+            };
+            let up = forward.cross(right);
+            let (sin, cos) = board.roll.sin_cos();
+            let axis_u = right * cos + up * sin;
+            let axis_v = up * cos - right * sin;
+            let a = board.pos - axis_u * board.half.x - axis_v * board.half.y;
+            let b = board.pos + axis_u * board.half.x - axis_v * board.half.y;
+            let c = board.pos + axis_u * board.half.x + axis_v * board.half.y;
+            let d = board.pos - axis_u * board.half.x + axis_v * board.half.y;
+            let mut group = MeshGroup {
+                alpha: board.alpha,
+                texture_page: page,
+                transparent: true,
+                depth_test: true,
+                cull_mode: CullMode::None,
+                ..MeshGroup::default()
+            };
+            group.push_quad_textured(
+                [a.x, a.y, a.z],
+                [b.x, b.y, b.z],
+                [c.x, c.y, c.z],
+                [d.x, d.y, d.z],
+                board.color,
+                [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            );
+            frame.push(group);
         }
     }
     frame

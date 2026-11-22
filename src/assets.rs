@@ -1124,6 +1124,16 @@ pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<StageSpawn> 
     }
 }
 
+/// The 64x64 I8 snow/rain texture used by every weather quad (`tww/assets/GZLJ01/res/Object/Always.h:100`,
+/// `d_kankyo_rain.cpp:760`). Decoded to RGBA so it can be uploaded as a scene texture page.
+pub fn load_weather_texture() -> Option<(Vec<u8>, u32, u32)> {
+    let root = AssetRoot::from_env().ok()?;
+    let archive = root.read_archive(OBJECT_ALWAYS).ok()?;
+    let raw = archive.read_id(0x81).ok()?;
+    let image = crate::bti::decode(raw)?;
+    Some((image.pixels, image.width as u32, image.height as u32))
+}
+
 pub fn load_sea_shade() -> Option<f32> {
     match sea_shade_from_assets() {
         Ok(shade) => Some(shade),

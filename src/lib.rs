@@ -183,6 +183,7 @@ pub struct App {
     pub amos_knight_model: Option<assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
+    pub weather_texture: Option<(Vec<u8>, u32, u32)>,
     /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
     pub bottle_liquid_model: Option<j3d::bdl::RoomMesh>,
     pub bottle_fairy_model: Option<j3d::bdl::RoomMesh>,
@@ -372,6 +373,7 @@ impl App {
             floormaster_model: None,
             amos_knight_model: None,
             blur_texture: None,
+            weather_texture: None,
             bottle_liquid_model: None,
             bottle_fairy_model: None,
             player_anim: None,
@@ -495,6 +497,7 @@ impl App {
             app.tip_stab_model = assets::object_model(&archive, 0x3E);
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
+        app.weather_texture = assets::load_weather_texture();
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
@@ -1813,6 +1816,7 @@ impl App {
             sea: self.sea_view(),
             actors: self.actor_views(),
             particles: self.particle_views(),
+            billboards: self.billboard_views(),
         }
     }
 
@@ -1833,6 +1837,52 @@ impl App {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Rain drops and the sun disc, from the same `Weather` packet the decomp draws
+    /// (`tww/src/d/d_kankyo_rain.cpp:3946-4117`,
+    /// `wwhd/wwhd_src/d/d_kankyo_rain_drawRain.cpp:9-156`).
+    fn billboard_views(&self) -> Vec<view::BillboardView> {
+        let Some(weather) = self.sim.world.get_resource::<sim::weather::Weather>() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let count = weather.rain.rain_count.max(0) as usize;
+        for (index, drop) in weather.rain.eff.iter().take(count).enumerate() {
+            if drop.alpha <= 0.0 || drop.timer > 0 {
+                continue;
+            }
+            let size = 2.5 + index as f32 / 250.0 * 3.0;
+            // Four stacked quads per drop, the retail streak (`d_kankyo_rain.cpp:4082-4114`)
+            // collapsed into one taller quad here.
+            out.push(view::BillboardView {
+                pos: drop.base_pos + drop.pos + glam::Vec3::Y * 160.0,
+                half: glam::Vec2::new(size, 240.0 + size * 2.0),
+                color: [1.0, 1.0, 1.0],
+                alpha: (drop.alpha * 14.0).clamp(0.0, 1.0),
+                roll: 0.0,
+            });
+        }
+        let sun = &weather.sun;
+        if sun.visibility > 0.0 && (sun.sun_alpha > 0.0 || sun.moon_alpha > 0.0) {
+            let alpha = if sun.sun_alpha >= sun.moon_alpha {
+                sun.sun_alpha
+            } else {
+                sun.moon_alpha
+            } * sun.visibility;
+            out.push(view::BillboardView {
+                pos: sun.pos[0],
+                half: glam::Vec2::splat(30.0),
+                color: [
+                    sun.color.r as f32 / 127.0,
+                    sun.color.g as f32 / 127.0,
+                    sun.color.b as f32 / 127.0,
+                ],
+                alpha: alpha.clamp(0.0, 1.0),
+                roll: 0.0,
+            });
+        }
+        out
     }
 
     fn actor_views(&self) -> Vec<view::ActorView> {
@@ -4717,6 +4767,7 @@ pub fn root_view(
             &held,
             &npcs,
             blur.as_ref(),
+            app.weather_texture.as_ref(),
         ),
     };
     let desc = match &app.dff {
@@ -4729,6 +4780,7 @@ pub fn root_view(
             &held,
             &npcs,
             blur.is_some(),
+            app.weather_texture.is_some() && !snapshot.billboards.is_empty(),
         ),
     };
     let cam = app.cam.clone();
