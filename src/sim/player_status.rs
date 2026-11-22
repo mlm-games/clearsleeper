@@ -111,6 +111,7 @@ pub fn control(
     use_intent: Res<UseIntent>,
     equipped: Res<Equipped>,
     tact: Res<super::tact::Tact>,
+    spin: Res<super::spin::Spin>,
     scope: Res<super::scope::Scope>,
     mut status: ResMut<PlayerStatus>,
     mut info: ResMut<crate::text::msgproc::MsgGameInfo>,
@@ -143,6 +144,12 @@ pub fn control(
     }
     if player.face > 0.9 {
         bits |= STTS0_CRAWL;
+    }
+    if matches!(
+        spin.phase,
+        super::spin::SpinPhase::Move | super::spin::SpinPhase::Charge
+    ) {
+        bits |= STTS0_SPIN_ATTACK;
     }
 
     status.status0 = bits;

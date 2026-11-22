@@ -344,6 +344,7 @@ pub mod sk2;
 pub mod smtoge;
 pub mod snap;
 pub mod spcitem;
+pub mod spin;
 pub mod spotbox;
 pub mod sss;
 pub mod ssturu;
@@ -1762,6 +1763,7 @@ pub fn build(
     sim.world.insert_resource(health::BottleDrink::default());
     sim.world.insert_resource(health::Magic::default());
     sim.world.insert_resource(guard::Guard::default());
+    sim.world.insert_resource(spin::Spin::default());
     sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());
@@ -2145,6 +2147,7 @@ pub fn build(
                         mmusic::control.in_set(WwSimSet::Execute),
                         ygush::control.in_set(WwSimSet::Execute),
                         guard::control.in_set(WwSimSet::Execute),
+                        spin::control.in_set(WwSimSet::Execute),
                         player_status::control.in_set(WwSimSet::Execute),
                         bombflower::clear_blasts.in_set(WwSimSet::Execute),
                         ajav::control.in_set(WwSimSet::Execute),

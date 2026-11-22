@@ -95,6 +95,9 @@ pub enum CutKind {
     L,
     EA,
     EB,
+    /// `CUT_TYPE_CUT_ROLL` (`tww/src/d/actor/d_a_player_sword.inc:1522`,
+    /// `wwhd/wwhd_src/d/actor/d_a_player_main_08.cpp:867`).
+    Spin,
 }
 
 /// One cut's timing and speed numbers, the values the reference's own tables hold.
@@ -173,6 +176,14 @@ fn cut(kind: CutKind) -> Cut {
             lunge_speed: 7.0,
             decel_max: 1.5,
         },
+        // The magic roll's AT stays live for the whole spin (`d_a_player_sword.inc:1512-1555`).
+        CutKind::Spin => Cut {
+            duration: super::spin::ROLL_TICKS,
+            at_first: 1,
+            at_last: super::spin::ROLL_TICKS,
+            lunge_speed: 30.0,
+            decel_max: 1.5,
+        },
     }
 }
 
@@ -192,6 +203,7 @@ fn cut_proc(kind: CutKind) -> super::link_proc::Proc {
         CutKind::L => Proc::CutL,
         CutKind::EA => Proc::CutEa,
         CutKind::EB => Proc::CutEb,
+        CutKind::Spin => Proc::CutRoll,
     }
 }
 
@@ -234,6 +246,7 @@ fn cut_type(kind: CutKind) -> u8 {
         CutKind::L => CUT_TYPE_CUT_L,
         CutKind::EA => CUT_TYPE_CUT_EA,
         CutKind::EB => CUT_TYPE_CUT_EB,
+        CutKind::Spin => CUT_TYPE_CUT_ROLL,
     }
 }
 
@@ -548,7 +561,11 @@ pub fn control(
                             0.0,
                             SWORD_OFFSET * player.yaw.cos(),
                         ),
-                    sword_radius(selected),
+                    if kind == CutKind::Spin {
+                        super::spin::ROLL_TICKS as f32
+                    } else {
+                        sword_radius(selected)
+                    },
                 ),
                 AT_SPRM_VS_ENEMY,
                 &AtMeta {

@@ -52,6 +52,7 @@ pub fn control(
     roll: Res<Roll>,
     jump: Res<Jump>,
     guard: Res<super::guard::Guard>,
+    spin: Res<super::spin::Spin>,
     game_over: Res<GameOver>,
     mut hurt: ResMut<HurtReaction>,
     mut boom_catch: ResMut<BoomCatch>,
@@ -96,6 +97,21 @@ pub fn control(
         pose.frame = (HURT_FRAMES - hurt_left) as f32 * 2.0;
         return;
     }
+    // The charged spin plays CUTTURNP then CUTTURNPWFB (`d_a_player_sword.inc:1666,1689`;
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_08.cpp:842`). The roll's CUTTURNB is driven
+    // through `combat.kind` below.
+    if !combat.active {
+        let spin_stem = match spin.phase {
+            super::spin::SpinPhase::Charge => Some("cutturnp"),
+            super::spin::SpinPhase::Move => Some("cutturnpwfb"),
+            super::spin::SpinPhase::Idle => None,
+        };
+        if let Some(stem) = spin_stem {
+            pose.stem = Some(stem);
+            pose.frame = spin.frame as f32 * 2.0;
+            return;
+        }
+    }
     // Each sword process installs one of these body animations for its whole run:
     // tww/src/d/actor/d_a_player_sword.inc:561-562,663-664,765-766,866-867,965-966,1049-1050;
     // wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:905-1064.
@@ -107,6 +123,7 @@ pub fn control(
             CutKind::L => "cutl",
             CutKind::EA => "cutea",
             CutKind::EB => "cuteb",
+            CutKind::Spin => "cutturnb",
         };
         pose.stem = Some(stem);
         // The cut's own tick counter is its frame control; the bck advances two frames per tick
