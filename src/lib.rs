@@ -120,6 +120,7 @@ pub struct App {
     pub hammer_model: Option<j3d::bdl::RoomMesh>,
     pub telescope_model: Option<j3d::bdl::RoomMesh>,
     pub takt_model: Option<j3d::bdl::RoomMesh>,
+    pub bottle_model: Option<j3d::bdl::RoomMesh>,
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
@@ -297,6 +298,7 @@ impl App {
             hammer_model: None,
             telescope_model: None,
             takt_model: None,
+            bottle_model: None,
             ba1_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
@@ -406,6 +408,8 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_TELESCOPE_ENTRY);
         app.takt_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_WIND_WAKER_ENTRY);
+        app.bottle_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_BOTTLE_ENTRY);
         app.ba1_model = assets::load_ba_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
@@ -4314,6 +4318,17 @@ pub fn root_view(
             .is_some_and(|tact| tact.phase != sim::tact::TactPhase::Idle)
         {
             if let Some(model) = app.takt_model.as_ref() {
+                held.push(view::AttachedPart::hand(model, lhand));
+            }
+        }
+        if app
+            .sim
+            .world
+            .get_resource::<sim::item_use::ItemUse>()
+            .and_then(|state| state.stem)
+            .is_some_and(|stem| matches!(stem, "binopena" | "bindrinking"))
+        {
+            if let Some(model) = app.bottle_model.as_ref() {
                 held.push(view::AttachedPart::hand(model, lhand));
             }
         }
