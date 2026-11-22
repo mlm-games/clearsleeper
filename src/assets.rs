@@ -264,6 +264,7 @@ pub const LINK_HAMMER_ENTRY: &str = "hammer.bdl";
 pub const LINK_TELESCOPE_ENTRY: &str = "telescope.bdl";
 pub const LINK_WIND_WAKER_ENTRY: &str = "takt.bdl";
 pub const LINK_BOTTLE_ENTRY: &str = "bottleemp.bdl";
+pub const LINK_CAMERA_ENTRY: &str = "camera.bdl";
 
 /// The body `res/Object/<name>.arc` carries, read by entry name where one is named.
 ///

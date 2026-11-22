@@ -1777,6 +1777,7 @@ pub fn build(
     sim.world.insert_resource(events::SimEvents::default());
     sim.world.insert_resource(actor_anm::ActorAnms::default());
     sim.world.insert_resource(snap::SnapPacket::default());
+    sim.world.insert_resource(snap::PhotoCapture::default());
     sim.world.insert_resource(shadow::ShadowControl::default());
     sim.world.insert_resource(fade::Fade::default());
     sim.world.insert_resource(fade::Wipe::default());
@@ -2118,6 +2119,7 @@ pub fn build(
                             registry::control.in_set(WwSimSet::Execute),
                             actor::snapshot.in_set(WwSimSet::Execute),
                             snap::control.in_set(WwSimSet::Execute),
+                            snap::capture.in_set(WwSimSet::Execute),
                             shadow::control.in_set(WwSimSet::Execute),
                             camera::track.in_set(WwSimSet::Execute),
                             isle_timer::control.in_set(WwSimSet::Execute),

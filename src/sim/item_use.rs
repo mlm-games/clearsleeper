@@ -21,10 +21,13 @@ pub const FAN_TICKS: u32 = 17;
 const TACT_TICKS: u32 = 24;
 const BOTTLE_TICKS: u32 = 28;
 const GRAB_LIFT_TICKS: u32 = 8;
+/// The picture-box shutter pose, long enough for the one-frame registration/judge handshake.
+const PHOTO_TICKS: u32 = 12;
 
 fn limit(stem: Option<&'static str>) -> u32 {
     match stem {
         Some("taktdge") => TACT_TICKS,
+        Some("photo") => PHOTO_TICKS,
         Some("bindrinking" | "binopena") => BOTTLE_TICKS,
         _ => FAN_TICKS,
     }
@@ -89,6 +92,13 @@ pub fn control(
             // wwhd/wwhd_src/d/actor/d_a_player_main.cpp:215,
             // wwhd/wwhd_src/d/actor/d_a_player_main_06.cpp:455.
             stem = Some("taktdge");
+        }
+        if stem.is_none()
+            && (equipped.item(0) == super::inventory::ITEM_PICTO_BOX
+                || equipped.item(0) == super::inventory::ITEM_DELUXE_PICTO_BOX)
+        {
+            // tww/src/d/actor/d_a_player_main.cpp:3746-3755 (the picture-box item process).
+            stem = Some("photo");
         }
         if let Some(stem) = stem {
             state.stem = Some(stem);

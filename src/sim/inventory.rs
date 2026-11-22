@@ -13,6 +13,9 @@ pub const ITEM_DEKU_LEAF: u8 = 0x34;
 /// `dInvSlot_DEKU_LEAF_e`, `d_com_inf_game.h:1076`.
 pub const SLOT_DEKU_LEAF: usize = 6;
 pub const ITEM_WIND_WAKER: u8 = 0x22;
+/// `dItemNo_PICTO_BOX_e` / `dItemNo_DELUXE_PICTO_BOX_e` (`d_item_data.h:42,45`).
+pub const ITEM_PICTO_BOX: u8 = 0x23;
+pub const ITEM_DELUXE_PICTO_BOX: u8 = 0x26;
 pub const ITEM_SKULL_HAMMER: u8 = 0x33;
 pub const FIRST_BOMB: u8 = 0x0B;
 

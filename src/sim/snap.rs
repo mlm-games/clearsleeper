@@ -34,6 +34,9 @@ use bevy_ecs::prelude::*;
 use glam::{Mat4, Quat, Vec3};
 
 use super::camera::Camera;
+use super::flags::Collect;
+use super::intent::UseIntent;
+use super::inventory::{Equipped, ITEM_DELUXE_PICTO_BOX, ITEM_PICTO_BOX, check_get_item};
 use super::registry::ERROR_PROC_ID;
 use super::walk::{from_s16, to_s16};
 
@@ -1668,6 +1671,43 @@ pub struct SnapObj {
     pub max_y: i16,
 }
 
+/// The shell-side photo result and the one-frame shutter handshake: `d_snap.cpp` releases the
+/// shutter, lets the frame's actor draws register their proxies, then judges the captured frame
+/// (`d_picture_box.cpp:616-617,673`).
+#[derive(Resource, Debug, Default)]
+pub struct PhotoCapture {
+    pressed: bool,
+    pending: bool,
+    pub result: u32,
+    pub detail: u8,
+}
+
+pub fn capture(
+    intent: Res<UseIntent>,
+    equipped: Res<Equipped>,
+    collect: Res<Collect>,
+    camera: Option<Res<Camera>>,
+    mut packet: ResMut<SnapPacket>,
+    mut state: ResMut<PhotoCapture>,
+) {
+    let edge = intent.0 && !state.pressed;
+    state.pressed = intent.0;
+    if edge
+        && (check_get_item(&equipped, &collect, ITEM_PICTO_BOX)
+            || check_get_item(&equipped, &collect, ITEM_DELUXE_PICTO_BOX))
+    {
+        packet.release_shutter();
+        state.pending = true;
+        return;
+    }
+    if state.pending {
+        state.pending = false;
+        packet.judge_from_registry(camera.as_deref());
+        state.result = packet.result() as u32;
+        state.detail = packet.result_detail();
+    }
+}
+
 /// `dSnap_Obj::dSnap_Obj` (`d_snap.cpp:1458-1472`).
 impl Default for SnapObj {
     fn default() -> Self {
@@ -1844,6 +1884,40 @@ fn distance_angle_s(x: i16, y: i16) -> i32 {
 
 /// `0.5f * cM3d_VectorProduct2d(a, b, c)` when the cross product is positive (`d_snap.cpp`'s
 /// `if (f0 > 0.0f) f28 += f0;` in `CalcArea2D`).
+fn rasterize(tri: &[Vec3; 3], row: usize, depths: &mut [f32], winners: &mut [usize]) {
+    let min_x = tri.iter().map(|v| v.x).fold(f32::INFINITY, f32::min);
+    let max_x = tri.iter().map(|v| v.x).fold(f32::NEG_INFINITY, f32::max);
+    let min_y = tri.iter().map(|v| v.y).fold(f32::INFINITY, f32::min);
+    let max_y = tri.iter().map(|v| v.y).fold(f32::NEG_INFINITY, f32::max);
+    let x0 = (min_x as i32).max(SHUTTER_LEFT);
+    let x1 = (max_x.ceil() as i32).min(SHUTTER_RIGHT);
+    let y0 = (min_y as i32).max(SHUTTER_TOP);
+    let y1 = (max_y.ceil() as i32).min(SHUTTER_BOTTOM);
+    let area = (tri[1].x - tri[0].x) * (tri[2].y - tri[0].y)
+        - (tri[1].y - tri[0].y) * (tri[2].x - tri[0].x);
+    if area.abs() < 1e-6 {
+        return;
+    }
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
+            let w0 = ((tri[1].x - px) * (tri[2].y - py) - (tri[1].y - py) * (tri[2].x - px)) / area;
+            let w1 = ((tri[2].x - px) * (tri[0].y - py) - (tri[2].y - py) * (tri[0].x - px)) / area;
+            let w2 = 1.0 - w0 - w1;
+            if w0 < 0.0 || w1 < 0.0 || w2 < 0.0 {
+                continue;
+            }
+            let depth = w0 * tri[0].z + w1 * tri[1].z + w2 * tri[2].z;
+            let index = ((y - SHUTTER_TOP) * SHUTTER_WIDTH + (x - SHUTTER_LEFT)) as usize;
+            if index < depths.len() && depth < depths[index] {
+                depths[index] = depth;
+                winners[index] = row;
+            }
+        }
+    }
+}
+
 fn positive_triangle(a: Vec3, b: Vec3, c: Vec3) -> f32 {
     let cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     let half = 0.5 * cross;
@@ -2046,6 +2120,76 @@ impl SnapPacket {
         self.set_result(camera);
         self.flag &= !1;
         true
+    }
+
+    /// Judge from a CPU-rasterised label plane built out of the registered proxies, the port's
+    /// stand-in for retail's destination-alpha render and `GXPeekARGB` readback
+    /// (`tww/src/d/d_snap.cpp:1890-1910,1938-1973`; HD `d_snap.cpp:701+,1061-1112`). Framing,
+    /// proxy-vs-proxy depth order and the projected-area ratio are faithful; occlusion by
+    /// unregistered scene geometry is not reproduced.
+    pub fn judge_from_registry(&mut self, camera: Option<&Camera>) -> bool {
+        if self.chk_release_shutter() == 0 {
+            return false;
+        }
+        let area = (SHUTTER_WIDTH * SHUTTER_HEIGHT) as usize;
+        let mut depths = vec![f32::INFINITY; area];
+        let mut winners = vec![TABLE_LEN; area];
+        let count = self.count;
+        for row in 0..count {
+            let obj = &self.table[row].obj;
+            let mut triangles = Vec::new();
+            if !obj.sphere {
+                let model = Mat4::from_translation(obj.center)
+                    * Mat4::from_scale(Vec3::new(obj.radius, obj.height, obj.radius))
+                    * Mat4::from_rotation_y(from_s16(obj.angle_y));
+                let at = |local: Vec3| project_point(camera, model.transform_point3(local));
+                let origin = at(Vec3::ZERO);
+                let top = at(Vec3::Y);
+                for i in 0..CYL_SEGMENTS {
+                    let v = CYL_VERTS[i];
+                    let next = CYL_VERTS[i + 1];
+                    let bottom_i = at(Vec3::new(v[0], 0.0, v[2]));
+                    let top_i = at(Vec3::new(v[0], 1.0, v[2]));
+                    let top_next = at(Vec3::new(next[0], 1.0, next[2]));
+                    let bottom_next = at(Vec3::new(next[0], 0.0, next[2]));
+                    triangles.extend([
+                        [bottom_i, top_i, top_next],
+                        [bottom_i, top_next, bottom_next],
+                        [top, top_next, top_i],
+                        [origin, bottom_i, bottom_next],
+                    ]);
+                }
+            } else {
+                let model =
+                    Mat4::from_translation(obj.center) * Mat4::from_scale(Vec3::splat(obj.radius));
+                for tri in TRI_INDICES {
+                    triangles.push([
+                        project_point(
+                            camera,
+                            model.transform_point3(Vec3::from(SPHERE_VERTS[tri[0]])),
+                        ),
+                        project_point(
+                            camera,
+                            model.transform_point3(Vec3::from(SPHERE_VERTS[tri[1]])),
+                        ),
+                        project_point(
+                            camera,
+                            model.transform_point3(Vec3::from(SPHERE_VERTS[tri[2]])),
+                        ),
+                    ]);
+                }
+            }
+            for tri in triangles {
+                rasterize(&tri, row, &mut depths, &mut winners);
+            }
+        }
+        let mut pixels = vec![0_u32; area];
+        for (index, winner) in winners.iter().enumerate() {
+            if *winner < TABLE_LEN {
+                pixels[index] = (*winner as u32) << LABEL_SHIFT;
+            }
+        }
+        self.judge(&pixels, camera)
     }
 
     /// `dSnap_packet::FindPhoto` (`d_snap.cpp:1976-1986`).

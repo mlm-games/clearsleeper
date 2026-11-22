@@ -187,6 +187,7 @@ pub struct App {
     /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
     pub bottle_liquid_model: Option<j3d::bdl::RoomMesh>,
     pub bottle_fairy_model: Option<j3d::bdl::RoomMesh>,
+    pub camera_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -376,6 +377,7 @@ impl App {
             weather_texture: None,
             bottle_liquid_model: None,
             bottle_fairy_model: None,
+            camera_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -489,6 +491,8 @@ impl App {
         app.bottle_liquid_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, "binliquid.bdl");
         app.bottle_fairy_model = assets::load_actor_model_entry(view::LINK_ARCHIVE, "binfairy.bdl");
+        app.camera_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_CAMERA_ENTRY);
         // Blade glow auras are BDL entries 0x4A/0x4C of Link.arc, loaded by id the way retail
         // reads them (`d_a_player_sword.inc:36-56`; `tww/assets/GZLE01/res/Object/Link.h:71,73`).
         if let Some(archive) = assets::load_object_archive(view::LINK_ARCHIVE) {
@@ -4645,6 +4649,17 @@ pub fn root_view(
                 };
                 part.color = first_color(anim, frame);
                 held.push(part);
+            }
+        }
+        if app
+            .sim
+            .world
+            .get_resource::<sim::item_use::ItemUse>()
+            .and_then(|state| state.stem)
+            == Some("photo")
+        {
+            if let Some(model) = app.camera_model.as_ref() {
+                held.push(view::AttachedPart::hand(model, lhand));
             }
         }
     }
