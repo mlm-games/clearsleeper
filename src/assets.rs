@@ -244,6 +244,17 @@ pub const LINK_HAIR_ENTRY: &str = "katsura.bdl";
 /// `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3371-3406`).
 pub const LINK_HANDS_ENTRY: &str = "hands.bdl";
 
+/// Held weapon/shield parts, attached to the hand joints or the back. The blade table is
+/// `d_a_player_sword.inc:20-70` (`swa`/`swms`), the grips `d_a_player_main.cpp:1222-1258`,
+/// and the shield select `d_a_player_main.cpp:1280-1296`
+/// (`wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3112-3250`).
+pub const LINK_SWORD_ENTRY: &str = "swa.bdl";
+pub const LINK_MASTER_SWORD_ENTRY: &str = "swms.bdl";
+pub const LINK_SWORD_GRIP_ENTRY: &str = "swgripa.bdl";
+pub const LINK_MASTER_GRIP_ENTRY: &str = "swgripms.bdl";
+pub const LINK_SHIELD_ENTRY: &str = "sha.bdl";
+pub const LINK_MIRROR_SHIELD_ENTRY: &str = "shms.bdl";
+
 /// The body `res/Object/<name>.arc` carries, read by entry name where one is named.
 ///
 /// Object archives are named for what they hold, and a character archive holds several `bdl`

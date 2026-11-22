@@ -79,6 +79,13 @@ pub struct App {
     pub hair_model: Option<j3d::bdl::RoomMesh>,
     /// The `hands.bdl` parts model, attached to `cl.bdl`'s hand joints.
     pub hands_model: Option<j3d::bdl::RoomMesh>,
+    /// Held weapon/shield parts from `Link.arc`, attached to the hand joints.
+    pub sword_model: Option<j3d::bdl::RoomMesh>,
+    pub master_sword_model: Option<j3d::bdl::RoomMesh>,
+    pub sword_grip_model: Option<j3d::bdl::RoomMesh>,
+    pub master_grip_model: Option<j3d::bdl::RoomMesh>,
+    pub shield_model: Option<j3d::bdl::RoomMesh>,
+    pub mirror_shield_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
@@ -242,6 +249,12 @@ impl App {
             actor_model: None,
             hair_model: None,
             hands_model: None,
+            sword_model: None,
+            master_sword_model: None,
+            sword_grip_model: None,
+            master_grip_model: None,
+            shield_model: None,
+            mirror_shield_model: None,
             player_anim: None,
             dff: None,
             menu: menus::Menu::new(),
@@ -325,6 +338,20 @@ impl App {
         if app.hands_model.is_none() {
             log::warn!("clearsleeper: hands model unavailable");
         }
+        // Held weapon/shield parts. Every entry is present in Link.arc; the blade/grip/shield
+        // choice is made per frame in root_view from the snapshot's equipment.
+        app.sword_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_SWORD_ENTRY);
+        app.master_sword_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MASTER_SWORD_ENTRY);
+        app.sword_grip_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_SWORD_GRIP_ENTRY);
+        app.master_grip_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MASTER_GRIP_ENTRY);
+        app.shield_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_SHIELD_ENTRY);
+        app.mirror_shield_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MIRROR_SHIELD_ENTRY);
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -1479,6 +1506,13 @@ impl App {
                     .world
                     .get_resource::<sim::camera::Camera>()
                     .is_some_and(|camera| camera.attention(sim::camera::ATTN_SUBJECT)),
+            equipment: {
+                let collect = self.sim.world.resource::<sim::flags::Collect>();
+                view::PlayerEquipment {
+                    sword: sim::inventory::sword(collect),
+                    shield: sim::inventory::shield(collect),
+                }
+            },
             bounds_min: area.bounds_min,
             bounds_max: area.bounds_max,
             ground_y,
@@ -3898,6 +3932,67 @@ pub fn root_view(
     if app.camera_underground(&camera, &snapshot) {
         camera = app.fallback_camera(&snapshot);
     }
+    // The held sword/grip/shield follow `getSelectEquip(0/1)` (tww/src/d/actor/d_a_player_main.cpp:1945-1964).
+    // The blade/grip use the left hand, the shield the right. A missing model or NO_ITEM
+    // simply contributes nothing.
+    let lhand = app
+        .actor_model
+        .as_ref()
+        .map_or(8, |m| m.find_node_id(b"cl_LhandA").unwrap_or(8) as usize);
+    let rhand = app
+        .actor_model
+        .as_ref()
+        .map_or(12, |m| m.find_node_id(b"cl_RhandA").unwrap_or(12) as usize);
+    let mut held: Vec<view::AttachedPart<'_>> = Vec::new();
+    if !snapshot.player_no_draw {
+        let sword = snapshot.equipment.sword;
+        if sword == sim::inventory::ITEM_SWORD {
+            if let Some(model) = app.sword_model.as_ref() {
+                held.push(view::AttachedPart {
+                    mesh: model,
+                    body_joint: lhand,
+                });
+            }
+            if let Some(model) = app.sword_grip_model.as_ref() {
+                held.push(view::AttachedPart {
+                    mesh: model,
+                    body_joint: lhand,
+                });
+            }
+        } else if sword != sim::inventory::NO_ITEM {
+            if let Some(model) = app.master_sword_model.as_ref() {
+                held.push(view::AttachedPart {
+                    mesh: model,
+                    body_joint: lhand,
+                });
+            }
+            if let Some(model) = app.master_grip_model.as_ref() {
+                held.push(view::AttachedPart {
+                    mesh: model,
+                    body_joint: lhand,
+                });
+            }
+        }
+        match snapshot.equipment.shield {
+            sim::inventory::ITEM_SHIELD => {
+                if let Some(model) = app.shield_model.as_ref() {
+                    held.push(view::AttachedPart {
+                        mesh: model,
+                        body_joint: rhand,
+                    });
+                }
+            }
+            sim::inventory::ITEM_MIRROR_SHIELD => {
+                if let Some(model) = app.mirror_shield_model.as_ref() {
+                    held.push(view::AttachedPart {
+                        mesh: model,
+                        body_joint: rhand,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, camera),
         None => view::build_frame_with_actor(
@@ -3908,6 +4003,7 @@ pub fn root_view(
             app.player_anim.as_ref(),
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
+            &held,
         ),
     };
     let desc = match &app.dff {
@@ -3917,6 +4013,7 @@ pub fn root_view(
             app.actor_model.as_ref(),
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
+            &held,
         ),
     };
     let cam = app.cam.clone();

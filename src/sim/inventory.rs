@@ -162,6 +162,25 @@ pub const ITEM_SONG_OF_PASSING: u8 = 0x72;
 pub const SWORD_COLLECT_BYTE: u8 = 0;
 pub const SWORD_COLLECT_LEVEL: u8 = 0;
 
+/// The shield items and the collect byte their acquisition writes (`d_item_data.h:66-67`,
+/// `d_item.cpp:900-912`; `wwhd/wwhd_src/d/d_item_2.cpp:60-68`).
+pub const ITEM_SHIELD: u8 = 0x3B;
+pub const ITEM_MIRROR_SHIELD: u8 = 0x3C;
+pub const SHIELD_COLLECT_BYTE: u8 = 1;
+
+/// `dComIfGs_getSelectEquip(1)`, derived from the same collect bits `setSelectEquip` writes
+/// through (`d_com_inf_game.cpp:1905-1940`; HD `:967-990`). The mirror shield wins when both
+/// bits are set, matching the collect byte's bit order.
+pub fn shield(collect: &super::flags::Collect) -> u8 {
+    if collect.test(SHIELD_COLLECT_BYTE, 1) {
+        ITEM_MIRROR_SHIELD
+    } else if collect.test(SHIELD_COLLECT_BYTE, 0) {
+        ITEM_SHIELD
+    } else {
+        NO_ITEM
+    }
+}
+
 /// The sword `dComIfGs_getSelectEquip(0)` answers with, read off the same collect bits the sword
 /// item functions write: `item_func_sword` pairs bit 0 with `dItemNo_SWORD_e`, then the three
 /// master-sword functions pair bits 1 to 3 with `dItemNo_MASTER_SWORD_1_e` to

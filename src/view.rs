@@ -64,6 +64,23 @@ pub struct PlayerAnm {
     pub looping: bool,
 }
 
+/// The equipped sword and shield item ids, `dComIfGs_getSelectEquip(0/1)`
+/// (`d_save.h:46`). `0xFF` means none (`inventory::NO_ITEM`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PlayerEquipment {
+    pub sword: u8,
+    pub shield: u8,
+}
+
+/// A parts model attached at one of the body's joints, the port's `setBaseTRMtx` target
+/// (`tww/src/d/actor/d_a_player_main.cpp:1150-1159`,
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3174-3181`).
+#[derive(Clone, Copy)]
+pub struct AttachedPart<'a> {
+    pub mesh: &'a RoomMesh,
+    pub body_joint: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
@@ -74,6 +91,7 @@ pub struct SceneSnapshot {
     /// before it submits its model: something raised `daPyFlg0_NO_DRAW`, or the camera carries
     /// `dCamAttnStts_SUBJECT_e` ([`crate::sim::camera::Camera::publish_attention`]).
     pub player_no_draw: bool,
+    pub equipment: PlayerEquipment,
     pub bounds_min: Vec2,
     pub bounds_max: Vec2,
     pub ground_y: f32,
@@ -154,16 +172,21 @@ pub fn batch_desc_with_actor(
     actor: Option<&RoomMesh>,
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
+    held: &[AttachedPart<'_>],
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) => BatchDesc::default(),
+        (None, None, None, None) if held.is_empty() => BatchDesc::default(),
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
                 room.map_or(0, |room| room.textures.len())
                     + actor.map_or(0, |actor| used_pages(actor).len())
                     + hair.map_or(0, |hair| used_pages(hair).len())
-                    + hands.map_or(0, |hands| used_pages(hands).len()),
+                    + hands.map_or(0, |hands| used_pages(hands).len())
+                    + held
+                        .iter()
+                        .map(|part| used_pages(part.mesh).len())
+                        .sum::<usize>(),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -266,7 +289,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None, None)
+    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[])
 }
 
 pub fn build_frame_with_actor(
@@ -277,11 +300,12 @@ pub fn build_frame_with_actor(
     actor_anim: Option<&crate::assets::PlayerIdle>,
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
+    held: &[AttachedPart<'_>],
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair, hands),
+        desc: batch_desc_with_actor(room, actor, hair, hands, held),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -443,6 +467,36 @@ pub fn build_frame_with_actor(
                 frame.push(group);
             }
         }
+        // Held weapon/shield parts, each attached to one body hand joint the way retail
+        // sets the part model's base matrix (tww/src/d/actor/d_a_player_main.cpp:1150-1159,
+        // :1274, :1311-1315). Page slots follow hands in the same order batch_desc_with_actor
+        // budgeted them.
+        let mut held_page = page_base
+            + pages.len() as u32
+            + hair.map_or(0, |h| used_pages(h).len()) as u32
+            + hands.map_or(0, |h| used_pages(h).len()) as u32;
+        for part in held {
+            let part_pages = used_pages(part.mesh);
+            for (slot, page) in part_pages.iter().enumerate() {
+                let Some(texture) = part.mesh.textures.get(*page as usize) else {
+                    continue;
+                };
+                frame.uploads.push(SceneUpload {
+                    page: held_page + slot as u32,
+                    x: 0,
+                    y: 0,
+                    w: texture.width,
+                    h: texture.height,
+                    rgba: texture.rgba.clone(),
+                });
+            }
+            if let Some(body) = pose.get(part.body_joint).copied() {
+                for group in attached_groups(part.mesh, snapshot, held_page, &part_pages, body) {
+                    frame.push(group);
+                }
+            }
+            held_page += part_pages.len() as u32;
+        }
     }
     frame
 }
@@ -575,6 +629,126 @@ fn hands_groups(
             })
         })
         .collect()
+}
+
+/// A parts model placed at one body joint, the port's `setBaseTRMtx(lHandA_jnt_mtx)` /
+/// `(rHandA_jnt_mtx)` (`tww/src/d/actor/d_a_player_main.cpp:1150-1159,1274,1311-1315`;
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3174-3181,3220-3224`). `body` is the joint's
+/// animated matrix in player-model space. Skinned groups use the part's own EVP1 inverse bind
+/// (which is not `inverse(JNT1 bind world)`, `j3d/bdl.rs:191-194`); direct groups cancel the
+/// part's own bind matrix so the part rests in the body joint's pose.
+fn attached_groups(
+    part: &RoomMesh,
+    snapshot: &SceneSnapshot,
+    page_base: u32,
+    pages: &[u32],
+    body: Mat4,
+) -> Vec<MeshGroup> {
+    if part.joint_matrices.len() != part.joints.len() {
+        return Vec::new();
+    }
+    let origin = Vec3::new(
+        snapshot.player_pos.x,
+        snapshot.player_pos.y,
+        snapshot.player_pos.z,
+    );
+    let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
+    let base = to_world * body;
+    let part_pose: Vec<Mat4> = part
+        .joint_matrices
+        .iter()
+        .map(|bind| base * *bind)
+        .collect();
+    let inverse_bind: Vec<Mat4> = if part.inverse_bind.len() == part.joint_matrices.len() {
+        part.inverse_bind.clone()
+    } else {
+        part.joint_matrices
+            .iter()
+            .map(|m| m.try_inverse().unwrap_or(Mat4::IDENTITY))
+            .collect()
+    };
+
+    let mut out = Vec::new();
+    for group in &part.groups {
+        if !group.joint_indices.is_empty() {
+            if group.joint_indices.len() != group.positions.len() {
+                continue;
+            }
+            let (indices, cull_mode) = group_indices(group);
+            let mesh = SkinnedMesh {
+                positions: group.positions.clone(),
+                normals: group.normals.clone(),
+                uvs: group.uvs.clone(),
+                colors: group.colors.clone(),
+                indices,
+                joints: group.joint_indices.clone(),
+                weights: group.joint_weights.clone(),
+                inverse_bind: inverse_bind.clone(),
+                joint_nodes: (0..part.joints.len()).collect(),
+                texture_page: actor_page(group, pages, page_base),
+                alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
+                depth_test: group.z_compare,
+                transparent: transparent(group),
+                ..SkinnedMesh::default()
+            };
+            let mut baked = mesh.pose(&part_pose);
+            baked.cull_mode = cull_mode;
+            out.push(baked);
+            continue;
+        }
+        let transform = match group.direct_joint {
+            Some(joint) => {
+                let (Some(bind), Some(posed)) = (
+                    part.joint_matrices.get(joint as usize),
+                    part_pose.get(joint as usize),
+                ) else {
+                    continue;
+                };
+                let Some(inverse) = bind.try_inverse() else {
+                    continue;
+                };
+                *posed * inverse
+            }
+            None => base,
+        };
+        let positions = group
+            .positions
+            .iter()
+            .map(|p| {
+                let v = transform.transform_point3(Vec3::from(*p));
+                [v.x, v.y, v.z]
+            })
+            .collect();
+        let normals = if group.lit {
+            group
+                .normals
+                .iter()
+                .map(|n| {
+                    let v = transform
+                        .transform_vector3(Vec3::from(*n))
+                        .normalize_or_zero();
+                    [v.x, v.y, v.z]
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let (indices, cull_mode) = group_indices(group);
+        out.push(MeshGroup {
+            positions,
+            colors: group.colors.clone(),
+            normals,
+            uvs: group.uvs.clone(),
+            indices,
+            texture_page: actor_page(group, pages, page_base),
+            alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
+            depth_test: group.z_compare,
+            transparent: transparent(group),
+            cull_mode,
+            ..MeshGroup::default()
+        });
+    }
+    out
 }
 
 fn skinned_groups(
