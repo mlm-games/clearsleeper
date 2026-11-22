@@ -1247,8 +1247,43 @@ pub fn load_weather_texture() -> Option<(Vec<u8>, u32, u32)> {
     let root = AssetRoot::from_env().ok()?;
     let archive = root.read_archive(OBJECT_ALWAYS).ok()?;
     let raw = archive.read_id(0x81).ok()?;
-    let image = crate::bti::decode(raw)?;
+    let image = crate::bti::decode(raw).or_else(|| {
+        // Always 0x81 (`tx_snow01`) is a headerless 64x64 raw I8 image, not a BTI
+        // (`tww/assets/GZLJ01/res/Object/Always.h:100`, `d_kankyo_rain.cpp:4915`).
+        if raw.len() < 64 * 64 {
+            return None;
+        }
+        Some(crate::bti::Image {
+            width: 64,
+            height: 64,
+            pixels: raw[..64 * 64].iter().flat_map(|&v| [v, v, v, v]).collect(),
+            mag_linear: true,
+            wrap_s: 0,
+            wrap_t: 0,
+            alpha_enabled: true,
+        })
+    })?;
     Some((image.pixels, image.width as u32, image.height as u32))
+}
+
+/// Weather texture pages, indexed by [`WeatherPage`]. All live in `Always.arc`.
+pub const WEATHER_IDS: [u16; 6] = [0x81, 0x82, 0x85, 0x6D, 0x6E, 0x84];
+
+pub fn load_weather_textures() -> Vec<Option<(Vec<u8>, u32, u32)>> {
+    let Some(root) = AssetRoot::from_env().ok() else {
+        return vec![None; WEATHER_IDS.len()];
+    };
+    let Ok(archive) = root.read_archive(OBJECT_ALWAYS) else {
+        return vec![None; WEATHER_IDS.len()];
+    };
+    WEATHER_IDS
+        .iter()
+        .map(|&id| {
+            let raw = archive.read_id(id).ok()?;
+            let image = crate::bti::decode(raw)?;
+            Some((image.pixels, image.width as u32, image.height as u32))
+        })
+        .collect()
 }
 
 pub fn load_sea_shade() -> Option<f32> {

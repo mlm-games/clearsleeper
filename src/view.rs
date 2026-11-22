@@ -228,6 +228,10 @@ pub struct BillboardView {
     pub color: Rgb,
     pub alpha: f32,
     pub roll: f32,
+    /// Index into `App::weather_textures`; stars and flare rays are untextured.
+    pub page: usize,
+    pub textured: bool,
+    pub depth_test: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -284,7 +288,7 @@ pub fn batch_desc_with_actor(
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
     blur: bool,
-    weather: bool,
+    weather_pages: usize,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
         (None, None, None, None) if held.is_empty() && npcs.is_empty() && !blur && !weather => {
@@ -309,7 +313,7 @@ pub fn batch_desc_with_actor(
                         })
                         .sum::<usize>()
                     + usize::from(blur)
-                    + usize::from(weather),
+                    + weather_pages,
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -423,7 +427,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         &[],
         &[],
         None,
-        None,
+        &[],
     )
 }
 
@@ -438,7 +442,7 @@ pub fn build_frame_with_actor(
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
     blur: Option<&SwordBlurDraw<'_>>,
-    weather_texture: Option<&(Vec<u8>, u32, u32)>,
+    weather_textures: &[Option<(Vec<u8>, u32, u32)>],
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
@@ -451,7 +455,11 @@ pub fn build_frame_with_actor(
             held,
             npcs,
             blur.is_some(),
-            weather_texture.is_some() && !snapshot.billboards.is_empty(),
+            if snapshot.billboards.is_empty() {
+                0
+            } else {
+                weather_textures.iter().filter(|t| t.is_some()).count()
+            },
         ),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
@@ -796,17 +804,20 @@ pub fn build_frame_with_actor(
             });
         }
     }
-    if let (Some((rgba, width, height)), true) = (weather_texture, !snapshot.billboards.is_empty())
-    {
-        let page = npc_page + u32::from(blur.is_some());
-        frame.uploads.push(SceneUpload {
-            page,
-            x: 0,
-            y: 0,
-            w: *width,
-            h: *height,
-            rgba: rgba.clone(),
-        });
+    if !snapshot.billboards.is_empty() {
+        let weather_base = npc_page + u32::from(blur.is_some());
+        for (index, texture) in weather_textures.iter().enumerate() {
+            if let Some((rgba, width, height)) = texture {
+                frame.uploads.push(SceneUpload {
+                    page: weather_base + index as u32,
+                    x: 0,
+                    y: 0,
+                    w: *width,
+                    h: *height,
+                    rgba: rgba.clone(),
+                });
+            }
+        }
         let eye = cam.eye();
         for board in &snapshot.billboards {
             let forward = (eye - board.pos).normalize_or(Vec3::Z);
@@ -826,20 +837,30 @@ pub fn build_frame_with_actor(
             let d = board.pos - axis_u * board.half.x + axis_v * board.half.y;
             let mut group = MeshGroup {
                 alpha: board.alpha,
-                texture_page: page,
+                texture_page: weather_base + board.page as u32,
                 transparent: true,
-                depth_test: true,
+                depth_test: board.depth_test,
                 cull_mode: CullMode::None,
                 ..MeshGroup::default()
             };
-            group.push_quad_textured(
-                [a.x, a.y, a.z],
-                [b.x, b.y, b.z],
-                [c.x, c.y, c.z],
-                [d.x, d.y, d.z],
-                board.color,
-                [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
-            );
+            if board.textured {
+                group.push_quad_textured(
+                    [a.x, a.y, a.z],
+                    [b.x, b.y, b.z],
+                    [c.x, c.y, c.z],
+                    [d.x, d.y, d.z],
+                    board.color,
+                    [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                );
+            } else {
+                group.push_quad(
+                    [a.x, a.y, a.z],
+                    [b.x, b.y, b.z],
+                    [c.x, c.y, c.z],
+                    [d.x, d.y, d.z],
+                    board.color,
+                );
+            }
             frame.push(group);
         }
     }

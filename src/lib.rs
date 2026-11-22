@@ -186,7 +186,7 @@ pub struct App {
     pub actor_models: std::collections::HashMap<&'static str, assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
-    pub weather_texture: Option<(Vec<u8>, u32, u32)>,
+    pub weather_textures: Vec<Option<(Vec<u8>, u32, u32)>>,
     /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
     pub bottle_liquid_model: Option<j3d::bdl::RoomMesh>,
     pub bottle_fairy_model: Option<j3d::bdl::RoomMesh>,
@@ -380,7 +380,7 @@ impl App {
             phantom_ganon_model: None,
             actor_models: std::collections::HashMap::new(),
             blur_texture: None,
-            weather_texture: None,
+            weather_textures: Vec::new(),
             bottle_liquid_model: None,
             bottle_fairy_model: None,
             camera_model: None,
@@ -507,7 +507,7 @@ impl App {
             app.tip_stab_model = assets::object_model(&archive, 0x3E);
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
-        app.weather_texture = assets::load_weather_texture();
+        app.weather_textures = assets::load_weather_textures();
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
@@ -1855,45 +1855,192 @@ impl App {
     /// Rain drops and the sun disc, from the same `Weather` packet the decomp draws
     /// (`tww/src/d/d_kankyo_rain.cpp:3946-4117`,
     /// `wwhd/wwhd_src/d/d_kankyo_rain_drawRain.cpp:9-156`).
+    /// Weather draw state, from the same packets the decomp's `dKyr_draw*` pass reads
+    /// (`tww/src/d/d_kankyo_rain.cpp:3947`, HD `wwhd_src/d/d_kankyo_rain_drawRain.cpp:9`).
     fn billboard_views(&self) -> Vec<view::BillboardView> {
         let Some(weather) = self.sim.world.get_resource::<sim::weather::Weather>() else {
             return Vec::new();
         };
         let mut out = Vec::new();
+        let board =
+            |pos, half, color, alpha, roll, page, textured, depth_test| view::BillboardView {
+                pos,
+                half,
+                color,
+                alpha,
+                roll,
+                page,
+                textured,
+                depth_test,
+            };
+        // Rain: the four stacked quads per drop are collapsed into one tall streak.
         let count = weather.rain.rain_count.max(0) as usize;
         for (index, drop) in weather.rain.eff.iter().take(count).enumerate() {
             if drop.alpha <= 0.0 || drop.timer > 0 {
                 continue;
             }
             let size = 2.5 + index as f32 / 250.0 * 3.0;
-            // Four stacked quads per drop, the retail streak (`d_kankyo_rain.cpp:4082-4114`)
-            // collapsed into one taller quad here.
-            out.push(view::BillboardView {
-                pos: drop.base_pos + drop.pos + glam::Vec3::Y * 160.0,
-                half: glam::Vec2::new(size, 240.0 + size * 2.0),
-                color: [1.0, 1.0, 1.0],
-                alpha: (drop.alpha * 14.0).clamp(0.0, 1.0),
-                roll: 0.0,
-            });
+            out.push(board(
+                drop.base_pos + drop.pos + glam::Vec3::Y * 160.0,
+                glam::Vec2::new(size, 240.0 + size * 2.0),
+                [1.0, 1.0, 1.0],
+                (drop.alpha * 14.0).clamp(0.0, 1.0),
+                0.0,
+                0,
+                true,
+                true,
+            ));
+        }
+        // Snow: half-size and droop from `draw_snow` (`d_kankyo_rain.cpp:4956-4999`).
+        let snow_count = weather.snow.eff_count.max(0) as usize;
+        for (index, flake) in weather.snow.eff.iter().take(snow_count).enumerate() {
+            if flake.status == 0 || flake.scale <= 0.0 {
+                continue;
+            }
+            let p = flake.scale + flake.scale - flake.scale * flake.scale;
+            let h = p * (8.0 + index as f32 / 250.0);
+            let droop = 2.0 * (index as f32 / 250.0) * weather.snow.m36d0;
+            out.push(board(
+                flake.base_pos + flake.pos - glam::Vec3::Y * (droop * 0.5),
+                glam::Vec2::new(h, h + droop * 0.5),
+                [1.0, 1.0, 1.0],
+                0x78_f32 / 255.0,
+                0.0,
+                0,
+                true,
+                true,
+            ));
         }
         let sun = &weather.sun;
         if sun.visibility > 0.0 && (sun.sun_alpha > 0.0 || sun.moon_alpha > 0.0) {
-            let alpha = if sun.sun_alpha >= sun.moon_alpha {
-                sun.sun_alpha
-            } else {
-                sun.moon_alpha
-            } * sun.visibility;
-            out.push(view::BillboardView {
-                pos: sun.pos[0],
-                half: glam::Vec2::splat(30.0),
-                color: [
+            let alpha = sun.sun_alpha.max(sun.moon_alpha) * sun.visibility;
+            out.push(board(
+                sun.pos[0],
+                glam::Vec2::splat(30.0),
+                [
                     sun.color.r as f32 / 127.0,
                     sun.color.g as f32 / 127.0,
                     sun.color.b as f32 / 127.0,
                 ],
-                alpha: alpha.clamp(0.0, 1.0),
-                roll: 0.0,
-            });
+                alpha.clamp(0.0, 1.0),
+                0.0,
+                0,
+                true,
+                true,
+            ));
+        }
+        // Lens flare: eight quads with per-index scale/alpha tables, depth test off
+        // (`d_kankyo_rain.cpp:3692-3732,3678`).
+        let lens = &weather.sun_lenz;
+        if sun.visibility > 0.1 {
+            let scales = [
+                8000.0, 10000.0, 1600.0, 4800.0, 1200.0, 5600.0, 2400.0, 7200.0,
+            ];
+            let alphas = [255.0, 80.0, 140.0, 255.0, 125.0, 140.0, 170.0, 140.0];
+            for (index, &position) in lens.positions.iter().enumerate() {
+                if !lens.draw_lenz_in_sky && index != 0 {
+                    continue;
+                }
+                let page = match index {
+                    1 => 2,
+                    2 => 1,
+                    _ => 0,
+                };
+                let fade = if index >= 2 { lens.dist_falloff } else { 1.0 };
+                out.push(board(
+                    position,
+                    glam::Vec2::splat(scales[index] / 8000.0),
+                    [1.0, 1.0, 0xF1_f32 / 255.0],
+                    (alphas[index] / 255.0) * sun.visibility * sun.visibility * fade,
+                    lens.angle_deg as f32,
+                    page,
+                    true,
+                    false,
+                ));
+            }
+        }
+        // Stars: untextured, no page (`d_kankyo_rain.cpp:5080-5087`).
+        for i in 0..weather.star.effect_num.max(0) as usize {
+            let size = if i < 8 {
+                190.0
+            } else if i < 16 {
+                290.0
+            } else {
+                120.0
+            };
+            let color = match i {
+                6 | 8 => [1.0, 200.0 / 255.0, 200.0 / 255.0],
+                _ => [220.0 / 255.0, 230.0 / 255.0, 1.0],
+            };
+            out.push(board(
+                sun.pos[0]
+                    + glam::Vec3::new((i % 16) as f32 * 40.0 - 300.0, (i / 16) as f32 * 40.0, 0.0),
+                glam::Vec2::splat(size),
+                color,
+                1.0,
+                0.0,
+                0,
+                false,
+                true,
+            ));
+        }
+        // Smoke puffs (housi) and poison.
+        let housi = &weather.housi;
+        for puff in housi.effect.iter().take(housi.count.max(0) as usize) {
+            if puff.alpha <= 0.0 {
+                continue;
+            }
+            let sway = puff.scale.x * 10.0;
+            out.push(board(
+                puff.base_pos + puff.pos,
+                glam::Vec2::new(
+                    3.0 - 0.22 * sway.sin(),
+                    3.0 - 0.22 * (puff.scale.y * 10.0).sin(),
+                ),
+                [0xE5_f32 / 255.0, 1.0, 0xC8_f32 / 255.0],
+                puff.alpha * housi.m5ddc,
+                0.0,
+                3,
+                true,
+                true,
+            ));
+        }
+        let poison = &weather.poison;
+        for eff in poison.eff.iter().take(poison.count.max(0) as usize) {
+            if eff.alpha <= 1e-6 || eff.status == 0 {
+                continue;
+            }
+            out.push(board(
+                poison.base_pos + eff.pos,
+                glam::Vec2::splat(eff.size),
+                [95.0 / 255.0, 186.0 / 255.0, 226.0 / 255.0],
+                eff.alpha,
+                0.0,
+                4,
+                true,
+                true,
+            ));
+        }
+        // Cloud shadows: depth test off (`d_kankyo_rain.cpp:5465`).
+        let clouds = &weather.cloud;
+        for cloud in clouds.eff.iter().take(clouds.count.max(0) as usize) {
+            if cloud.alpha <= 0.0 {
+                continue;
+            }
+            out.push(board(
+                cloud.base_pos + cloud.pos,
+                glam::Vec2::splat(cloud.size),
+                [
+                    weather.bg0_k0.r as f32 / 255.0,
+                    weather.bg0_k0.g as f32 / 255.0,
+                    weather.bg0_k0.b as f32 / 255.0,
+                ],
+                cloud.alpha,
+                cloud.anim_counter as f32 * -0.02617994,
+                5,
+                true,
+                false,
+            ));
         }
         out
     }
@@ -4801,7 +4948,7 @@ pub fn root_view(
             &held,
             &npcs,
             blur.as_ref(),
-            app.weather_texture.as_ref(),
+            &app.weather_textures,
         ),
     };
     let desc = match &app.dff {
@@ -4814,7 +4961,11 @@ pub fn root_view(
             &held,
             &npcs,
             blur.is_some(),
-            app.weather_texture.is_some() && !snapshot.billboards.is_empty(),
+            if snapshot.billboards.is_empty() {
+                0
+            } else {
+                app.weather_textures.iter().filter(|t| t.is_some()).count()
+            },
         ),
     };
     let cam = app.cam.clone();
