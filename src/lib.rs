@@ -3946,7 +3946,7 @@ pub fn root_view(
     let mut held: Vec<view::AttachedPart<'_>> = Vec::new();
     if !snapshot.player_no_draw {
         let sword = snapshot.equipment.sword;
-        if sword == sim::inventory::ITEM_SWORD {
+        if sword == sim::damage::ITEM_SWORD {
             if let Some(model) = app.sword_model.as_ref() {
                 held.push(view::AttachedPart {
                     mesh: model,
