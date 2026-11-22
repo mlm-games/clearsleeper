@@ -1280,7 +1280,21 @@ pub fn load_weather_textures() -> Vec<Option<(Vec<u8>, u32, u32)>> {
         .iter()
         .map(|&id| {
             let raw = archive.read_id(id).ok()?;
-            let image = crate::bti::decode(raw)?;
+            let image = crate::bti::decode(raw).or_else(|| {
+                // Always 0x81 (`tx_snow01`) is a headerless 64x64 raw I8 image, not a BTI.
+                if id != 0x81 || raw.len() < 64 * 64 {
+                    return None;
+                }
+                Some(crate::bti::Image {
+                    width: 64,
+                    height: 64,
+                    pixels: raw[..64 * 64].iter().flat_map(|&v| [v, v, v, v]).collect(),
+                    mag_linear: true,
+                    wrap_s: 0,
+                    wrap_t: 0,
+                    alpha_enabled: true,
+                })
+            })?;
             Some((image.pixels, image.width as u32, image.height as u32))
         })
         .collect()

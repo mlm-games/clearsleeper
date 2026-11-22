@@ -413,6 +413,17 @@ pub struct SnowEff {
     pub timer: i16,
 }
 
+/// The splash layer's alpha ease from `dKyr_drawSibuki` (`d_kankyo_rain.cpp:4137-4143`), which
+/// the retail draw owns but this port has to run in sim so the view can read the result.
+pub fn sibuki_draw_state(mut weather: ResMut<Weather>) {
+    let target = if weather.rain.status & 1 != 0 {
+        0.0
+    } else {
+        200.0
+    };
+    add_calc(&mut weather.rain.sibuki_alpha, target, 0.2, 30.0, 0.001);
+}
+
 /// `dKankyo_snow_Packet` (`d_kankyo_wether.h:111-126`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SnowPacket {

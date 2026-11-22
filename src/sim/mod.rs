@@ -2128,6 +2128,7 @@ pub fn build(
                             weather::control.in_set(WwSimSet::Execute),
                             weather::control_clouds.in_set(WwSimSet::Execute),
                             weather::control_draw.in_set(WwSimSet::Execute),
+                            weather::sibuki_draw_state.in_set(WwSimSet::Execute),
                         )
                             .chain(),
                         (

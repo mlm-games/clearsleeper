@@ -198,6 +198,7 @@ pub struct SceneSnapshot {
     pub actors: Vec<ActorView>,
     pub particles: Vec<ParticleView>,
     pub billboards: Vec<BillboardView>,
+    pub oriented_weather: Vec<OrientedWeatherView>,
 }
 
 /// One live emitter as the draw layer needs it: where it is, how big, what
@@ -232,6 +233,17 @@ pub struct BillboardView {
     pub page: usize,
     pub textured: bool,
     pub depth_test: bool,
+}
+
+/// Weather drawn on a world-space plane rather than camera-facing (`d_kankyo_rain.cpp:4220-4234`
+/// for sibuki's XZ splash, `:5332-5370` for wave's sheared crest).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrientedWeatherView {
+    pub corners: [[f32; 3]; 4],
+    pub color: Rgb,
+    pub alpha: f32,
+    pub page: usize,
+    pub textured: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -457,10 +469,10 @@ pub fn build_frame_with_actor(
             held,
             npcs,
             blur.is_some(),
-            if snapshot.billboards.is_empty() {
+            if snapshot.billboards.is_empty() && snapshot.oriented_weather.is_empty() {
                 0
             } else {
-                weather_textures.iter().filter(|t| t.is_some()).count()
+                weather_textures.len()
             },
         ),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
@@ -806,7 +818,7 @@ pub fn build_frame_with_actor(
             });
         }
     }
-    if !snapshot.billboards.is_empty() {
+    if !snapshot.billboards.is_empty() || !snapshot.oriented_weather.is_empty() {
         let weather_base = npc_page + u32::from(blur.is_some());
         for (index, texture) in weather_textures.iter().enumerate() {
             if let Some((rgba, width, height)) = texture {
@@ -861,6 +873,35 @@ pub fn build_frame_with_actor(
                     [c.x, c.y, c.z],
                     [d.x, d.y, d.z],
                     board.color,
+                );
+            }
+            frame.push(group);
+        }
+        for quad in &snapshot.oriented_weather {
+            let mut group = MeshGroup {
+                alpha: quad.alpha,
+                texture_page: weather_base + quad.page as u32,
+                transparent: true,
+                depth_test: true,
+                cull_mode: CullMode::None,
+                ..MeshGroup::default()
+            };
+            if quad.textured {
+                group.push_quad_textured(
+                    quad.corners[0],
+                    quad.corners[1],
+                    quad.corners[2],
+                    quad.corners[3],
+                    quad.color,
+                    [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                );
+            } else {
+                group.push_quad(
+                    quad.corners[0],
+                    quad.corners[1],
+                    quad.corners[2],
+                    quad.corners[3],
+                    quad.color,
                 );
             }
             frame.push(group);

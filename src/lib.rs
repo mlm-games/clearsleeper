@@ -1830,6 +1830,7 @@ impl App {
             actors: self.actor_views(),
             particles: self.particle_views(),
             billboards: self.billboard_views(),
+            oriented_weather: self.oriented_weather_views(),
         }
     }
 
@@ -2041,6 +2042,86 @@ impl App {
                 true,
                 false,
             ));
+        }
+        out
+    }
+
+    /// Splash crests and sea-surface caps, drawn on world-space planes instead of camera-facing
+    /// billboards (`tww/src/d/d_kankyo_rain.cpp:4220-4234,5332-5370`; HD
+    /// `wwhd_src/d/d_kankyo_rain_drawSibuki.cpp:68-81`,
+    /// `wwhd/wwhd_src/d/d_kankyo_rain_drawWave.cpp:71-112`).
+    fn oriented_weather_views(&self) -> Vec<view::OrientedWeatherView> {
+        let Some(weather) = self.sim.world.get_resource::<sim::weather::Weather>() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let eye = weather.rain.cam_eye_pos;
+        let center = weather.rain.cam_center_pos;
+        let forward = (center - eye).normalize_or(glam::Vec3::Z);
+        let right = glam::Vec3::Y.cross(forward).normalize_or(glam::Vec3::X);
+        let up = forward.cross(right).normalize_or(glam::Vec3::Y);
+        // Sibuki: world XZ ground quads scattered in front of the camera.
+        if weather.rain.sibuki_alpha > 1.0 {
+            let count = weather.rain.rain_count.max(0) as usize / 2;
+            let base = eye + forward * 7000.0;
+            for i in 0..count {
+                let jitter = |k: u32| {
+                    let v = (i as u32 + 1)
+                        .wrapping_mul(1664525)
+                        .wrapping_add(k.wrapping_mul(1013904223));
+                    ((v >> 8) % 2000) as f32 / 1000.0 - 1.0
+                };
+                let pos = base
+                    + glam::Vec3::new(jitter(1) * 3600.0, jitter(2) * 1500.0, jitter(3) * 3600.0);
+                let size = 20.0 + jitter(4).abs() * 25.0;
+                out.push(view::OrientedWeatherView {
+                    corners: [
+                        [pos.x - size, pos.y, pos.z - size],
+                        [pos.x + size, pos.y, pos.z - size],
+                        [pos.x + size, pos.y, pos.z + size],
+                        [pos.x - size, pos.y, pos.z + size],
+                    ],
+                    color: [180.0 / 255.0, 200.0 / 255.0, 220.0 / 255.0],
+                    alpha: (weather.rain.sibuki_alpha / 255.0 * weather.rain.fwd_fade1)
+                        .clamp(0.0, 1.0),
+                    page: 2,
+                    textured: true,
+                });
+            }
+        }
+        // Wave: camera-plane caps, top edge sheared by wind across the crest.
+        let wave_count = weather.wave_chan.wave_count.max(0) as usize;
+        if wave_count > 0 {
+            for (index, crest) in weather.wave.eff.iter().take(wave_count).enumerate() {
+                if crest.alpha <= 0.0 || crest.status == 0 {
+                    continue;
+                }
+                let height = crest.counter.sin() * 250.0 * crest.scale * crest.strength_env;
+                let width = 5.0 * 250.0 * crest.scale;
+                if width <= 0.0 || height <= 0.0 {
+                    continue;
+                }
+                let shear =
+                    width * 1.2 * crest.speed * weather.wave.skew_width * weather.wave.skew_dir;
+                let base = crest.base_pos + crest.pos;
+                let corner = |x: f32, y: f32| {
+                    let p = base + right * x + up * y;
+                    [p.x, p.y, p.z]
+                };
+                out.push(view::OrientedWeatherView {
+                    corners: [
+                        corner(-width, 0.0),
+                        corner(width, 0.0),
+                        corner(width + shear, height),
+                        corner(-width + shear, height),
+                    ],
+                    color: [0.12, 0.35, 0.45],
+                    alpha: crest.alpha.clamp(0.0, 1.0),
+                    page: 0,
+                    textured: true,
+                });
+                let _ = index;
+            }
         }
         out
     }
@@ -4962,10 +5043,10 @@ pub fn root_view(
             &held,
             &npcs,
             blur.is_some(),
-            if snapshot.billboards.is_empty() {
+            if snapshot.billboards.is_empty() && snapshot.oriented_weather.is_empty() {
                 0
             } else {
-                app.weather_textures.iter().filter(|t| t.is_some()).count()
+                app.weather_textures.len()
             },
         ),
     };
