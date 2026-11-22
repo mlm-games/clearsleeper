@@ -26,6 +26,9 @@ pub struct PolyCodes {
     pub attribute_direct: u8,
     /// `dBgS::GetGroundCode`, `bg_s.cpp:235`: `(m_info1 >> 21) & 0x1F`.
     pub ground: GroundCode,
+    /// `dBgS::ChkPolyHSStick`, `d_bg_s.cpp:299-309`: `m_info3 & 0x10`, whether a hook can bite
+    /// this polygon (`wwhd/wwhd_src/d/d_bg_s.cpp:720-736`).
+    pub hook_stick: bool,
 }
 
 impl Default for PolyCodes {
@@ -37,6 +40,7 @@ impl Default for PolyCodes {
             attribute: AttrCode::Normal,
             attribute_direct: 0,
             ground: GroundCode::Other(0),
+            hook_stick: false,
         }
     }
 }
@@ -230,7 +234,8 @@ pub enum AttrCode {
     Damage,
     /// `0x0A`.
     Carpet,
-    /// `0x0B`, which `hookshot.cpp:269` lets a hook bite.
+    /// `0x0B`, used at `hookshot.cpp:269` only to pick the sand rebound particle; the bite is
+    /// [`PolyCodes::hook_stick`].
     Sand,
     /// `0x0F`, which `arrow.cpp:819` sticks to and `main.cpp:2449` skips sliding on.
     Ice,

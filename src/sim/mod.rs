@@ -130,6 +130,7 @@ pub mod ground;
 pub mod ground_code;
 pub mod gryw;
 pub mod gtaki;
+pub mod guard;
 pub mod gull;
 pub mod gy_ctrl;
 pub mod hami2;
@@ -1760,6 +1761,7 @@ pub fn build(
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(health::BottleDrink::default());
     sim.world.insert_resource(health::Magic::default());
+    sim.world.insert_resource(guard::Guard::default());
     sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());

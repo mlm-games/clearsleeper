@@ -98,6 +98,18 @@ impl Hookshot {
         self.heading = Vec3::ZERO;
     }
 
+    /// `d_a_hookshot.cpp:245-256` (`wwhd/wwhd_src/d/actor/d_a_hookshot.cpp:640-661`): a hook
+    /// that bites a stickable polygon pulls the player toward the fixed point. `Phase::Pull`
+    /// already skips the actor-position update when `carry` is `None`, so `haul()` pulls the
+    /// player just as it does for an actor anchor.
+    pub fn bite(&mut self, point: Vec3) {
+        self.phase = Phase::Pull;
+        self.pos = point;
+        self.carry = None;
+        self.carry_offset = Vec3::ZERO;
+        self.heading = Vec3::ZERO;
+    }
+
     pub fn reel(&mut self) {
         self.phase = Phase::Return;
     }
@@ -188,7 +200,21 @@ pub fn control(
                     }
                     None if hook.over_extended() || hook.beyond_reach() => hook.reel(),
                     None => {
-                        hook.step();
+                        // `tww/src/d/actor/d_a_hookshot.cpp:243-258` /
+                        // `wwhd/wwhd_src/d/actor/d_a_hookshot.cpp:633-669`: the chain tests the
+                        // background along its travel and bites a stickable polygon. Actors
+                        // are tested first, matching the reference's sight capsule order.
+                        let next = hook.pos + hook.heading * SHOT_STEP;
+                        match solid.and_then(|collision| {
+                            collision
+                                .line_cross(hook.pos, next)
+                                .map(|hit| (hit, collision))
+                        }) {
+                            Some((hit, collision)) if collision.hook_stick(hit.tri) => {
+                                hook.bite(hit.point);
+                            }
+                            _ => hook.step(),
+                        }
                     }
                 }
             }

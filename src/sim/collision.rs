@@ -699,10 +699,12 @@ impl Collision {
         let info_offset = u32_at(data, 0x2C).ok_or(DzbError::Truncated)?;
         let mut info0 = Vec::with_capacity(info_count as usize);
         let mut info1 = Vec::with_capacity(info_count as usize);
+        let mut info3 = Vec::with_capacity(info_count as usize);
         for index in 0..info_count as usize {
             let at = info_offset as usize + index * INFO_STRIDE;
             info0.push(u32_at(data, at).ok_or(DzbError::Truncated)?);
             info1.push(u32_at(data, at + 4).ok_or(DzbError::Truncated)?);
+            info3.push(u32_at(data, at + 0x0C).ok_or(DzbError::Truncated)?);
         }
 
         let group_count = u32_at(data, 0x20).ok_or(DzbError::Truncated)?;
@@ -754,7 +756,7 @@ impl Collision {
             }
             let info_id = usize::from(u16_at(data, at + 6).ok_or(DzbError::Truncated)?);
             codes.push(match (info0.get(info_id), info1.get(info_id)) {
-                (Some(&info), Some(&raw)) => Self::codes_of(info, raw),
+                (Some(&info), Some(&raw)) => Self::codes_of(info, raw, info3.get(info_id).copied()),
                 _ => PolyCodes::default(),
             });
             // `cBgD_Tri_t::m_grp` (`c_bg_w.h:57`) and `cBgW::GetGrpInf` (`c_bg_w.h:179`):
@@ -790,7 +792,7 @@ impl Collision {
     /// reference accessors read: `GetExitId` `bg_s.cpp:107` on `m_info0`, and `GetWallCode`
     /// `:172`, `GetSpecialCode` `:177`, `GetAttributeCode` `:188` and `GetGroundCode` `:236` on
     /// `m_info1`.
-    fn codes_of(info: u32, raw: u32) -> PolyCodes {
+    fn codes_of(info: u32, raw: u32, info3: Option<u32>) -> PolyCodes {
         let attribute = ((raw & ATTRIBUTE_MASK) >> ATTRIBUTE_SHIFT) as u8;
         PolyCodes {
             exit: ((info & EXIT_MASK) >> EXIT_SHIFT) as u8,
@@ -799,6 +801,7 @@ impl Collision {
             attribute: attribute_from_direct(attribute),
             attribute_direct: attribute,
             ground: GroundCode::from_raw(((raw & GROUND_MASK) >> GROUND_SHIFT) as u8),
+            hook_stick: info3.is_some_and(|word| word & 0x10 != 0),
         }
     }
 
@@ -1022,6 +1025,12 @@ impl Collision {
     /// `dBgS::LineCrossNonMoveBG` at `bg_s.cpp:309` is the same test with the moving rooms left
     /// out. A [`Collision`] holds the static rooms of one room set, so there is nothing to
     /// exclude here; a room that moves needs its own [`Collision`].
+    /// `dBgS::ChkPolyHSStick`, `d_bg_s.cpp:299-309`: `m_info3 & 0x10`, whether a hook can bite
+    /// a polygon (`wwhd/wwhd_src/d/d_bg_s.cpp:720-736`).
+    pub fn hook_stick(&self, tri: usize) -> bool {
+        self.codes.get(tri).is_some_and(|codes| codes.hook_stick)
+    }
+
     pub fn line_cross(&self, from: Vec3, to: Vec3) -> Option<LineHit> {
         let dir = to - from;
         let mut nearest: Option<(f32, usize)> = None;

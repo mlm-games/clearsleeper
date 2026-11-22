@@ -171,7 +171,7 @@ fn launch(
     held: &mut Held,
     rounds: u8,
     locks: usize,
-    kind: u8,
+    arrow_kind: u8,
     magic: &mut super::health::Magic,
     commands: &mut Commands,
 ) {
@@ -196,11 +196,11 @@ fn launch(
             ));
         }
         Kind::Arrow => {
-            let cost = arrow::MAGIC_COST[kind as usize] as u8;
+            let cost = arrow::MAGIC_COST[arrow_kind as usize] as u8;
             if !magic.spend(cost) {
                 return;
             }
-            let mut shaft = arrow::Arrow::nocked(kind, rounds);
+            let mut shaft = arrow::Arrow::nocked(arrow_kind, rounds);
             shaft.pos = pos;
             shaft.yaw = player.yaw;
             shaft.shoot(0.0, player.yaw);
