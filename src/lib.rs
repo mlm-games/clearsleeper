@@ -119,6 +119,7 @@ pub struct App {
     pub leaf_open_model: Option<j3d::bdl::RoomMesh>,
     pub hammer_model: Option<j3d::bdl::RoomMesh>,
     pub telescope_model: Option<j3d::bdl::RoomMesh>,
+    pub takt_model: Option<j3d::bdl::RoomMesh>,
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
@@ -295,6 +296,7 @@ impl App {
             leaf_open_model: None,
             hammer_model: None,
             telescope_model: None,
+            takt_model: None,
             ba1_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
@@ -402,6 +404,8 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HAMMER_ENTRY);
         app.telescope_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_TELESCOPE_ENTRY);
+        app.takt_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_WIND_WAKER_ENTRY);
         app.ba1_model = assets::load_ba_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
@@ -4301,6 +4305,16 @@ pub fn root_view(
                         -0x41F as f32 * deg,
                     );
                 held.push(part);
+            }
+        }
+        if app
+            .sim
+            .world
+            .get_resource::<sim::tact::Tact>()
+            .is_some_and(|tact| tact.phase != sim::tact::TactPhase::Idle)
+        {
+            if let Some(model) = app.takt_model.as_ref() {
+                held.push(view::AttachedPart::hand(model, lhand));
             }
         }
     }
