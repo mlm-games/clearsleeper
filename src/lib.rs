@@ -312,8 +312,11 @@ impl App {
         if app.actor_model.is_none() {
             log::warn!("clearsleeper: actor model unavailable");
         }
-        app.hair_model =
-            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HAIR_ENTRY);
+        // `katsura.bdl` is a casual-clothes wig: both trees draw it only under the
+        // CASUAL_CLOTHES flag (`tww/src/d/actor/d_a_player_main.cpp:1901`,
+        // `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3729`). The port has no outfit
+        // state, and `cl.bdl` shape 4 now supplies the real hair, so the wig is left
+        // unloaded rather than drawn over it.
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
