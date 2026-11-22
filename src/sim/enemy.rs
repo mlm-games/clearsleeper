@@ -319,6 +319,8 @@ fn tick(
     player: &Player,
     health: &mut Health,
     guard: &mut super::guard::Guard,
+    protected: bool,
+    soup: &mut bool,
 ) {
     let profile = enemy.profile;
     let dx = player.pos.x - actor.pos.x;
@@ -397,10 +399,10 @@ fn tick(
                         actor.pos,
                         ATTACK_POWER,
                         0,
-                        armor.protects(),
+                        protected,
                     ) {
                         // A landed blow clears the soup power-up (`d_a_player_main.cpp:4982-4989`).
-                        combat.soup = false;
+                        *soup = false;
                     }
                 }
             }
@@ -460,7 +462,15 @@ pub fn control(
             };
             enemy.closing = false;
         } else if floored {
-            tick(&mut enemy, &mut actor, player, &mut health, &mut guard);
+            tick(
+                &mut enemy,
+                &mut actor,
+                player,
+                &mut health,
+                &mut guard,
+                armor.protects(),
+                &mut combat.soup,
+            );
         } else {
             enemy.speed = 0.0;
         }

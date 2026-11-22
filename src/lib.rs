@@ -4431,6 +4431,7 @@ pub fn root_view(
                         cloth,
                     })
                 })
+                .collect::<Vec<_>>()
         })
         .unwrap_or_default();
     let frame = match &app.dff {
