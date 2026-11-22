@@ -4001,7 +4001,7 @@ pub fn root_view(
     // NO_ITEM simply contributes nothing.
     let body_node = |name: &[u8], fallback: usize| {
         app.actor_model.as_ref().map_or(fallback, |m| {
-            m.find_node_id(name).unwrap_or(fallback as u16) as usize
+            m.find_node_id(name).unwrap_or(fallback as u32) as usize
         })
     };
     let lhand = body_node(b"cl_LhandA", 8);

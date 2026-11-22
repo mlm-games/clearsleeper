@@ -2149,7 +2149,6 @@ pub fn build(
                         mmusic::control.in_set(WwSimSet::Execute),
                         ygush::control.in_set(WwSimSet::Execute),
                         deku_leaf::control.in_set(WwSimSet::Execute),
-                        guard::control.in_set(WwSimSet::Execute),
                         spin::control.in_set(WwSimSet::Execute),
                         player_status::control.in_set(WwSimSet::Execute),
                         bombflower::clear_blasts.in_set(WwSimSet::Execute),
@@ -2412,6 +2411,9 @@ pub fn build(
                         water::water_probe.in_set(WwSimSet::Execute),
                         swim::control.in_set(WwSimSet::Execute),
                         lock::control.in_set(WwSimSet::Execute),
+                        // After `lock::control`: `Guard::control` reads `lock.target`, so it must
+                        // see this tick's lock, not the previous one (tww `d_a_player_main.cpp:4329`).
+                        guard::control.in_set(WwSimSet::Execute),
                         jump::control.in_set(WwSimSet::Execute),
                         roll::control.in_set(WwSimSet::Execute),
                         hop::control.in_set(WwSimSet::Execute),

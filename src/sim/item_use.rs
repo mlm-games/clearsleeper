@@ -99,8 +99,14 @@ pub fn control(
     if state.stem.is_some() {
         state.frame += 1;
         if state.frame >= limit(state.stem) {
-            state.stem = None;
-            state.frame = 0;
+            // `deku_leaf::control` owns the glide stem and re-publishes it every tick. Clearing it
+            // here for a single tick makes the leaf pose drop out mid-glide, so wrap instead.
+            if state.stem == Some("usefanb") {
+                state.frame = 0;
+            } else {
+                state.stem = None;
+                state.frame = 0;
+            }
         }
     }
 }
