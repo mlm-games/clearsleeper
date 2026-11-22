@@ -252,6 +252,139 @@ publish_actor!(
     0x5
 );
 
+// Actors whose BCK id is stored sim-side but which have no frame cursor in the port: pose the
+// bind pose of the selected animation. Still far more faithful than a coloured box.
+publish_actor!(
+    aryll,
+    super::aryll::Aryll,
+    "Ls",
+    |c: &super::aryll::Aryll| c.bck as i32,
+    |_c: &super::aryll::Aryll| 0.0,
+    |_c: &super::aryll::Aryll| false,
+    0x8,
+    0x15
+);
+publish_actor!(
+    sage,
+    super::sage::Sage,
+    "Hr",
+    |c: &super::sage::Sage| c.anm_idx as i32,
+    |_c: &super::sage::Sage| 0.0,
+    |_c: &super::sage::Sage| false,
+    0x6,
+    0xF
+);
+publish_actor!(
+    npc_hi1,
+    super::npc_hi1::NpcHi1,
+    "Hi",
+    |c: &super::npc_hi1::NpcHi1| c.anm_no as i32,
+    |_c: &super::npc_hi1::NpcHi1| 0.0,
+    |_c: &super::npc_hi1::NpcHi1| false,
+    0x6,
+    0x7
+);
+publish_actor!(
+    npc_nz,
+    super::npc_nz::NpcNz,
+    "Nz",
+    |c: &super::npc_nz::NpcNz| c.anm_idx as i32,
+    |_c: &super::npc_nz::NpcNz| 0.0,
+    |_c: &super::npc_nz::NpcNz| false,
+    0x15,
+    0x23
+);
+publish_actor!(
+    npc_km1,
+    super::npc_km1::NpcKm1,
+    "Km",
+    |c: &super::npc_km1::NpcKm1| c.anm as i32,
+    |_c: &super::npc_km1::NpcKm1| 0.0,
+    |_c: &super::npc_km1::NpcKm1| false,
+    0x9,
+    0x9
+);
+publish_actor!(
+    npc_jb1,
+    super::npc_jb1::NpcJb1,
+    "Jb",
+    |c: &super::npc_jb1::NpcJb1| c.anm as i32,
+    |_c: &super::npc_jb1::NpcJb1| 0.0,
+    |_c: &super::npc_jb1::NpcJb1| false,
+    0x7,
+    0x9
+);
+publish_actor!(
+    npc_ho,
+    super::npc_ho::NpcHo,
+    "Ho",
+    |c: &super::npc_ho::NpcHo| c.anm_idx as i32,
+    |_c: &super::npc_ho::NpcHo| 0.0,
+    |_c: &super::npc_ho::NpcHo| false,
+    0x6,
+    0x9
+);
+publish_actor!(
+    lenzo,
+    super::lenzo::Lenzo,
+    "Po",
+    |c: &super::lenzo::Lenzo| c.bck as i32,
+    |_c: &super::lenzo::Lenzo| 0.0,
+    |_c: &super::lenzo::Lenzo| false,
+    0x5,
+    0x9
+);
+publish_actor!(
+    marlon,
+    super::marlon::Marlon,
+    "Mn",
+    |c: &super::marlon::Marlon| c.bck_idx as i32,
+    |_c: &super::marlon::Marlon| 0.0,
+    |_c: &super::marlon::Marlon| false,
+    0x6,
+    0xD
+);
+publish_actor!(
+    npc_ah,
+    super::npc_ah::NpcAh,
+    "Ah",
+    |c: &super::npc_ah::NpcAh| c.bck_idx as i32,
+    |_c: &super::npc_ah::NpcAh| 0.0,
+    |_c: &super::npc_ah::NpcAh| false,
+    0x5,
+    0x6
+);
+publish_actor!(
+    npc_tt,
+    super::npc_tt::NpcTt,
+    "Tt",
+    |c: &super::npc_tt::NpcTt| c.anm_idx as i32,
+    |_c: &super::npc_tt::NpcTt| 0.0,
+    |_c: &super::npc_tt::NpcTt| false,
+    0x11,
+    0x19
+);
+publish_actor!(
+    npc_mt,
+    super::npc_mt::NpcMt,
+    "Niten",
+    |c: &super::npc_mt::NpcMt| c.bck as i32,
+    |_c: &super::npc_mt::NpcMt| 0.0,
+    |_c: &super::npc_mt::NpcMt| false,
+    0x5,
+    0xA
+);
+publish_actor!(
+    npc_btsw2,
+    super::npc_btsw2::NpcBtsw2,
+    "Btsw",
+    |c: &super::npc_btsw2::NpcBtsw2| c.anm as i32,
+    |_c: &super::npc_btsw2::NpcBtsw2| 0.0,
+    |_c: &super::npc_btsw2::NpcBtsw2| false,
+    0x8,
+    0x11
+);
+
 /// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
     for (entity, bird) in &birds {

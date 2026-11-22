@@ -2401,6 +2401,22 @@ pub fn build(
                     )
                         .chain(),
                     (
+                        actor_anm::aryll.in_set(WwSimSet::Execute),
+                        actor_anm::sage.in_set(WwSimSet::Execute),
+                        actor_anm::npc_hi1.in_set(WwSimSet::Execute),
+                        actor_anm::npc_nz.in_set(WwSimSet::Execute),
+                        actor_anm::npc_km1.in_set(WwSimSet::Execute),
+                        actor_anm::npc_jb1.in_set(WwSimSet::Execute),
+                        actor_anm::npc_ho.in_set(WwSimSet::Execute),
+                        actor_anm::lenzo.in_set(WwSimSet::Execute),
+                        actor_anm::marlon.in_set(WwSimSet::Execute),
+                        actor_anm::npc_ah.in_set(WwSimSet::Execute),
+                        actor_anm::npc_tt.in_set(WwSimSet::Execute),
+                        actor_anm::npc_mt.in_set(WwSimSet::Execute),
+                        actor_anm::npc_btsw2.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )
