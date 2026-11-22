@@ -1225,8 +1225,10 @@ impl App {
                 | sim::events::SimEvent::Se(_)
                 | sim::events::SimEvent::SeAt(_, _)
                 | sim::events::SimEvent::SeStop(_)
-                | sim::events::SimEvent::Bgm(_)
-                | sim::events::SimEvent::StealItem(_) => None,
+                | sim::events::SimEvent::Bgm(_) => None,
+                // Consumed by `pump_damage_fx`, which spawns the dropped item before the
+                // event is ever drained here.
+                sim::events::SimEvent::StealItem(_) => None,
             };
             if let Some(cue) = cue {
                 self.audio.play(cue);
@@ -1321,12 +1323,30 @@ impl App {
             .sim
             .world
             .resource_mut::<sim::damage_fx::DamageParticles>() = particles;
-        if steals.is_empty() {
-            return;
-        }
-        let mut events = self.sim.world.resource_mut::<sim::events::SimEvents>();
         for steal in steals {
-            events.list.push(sim::events::SimEvent::StealItem(steal));
+            // `fopAcM_createStealItem` (`f_op_actor_mng.cpp:1142-1178`,
+            // `wwhd/wwhd_src/f_op/f_op_actor_mng_4.cpp:25-44`): the struck actor drops a
+            // re-grabbable item at its own point with retail's -6.0 gravity. The life-ball
+            // table this resolves through is absent in the port, so a table index falls back
+            // to a green rupee; a literal id is used as-is (same rule as `switem::created_item`).
+            let item = if (0x20..=0x3E).contains(&steal.table) || steal.table == 0x3F {
+                0x01
+            } else {
+                (steal.table & 0xFF) as u8
+            };
+            let source = crate::dzs::StageActor {
+                name: "item".to_owned(),
+                parameters: u32::from(item),
+                pos: steal.pos.to_array(),
+                angle: [0; 3],
+                set_id: 0,
+                room: steal.room,
+                scale: [1.0; 3],
+            };
+            let entity = sim::spawn_actor(&mut self.sim.world, &source);
+            if let Some(mut pickup) = self.sim.world.get_mut::<sim::pickup::Pickup>(entity) {
+                *pickup = sim::pickup::Pickup::thrown(u32::from(item), 0.0, 0.0, -6.0);
+            }
         }
     }
 
