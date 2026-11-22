@@ -24,11 +24,19 @@ use super::inventory::Equipped;
 pub struct Health {
     pub units: u8,
     pub max: u8,
+    /// `checkNoDamageMode()`: the magic armor's damage gate, published here each tick so every
+    /// actor's `damage()` call is covered, not just the ones routed through `guard::hurt`
+    /// (`tww/include/d/actor/d_a_player_main.h:1832`).
+    pub no_damage: bool,
 }
 
 impl Default for Health {
     fn default() -> Self {
-        Self { units: 12, max: 12 }
+        Self {
+            units: 12,
+            max: 12,
+            no_damage: false,
+        }
     }
 }
 
@@ -43,6 +51,9 @@ impl Health {
     /// writes: to the ceiling when it is above it and to zero when it is below
     /// (`d_meter.cpp:1467-1471`).
     pub fn damage(&mut self, amount: u8) {
+        if self.no_damage {
+            return;
+        }
         self.units = self.units.saturating_sub(amount).min(self.ceiling());
     }
 

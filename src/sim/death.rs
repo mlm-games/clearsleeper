@@ -86,7 +86,8 @@ pub fn check(
             continue;
         }
         if swim.active && swim.air == 0 {
-            health.damage(1);
+            // Drowning is not a blow: bypass the armor's `checkNoDamageMode` gate.
+            health.units = health.units.saturating_sub(1);
             if health.units > 0 {
                 respawn(
                     player,

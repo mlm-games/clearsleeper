@@ -2417,6 +2417,8 @@ pub fn build(
                         // After `lock::control`: `Guard::control` reads `lock.target`, so it must
                         // see this tick's lock, not the previous one (tww `d_a_player_main.cpp:4329`).
                         guard::control.in_set(WwSimSet::Execute),
+                        // Publishes `Health::no_damage` before any actor damage system runs.
+                        magic_armor::control.in_set(WwSimSet::Execute),
                         jump::control.in_set(WwSimSet::Execute),
                         roll::control.in_set(WwSimSet::Execute),
                         hop::control.in_set(WwSimSet::Execute),
@@ -2579,7 +2581,6 @@ pub fn build(
                     transition::check.in_set(WwSimSet::Execute),
                     sea::sea_tick.in_set(WwSimSet::Execute),
                     warship::control.in_set(WwSimSet::Execute),
-                    magic_armor::control.in_set(WwSimSet::Execute),
                     health::apply_damage.in_set(WwSimSet::Execute),
                     health::drink.in_set(WwSimSet::Execute),
                     player_pose::hurt_reaction.in_set(WwSimSet::Execute),

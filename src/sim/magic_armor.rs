@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use super::flags::Collect;
-use super::health::Magic;
+use super::health::{Health, Magic};
 use super::intent::PadButtons;
 use super::inventory::{Equipped, check_get_item};
 
@@ -38,6 +38,7 @@ pub fn control(
     equipped: Res<Equipped>,
     collect: Res<Collect>,
     mut magic: ResMut<Magic>,
+    mut health: ResMut<Health>,
     mut armor: ResMut<MagicArmor>,
 ) {
     // The C button that selects the item in retail is the port's Z button; the C-button-to-item
@@ -51,15 +52,15 @@ pub fn control(
             magic.units -= 1;
         }
     }
-    if !armor.equipped {
-        return;
+    if armor.equipped {
+        if armor.drain > 0 {
+            armor.drain -= 1;
+        } else if magic.units > 0 {
+            armor.drain = DRAIN_TICKS;
+            magic.units -= 1;
+        } else {
+            armor.unequip();
+        }
     }
-    if armor.drain > 0 {
-        armor.drain -= 1;
-    } else if magic.units > 0 {
-        armor.drain = DRAIN_TICKS;
-        magic.units -= 1;
-    } else {
-        armor.unequip();
-    }
+    health.no_damage = armor.equipped;
 }

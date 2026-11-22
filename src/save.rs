@@ -293,6 +293,7 @@ impl From<SavedHealth> for Health {
         Health {
             units: saved.units,
             max: saved.max,
+            no_damage: false,
         }
     }
 }
