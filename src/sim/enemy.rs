@@ -390,7 +390,7 @@ fn tick(
                     enemy.struck = true;
                     // A frontal melee blow is guardable (`main.cpp:5151-5205`);
                     // `hurt` returns true when the shield absorbed it.
-                    super::guard::hurt(
+                    if !super::guard::hurt(
                         health,
                         guard,
                         player,
@@ -398,7 +398,10 @@ fn tick(
                         ATTACK_POWER,
                         0,
                         armor.protects(),
-                    );
+                    ) {
+                        // A landed blow clears the soup power-up (`d_a_player_main.cpp:4982-4989`).
+                        combat.soup = false;
+                    }
                 }
             }
             enemy.step_tick += 1;
@@ -419,6 +422,7 @@ pub fn control(
     mut health: ResMut<Health>,
     mut guard: ResMut<super::guard::Guard>,
     armor: Res<super::magic_armor::MagicArmor>,
+    mut combat: ResMut<super::combat::Combat>,
     players: Query<&Player>,
     mut hurts: Query<&mut Hurt, With<Enemy>>,
     mut idle: Query<&mut Hurt, (Without<Enemy>, Without<super::redead::ReDead>)>,
@@ -499,7 +503,7 @@ pub fn control(
         spear.pos += step;
         spear.life = spear.life.saturating_sub(1);
         if within(spear.pos, player.pos, THROW_REACH) {
-            super::guard::hurt(
+            if !super::guard::hurt(
                 &mut health,
                 &mut guard,
                 player,
@@ -507,7 +511,9 @@ pub fn control(
                 THROW_POWER,
                 0,
                 armor.protects(),
-            );
+            ) {
+                combat.soup = false;
+            }
             let _ = commands.entity(entity).despawn();
             continue;
         }
