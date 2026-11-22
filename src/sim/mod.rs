@@ -2388,6 +2388,11 @@ pub fn build(
                         actor_anm::bmdhand.in_set(WwSimSet::Execute),
                         actor_anm::medli.in_set(WwSimSet::Execute),
                         actor_anm::servant.in_set(WwSimSet::Execute),
+                        actor_anm::npc_p2.in_set(WwSimSet::Execute),
+                        actor_anm::zunari.in_set(WwSimSet::Execute),
+                        actor_anm::makar.in_set(WwSimSet::Execute),
+                        actor_anm::toripost.in_set(WwSimSet::Execute),
+                        actor_anm::npc_bmsw.in_set(WwSimSet::Execute),
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )

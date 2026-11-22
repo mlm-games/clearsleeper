@@ -190,6 +190,56 @@ publish_actor!(
     0x4,
     0xF
 );
+publish_actor!(
+    npc_p2,
+    super::npc_p2::NpcP2,
+    "P2",
+    |c: &super::npc_p2::NpcP2| c.anm_no,
+    |c: &super::npc_p2::NpcP2| c.morph.frame,
+    |_c: &super::npc_p2::NpcP2| false,
+    0x7,
+    0x23
+);
+publish_actor!(
+    zunari,
+    super::zunari::Zunari,
+    "Rsh",
+    |c: &super::zunari::Zunari| c.anm as i32,
+    |c: &super::zunari::Zunari| c.anm_frame,
+    |_c: &super::zunari::Zunari| false,
+    0x14,
+    0x1D
+);
+publish_actor!(
+    makar,
+    super::makar::Makar,
+    "Mk",
+    |c: &super::makar::Makar| c.anm as i32,
+    |c: &super::makar::Makar| c.anm_frame,
+    |_c: &super::makar::Makar| false,
+    0x5,
+    0x10
+);
+publish_actor!(
+    toripost,
+    super::toripost::Toripost,
+    "Toripost",
+    |c: &super::toripost::Toripost| c.bck_idx as i32,
+    |c: &super::toripost::Toripost| c.morf_frame,
+    |_c: &super::toripost::Toripost| false,
+    0x4,
+    0x6
+);
+publish_actor!(
+    npc_bmsw,
+    super::npc_bmsw::NpcBmsw,
+    "Bmsw",
+    |c: &super::npc_bmsw::NpcBmsw| c.anm_idx as i32,
+    |c: &super::npc_bmsw::NpcBmsw| c.anm_frame as f32,
+    |_c: &super::npc_bmsw::NpcBmsw| false,
+    0x9,
+    0x16
+);
 
 /// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
