@@ -175,6 +175,7 @@ pub struct App {
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
     pub chuchu_model: Option<assets::ActorModel>,
+    pub armos_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -357,6 +358,7 @@ impl App {
             master_tip_stab_model: None,
             ba1_model: None,
             chuchu_model: None,
+            armos_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -477,6 +479,7 @@ impl App {
         }
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
+        app.armos_model = assets::load_armos_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -4548,6 +4551,8 @@ pub fn root_view(
                         app.ba1_model.as_ref()
                     } else if anm.archive == sim::actor_anm::CC_ARCHIVE {
                         app.chuchu_model.as_ref()
+                    } else if anm.archive == sim::actor_anm::AM_ARCHIVE {
+                        app.armos_model.as_ref()
                     } else {
                         None
                     }?;

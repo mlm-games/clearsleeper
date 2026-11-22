@@ -299,6 +299,11 @@ pub const BA_MODEL_ENTRY: &str = "ba.bdl";
 pub const CC_ARCHIVE: &str = "CC";
 pub const CC_OBJECT_ARCHIVE: &str = "files/res/Object/Cc.arc";
 pub const CC_MODEL_ID: u16 = 0x2A;
+/// Armos body `AM_BDL` (id 0x22) and BCK ids 0x14..=0x1F in `Am.arc`
+/// (`tww/assets/GZLE01/res/Object/Am.h:25-38`, `d_a_am.cpp:137`).
+pub const AM_ARCHIVE: &str = "AM";
+pub const AM_OBJECT_ARCHIVE: &str = "files/res/Object/Am.arc";
+pub const AM_MODEL_ID: u16 = 0x22;
 
 pub fn load_chuchu_model() -> Option<ActorModel> {
     let archive = load_object_archive(CC_ARCHIVE)?;
@@ -306,6 +311,23 @@ pub fn load_chuchu_model() -> Option<ActorModel> {
     let anms = AnmArchive::open(CC_OBJECT_ARCHIVE).ok()?;
     let mut morphs = Vec::new();
     for id in 0x14..=0x22u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
+
+pub fn load_armos_model() -> Option<ActorModel> {
+    let archive = load_object_archive(AM_ARCHIVE)?;
+    let mesh = object_model(&archive, AM_MODEL_ID)?;
+    let anms = AnmArchive::open(AM_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x14..=0x1Fu16 {
         if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
             morphs.push((id as i32, morph));
         }
