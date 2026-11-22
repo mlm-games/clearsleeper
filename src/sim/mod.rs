@@ -2144,6 +2144,7 @@ pub fn build(
                         omensmk::control.in_set(WwSimSet::Execute),
                         mmusic::control.in_set(WwSimSet::Execute),
                         ygush::control.in_set(WwSimSet::Execute),
+                        guard::control.in_set(WwSimSet::Execute),
                         player_status::control.in_set(WwSimSet::Execute),
                         bombflower::clear_blasts.in_set(WwSimSet::Execute),
                         ajav::control.in_set(WwSimSet::Execute),

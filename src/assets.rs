@@ -425,6 +425,12 @@ pub const PLAYER_GAMEPLAY_STEMS: &[&str] = &[
     "swimdie",
     "boomcatch",
     "damf",
+    "atng",
+    "difencea",
+    "cutturnp",
+    "cutturnpwfb",
+    "cutturnpwlr",
+    "cutturnb",
 ];
 
 /// The standing animation pair, sampled with the player model's joint order, plus the demo bcks

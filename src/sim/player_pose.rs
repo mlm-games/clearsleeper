@@ -51,6 +51,7 @@ pub fn control(
     swim: Res<Swim>,
     roll: Res<Roll>,
     jump: Res<Jump>,
+    guard: Res<super::guard::Guard>,
     game_over: Res<GameOver>,
     mut hurt: ResMut<HurtReaction>,
     mut boom_catch: ResMut<BoomCatch>,
@@ -205,7 +206,18 @@ pub fn control(
     // wwhd/wwhd_src/d/actor/d_a_player_main_04b.cpp:675.
     match current {
         Some(Proc::CrouchDefense | Proc::CrouchDefenseSlip) => {
-            advance(&mut pose, "difence");
+            advance(
+                &mut pose,
+                if guard.slip > 0 {
+                    "difencea"
+                } else {
+                    "difence"
+                },
+            );
+            return;
+        }
+        Some(Proc::GuardSlip) => {
+            advance(&mut pose, "atng");
             return;
         }
         Some(Proc::CrawlMove | Proc::CrawlAutoMove) => {
@@ -287,6 +299,13 @@ pub fn control(
             return;
         }
         _ => {}
+    }
+    // `setShieldGuard` blends ATNG on the upper body while R is held with a lock
+    // (`tww/src/d/actor/d_a_player_main.cpp:4345-4357`;
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:4017-4018`).
+    if guard.raised {
+        advance(&mut pose, "atng");
+        return;
     }
     // A moving body is WALK below the dash band and DASH above it; a standing body keeps its
     // WAITS/WAIT pair. tww/src/d/actor/d_a_player_main.cpp:2968-3045;

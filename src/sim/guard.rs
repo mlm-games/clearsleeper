@@ -49,7 +49,8 @@ impl Guard {
     }
 }
 
-/// `setShieldGuard` (`main.cpp:4329-4337`; HD `d_a_player_main_03.cpp:4014-4015`): the
+/// `setShieldGuard` (`tww/src/d/actor/d_a_player_main.cpp:4329-4337`;
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_03.cpp:4014-4015`): the
 /// reference's shield-equip and stage gates have no port state, so R held with a lock target
 /// stands in for `checkAttentionLock() && checkShieldEquip() && checkGuardAccept()`.
 pub fn control(

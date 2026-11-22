@@ -382,7 +382,9 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
                 let hit_z = player.pos.z - center_z;
                 if hit_x * hit_x + hit_z * hit_z <= profile.radius * profile.radius {
                     enemy.struck = true;
-                    health.damage(ATTACK_POWER);
+                    // A frontal melee blow is guardable (`main.cpp:5151-5205`);
+                    // `hurt` returns true when the shield absorbed it.
+                    super::guard::hurt(&mut health, &mut guard, player, actor.pos, ATTACK_POWER, 0);
                 }
             }
             enemy.step_tick += 1;
@@ -401,6 +403,7 @@ fn tick(enemy: &mut Enemy, actor: &mut Actor, player: &Player, health: &mut Heal
 pub fn control(
     collision: Option<Res<Collision>>,
     mut health: ResMut<Health>,
+    mut guard: ResMut<super::guard::Guard>,
     players: Query<&Player>,
     mut hurts: Query<&mut Hurt, With<Enemy>>,
     mut idle: Query<&mut Hurt, (Without<Enemy>, Without<super::redead::ReDead>)>,
@@ -481,7 +484,7 @@ pub fn control(
         spear.pos += step;
         spear.life = spear.life.saturating_sub(1);
         if within(spear.pos, player.pos, THROW_REACH) {
-            health.damage(THROW_POWER);
+            super::guard::hurt(&mut health, &mut guard, player, spear.pos, THROW_POWER, 0);
             let _ = commands.entity(entity).despawn();
             continue;
         }
