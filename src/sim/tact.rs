@@ -87,7 +87,7 @@ fn bucket(angle: i16) -> (i16, i16) {
             let db = (*b - degrees).abs().min(360.0 - (*b - degrees).abs());
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         })
-        .unwrap_or(0) as usize;
+        .unwrap_or(0.0) as usize;
     WIND_ANGLES[nearest]
 }
 

@@ -1759,6 +1759,7 @@ pub fn build(
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(health::BottleDrink::default());
+    sim.world.insert_resource(health::Magic::default());
     sim.world.insert_resource(vibration::Vibration::default());
     sim.world.insert_resource(windmill::Wind::default());
     sim.world.insert_resource(wlvtag::WaterLevel::default());
@@ -1794,6 +1795,7 @@ pub fn build(
     sim.world.insert_resource(hammer::Cut::default());
     sim.world.insert_resource(pickup::Rupees::default());
     sim.world.insert_resource(item::Held::default());
+    sim.world.insert_resource(arrow::Selection::default());
     sim.world.insert_resource(item_use::ItemUse::default());
     sim.world
         .insert_resource(player_pose::HurtReaction::default());

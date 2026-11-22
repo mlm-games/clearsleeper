@@ -49,6 +49,39 @@ pub const ICE_WATER_FRAMES: i32 = 10 * 30;
 pub const MAGIC_COST: [i16; 4] = [0, 1, 1, 2];
 pub const ROUNDS: u8 = 5;
 
+/// `l_keepType`/`m_keep_type` (`tww/src/d/actor/d_a_arrow.cpp:461`,
+/// `wwhd/wwhd_src/d/actor/d_a_arrow.cpp:20`). A fresh nock starts at normal.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Selection(pub u8);
+
+const ITEM_MAGIC_ARROW: u8 = 0x35;
+const ITEM_LIGHT_ARROW: u8 = 0x36;
+
+/// `changeArrowType` (`tww/src/d/actor/d_a_arrow.cpp:432-476`,
+/// `wwhd/wwhd_src/d/actor/d_a_arrow.cpp:484-509`). The bow item in slot 12
+/// gates which magic kinds can be selected (`dInvSlot_BOW_e`, `inventory.rs:35-36`).
+pub fn cycle(kind: u8, magic: &super::health::Magic, equipped: &super::inventory::Equipped) -> u8 {
+    let bow = equipped.item(super::inventory::BOW_SLOT);
+    let magic_arrows = bow == ITEM_MAGIC_ARROW || bow == ITEM_LIGHT_ARROW;
+    match kind {
+        TYPE_NORMAL if magic.units >= 1 && magic_arrows => TYPE_FIRE,
+        TYPE_FIRE if magic.units >= 1 && magic_arrows => TYPE_ICE,
+        TYPE_ICE if magic.units >= 2 && bow == ITEM_LIGHT_ARROW => TYPE_LIGHT,
+        TYPE_LIGHT => TYPE_NORMAL,
+        _ => TYPE_NORMAL,
+    }
+}
+
+/// `checkRestMp` (`tww/src/d/actor/d_a_arrow.cpp:1025-1037`,
+/// `wwhd/wwhd_src/d/actor/d_a_arrow.cpp:1125-1130`).
+pub fn settle(kind: u8, magic: &super::health::Magic) -> u8 {
+    if magic.units < MAGIC_COST[kind as usize] as u8 {
+        TYPE_NORMAL
+    } else {
+        kind
+    }
+}
+
 /// `SrcObjAt Atp` for the fire and ice arrows in the reference's arrow attack table.
 const ATP_FIRE_ICE: u8 = 4;
 /// `SrcObjAt Atp` for the light arrow. The charge reads the damage as a signed byte, so this value

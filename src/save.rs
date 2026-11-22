@@ -82,6 +82,8 @@ pub struct SaveGame {
     #[serde(default)]
     pub health: SavedHealth,
     #[serde(default)]
+    pub magic: SavedMagic,
+    #[serde(default)]
     pub stage: String,
     #[serde(default)]
     pub rooms: Vec<u8>,
@@ -197,6 +199,36 @@ pub struct SavedHealth {
 impl Default for SavedHealth {
     fn default() -> Self {
         (&Health::default()).into()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SavedMagic {
+    pub units: u8,
+    pub max: u8,
+}
+
+impl Default for SavedMagic {
+    fn default() -> Self {
+        Self { units: 0, max: 0 }
+    }
+}
+
+impl From<&crate::sim::health::Magic> for SavedMagic {
+    fn from(magic: &crate::sim::health::Magic) -> Self {
+        Self {
+            units: magic.units,
+            max: magic.max,
+        }
+    }
+}
+
+impl From<SavedMagic> for crate::sim::health::Magic {
+    fn from(saved: SavedMagic) -> Self {
+        Self {
+            units: saved.units,
+            max: saved.max,
+        }
     }
 }
 
@@ -322,6 +354,7 @@ impl App {
         let mut query = world.query::<&Player>();
         let player = *query.iter(world).next().expect("player exists at boot");
         let health = *world.resource::<Health>();
+        let magic = *world.resource::<crate::sim::health::Magic>();
         let rupees = world.resource::<Rupees>().count;
         let events = world.resource::<EventFlags>().words().to_vec();
         let switches = world.resource::<Switches>().words();
@@ -352,6 +385,7 @@ impl App {
             player: (&player).into(),
             area: (&area).into(),
             health: (&health).into(),
+            magic: (&magic).into(),
             stage,
             rooms: self.rooms.clone(),
             rupees,
@@ -429,6 +463,7 @@ impl App {
             *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
             world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
             *world.resource_mut::<Health>() = save.health.clone().into();
+            *world.resource_mut::<crate::sim::health::Magic>() = save.magic.into();
             *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
             *world.resource_mut::<EventFlags>() =
                 EventFlags::from_words(padded_flags(save.events.as_slice()));

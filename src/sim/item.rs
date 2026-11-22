@@ -166,7 +166,15 @@ impl Shots<'_, '_> {
     }
 }
 
-fn launch(player: &Player, held: &mut Held, rounds: u8, locks: usize, commands: &mut Commands) {
+fn launch(
+    player: &Player,
+    held: &mut Held,
+    rounds: u8,
+    locks: usize,
+    kind: u8,
+    magic: &mut super::health::Magic,
+    commands: &mut Commands,
+) {
     let Some(kind) = held.kind() else {
         return;
     };
@@ -188,7 +196,11 @@ fn launch(player: &Player, held: &mut Held, rounds: u8, locks: usize, commands: 
             ));
         }
         Kind::Arrow => {
-            let mut shaft = arrow::Arrow::nocked(arrow::TYPE_NORMAL, rounds);
+            let cost = arrow::MAGIC_COST[kind as usize] as u8;
+            if !magic.spend(cost) {
+                return;
+            }
+            let mut shaft = arrow::Arrow::nocked(kind, rounds);
             shaft.pos = pos;
             shaft.yaw = player.yaw;
             shaft.shoot(0.0, player.yaw);
@@ -212,6 +224,10 @@ pub fn control(
     collision: Option<Res<Collision>>,
     intent: Res<UseIntent>,
     mut health: ResMut<Health>,
+    mut magic: ResMut<super::health::Magic>,
+    mut selection: ResMut<arrow::Selection>,
+    equipped: Res<super::inventory::Equipped>,
+    pad: Option<Res<super::intent::PadButtons>>,
     mut held: ResMut<Held>,
     mut zones: ResMut<super::flags::ZoneActors>,
     players: Query<&Player>,
@@ -233,6 +249,12 @@ pub fn control(
 ) {
     let pressed = intent.0 && !held.pressed;
     held.pressed = intent.0;
+    // `spActionTrigger` is the R edge (`d_a_player_main.h:1909`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:2490-2499`); cycling only matters
+    // while an arrow is equipped, which `arrow::cycle` checks against the bow slot.
+    if pad.is_some_and(|pad| pad.trig.r) && held.kind() == Some(Kind::Arrow) {
+        selection.0 = arrow::cycle(selection.0, &magic, &equipped);
+    }
     let solid = collision.as_deref();
     let ready = health.units > 0
         && !gates.busy()
@@ -252,7 +274,15 @@ pub fn control(
                 .map_or(0, |arrow| (arrow.round + 1) % arrow::ROUNDS);
             let locks = gates.locked();
             for player in &players {
-                launch(player, &mut held, rounds, locks, &mut commands);
+                launch(
+                    player,
+                    &mut held,
+                    rounds,
+                    locks,
+                    selection.0,
+                    &mut magic,
+                    &mut commands,
+                );
             }
         }
     }

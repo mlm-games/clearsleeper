@@ -66,6 +66,40 @@ const RED_POTION: u8 = 0x51;
 const GREEN_POTION: u8 = 0x52;
 const BLUE_POTION: u8 = 0x53;
 
+/// `dComIfGs_getMagic`/`getMaxMagic` (`tww/include/d/d_com_inf_game.h:2088-2101`;
+/// `wwhd/wwhd_src/d/actor/d_a_arrow.cpp:498-500`). The meter's 0x20 clamp is
+/// `MAGIC_MAX_CLAMP` (`d_meter.cpp:4182-4187`).
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Magic {
+    pub units: u8,
+    pub max: u8,
+}
+
+impl Magic {
+    pub const MAX: u8 = 32;
+
+    /// `dMeter_magicGaugeMove`'s max clamp and a container grant (`d_meter.cpp:4202-4218`,
+    /// `d_item.cpp:606-614`).
+    pub fn grant_max(&mut self, amount: u8) {
+        self.max = self.max.saturating_add(amount).min(Self::MAX);
+        self.units = self.max;
+    }
+
+    pub fn refill(&mut self) {
+        self.units = self.max;
+    }
+
+    /// `daArrow_c::arrowUseMp` (`tww/src/d/actor/d_a_arrow.cpp:307-316`,
+    /// `wwhd/wwhd_src/d/actor/d_a_arrow.cpp:351-356`).
+    pub fn spend(&mut self, cost: u8) -> bool {
+        if self.units < cost {
+            return false;
+        }
+        self.units -= cost;
+        true
+    }
+}
+
 #[derive(Resource, Debug, Default)]
 pub struct BottleDrink {
     pressed: bool,
@@ -78,6 +112,7 @@ pub fn drink(
     intent: Res<UseIntent>,
     mut equipped: ResMut<Equipped>,
     mut health: ResMut<Health>,
+    mut magic: ResMut<Magic>,
     mut bottle: ResMut<BottleDrink>,
 ) {
     let edge = intent.0 && !bottle.pressed;
@@ -87,8 +122,12 @@ pub fn drink(
     }
     for slot in ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS {
         match equipped.item(slot) {
-            RED_POTION | BLUE_POTION => health.units = health.max,
-            GREEN_POTION => {}
+            RED_POTION => health.units = health.max,
+            BLUE_POTION => {
+                health.units = health.max;
+                magic.refill();
+            }
+            GREEN_POTION => magic.refill(),
             _ => continue,
         }
         equipped.set(slot, ITEM_EMPTY_BOTTLE);

@@ -1193,6 +1193,7 @@ pub fn blank_save() -> SaveGame {
             yaw: 0.0,
         },
         health: crate::save::SavedHealth::default(),
+        magic: crate::save::SavedMagic::default(),
         stage: String::new(),
         rooms: Vec::new(),
         rupees: 0,
