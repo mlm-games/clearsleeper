@@ -34,6 +34,7 @@ pub const BA_ARCHIVE: &str = "Ba";
 pub const CC_ARCHIVE: &str = crate::assets::CC_ARCHIVE;
 pub const AM_ARCHIVE: &str = crate::assets::AM_ARCHIVE;
 pub const FM_ARCHIVE: &str = crate::assets::FM_ARCHIVE;
+pub const AM2_ARCHIVE: &str = crate::assets::AM2_ARCHIVE;
 
 /// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
 pub fn clear(mut anms: ResMut<ActorAnms>) {
@@ -62,6 +63,26 @@ pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
             bck,
             frame: grandma.morf_frame,
             looping: grandma.morf.attribute() == Mode::Loop,
+        });
+    }
+}
+
+/// Amos Knight's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_am2.cpp:132-147`).
+pub fn amos_knight(
+    knights: Query<(Entity, &super::amos_knight::AmosKnight)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, knight) in &knights {
+        let bck = knight.curr_bck;
+        if !(0x6..=0xF).contains(&bck) {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: AM2_ARCHIVE,
+            bck,
+            frame: knight.morph.frame,
+            looping: knight.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
         });
     }
 }

@@ -309,6 +309,11 @@ pub const AM_MODEL_ID: u16 = 0x22;
 pub const FM_ARCHIVE: &str = "Fm";
 pub const FM_OBJECT_ARCHIVE: &str = "files/res/Object/Fm.arc";
 pub const FM_MODEL_ID: u16 = 0x15;
+/// Amos Knight body `AM2_BDL` (id 0x12) and BCK ids 0x6..=0xF in `Am2.arc`
+/// (`tww/assets/GZLE01/res/Object/Am2.h:11-22`, `d_a_am2.cpp:1225`).
+pub const AM2_ARCHIVE: &str = "AM2";
+pub const AM2_OBJECT_ARCHIVE: &str = "files/res/Object/Am2.arc";
+pub const AM2_MODEL_ID: u16 = 0x12;
 
 pub fn load_chuchu_model() -> Option<ActorModel> {
     let archive = load_object_archive(CC_ARCHIVE)?;
@@ -316,6 +321,23 @@ pub fn load_chuchu_model() -> Option<ActorModel> {
     let anms = AnmArchive::open(CC_OBJECT_ARCHIVE).ok()?;
     let mut morphs = Vec::new();
     for id in 0x14..=0x22u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
+
+pub fn load_amos_knight_model() -> Option<ActorModel> {
+    let archive = load_object_archive(AM2_ARCHIVE)?;
+    let mesh = object_model(&archive, AM2_MODEL_ID)?;
+    let anms = AnmArchive::open(AM2_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x6..=0xFu16 {
         if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
             morphs.push((id as i32, morph));
         }
