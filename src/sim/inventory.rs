@@ -12,6 +12,8 @@ pub const ITEM_BOW: u8 = 0x27;
 pub const ITEM_DEKU_LEAF: u8 = 0x34;
 /// `dInvSlot_DEKU_LEAF_e`, `d_com_inf_game.h:1076`.
 pub const SLOT_DEKU_LEAF: usize = 6;
+/// `dInvSlot_CAMERA_e`, shared by both picture boxes (`d_com_inf_game.h:1076`).
+pub const SLOT_PICTO_BOX: usize = 8;
 pub const ITEM_WIND_WAKER: u8 = 0x22;
 /// `dItemNo_PICTO_BOX_e` / `dItemNo_DELUXE_PICTO_BOX_e` (`d_item_data.h:42,45`).
 pub const ITEM_PICTO_BOX: u8 = 0x23;
@@ -29,8 +31,8 @@ const SLOT_ITEMS: &[(u8, usize)] = &[
     (0x2D, 5),
     (0x34, 6),
     (0x21, 7),
-    (0x23, 8),
-    (0x26, 8),
+    (0x23, SLOT_PICTO_BOX),
+    (0x26, SLOT_PICTO_BOX),
     (0x29, 9),
     (0x2A, 10),
     (0x2C, 11),

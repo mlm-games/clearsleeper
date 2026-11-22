@@ -1241,32 +1241,7 @@ pub fn load_stage_spawn(stage: &str, room: u8, point: u8) -> Option<StageSpawn> 
     }
 }
 
-/// The 64x64 I8 snow/rain texture used by every weather quad (`tww/assets/GZLJ01/res/Object/Always.h:100`,
-/// `d_kankyo_rain.cpp:760`). Decoded to RGBA so it can be uploaded as a scene texture page.
-pub fn load_weather_texture() -> Option<(Vec<u8>, u32, u32)> {
-    let root = AssetRoot::from_env().ok()?;
-    let archive = root.read_archive(OBJECT_ALWAYS).ok()?;
-    let raw = archive.read_id(0x81).ok()?;
-    let image = crate::bti::decode(raw).or_else(|| {
-        // Always 0x81 (`tx_snow01`) is a headerless 64x64 raw I8 image, not a BTI
-        // (`tww/assets/GZLJ01/res/Object/Always.h:100`, `d_kankyo_rain.cpp:4915`).
-        if raw.len() < 64 * 64 {
-            return None;
-        }
-        Some(crate::bti::Image {
-            width: 64,
-            height: 64,
-            pixels: raw[..64 * 64].iter().flat_map(|&v| [v, v, v, v]).collect(),
-            mag_linear: true,
-            wrap_s: 0,
-            wrap_t: 0,
-            alpha_enabled: true,
-        })
-    })?;
-    Some((image.pixels, image.width as u32, image.height as u32))
-}
-
-/// Weather texture pages, indexed by [`WeatherPage`]. All live in `Always.arc`.
+/// Weather texture pages in `Always.arc`, in the order the draw passes consume them.
 pub const WEATHER_IDS: [u16; 6] = [0x81, 0x82, 0x85, 0x6D, 0x6E, 0x84];
 
 pub fn load_weather_textures(stage: &str) -> Vec<Option<(Vec<u8>, u32, u32)>> {

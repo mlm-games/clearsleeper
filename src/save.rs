@@ -210,11 +210,20 @@ impl Default for SavedHealth {
 pub struct SavedMagic {
     pub units: u8,
     pub max: u8,
+    #[serde(default)]
+    pub armor_equipped: bool,
+    #[serde(default)]
+    pub armor_drain: u32,
 }
 
 impl Default for SavedMagic {
     fn default() -> Self {
-        Self { units: 0, max: 0 }
+        Self {
+            units: 0,
+            max: 0,
+            armor_equipped: false,
+            armor_drain: 0,
+        }
     }
 }
 
@@ -223,6 +232,8 @@ impl From<&crate::sim::health::Magic> for SavedMagic {
         Self {
             units: magic.units,
             max: magic.max,
+            armor_equipped: false,
+            armor_drain: 0,
         }
     }
 }
@@ -360,13 +371,16 @@ impl App {
         let player = *query.iter(world).next().expect("player exists at boot");
         let health = *world.resource::<Health>();
         let magic = *world.resource::<crate::sim::health::Magic>();
+        let armor = *world.resource::<crate::sim::magic_armor::MagicArmor>();
+        let mut saved_magic: SavedMagic = (&magic).into();
+        saved_magic.armor_equipped = armor.equipped;
+        saved_magic.armor_drain = armor.drain;
         let photo = *world.resource::<crate::sim::snap::PhotoCapture>();
         let mut photos = [0_u32; 3];
         let mut photo_details = [0_u8; 3];
-        if photo.result != 0 {
-            photos[0] = photo.result;
-            photo_details[0] = photo.detail;
-        }
+        // The result is stored whatever it is, 0 included (`d_picture_box.cpp:616-617`).
+        photos[0] = photo.result;
+        photo_details[0] = photo.detail;
         let rupees = world.resource::<Rupees>().count;
         let events = world.resource::<EventFlags>().words().to_vec();
         let switches = world.resource::<Switches>().words();
@@ -397,7 +411,7 @@ impl App {
             player: (&player).into(),
             area: (&area).into(),
             health: (&health).into(),
-            magic: (&magic).into(),
+            magic: saved_magic,
             photos,
             photo_details,
             stage,
@@ -476,7 +490,15 @@ impl App {
             text.set_player_name(&save.name);
             *world.resource_mut::<CurrentFrame>() = CurrentFrame(save.tick);
             world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
-            *world.resource_mut::<Health>() = save.health.clone().into();
+            let mut health: Health = save.health.clone().into();
+            health.no_damage = save.magic.armor_equipped;
+            *world.resource_mut::<Health>() = health;
+            // The armor's equip flag and drain timer survive a save (`d_a_player_main.cpp:3759-3775`).
+            {
+                let mut armor = world.resource_mut::<crate::sim::magic_armor::MagicArmor>();
+                armor.equipped = save.magic.armor_equipped;
+                armor.drain = save.magic.armor_drain;
+            }
             *world.resource_mut::<crate::sim::health::Magic>() = save.magic.into();
             {
                 let mut photo = world.resource_mut::<crate::sim::snap::PhotoCapture>();

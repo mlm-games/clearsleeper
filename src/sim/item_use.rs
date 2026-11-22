@@ -4,7 +4,10 @@ use super::ba1::{ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_EMPTY_BOTTLE};
 use super::carry::Carry;
 use super::combat::Combat;
 use super::intent::UseIntent;
-use super::inventory::{Equipped, ITEM_DEKU_LEAF, ITEM_WIND_WAKER, SLOT_DEKU_LEAF, WAKER_SLOT};
+use super::inventory::{
+    Equipped, ITEM_DEKU_LEAF, ITEM_DELUXE_PICTO_BOX, ITEM_PICTO_BOX, ITEM_WIND_WAKER,
+    SLOT_DEKU_LEAF, SLOT_PICTO_BOX, WAKER_SLOT,
+};
 
 /// Presentation-only state for the body animation an item or a carried object starts in normal
 /// play. The decomp installs one bck for the whole process (`d_a_player_fan.inc:183-191`), which
@@ -94,10 +97,11 @@ pub fn control(
             stem = Some("taktdge");
         }
         if stem.is_none()
-            && (equipped.item(0) == super::inventory::ITEM_PICTO_BOX
-                || equipped.item(0) == super::inventory::ITEM_DELUXE_PICTO_BOX)
+            && (equipped.item(SLOT_PICTO_BOX) == ITEM_PICTO_BOX
+                || equipped.item(SLOT_PICTO_BOX) == ITEM_DELUXE_PICTO_BOX)
         {
-            // tww/src/d/actor/d_a_player_main.cpp:3746-3755 (the picture-box item process).
+            // tww/src/d/actor/d_a_player_main.cpp:3746-3755 (the picture-box item process);
+            // wwhd/wwhd_src/d/actor/d_a_player_main.cpp: the camera is read from its own slot.
             stem = Some("photo");
         }
         if let Some(stem) = stem {

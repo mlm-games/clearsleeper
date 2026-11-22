@@ -60,6 +60,11 @@ impl Health {
     pub fn heal(&mut self, amount: u8) {
         self.units = self.units.saturating_add(amount).min(self.ceiling());
     }
+
+    /// A potion or fairy writes the same clamped life the meter does (`d_meter.cpp:1465-1467`).
+    pub fn refill(&mut self) {
+        self.units = self.ceiling();
+    }
 }
 
 pub fn apply_damage(
@@ -144,9 +149,9 @@ pub fn drink(
     for slot in ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS {
         let item = equipped.item(slot);
         match item {
-            RED_POTION => health.units = health.max,
+            RED_POTION => health.refill(),
             BLUE_POTION => {
-                health.units = health.max;
+                health.refill();
                 magic.refill();
             }
             GREEN_POTION => magic.refill(),
@@ -154,7 +159,7 @@ pub fn drink(
                 // Soup refills both meters and doubles sword power until the next blow;
                 // a full soup leaves a half soup behind (`d_a_player_bottle.inc:139-147,168-171`;
                 // HD `wwhd/wwhd_src/d/actor/d_a_player_main_07.cpp:4514-4539`).
-                health.units = health.max;
+                health.refill();
                 magic.refill();
                 combat.soup = true;
             }

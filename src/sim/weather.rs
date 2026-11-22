@@ -4353,9 +4353,15 @@ pub fn control_draw(
 pub fn control_clouds(
     mut weather: ResMut<Weather>,
     camera: Res<Camera>,
+    frame_res: Res<CurrentFrame>,
     stage: Option<Res<StageName>>,
 ) {
-    let frame = Frame::capture(&weather, Some(&camera), 0, stage.as_deref());
+    let frame = Frame::capture(
+        &weather,
+        Some(&camera),
+        frame_res.0 as u32,
+        stage.as_deref(),
+    );
     wether_move_draw2(&mut weather, &frame);
 }
 

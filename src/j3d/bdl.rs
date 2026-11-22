@@ -369,6 +369,8 @@ impl RoomMesh {
     pub fn append(&mut self, mut part: RoomMesh) {
         let page_base = self.textures.len() as u32;
         let animation_base = self.animations.len() as u32;
+        let joint_base = self.joints.len() as u16;
+        let material_base = self.materials.len() as u16;
         for group in &mut part.groups {
             if let Some(page) = group.texture_page.as_mut() {
                 *page += page_base;
@@ -376,10 +378,28 @@ impl RoomMesh {
             if let Some(binding) = group.anim.as_mut() {
                 binding.set += animation_base;
             }
+            if let Some(joint) = group.direct_joint.as_mut() {
+                *joint += joint_base;
+            }
+            if let Some(material) = group.material.as_mut() {
+                *material += material_base;
+            }
+            for (indices, weights) in group.joint_indices.iter_mut().zip(&group.joint_weights) {
+                for (index, weight) in indices.iter_mut().zip(weights) {
+                    if *weight > 0.0 && *index != PARENT_NONE {
+                        *index += joint_base;
+                    }
+                }
+            }
         }
         for material in &mut part.materials {
             for unit in material.tex_nos.iter_mut().flatten() {
                 *unit += page_base as u16;
+            }
+        }
+        for parent in &mut part.joint_parents {
+            if *parent != PARENT_NONE {
+                *parent += joint_base;
             }
         }
         self.uv_placements.append(&mut part.uv_placements);
@@ -389,6 +409,7 @@ impl RoomMesh {
         self.textures.append(&mut part.textures);
         self.joints.append(&mut part.joints);
         self.joint_matrices.append(&mut part.joint_matrices);
+        self.inverse_bind.append(&mut part.inverse_bind);
         self.joint_parents.append(&mut part.joint_parents);
         self.joint_names.append(&mut part.joint_names);
     }

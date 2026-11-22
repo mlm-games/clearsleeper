@@ -302,8 +302,6 @@ struct AlbumStage {
     host: crate::ui_menu_collect::AlbumHost,
     tune: crate::ui_menu_collect::AlbumTune,
     input: crate::ui_menu_collect::AlbumInput,
-    picture_num: u8,
-    capture_step: i32,
     shutter_pending: bool,
     draw: Option<crate::ui_menu_collect::AlbumDraw>,
     canvas: text::raster::Canvas,
@@ -346,14 +344,13 @@ impl App {
         let input = self.album_input();
         album.create(&input, &mut out);
         let mut host = crate::ui_menu_collect::AlbumHost::default();
-        host.create(&mut 0, &mut out);
+        let mut picture_num = input.picture_num;
+        host.create(&mut picture_num, &mut out);
         self.album = Some(AlbumStage {
             album,
             host,
             tune: crate::ui_menu_collect::AlbumTune::default(),
             input,
-            picture_num: 0,
-            capture_step: 0,
             shutter_pending: false,
             draw: None,
             canvas: text::raster::Canvas::new(640, 480),
@@ -365,43 +362,68 @@ impl App {
     }
 
     fn album_input(&self) -> crate::ui_menu_collect::AlbumInput {
-        use crate::ui_menu_collect::AlbumInput;
-        let world = &self.sim.world;
-        let collect = *world.resource::<sim::flags::Collect>();
-        let story = *world.resource::<sim::flags::StoryBits>();
-        let photo = *world.resource::<sim::snap::PhotoCapture>();
+        use crate::ui_menu_collect::{AlbumInput, PhotoRecord};
         let mut input = AlbumInput {
-            collect,
-            story,
             camera_attention: true,
-            camera_slot_item: world.resource::<sim::inventory::Equipped>().item(8),
-            capture_result: photo.result,
-            capture_result_detail: photo.detail,
-            picture_num: 0,
-            picture_status: 0,
             ..AlbumInput::default()
         };
+        input = self.refresh_album_input(&input);
+        let photo = *self.sim.world.resource::<sim::snap::PhotoCapture>();
+        // The shell keeps one judged photo in memory; the album's slot count follows it until a
+        // save is loaded (`d_picture_box.cpp:616-617`, the result/detail pair stored per picture).
+        if photo.result != 0 || photo.detail != 0 {
+            let mut record = PhotoRecord::from_texture(&[]);
+            record.snap_result = photo.result;
+            record.snap_result_detail = photo.detail;
+            input.saved[0] = record;
+            input.picture_num = 1;
+        }
+        input
+    }
+
+    fn refresh_album_input(
+        &self,
+        base: &crate::ui_menu_collect::AlbumInput,
+    ) -> crate::ui_menu_collect::AlbumInput {
+        use crate::ui_menu_collect::AlbumInput;
+        let world = &self.sim.world;
+        let mut input = base.clone();
+        input.collect = *world.resource::<sim::flags::Collect>();
+        input.story = *world.resource::<sim::flags::StoryBits>();
+        input.camera_slot_item = world
+            .resource::<sim::inventory::Equipped>()
+            .item(sim::inventory::SLOT_PICTO_BOX);
         input.capture_from(world.resource::<sim::snap::SnapPacket>());
         input
     }
 
     fn step_album(&mut self, _dt: Duration) {
-        use crate::ui_menu_collect::{AlbumOutput, PadInput};
-        let input = self.album_input();
+        use crate::ui_menu_collect::{AlbumOutput, CAPTURE_READY, PadInput};
+        let refreshed = self
+            .album
+            .as_ref()
+            .map(|stage| self.refresh_album_input(&stage.input));
         let Some(stage) = self.album.as_mut() else {
             return;
         };
-        stage.input = input;
+        stage.input = refreshed.unwrap_or_default();
+        // Discrete actions key on press edges; d-pad and the stick stay levels.
+        let trig = self
+            .sim
+            .world
+            .get_resource::<sim::intent::PadButtons>()
+            .map(|pad| pad.trig)
+            .unwrap_or_default();
         let pad = &self.sampled_pad;
         let menu_pad = PadInput {
-            a: pad.hold.a,
-            b: pad.hold.b,
-            x: pad.hold.x,
-            y: pad.hold.y,
-            z: pad.hold.z,
-            l: pad.hold.l,
-            r: pad.hold.r,
-            start: pad.hold.start,
+            a: trig.a,
+            b: trig.b,
+            x: trig.x,
+            y: trig.y,
+            z: trig.z,
+            l: trig.l,
+            r: trig.r,
+            start: trig.start,
             stick_value: pad.move_axis.length(),
             stick_angle: sim::walk::to_s16(pad.move_axis.x.atan2(-pad.move_axis.y)),
             ..PadInput::default()
@@ -414,6 +436,22 @@ impl App {
             &mut out,
             &stage.tune,
         );
+        if let Some(step) = out.capture_step {
+            stage.input.capture_step = step;
+        }
+        if let Some(num) = out.picture_num {
+            stage.input.picture_num = num;
+        }
+        if let Some(status) = out.picture_status {
+            stage.input.picture_status = status;
+        }
+        for (slot, record) in out.saved.iter().enumerate() {
+            if let (0, Some(record)) = (slot, record) {
+                let mut photo = self.sim.world.resource_mut::<sim::snap::PhotoCapture>();
+                photo.result = record.snap_result;
+                photo.detail = record.snap_result_detail;
+            }
+        }
         if out.release_shutter {
             self.sim
                 .world
@@ -435,7 +473,7 @@ impl App {
             stage
                 .input
                 .capture_from(self.sim.world.resource::<sim::snap::SnapPacket>());
-            stage.capture_step = 5;
+            stage.input.capture_step = CAPTURE_READY;
         }
         if stage.album.get_status() == crate::ui_menu_collect::STATE_CLOSED || out.photo_box_cancel
         {
@@ -710,7 +748,6 @@ impl App {
             app.tip_stab_model = assets::object_model(&archive, 0x3E);
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
-        app.weather_textures = assets::load_weather_textures(&app.stage_name);
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
@@ -850,6 +887,9 @@ impl App {
 
     fn reset_world_at(&mut self, stage: &str, spawn_point: u8) {
         self.stage_name = stage.to_owned();
+        // Vrkumo cloud pages live in the stage archive (`tww/src/d/d_kankyo_wether.cpp:818-834`;
+        // `wwhd/wwhd_src/d/d_kankyo_wether.cpp:2830-2846`), so reload them once the stage is known.
+        self.weather_textures = assets::load_weather_textures(&self.stage_name);
         self.title_actor = None;
         self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
