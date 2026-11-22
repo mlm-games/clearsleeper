@@ -410,7 +410,7 @@ impl Default for Salvage {
 }
 
 pub fn control(
-    tags: Query<(&Actor, &mut Salvage, &Scale)>,
+    mut tags: Query<(&Actor, &mut Salvage, &Scale)>,
     players: Query<&super::player::Player>,
     cranes: Query<&Crane>,
     switches: Res<Switches>,
