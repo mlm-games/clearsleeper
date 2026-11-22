@@ -673,3 +673,307 @@ publish_actor!(
     0xC,
     0xC
 );
+
+/// Bokoblin and spear Moblin both spawn `enemy::Enemy`; the stage actor name picks the archive
+/// and the sim's coarse state picks a wait, walk or attack BCK. The decomp does the same split in
+/// `tww/src/d/actor/d_a_bk.cpp:81-98` and `tww/src/d/actor/d_a_mo2.cpp:137-153`.
+pub fn boko_moblin(
+    entities: Query<(Entity, &super::actor::Actor, &super::enemy::Enemy)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    use super::enemy::EnemyState;
+    for (entity, actor, enemy) in &entities {
+        let (archive, bck) = match actor.name.as_str() {
+            "Bk" => (
+                "Bk",
+                match enemy.state {
+                    EnemyState::Attack => 0x2A,
+                    EnemyState::Chase => 0x52,
+                    _ => 0x51,
+                },
+            ),
+            "mo2" => (
+                "Mo2",
+                match enemy.state {
+                    EnemyState::Chase | EnemyState::Attack => 0x75,
+                    _ => 0x73,
+                },
+            ),
+            _ => continue,
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive,
+            bck,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+publish_actor!(
+    gull_bodies,
+    super::gull::Gull,
+    "Kamome",
+    |c: &super::gull::Gull| if c.flying { 0xF } else { 0x12 },
+    |_c: &super::gull::Gull| 0.0,
+    |_c: &super::gull::Gull| false,
+    0xC,
+    0x14
+);
+publish_actor!(
+    balloon_bodies,
+    super::balloon::Balloon,
+    "Bb",
+    |_c: &super::balloon::Balloon| 0x21,
+    |_c: &super::balloon::Balloon| 0.0,
+    |_c: &super::balloon::Balloon| false,
+    0x15,
+    0x22
+);
+publish_actor!(
+    ks_bodies,
+    super::ks::Ks,
+    "Ks",
+    |_c: &super::ks::Ks| -1,
+    |_c: &super::ks::Ks| 0.0,
+    |_c: &super::ks::Ks| false,
+    -1,
+    0xC
+);
+publish_actor!(
+    dr2_bodies,
+    super::dr2::Dr2,
+    "Dr2",
+    |_c: &super::dr2::Dr2| 0x9,
+    |_c: &super::dr2::Dr2| 0.0,
+    |_c: &super::dr2::Dr2| false,
+    0x9,
+    0xB
+);
+publish_actor!(
+    bemos_bodies,
+    super::bemos::Bemos,
+    "Hmos",
+    |_c: &super::bemos::Bemos| -1,
+    |_c: &super::bemos::Bemos| 0.0,
+    |_c: &super::bemos::Bemos| false,
+    -1,
+    0
+);
+publish_actor!(
+    kn_bodies,
+    super::kn::Kn,
+    "Kn",
+    |_c: &super::kn::Kn| 0x5,
+    |_c: &super::kn::Kn| 0.0,
+    |_c: &super::kn::Kn| false,
+    0x4,
+    0x7
+);
+publish_actor!(
+    daiocta_bodies,
+    super::daiocta::Daiocta,
+    "Daiocta",
+    |_c: &super::daiocta::Daiocta| 0xD,
+    |_c: &super::daiocta::Daiocta| 0.0,
+    |_c: &super::daiocta::Daiocta| false,
+    0x6,
+    0xD
+);
+publish_actor!(
+    dragon_bodies,
+    super::dragon::Dragon,
+    "Dr",
+    |_c: &super::dragon::Dragon| 0x10,
+    |_c: &super::dragon::Dragon| 0.0,
+    |_c: &super::dragon::Dragon| false,
+    0xB,
+    0x10
+);
+publish_actor!(
+    boko_bodies,
+    super::boko::Boko,
+    "Boko",
+    |_c: &super::boko::Boko| -1,
+    |_c: &super::boko::Boko| 0.0,
+    |_c: &super::boko::Boko| false,
+    -1,
+    0
+);
+publish_actor!(
+    bird_bodies,
+    super::bird::Bird,
+    "Bm",
+    |_c: &super::bird::Bird| 0x20,
+    |_c: &super::bird::Bird| 0.0,
+    |_c: &super::bird::Bird| false,
+    0x0,
+    0x50
+);
+publish_actor!(
+    dk_bodies,
+    super::dk::Dk,
+    "Dk",
+    |_c: &super::dk::Dk| 0x11,
+    |_c: &super::dk::Dk| 0.0,
+    |_c: &super::dk::Dk| false,
+    0x10,
+    0x11
+);
+publish_actor!(
+    form3_bodies,
+    super::ganon_form3::GanonForm3,
+    "Bgn3",
+    |_c: &super::ganon_form3::GanonForm3| 0x6,
+    |_c: &super::ganon_form3::GanonForm3| 0.0,
+    |_c: &super::ganon_form3::GanonForm3| false,
+    0x6,
+    0x10
+);
+publish_actor!(
+    shmrgrd_bodies,
+    super::shmrgrd::Shmrgrd,
+    "Shmrgrd",
+    |_c: &super::shmrgrd::Shmrgrd| -1,
+    |_c: &super::shmrgrd::Shmrgrd| 0.0,
+    |_c: &super::shmrgrd::Shmrgrd| false,
+    -1,
+    0
+);
+publish_actor!(
+    apzl_bodies,
+    super::apzl::Apzl,
+    "Apzl",
+    |_c: &super::apzl::Apzl| -1,
+    |_c: &super::apzl::Apzl| 0.0,
+    |_c: &super::apzl::Apzl| false,
+    -1,
+    0
+);
+publish_actor!(
+    figure_bodies,
+    super::figure::Figure,
+    "Figure",
+    |_c: &super::figure::Figure| -1,
+    |_c: &super::figure::Figure| 0.0,
+    |_c: &super::figure::Figure| false,
+    -1,
+    0
+);
+
+/// Keese share one component for both the normal and fire variants, so the stage name selects
+/// the archive. `BDL_KI=0x18`, `BDL_FK=0x17`, both with BCKs `0xF..=0x14`
+/// (`tww/src/d/actor/d_a_ki.cpp:1211-1233`).
+pub fn keese_bodies(
+    entities: Query<(Entity, &super::actor::Actor, &super::ki::Ki)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, actor, _ki) in &entities {
+        let archive = if actor.name == "Fkeeth" { "FK" } else { "Ki" };
+        anms.0.push(ActorAnm {
+            entity,
+            archive,
+            bck: 0x14,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+/// Ivan's `anm_idx` indexes `l_bck_ix_tbl` (`tww/src/d/actor/d_a_npc_mk.cpp:18-34`).
+pub fn ivan_bodies(entities: Query<(Entity, &super::ivan::Ivan)>, mut anms: ResMut<ActorAnms>) {
+    const BCK: [i32; 12] = [0xF, 0xC, 0xD, 0xE, 0x10, 0xB, 0x9, 0x6, 0x7, 0x5, 0x8, 0xA];
+    for (entity, ivan) in &entities {
+        let index = ivan.anm_idx;
+        let Some(&bck) = usize::try_from(index).ok().and_then(|i| BCK.get(i)) else {
+            continue;
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: "Mk",
+            bck,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+/// The talking trees and goddess statues share one body with four head variants
+/// (`tww/src/d/actor/d_a_obj_doguu.cpp:98-182`).
+pub fn doguu_bodies(
+    entities: Query<(Entity, &super::obj_doguu::ObjDoguu)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, obj) in &entities {
+        let bck = match obj.megami {
+            1 => 0x7,
+            2 => 0x8,
+            3 => 0x9,
+            _ => 0x6,
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: "Doguu",
+            bck,
+            frame: obj.bck_frame,
+            looping: false,
+        });
+    }
+}
+
+/// `Homen.arc` has two bodies with no BCK (`tww/src/d/actor/d_a_obj_homen.cpp:212-220`).
+pub fn homen_bodies(entities: Query<(Entity, &super::homen::Homen)>, mut anms: ResMut<ActorAnms>) {
+    for (entity, obj) in &entities {
+        anms.0.push(ActorAnm {
+            entity,
+            archive: if obj.kind == 0 { "Homen" } else { "Homen2" },
+            bck: -1,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}
+
+/// Darknut (`d_a_tn.cpp`, not Tingle — the sim module name is a misnomer). The action maps to
+/// the A-series BCKs in `tww/assets/GZLE01/res/Object/Tn.h:178-179,178-179`.
+publish_actor!(
+    darknut,
+    super::tingle::Tingle,
+    "Tn",
+    |c: &super::tingle::Tingle| match c.action {
+        super::tingle::ACTION_STAND => 0x3D,
+        super::tingle::ACTION_FIGHT_RUN => 0x3E,
+        super::tingle::ACTION_FIGHT => 0x35,
+        super::tingle::ACTION_DEFENCE => 0x30,
+        super::tingle::ACTION_HUKKI => 0x32,
+        super::tingle::ACTION_FAIL => 0x4A,
+        _ => 0x3D,
+    },
+    |_c: &super::tingle::Tingle| 0.0,
+    |_c: &super::tingle::Tingle| false,
+    0x28,
+    0x67
+);
+
+/// The merchants' `anm_idx` indexes `l_bck_ix_tbl[][10]`
+/// (`tww/src/d/actor/d_a_npc_roten.cpp:1420-1431`); the ten entries are the `dRes_ID_RO_BCK_*`
+/// values in `tww/assets/GZLE01/res/Object/Ro.h:39-51`. The port stores the same table index.
+pub fn merchants(
+    entities: Query<(Entity, &super::merchant::Merchant)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    const BCK: [i32; 10] = [0x0, 0x4, 0x7, 0x5, 0x6, 0xA, 0xB, 0x8, 0x9, 0x13];
+    for (entity, merchant) in &entities {
+        let Some(&bck) = BCK.get(usize::from(merchant.anm_idx)) else {
+            continue;
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: "Ro",
+            bck,
+            frame: 0.0,
+            looping: false,
+        });
+    }
+}

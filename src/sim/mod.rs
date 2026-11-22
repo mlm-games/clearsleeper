@@ -2431,6 +2431,34 @@ pub fn build(
                         actor_anm::gp1.in_set(WwSimSet::Execute),
                         actor_anm::pf1.in_set(WwSimSet::Execute),
                         actor_anm::great_fairy.in_set(WwSimSet::Execute),
+                        actor_anm::boko_moblin.in_set(WwSimSet::Execute),
+                        actor_anm::darknut.in_set(WwSimSet::Execute),
+                        actor_anm::merchants.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
+                        actor_anm::gull_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::balloon_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::ks_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::dr2_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::bemos_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::kn_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::daiocta_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::dragon_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::boko_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::bird_bodies.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
+                        actor_anm::dk_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::form3_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::shmrgrd_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::apzl_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::figure_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::keese_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::ivan_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::doguu_bodies.in_set(WwSimSet::Execute),
+                        actor_anm::homen_bodies.in_set(WwSimSet::Execute),
                     )
                         .chain(),
                     (

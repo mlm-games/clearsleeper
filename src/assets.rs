@@ -397,6 +397,40 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Zl", "files/res/Object/Zl.arc", 0xF, 0x0, 0x2A),
     ("Zl2", "files/res/Object/Zl2.arc", 0x1, 0x0, 0x0),
     ("Always", "files/res/Object/Always.arc", 0x1F, 0xC, 0xC),
+    // Bokoblin (`tww/assets/GZLE01/res/Object/Bk.h:179`), Moblin
+    // (`tww/assets/GZLE01/res/Object/Mo2.h:249`) and Darknut
+    // (`tww/assets/GZLE01/res/Object/Tn.h:224`). `read_id` wants the `dRes_ID_*` value
+    // (`archive.rs:432-437`).
+    ("Bk", "files/res/Object/Bk.arc", 0x56, 0x29, 0x53),
+    ("Mo2", "files/res/Object/Mo2.arc", 0x78, 0x3E, 0x75),
+    ("Tn", "files/res/Object/Tn.arc", 0x6C, 0x28, 0x67),
+    // Travelling merchants use `Ro.arc`, not `Roten.arc` (`tww/src/d/actor/d_a_npc_roten.cpp:1412`).
+    ("Ro", "files/res/Object/Ro.arc", 0x2, 0x0, 0x13),
+    // Bodies with an animation cursor. Model ids and BCK ranges are from the GC object header
+    // for each archive: Bb, Ks, Dr2, Kn, Daiocta, Ki, Dr, Bm, Dk, Bgn and Doguu under
+    // tww/assets/GZLE01/res/Object/ (lines 82, 34, 54, 26, 55, 52, 40, 175, 24, 67 and 51).
+    ("Bb", "files/res/Object/Bb.arc", 0x25, 0x15, 0x22),
+    ("Ks", "files/res/Object/Ks.arc", 0xF, 0xC, 0xC),
+    ("Dr2", "files/res/Object/Dr2.arc", 0x17, 0x9, 0xB),
+    ("Kn", "files/res/Object/Kn.arc", 0xA, 0x4, 0x7),
+    ("Daiocta", "files/res/Object/Daiocta.arc", 0x11, 0x6, 0xD),
+    ("Ki", "files/res/Object/Ki.arc", 0x18, 0xF, 0x14),
+    ("FK", "files/res/Object/Ki.arc", 0x17, 0xF, 0x14),
+    ("Dr", "files/res/Object/Dr.arc", 0x13, 0xB, 0x10),
+    ("Bm", "files/res/Object/Bm.arc", 0x33, 0x0, 0x50),
+    ("Dk", "files/res/Object/Dk.arc", 0x12, 0x10, 0x11),
+    ("Bgn3", "files/res/Object/Bgn.arc", 0x15, 0x6, 0x10),
+    ("Doguu", "files/res/Object/Doguu.arc", 0x11, 0x6, 0xA),
+    // Bodies with no BCK at all draw the bind pose (`anm.bck < 0`). Model ids are from the GC
+    // object headers Boko, Hmos, Shmrgrd, Apzl, Homen and Figure under
+    // tww/assets/GZLE01/res/Object/ (lines 16, 26, 18, 278, 20 and 18).
+    ("Boko", "files/res/Object/Boko.arc", 0x3, 0x0, 0x0),
+    ("Hmos", "files/res/Object/Hmos.arc", 0x5, 0x0, 0x0),
+    ("Shmrgrd", "files/res/Object/Shmrgrd.arc", 0x4, 0x0, 0x0),
+    ("Apzl", "files/res/Object/Apzl.arc", 0x6, 0x0, 0x0),
+    ("Homen", "files/res/Object/Homen.arc", 0x4, 0x0, 0x0),
+    ("Homen2", "files/res/Object/Homen.arc", 0x5, 0x0, 0x0),
+    ("Figure", "files/res/Object/Figure.arc", 0x1, 0x0, 0x0),
 ];
 
 /// All data-driven actor bodies, keyed by archive name.
@@ -412,14 +446,12 @@ pub fn load_actor_models() -> std::collections::HashMap<&'static str, ActorModel
         let Some(mesh) = object_model(&data, model_id) else {
             continue;
         };
-        let anms = match AnmArchive::open(path) {
-            Ok(anms) => anms,
-            Err(_) => continue,
-        };
         let mut morphs = Vec::new();
-        for id in min..=max {
-            if let Some(morph) = anms.morph(AnmRef::Id(id as u16), &mesh.joint_parents) {
-                morphs.push((id, morph));
+        if let Ok(anms) = AnmArchive::open(path) {
+            for id in min..=max {
+                if let Some(morph) = anms.morph(AnmRef::Id(id as u16), &mesh.joint_parents) {
+                    morphs.push((id, morph));
+                }
             }
         }
         out.insert(

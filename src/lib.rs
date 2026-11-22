@@ -5243,15 +5243,22 @@ pub fn root_view(
                     } else {
                         app.actor_models.get(anm.archive)
                     }?;
-                    let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
-                    let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
-                    let end = morph.frame_max().max(1.0);
-                    let frame = anm.frame * 2.0;
-                    let frame = if anm.looping {
-                        frame % end
+                    // A negative bck is the static-pose sentinel for bodies with no animation
+                    // (`NpcDraw::anim == None` draws the bind pose).
+                    let anim = if anm.bck < 0 {
+                        None
                     } else {
-                        frame.min(end)
+                        let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
+                        let end = morph.frame_max().max(1.0);
+                        let frame = anm.frame * 2.0;
+                        let frame = if anm.looping {
+                            frame % end
+                        } else {
+                            frame.min(end)
+                        };
+                        Some((morph, frame))
                     };
+                    let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
                     let ba1 = if anm.archive == sim::actor_anm::BA_ARCHIVE {
                         app.sim.world.get::<sim::ba1::Ba1>(anm.entity)
                     } else {
@@ -5277,7 +5284,7 @@ pub fn root_view(
                         .map(|(joint, mesh)| (joint as u16, mesh));
                     Some(view::NpcDraw {
                         mesh: &model.mesh,
-                        anim: Some((morph, frame)),
+                        anim,
                         pos: actor.pos,
                         yaw: sim::walk::from_s16(actor.shape_angle[1]),
                         joint_control,
