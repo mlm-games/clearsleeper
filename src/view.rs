@@ -387,11 +387,6 @@ pub fn build_frame_with_actor(
     frame
 }
 
-/// `cl.bdl`'s hair shape. Retail draws hair as the separate `katsura.bdl` model attached to
-/// `CL_JNT_HEAD_JNT` (`d_a_player_main.cpp:11598`, `:11934`); this shape is the unused rest
-/// geometry that fans out around the head.
-const CL_HAIR_GROUP: usize = 4;
-
 /// `mpKatsuraModel->setBaseTRMtx(mpCLModel->getAnmMtx(CL_JNT_HEAD_JNT_e))`
 /// (`d_a_player_main.cpp:11598`): the hair model's vertices are in head-local space, not in
 /// `katsura.bdl`'s own root, and the head's animated matrix places them.
@@ -479,13 +474,11 @@ fn skinned_groups(
         .groups
         .iter()
         .enumerate()
-        .filter(|(index, group)| {
-            *index != CL_HAIR_GROUP
-                && !group.joint_indices.is_empty()
-                && group.joint_indices.len() == group.positions.len()
+        .filter(|(_, group)| {
+            !group.joint_indices.is_empty() && group.joint_indices.len() == group.positions.len()
         })
         .map(|(_, group)| {
-            let (indices, _) = group_indices(group);
+            let (indices, cull_mode) = group_indices(group);
             let mut mesh = SkinnedMesh {
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),
@@ -503,7 +496,9 @@ fn skinned_groups(
                 ..SkinnedMesh::default()
             };
             mesh.name = "cl".to_string();
-            mesh.pose(placed)
+            let mut baked = mesh.pose(placed);
+            baked.cull_mode = cull_mode;
+            baked
         })
         .collect()
 }
