@@ -183,6 +183,7 @@ pub struct App {
     pub amos_knight_model: Option<assets::ActorModel>,
     pub helmaroc_model: Option<assets::ActorModel>,
     pub phantom_ganon_model: Option<assets::ActorModel>,
+    pub actor_models: std::collections::HashMap<&'static str, assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
     pub weather_texture: Option<(Vec<u8>, u32, u32)>,
@@ -377,6 +378,7 @@ impl App {
             amos_knight_model: None,
             helmaroc_model: None,
             phantom_ganon_model: None,
+            actor_models: std::collections::HashMap::new(),
             blur_texture: None,
             weather_texture: None,
             bottle_liquid_model: None,
@@ -513,6 +515,7 @@ impl App {
         app.amos_knight_model = assets::load_amos_knight_model();
         app.helmaroc_model = assets::load_helmaroc_model();
         app.phantom_ganon_model = assets::load_phantom_ganon_model();
+        app.actor_models = assets::load_actor_models();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -1912,6 +1915,7 @@ impl App {
                     height: 12.0,
                     half: 6.0,
                     anm: None,
+                    modeled: false,
                 });
                 continue;
             }
@@ -1936,6 +1940,7 @@ impl App {
                     height: 10.0,
                     half: 10.0,
                     anm: None,
+                    modeled: false,
                 });
                 continue;
             }
@@ -1947,6 +1952,7 @@ impl App {
                     height: 4.0,
                     half: 4.0,
                     anm: None,
+                    modeled: false,
                 });
                 continue;
             }
@@ -1958,6 +1964,7 @@ impl App {
                     height: 24.0,
                     half: 24.0,
                     anm: None,
+                    modeled: false,
                 });
                 continue;
             }
@@ -1975,6 +1982,7 @@ impl App {
                     height: 30.0,
                     half: 12.0,
                     anm: None,
+                    modeled: false,
                 });
                 continue;
             }
@@ -3593,6 +3601,7 @@ impl App {
                 height,
                 half,
                 anm: anims.get(&entity.id()).copied(),
+                modeled: anims.get(&entity.id()).is_some(),
             });
         }
         out
@@ -4695,7 +4704,7 @@ pub fn root_view(
                     } else if anm.archive == sim::actor_anm::FGANON_ARCHIVE {
                         app.phantom_ganon_model.as_ref()
                     } else {
-                        None
+                        app.actor_models.get(anm.archive)
                     }?;
                     let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
                     let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;

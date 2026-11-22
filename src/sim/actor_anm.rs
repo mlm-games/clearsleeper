@@ -69,6 +69,128 @@ pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
     }
 }
 
+macro_rules! publish_actor {
+    ($name:ident, $comp:ty, $archive:expr, $bck:expr, $frame:expr, $looping:expr, $min:expr, $max:expr) => {
+        pub fn $name(entities: Query<(Entity, &$comp)>, mut anms: ResMut<ActorAnms>) {
+            for (entity, actor) in &entities {
+                let bck = ($bck)(actor) as i32;
+                if bck < $min || bck > $max {
+                    continue;
+                }
+                anms.0.push(ActorAnm {
+                    entity,
+                    archive: $archive,
+                    bck,
+                    frame: ($frame)(actor),
+                    looping: ($looping)(actor),
+                });
+            }
+        }
+    };
+}
+
+use super::anim_clock::ACTOR_EMODE_LOOP;
+publish_actor!(
+    gohdan,
+    super::gohdan::Gohdan,
+    "Bst",
+    |c: &super::gohdan::Gohdan| c.anm,
+    |c: &super::gohdan::Gohdan| c.morph.frame,
+    |c: &super::gohdan::Gohdan| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0x6,
+    0x29
+);
+publish_actor!(
+    gohma,
+    super::gohma::Gohma,
+    "Btd",
+    |c: &super::gohma::Gohma| c.morph_bck,
+    |c: &super::gohma::Gohma| c.morph.frame,
+    |c: &super::gohma::Gohma| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0x8,
+    0x39
+);
+publish_actor!(
+    kalle_demos,
+    super::kalle_demos::KalleDemos,
+    "Bmd",
+    |c: &super::kalle_demos::KalleDemos| c.anm,
+    |c: &super::kalle_demos::KalleDemos| c.body_morph.frame,
+    |c: &super::kalle_demos::KalleDemos| c.body_morph.attribute == ACTOR_EMODE_LOOP,
+    0x8,
+    0x25
+);
+publish_actor!(
+    kamome2,
+    super::kamome2::Kamome2,
+    "Kamome",
+    |c: &super::kamome2::Kamome2| c.morph.bck as i32,
+    |c: &super::kamome2::Kamome2| c.morph.frame,
+    |c: &super::kamome2::Kamome2| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0xC,
+    0x14
+);
+publish_actor!(
+    kamome,
+    super::kamome::Kamome,
+    "Kamome",
+    |c: &super::kamome::Kamome| c.anm_idx,
+    |c: &super::kamome::Kamome| c.morph.frame,
+    |c: &super::kamome::Kamome| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0xC,
+    0x14
+);
+publish_actor!(
+    npc_p1,
+    super::npc_p1::NpcP1,
+    "P1",
+    |c: &super::npc_p1::NpcP1| c.anm_num,
+    |c: &super::npc_p1::NpcP1| c.morph.frame,
+    |c: &super::npc_p1::NpcP1| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0x1A,
+    0x29
+);
+publish_actor!(
+    npc_tc,
+    super::npc_tc::NpcTc,
+    "Tc",
+    |c: &super::npc_tc::NpcTc| c.bck_idx as i32,
+    |c: &super::npc_tc::NpcTc| c.frame.frame,
+    |c: &super::npc_tc::NpcTc| c.frame.attribute == ACTOR_EMODE_LOOP,
+    0x6,
+    0x16
+);
+publish_actor!(
+    bmdhand,
+    super::bmdhand::Bmdhand,
+    "Bmdhand",
+    |c: &super::bmdhand::Bmdhand| c.anm + 5,
+    |c: &super::bmdhand::Bmdhand| c.morph.frame,
+    |_c: &super::bmdhand::Bmdhand| false,
+    0x5,
+    0x6
+);
+publish_actor!(
+    medli,
+    super::medli::Medli,
+    "Md",
+    |c: &super::medli::Medli| c.anm,
+    |c: &super::medli::Medli| c.anm_frame,
+    |_c: &super::medli::Medli| false,
+    0x7,
+    0x59
+);
+publish_actor!(
+    servant,
+    super::servant::Servant,
+    "Sv",
+    |c: &super::servant::Servant| c.anm,
+    |c: &super::servant::Servant| c.morph_frame,
+    |_c: &super::servant::Servant| false,
+    0x4,
+    0xF
+);
+
 /// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
     for (entity, bird) in &birds {

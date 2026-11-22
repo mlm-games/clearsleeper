@@ -343,6 +343,78 @@ pub fn load_chuchu_model() -> Option<ActorModel> {
     })
 }
 
+/// Data-driven actor bodies: (archive, object archive path, model resource id, BCK id range).
+/// One row per actor family from the generated `Object/*.h` headers; any model that parses is
+/// cached once and posed by the BCK the sim component publishes.
+pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
+    ("Bst", "files/res/Object/Bst.arc", 0x2C, 0x6, 0x29),
+    ("Btd", "files/res/Object/Btd.arc", 0x40, 0x8, 0x39),
+    ("Bmd", "files/res/Object/Bmd.arc", 0x2B, 0x8, 0x25),
+    ("Kamome", "files/res/Object/Kamome.arc", 0x17, 0xC, 0x14),
+    ("P1", "files/res/Object/P1.arc", 0x11, 0x1A, 0x29),
+    ("Tc", "files/res/Object/Tc.arc", 0x19, 0x6, 0x16),
+    ("Bgn", "files/res/Object/Bgn.arc", 0x13, 0x6, 0x10),
+    ("Bwds", "files/res/Object/Bwds.arc", 0x8, 0x4, 0x5),
+    ("Btsw", "files/res/Object/Btsw.arc", 0x1A, 0x8, 0x11),
+    ("Niten", "files/res/Object/Niten.arc", 0xD, 0x5, 0xA),
+    ("Ls", "files/res/Object/Ls.arc", 0x1B, 0x8, 0x15),
+    ("Md", "files/res/Object/Md.arc", 0x5C, 0x7, 0x59),
+    ("Mk", "files/res/Object/Mk.arc", 0x13, 0x5, 0x10),
+    ("Mn", "files/res/Object/Mn.arc", 0x13, 0x6, 0xD),
+    ("Po", "files/res/Object/Po.arc", 0xC, 0x5, 0x9),
+    ("Rsh", "files/res/Object/Rsh.arc", 0x20, 0x14, 0x1D),
+    ("Sv", "files/res/Object/Sv.arc", 0x12, 0x4, 0xF),
+    ("Hr", "files/res/Object/Hr.arc", 0x14, 0x6, 0xF),
+    ("Ah", "files/res/Object/Ah.arc", 0x9, 0x5, 0x6),
+    ("Ho", "files/res/Object/Ho.arc", 0xF, 0x6, 0x9),
+    ("Hi", "files/res/Object/Hi.arc", 0xA, 0x6, 0x7),
+    ("Km", "files/res/Object/Km.arc", 0xC, 0x9, 0x9),
+    ("Nz", "files/res/Object/Nz.arc", 0x26, 0x15, 0x23),
+    ("P2", "files/res/Object/P2.arc", 0x26, 0x7, 0x23),
+    ("Tt", "files/res/Object/Tt.arc", 0x1C, 0x11, 0x19),
+    ("Toripost", "files/res/Object/Toripost.arc", 0x9, 0x4, 0x6),
+    ("Bmsw", "files/res/Object/Bmsw.arc", 0x1D, 0x9, 0x16),
+    ("Jb", "files/res/Object/Jb.arc", 0xC, 0x7, 0x9),
+    ("Rd", "files/res/Object/Rd.arc", 0x17, 0x6, 0x14),
+    ("St", "files/res/Object/St.arc", 0x38, 0x4, 0x35),
+    ("Bmdhand", "files/res/Object/Bmdhand.arc", 0x9, 0x5, 0x6),
+];
+
+/// All data-driven actor bodies, keyed by archive name.
+pub fn load_actor_models() -> std::collections::HashMap<&'static str, ActorModel> {
+    let mut out = std::collections::HashMap::new();
+    for &(archive, path, model_id, min, max) in ACTOR_ARCHIVES {
+        let Some(root) = AssetRoot::from_env().ok() else {
+            continue;
+        };
+        let Ok(data) = root.read_archive(path) else {
+            continue;
+        };
+        let Some(mesh) = object_model(&data, model_id) else {
+            continue;
+        };
+        let anms = match AnmArchive::open(path) {
+            Ok(anms) => anms,
+            Err(_) => continue,
+        };
+        let mut morphs = Vec::new();
+        for id in min..=max {
+            if let Some(morph) = anms.morph(AnmRef::Id(id as u16), &mesh.joint_parents) {
+                morphs.push((id, morph));
+            }
+        }
+        out.insert(
+            archive,
+            ActorModel {
+                mesh,
+                morphs,
+                cloth: None,
+            },
+        );
+    }
+    out
+}
+
 pub fn load_helmaroc_model() -> Option<ActorModel> {
     let archive = load_object_archive(OQ_ARCHIVE)?;
     let mesh = object_model(&archive, OQ_MODEL_ID)?;

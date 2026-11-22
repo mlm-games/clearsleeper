@@ -64,6 +64,13 @@ pub const DSNAP_TYPE_UNK05: u32 = 0x05;
 pub const DSNAP_TYPE_UNK06: u32 = 0x06;
 pub const DSNAP_TYPE_UNK48: u32 = 0x48;
 pub const DSNAP_TYPE_NPC_BA1: u32 = 0x4A;
+/// Figure types from `tww/include/d/d_snap.h:180-202`.
+pub const DSNAP_TYPE_CC: u32 = 0xAC;
+pub const DSNAP_TYPE_FM: u32 = 0xB5;
+pub const DSNAP_TYPE_AM2: u32 = 0xB6;
+pub const DSNAP_TYPE_AM: u32 = 0xB7;
+pub const DSNAP_TYPE_FGANON: u32 = 0xC2;
+pub const DSNAP_TYPE_UNKBA: u32 = 0xBA;
 pub const DSNAP_TYPE_UNKCF: u32 = 0xCF;
 pub const DSNAP_TYPE_LAST_INDEX: u32 = 0xD0;
 
@@ -1705,6 +1712,66 @@ pub fn capture(
         packet.judge_from_registry(camera.as_deref());
         state.result = packet.result() as u32;
         state.detail = packet.result_detail();
+    }
+}
+
+/// Register every actor that has a modelled body, the way each decomp actor's `_draw` calls
+/// `dSnap_RegistFig` (e.g. `d_a_am.cpp:120`, `d_a_cc.cpp:126`, `d_a_fm.cpp:3254`).
+pub fn register_actors(
+    mut packet: ResMut<SnapPacket>,
+    players: Query<&super::player::Player>,
+    armos: Query<(Entity, &super::actor::Actor, &super::armos::Armos)>,
+    chuchus: Query<(Entity, &super::actor::Actor, &super::chuchu::Chuchu)>,
+    masters: Query<(
+        Entity,
+        &super::actor::Actor,
+        &super::floormaster::Floormaster,
+    )>,
+    knights: Query<(
+        Entity,
+        &super::actor::Actor,
+        &super::amos_knight::AmosKnight,
+    )>,
+    birds: Query<(Entity, &super::actor::Actor, &super::helmaroc::Helmaroc)>,
+    ganons: Query<(
+        Entity,
+        &super::actor::Actor,
+        &super::phantom_ganon::PhantomGanon,
+    )>,
+) {
+    let Some(player) = players.iter().next() else {
+        return;
+    };
+    let player_pos = player.pos;
+    let mut add = |photo: u32, entity: Entity, actor: &super::actor::Actor| {
+        packet.regist_fig(
+            photo,
+            entity.to_bits() as u32,
+            actor.pos,
+            actor.shape_angle[1],
+            1.0,
+            1.0,
+            1.0,
+            player_pos,
+        );
+    };
+    for (entity, actor, _) in &armos {
+        add(DSNAP_TYPE_AM, entity, actor);
+    }
+    for (entity, actor, _) in &chuchus {
+        add(DSNAP_TYPE_CC, entity, actor);
+    }
+    for (entity, actor, _) in &masters {
+        add(DSNAP_TYPE_FM, entity, actor);
+    }
+    for (entity, actor, _) in &knights {
+        add(DSNAP_TYPE_AM2, entity, actor);
+    }
+    for (entity, actor, _) in &birds {
+        add(DSNAP_TYPE_UNKBA, entity, actor);
+    }
+    for (entity, actor, _) in &ganons {
+        add(DSNAP_TYPE_FGANON, entity, actor);
     }
 }
 

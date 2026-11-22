@@ -42,6 +42,8 @@ pub struct ActorView {
     /// The BCK an actor's own frame cursor is on. One field for every actor so the view can
     /// skin any of them the same way it skins the player ([`PlayerAnm`]).
     pub anm: Option<ActorAnm>,
+    /// Whether this actor is drawn from a real model instead of a box.
+    pub modeled: bool,
 }
 
 /// The animation an actor's sim cursor is on: the object archive and resource id its own anm
@@ -489,7 +491,7 @@ pub fn build_frame_with_actor(
         frame.push(walls_group(snapshot, eye));
     }
     if !snapshot.actors.is_empty() {
-        frame.push(actors_group(snapshot, eye, !npcs.is_empty()));
+        frame.push(actors_group(snapshot, eye));
     }
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
@@ -1388,19 +1390,13 @@ fn actor_look(actor: &ActorView) -> Rgb {
     }
 }
 
-fn actors_group(snapshot: &SceneSnapshot, eye: Vec3, npc_model: bool) -> MeshGroup {
+fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let mut group = MeshGroup::default();
     for actor in &snapshot.actors {
-        // A Ba actor is drawn from its own BDL instead of a box; keep the box when the model
-        // could not be loaded so the actor never disappears entirely.
-        if npc_model
-            && actor.anm.is_some_and(|anm| {
-                matches!(
-                    anm.archive,
-                    "Ba" | "CC" | "AM" | "Fm" | "AM2" | "Oq" | "Fganon"
-                )
-            })
-        {
+        // Modelled actors are drawn from their own BDL/BMD instead of a box. `modeled` is set
+        // only when a publisher found both a loaded model and a matching BCK morph, so an actor
+        // whose model failed to load keeps its box and never disappears entirely.
+        if actor.modeled {
             continue;
         }
         group.push_box(
