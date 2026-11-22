@@ -176,6 +176,8 @@ pub struct App {
     pub ba1_model: Option<assets::ActorModel>,
     pub chuchu_model: Option<assets::ActorModel>,
     pub armos_model: Option<assets::ActorModel>,
+    /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
+    pub blur_texture: Option<(Vec<u8>, u32, u32)>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -359,6 +361,7 @@ impl App {
             ba1_model: None,
             chuchu_model: None,
             armos_model: None,
+            blur_texture: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -526,6 +529,12 @@ impl App {
             }
         }
         if let Ok(anms) = assets::AnmArchive::open("files/res/Object/Link.arc") {
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x70)) {
+                if let Some(image) = bti::decode(&raw) {
+                    app.blur_texture =
+                        Some((image.pixels, image.width as u32, image.height as u32));
+                }
+            }
             if let Some(model) = app.master_grip_model.as_ref() {
                 app.part_anims.grip = anms.morph(assets::AnmRef::Id(0x0F), &model.joint_parents);
             }
@@ -4600,6 +4609,44 @@ pub fn root_view(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    // The slash trail is the blade tip sampled at past cut frames, ribboned by the view with
+    // `blur.bti` (`tww/src/d/actor/d_a_player_particle.inc:193-309`).
+    let blur = app.blur_texture.as_ref().and_then(|(rgba, width, height)| {
+        let stem = snapshot.player_anm.map(|anm| anm.stem)?;
+        if !matches!(
+            stem,
+            "cuta" | "cutf" | "cutr" | "cutl" | "cutea" | "cuteb" | "cutturnb"
+        ) {
+            return None;
+        }
+        let morph = if snapshot.equipment.sword == sim::damage::ITEM_SWORD {
+            app.part_anims.blades[blade_slot.unwrap_or(0)].as_ref()
+        } else {
+            app.part_anims.master_blades[blade_slot.unwrap_or(0)].as_ref()
+        }?;
+        let frame = snapshot.player_anm.map_or(0.0, |anm| anm.frame);
+        let to_world = glam::Mat4::from_translation(snapshot.player_pos)
+            * glam::Mat4::from_rotation_y(-snapshot.player_yaw);
+        let points = (0..16u32)
+            .map(|k| {
+                let past = (frame - k as f32 * 2.0).max(0.0);
+                let joints = morph.joint_matrices(past);
+                let tip = joints
+                    .last()
+                    .copied()
+                    .unwrap_or(glam::Mat4::IDENTITY)
+                    .w_axis
+                    .truncate();
+                to_world.transform_point3(tip)
+            })
+            .collect();
+        Some(view::SwordBlurDraw {
+            points,
+            rgba,
+            width: *width,
+            height: *height,
+        })
+    });
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, camera),
         None => view::build_frame_with_actor(
@@ -4612,6 +4659,7 @@ pub fn root_view(
             app.hands_model.as_ref(),
             &held,
             &npcs,
+            blur.as_ref(),
         ),
     };
     let desc = match &app.dff {
@@ -4623,6 +4671,7 @@ pub fn root_view(
             app.hands_model.as_ref(),
             &held,
             &npcs,
+            blur.is_some(),
         ),
     };
     let cam = app.cam.clone();

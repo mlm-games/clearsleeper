@@ -157,6 +157,15 @@ pub struct NpcDraw<'a> {
     pub cloth: Option<(u16, &'a RoomMesh)>,
 }
 
+/// A blade-tip ribbon sampled from the cut's BCK at past frames, drawn with `blur.bti` the way
+/// `copySwBlur` feeds `drawSwBlur` (`tww/src/d/actor/d_a_player_particle.inc:193-309`).
+pub struct SwordBlurDraw<'a> {
+    pub points: Vec<Vec3>,
+    pub rgba: &'a [u8],
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
@@ -259,9 +268,12 @@ pub fn batch_desc_with_actor(
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
+    blur: bool,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) if held.is_empty() && npcs.is_empty() => BatchDesc::default(),
+        (None, None, None, None) if held.is_empty() && npcs.is_empty() && !blur => {
+            BatchDesc::default()
+        }
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
@@ -279,7 +291,8 @@ pub fn batch_desc_with_actor(
                             used_pages(npc.mesh).len()
                                 + npc.cloth.map_or(0, |(_, mesh)| used_pages(mesh).len())
                         })
-                        .sum::<usize>(),
+                        .sum::<usize>()
+                    + usize::from(blur),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -382,7 +395,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], &[])
+    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], &[], None)
 }
 
 pub fn build_frame_with_actor(
@@ -395,11 +408,12 @@ pub fn build_frame_with_actor(
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
     npcs: &[NpcDraw<'_>],
+    blur: Option<&SwordBlurDraw<'_>>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair, hands, held, npcs),
+        desc: batch_desc_with_actor(room, actor, hair, hands, held, npcs, blur.is_some()),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -690,6 +704,57 @@ pub fn build_frame_with_actor(
                     frame.push(group);
                 }
             }
+        }
+    }
+    if let Some(blur) = blur {
+        if blur.points.len() >= 2 {
+            frame.uploads.push(SceneUpload {
+                page: npc_page,
+                x: 0,
+                y: 0,
+                w: blur.width,
+                h: blur.height,
+                rgba: blur.rgba.to_vec(),
+            });
+            let mut positions = Vec::new();
+            let mut uvs = Vec::new();
+            for (index, point) in blur.points.iter().enumerate() {
+                let direction = blur.points.get(index + 1).unwrap_or(point).clone()
+                    - blur
+                        .points
+                        .get(index.wrapping_sub(1))
+                        .unwrap_or(point)
+                        .clone();
+                let side = direction.cross(Vec3::Y);
+                let side = if side.length_squared() < 1e-6 {
+                    Vec3::X
+                } else {
+                    side.normalize()
+                } * 3.0;
+                positions.extend([
+                    [point.x - side.x, point.y - side.y, point.z - side.z],
+                    [point.x + side.x, point.y + side.y, point.z + side.z],
+                ]);
+                let v = index as f32 / (blur.points.len() - 1) as f32;
+                uvs.extend([[0.0, v], [1.0, v]]);
+            }
+            let indices = (0..blur.points.len() - 1)
+                .flat_map(|i| {
+                    let base = (i * 2) as u32;
+                    [base, base + 1, base + 2, base + 1, base + 3, base + 2]
+                })
+                .collect();
+            frame.push(MeshGroup {
+                positions,
+                uvs,
+                indices,
+                colors: vec![[1.0, 1.0, 1.0]; blur.points.len() * 2],
+                texture_page: npc_page,
+                alpha_cutoff: 0.02,
+                transparent: true,
+                depth_test: false,
+                ..MeshGroup::default()
+            });
         }
     }
     frame
