@@ -390,7 +390,15 @@ fn tick(
                     enemy.struck = true;
                     // A frontal melee blow is guardable (`main.cpp:5151-5205`);
                     // `hurt` returns true when the shield absorbed it.
-                    super::guard::hurt(health, guard, player, actor.pos, ATTACK_POWER, 0);
+                    super::guard::hurt(
+                        health,
+                        guard,
+                        player,
+                        actor.pos,
+                        ATTACK_POWER,
+                        0,
+                        armor.protects(),
+                    );
                 }
             }
             enemy.step_tick += 1;
@@ -410,6 +418,7 @@ pub fn control(
     collision: Option<Res<Collision>>,
     mut health: ResMut<Health>,
     mut guard: ResMut<super::guard::Guard>,
+    armor: Res<super::magic_armor::MagicArmor>,
     players: Query<&Player>,
     mut hurts: Query<&mut Hurt, With<Enemy>>,
     mut idle: Query<&mut Hurt, (Without<Enemy>, Without<super::redead::ReDead>)>,
@@ -490,7 +499,15 @@ pub fn control(
         spear.pos += step;
         spear.life = spear.life.saturating_sub(1);
         if within(spear.pos, player.pos, THROW_REACH) {
-            super::guard::hurt(&mut health, &mut guard, player, spear.pos, THROW_POWER, 0);
+            super::guard::hurt(
+                &mut health,
+                &mut guard,
+                player,
+                spear.pos,
+                THROW_POWER,
+                0,
+                armor.protects(),
+            );
             let _ = commands.entity(entity).despawn();
             continue;
         }

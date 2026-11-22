@@ -234,6 +234,7 @@ pub mod lpalm;
 pub mod lstair;
 pub mod lwood;
 pub mod machine;
+pub mod magic_armor;
 pub mod magma;
 pub mod makar;
 pub mod marlon;
@@ -1763,6 +1764,8 @@ pub fn build(
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(health::BottleDrink::default());
     sim.world.insert_resource(health::Magic::default());
+    sim.world
+        .insert_resource(magic_armor::MagicArmor::default());
     sim.world.insert_resource(guard::Guard::default());
     sim.world.insert_resource(deku_leaf::Fan::default());
     sim.world.insert_resource(spin::Spin::default());
@@ -2576,6 +2579,7 @@ pub fn build(
                     transition::check.in_set(WwSimSet::Execute),
                     sea::sea_tick.in_set(WwSimSet::Execute),
                     warship::control.in_set(WwSimSet::Execute),
+                    magic_armor::control.in_set(WwSimSet::Execute),
                     health::apply_damage.in_set(WwSimSet::Execute),
                     health::drink.in_set(WwSimSet::Execute),
                     player_pose::hurt_reaction.in_set(WwSimSet::Execute),

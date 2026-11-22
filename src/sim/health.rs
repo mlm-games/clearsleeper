@@ -53,11 +53,12 @@ impl Health {
 
 pub fn apply_damage(
     intent: Res<DamageIntent>,
+    armor: Res<super::magic_armor::MagicArmor>,
     mut health: ResMut<Health>,
     mut combat: ResMut<Combat>,
     mut events: ResMut<SimEvents>,
 ) {
-    if intent.0 > 0 {
+    if intent.0 > 0 && !armor.protects() {
         health.damage(intent.0);
         // `setDamagePoint` clears the soup power-up on a landed blow
         // (`tww/src/d/actor/d_a_player_main.cpp:4982-4989`, HD equivalent).

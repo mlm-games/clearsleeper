@@ -78,8 +78,11 @@ pub fn hurt(
     attacker: Vec3,
     amount: u8,
     spl: u8,
+    protected: bool,
 ) -> bool {
-    if guard.absorb(player, attacker, spl) {
+    // The magic armor's `checkNoDamageMode()` gates `setDamagePoint` before any guard test
+    // (`tww/src/d/actor/d_a_player_main.cpp:4982-4985`, `d_a_player_main.h:1832`).
+    if protected || guard.absorb(player, attacker, spl) {
         return true;
     }
     health.damage(amount);
