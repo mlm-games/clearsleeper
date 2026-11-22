@@ -68,21 +68,17 @@ impl AnmColor {
     pub fn color(&self, entry: usize, frame: f32) -> Option<[u8; 4]> {
         let entry = self.entries.get(entry)?;
         let mut rgba = [0_u8; CHANNELS];
-        for (slot, key) in rgba.iter_mut().zip(entry.channels) {
+        for (channel, (slot, key)) in rgba.iter_mut().zip(entry.channels).enumerate() {
             *slot = match key.max_frame {
                 0 => 0,
-                1 => self.values_at(key.offset),
-                _ => interpolate(&self.values, &key, frame),
+                1 => self.values[channel]
+                    .get(usize::from(key.offset))
+                    .copied()
+                    .unwrap_or(0),
+                _ => interpolate(&self.values[channel], &key, frame),
             };
         }
         Some(rgba)
-    }
-
-    fn values_at(&self, offset: u16) -> u8 {
-        self.values[0]
-            .get(usize::from(offset))
-            .copied()
-            .unwrap_or(0)
     }
 
     /// `J3DAnmColor::searchUpdateMaterialID`, matching an entry's name to a model material.
