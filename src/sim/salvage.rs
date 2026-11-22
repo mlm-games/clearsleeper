@@ -103,10 +103,10 @@ impl Default for Control {
             ocean_sv: [0; OCEAN_GRIDS],
             random_salvage_point: 0,
             collect: [0; 16],
-            inside_near: 0.0,
-            surface_near: 0.0,
-            cmap_near: 0.0,
-            disappear_frame: 10,
+            inside_near: 10.0,
+            surface_near: 20.0,
+            cmap_near: 80.0,
+            disappear_frame: 20,
             depth_index: 0,
             in_sea: false,
         }
@@ -410,7 +410,7 @@ impl Default for Salvage {
 }
 
 pub fn control(
-    tags: Query<(&Actor, &Salvage, &Scale)>,
+    tags: Query<(&Actor, &mut Salvage, &Scale)>,
     players: Query<&super::player::Player>,
     cranes: Query<&Crane>,
     switches: Res<Switches>,
@@ -424,9 +424,12 @@ pub fn control(
     if cranes.iter().any(|crane| crane.crane_top().is_some()) {
         control.in_sea = true;
     }
-    for (actor, tag, scale) in tags.iter() {
-        if tag.phase == Phase::Salvage {
+    for (actor, mut tag, scale) in tags.iter_mut() {
+        // `mTagData_p->entry(this, NULL)` is a create-time call (`d_a_salvage.cpp:98`,
+        // `wwhd/wwhd_src/d/actor/d_a_salvage.cpp:147`), not something gated on the proc.
+        if tag.phase == Phase::WaitInit {
             control.entry(actor, scale.0, &switches, &events, &day);
+            tag.phase = Phase::Wait;
         }
     }
     control.calc_alpha(player.pos, false);

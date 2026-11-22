@@ -98,6 +98,8 @@ pub struct SalvageTbox {
     pub shadow_scroll: f32,
     /// `fopAcM_SetGravity` <- initDrop :397.
     pub gravity: f32,
+    /// One-shot guard: the retail `mItemPID == ERROR` check (`d_a_salvage_tbox.cpp:439`).
+    pub granted: bool,
 }
 
 impl SalvageTbox {
@@ -119,6 +121,7 @@ impl SalvageTbox {
             shadow_pos: glam::Vec3::ZERO,
             shadow_scroll: SHADOW_SCROLL,
             gravity: 0.0,
+            granted: false,
         }
     }
 
@@ -232,6 +235,7 @@ pub fn control(
     sea: Option<Res<Sea>>,
     info: Res<MsgGameInfo>,
     mut manager: ResMut<EventManager>,
+    mut gets: ResMut<super::event::ItemGets>,
     mut events: ResMut<SimEvents>,
 ) {
     let crane = cranes.iter().next();
@@ -258,7 +262,15 @@ pub fn control(
                 if manager.get_is_advance(staff) {
                     box_state.init(ACTIONS[idx as usize].into());
                 }
+                let was_getitem = box_state.act == BoxAct::WaitGetItem;
                 let done = box_state.step(&mut actor, crane, sea.as_deref(), &mut events);
+                // `actWait` creates the item actor for crate types 1/2
+                // (`d_a_salvage_tbox.cpp:439-443`; HD `:620-628`). The port grants through
+                // ItemGets -> Award::give, the same hand-off a loose pickup uses.
+                if was_getitem && !box_state.granted && (1..=2).contains(&box_state.box_type) {
+                    gets.0.push(box_state.item_no as u8);
+                    box_state.granted = true;
+                }
                 if done {
                     // dComIfGp_evmng_cutEnd(staffIdx) :337
                     manager.cut_end(staff);
