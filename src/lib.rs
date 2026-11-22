@@ -179,6 +179,7 @@ pub struct App {
     pub ba1_model: Option<assets::ActorModel>,
     pub chuchu_model: Option<assets::ActorModel>,
     pub armos_model: Option<assets::ActorModel>,
+    pub floormaster_model: Option<assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
     /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
@@ -367,6 +368,7 @@ impl App {
             ba1_model: None,
             chuchu_model: None,
             armos_model: None,
+            floormaster_model: None,
             blur_texture: None,
             bottle_liquid_model: None,
             bottle_fairy_model: None,
@@ -494,6 +496,7 @@ impl App {
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
+        app.floormaster_model = assets::load_floormaster_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -4609,6 +4612,8 @@ pub fn root_view(
                         app.chuchu_model.as_ref()
                     } else if anm.archive == sim::actor_anm::AM_ARCHIVE {
                         app.armos_model.as_ref()
+                    } else if anm.archive == sim::actor_anm::FM_ARCHIVE {
+                        app.floormaster_model.as_ref()
                     } else {
                         None
                     }?;

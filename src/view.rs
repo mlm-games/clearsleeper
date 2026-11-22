@@ -1312,7 +1312,7 @@ fn actors_group(snapshot: &SceneSnapshot, eye: Vec3, npc_model: bool) -> MeshGro
         if npc_model
             && actor
                 .anm
-                .is_some_and(|anm| matches!(anm.archive, "Ba" | "CC" | "AM"))
+                .is_some_and(|anm| matches!(anm.archive, "Ba" | "CC" | "AM" | "Fm"))
         {
             continue;
         }

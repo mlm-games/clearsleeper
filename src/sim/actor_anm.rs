@@ -33,6 +33,7 @@ pub struct ActorAnms(pub Vec<ActorAnm>);
 pub const BA_ARCHIVE: &str = "Ba";
 pub const CC_ARCHIVE: &str = crate::assets::CC_ARCHIVE;
 pub const AM_ARCHIVE: &str = crate::assets::AM_ARCHIVE;
+pub const FM_ARCHIVE: &str = crate::assets::FM_ARCHIVE;
 
 /// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
 pub fn clear(mut anms: ResMut<ActorAnms>) {
@@ -61,6 +62,26 @@ pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
             bck,
             frame: grandma.morf_frame,
             looping: grandma.morf.attribute() == Mode::Loop,
+        });
+    }
+}
+
+/// Floormaster's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_fm.cpp:2586`).
+pub fn floormaster(
+    masters: Query<(Entity, &super::floormaster::Floormaster)>,
+    mut anms: ResMut<ActorAnms>,
+) {
+    for (entity, master) in &masters {
+        let bck = master.anm_bck;
+        if !(0x6..=0x12).contains(&bck) {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: FM_ARCHIVE,
+            bck,
+            frame: master.morph.frame,
+            looping: master.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
         });
     }
 }

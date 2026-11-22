@@ -2371,6 +2371,7 @@ pub fn build(
                         actor_anm::ba1.in_set(WwSimSet::Execute),
                         actor_anm::chuchu.in_set(WwSimSet::Execute),
                         actor_anm::armos.in_set(WwSimSet::Execute),
+                        actor_anm::floormaster.in_set(WwSimSet::Execute),
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )

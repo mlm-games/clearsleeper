@@ -304,6 +304,11 @@ pub const CC_MODEL_ID: u16 = 0x2A;
 pub const AM_ARCHIVE: &str = "AM";
 pub const AM_OBJECT_ARCHIVE: &str = "files/res/Object/Am.arc";
 pub const AM_MODEL_ID: u16 = 0x22;
+/// Floormaster body `FM_BDL` (id 0x15) and BCK ids 0x6..=0x12 in `Fm.arc`
+/// (`tww/assets/GZLE01/res/Object/fm.h:18-25`, `d_a_fm.cpp:26,388`).
+pub const FM_ARCHIVE: &str = "Fm";
+pub const FM_OBJECT_ARCHIVE: &str = "files/res/Object/Fm.arc";
+pub const FM_MODEL_ID: u16 = 0x15;
 
 pub fn load_chuchu_model() -> Option<ActorModel> {
     let archive = load_object_archive(CC_ARCHIVE)?;
@@ -311,6 +316,23 @@ pub fn load_chuchu_model() -> Option<ActorModel> {
     let anms = AnmArchive::open(CC_OBJECT_ARCHIVE).ok()?;
     let mut morphs = Vec::new();
     for id in 0x14..=0x22u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
+
+pub fn load_floormaster_model() -> Option<ActorModel> {
+    let archive = load_object_archive(FM_ARCHIVE)?;
+    let mesh = object_model(&archive, FM_MODEL_ID)?;
+    let anms = AnmArchive::open(FM_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x6..=0x12u16 {
         if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
             morphs.push((id as i32, morph));
         }
