@@ -123,6 +123,9 @@ pub struct App {
     pub telescope_model: Option<j3d::bdl::RoomMesh>,
     pub takt_model: Option<j3d::bdl::RoomMesh>,
     pub bottle_model: Option<j3d::bdl::RoomMesh>,
+    /// The blade's glow aura models, keyed by the sword table in `d_a_player_sword.inc:36-56`.
+    pub sword_glow_model: Option<j3d::bdl::RoomMesh>,
+    pub master_glow_model: Option<j3d::bdl::RoomMesh>,
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
@@ -301,6 +304,8 @@ impl App {
             telescope_model: None,
             takt_model: None,
             bottle_model: None,
+            sword_glow_model: None,
+            master_glow_model: None,
             ba1_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
@@ -412,6 +417,12 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_WIND_WAKER_ENTRY);
         app.bottle_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_BOTTLE_ENTRY);
+        // Blade glow auras are BDL entries 0x4A/0x4C of Link.arc, loaded by id the way retail
+        // reads them (`d_a_player_sword.inc:36-56`; `tww/assets/GZLE01/res/Object/Link.h:71,73`).
+        if let Some(archive) = assets::load_object_archive(view::LINK_ARCHIVE) {
+            app.sword_glow_model = assets::object_model(&archive, 0x4A);
+            app.master_glow_model = assets::object_model(&archive, 0x4C);
+        }
         app.ba1_model = assets::load_ba_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
@@ -4244,6 +4255,18 @@ pub fn root_view(
                 }
                 part.color = grip_tint.map(|tint| (0, tint));
                 part.uv = grip_uv;
+                held.push(part);
+            }
+        }
+        // The final Master Sword carries a glow aura over the blade
+        // (`d_a_player_sword.inc:158-204`), attached at the same hand joint.
+        if sword == sim::damage::MASTER_SWORD_3 {
+            if let Some(model) = app.master_glow_model.as_ref() {
+                let part = if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                };
                 held.push(part);
             }
         }
