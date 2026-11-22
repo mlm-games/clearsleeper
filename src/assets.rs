@@ -1269,14 +1269,14 @@ pub fn load_weather_texture() -> Option<(Vec<u8>, u32, u32)> {
 /// Weather texture pages, indexed by [`WeatherPage`]. All live in `Always.arc`.
 pub const WEATHER_IDS: [u16; 6] = [0x81, 0x82, 0x85, 0x6D, 0x6E, 0x84];
 
-pub fn load_weather_textures() -> Vec<Option<(Vec<u8>, u32, u32)>> {
+pub fn load_weather_textures(stage: &str) -> Vec<Option<(Vec<u8>, u32, u32)>> {
     let Some(root) = AssetRoot::from_env().ok() else {
-        return vec![None; WEATHER_IDS.len()];
+        return vec![None; WEATHER_IDS.len() + 3];
     };
     let Ok(archive) = root.read_archive(OBJECT_ALWAYS) else {
-        return vec![None; WEATHER_IDS.len()];
+        return vec![None; WEATHER_IDS.len() + 3];
     };
-    WEATHER_IDS
+    let mut pages = WEATHER_IDS
         .iter()
         .map(|&id| {
             let raw = archive.read_id(id).ok()?;
@@ -1297,7 +1297,23 @@ pub fn load_weather_textures() -> Vec<Option<(Vec<u8>, u32, u32)>> {
             })?;
             Some((image.pixels, image.width as u32, image.height as u32))
         })
-        .collect()
+        .collect::<Vec<_>>();
+    // Vrkumo cloud layers use three BTI entries from the stage archive
+    // (`tww/src/d/d_kankyo_wether.cpp:818-834`;
+    // `wwhd/wwhd_src/d/d_kankyo_wether.cpp:2830-2846`).
+    if let Ok(map) = root.read_archive(&stage_map(stage)) {
+        for name in ["cloud_01.bti", "cloud_02.bti", "cloud_03.bti"] {
+            let image = map
+                .read(name)
+                .ok()
+                .and_then(crate::bti::decode)
+                .map(|image| (image.pixels, image.width as u32, image.height as u32));
+            pages.push(image);
+        }
+    } else {
+        pages.resize(WEATHER_IDS.len() + 3, None);
+    }
+    pages
 }
 
 pub fn load_sea_shade() -> Option<f32> {

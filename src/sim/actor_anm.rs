@@ -395,6 +395,37 @@ publish_actor!(
     0x11
 );
 
+publish_actor!(
+    redead,
+    super::redead::ReDead,
+    "Rd",
+    |_c: &super::redead::ReDead| 0x6_i32,
+    |c: &super::redead::ReDead| c.timer1 as f32,
+    |_c: &super::redead::ReDead| false,
+    0x6,
+    0x14
+);
+publish_actor!(
+    stalfos,
+    super::stalfos::Stalfos,
+    "St",
+    |c: &super::stalfos::Stalfos| c.curr_bck,
+    |c: &super::stalfos::Stalfos| c.frame,
+    |c: &super::stalfos::Stalfos| c.looping,
+    0x4,
+    0x35
+);
+publish_actor!(
+    npc_btsw,
+    super::npc_btsw::NpcBtsw,
+    "Btsw",
+    |c: &super::npc_btsw::NpcBtsw| c.field_9c5 as i32,
+    |c: &super::npc_btsw::NpcBtsw| c.morf.frame,
+    |c: &super::npc_btsw::NpcBtsw| c.morf.attribute == ACTOR_EMODE_LOOP,
+    0x8,
+    0x11
+);
+
 /// Helmaroc's `mDoExt_McaMorf` cursor (`tww/src/d/actor/d_a_oq.cpp:144-146`).
 pub fn helmaroc(birds: Query<(Entity, &super::helmaroc::Helmaroc)>, mut anms: ResMut<ActorAnms>) {
     for (entity, bird) in &birds {

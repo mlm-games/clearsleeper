@@ -244,6 +244,7 @@ pub struct OrientedWeatherView {
     pub alpha: f32,
     pub page: usize,
     pub textured: bool,
+    pub depth_test: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -882,7 +883,7 @@ pub fn build_frame_with_actor(
                 alpha: quad.alpha,
                 texture_page: weather_base + quad.page as u32,
                 transparent: true,
-                depth_test: true,
+                depth_test: quad.depth_test,
                 cull_mode: CullMode::None,
                 ..MeshGroup::default()
             };

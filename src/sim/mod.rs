@@ -2415,6 +2415,9 @@ pub fn build(
                         actor_anm::npc_tt.in_set(WwSimSet::Execute),
                         actor_anm::npc_mt.in_set(WwSimSet::Execute),
                         actor_anm::npc_btsw2.in_set(WwSimSet::Execute),
+                        actor_anm::stalfos.in_set(WwSimSet::Execute),
+                        actor_anm::npc_btsw.in_set(WwSimSet::Execute),
+                        actor_anm::redead.in_set(WwSimSet::Execute),
                     )
                         .chain(),
                     (

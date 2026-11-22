@@ -703,7 +703,7 @@ impl App {
             app.tip_stab_model = assets::object_model(&archive, 0x3E);
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
-        app.weather_textures = assets::load_weather_textures();
+        app.weather_textures = assets::load_weather_textures(&app.stage);
         app.ba1_model = assets::load_ba_model();
         app.chuchu_model = assets::load_chuchu_model();
         app.armos_model = assets::load_armos_model();
@@ -2297,6 +2297,7 @@ impl App {
                         .clamp(0.0, 1.0),
                     page: 2,
                     textured: true,
+                    depth_test: true,
                 });
             }
         }
@@ -2330,8 +2331,51 @@ impl App {
                     alpha: crest.alpha.clamp(0.0, 1.0),
                     page: 0,
                     textured: true,
+                    depth_test: true,
                 });
                 let _ = index;
+            }
+        }
+        // Vrkumo: cloud layers on a world-space dome, drawn with depth test off the way HD does
+        // (`wwhd/wwhd_src/d/d_kankyo_rain_drawVrkumo.cpp:152-166`).
+        let vrkumo_count = weather.vrkumo_count.max(0) as usize;
+        if vrkumo_count > 0 {
+            for (index, cloud) in weather.vrkumo.inst.iter().take(vrkumo_count).enumerate() {
+                if cloud.alpha <= 0.0 {
+                    continue;
+                }
+                let yaw = cloud.position.x.atan2(cloud.position.z);
+                let horizontal = (cloud.position.x * cloud.position.x
+                    + cloud.position.z * cloud.position.z)
+                    .sqrt();
+                let pitch = cloud.position.y.atan2(horizontal);
+                let radius = 8000.0;
+                let direction = glam::Vec3::new(
+                    pitch.cos() * yaw.sin(),
+                    pitch.sin(),
+                    pitch.cos() * yaw.cos(),
+                );
+                let center = eye + direction * radius;
+                let right = glam::Vec3::Y.cross(direction).normalize_or(glam::Vec3::X);
+                let up = direction.cross(right).normalize_or(glam::Vec3::Y);
+                let size = 400.0 + cloud.height + cloud.dist_falloff * 200.0;
+                let corner = |x: f32, y: f32| {
+                    let p = center + right * x + up * y;
+                    [p.x, p.y, p.z]
+                };
+                out.push(view::OrientedWeatherView {
+                    corners: [
+                        corner(-size, -size),
+                        corner(size, -size),
+                        corner(size, size),
+                        corner(-size, size),
+                    ],
+                    color: [0.85, 0.87, 0.92],
+                    alpha: cloud.alpha.clamp(0.0, 1.0),
+                    page: 6 + index % 3,
+                    textured: true,
+                    depth_test: false,
+                });
             }
         }
         out

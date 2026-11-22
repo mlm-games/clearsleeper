@@ -457,6 +457,7 @@ pub struct Stalfos {
     pub aim: i16,
     pub clip: Clip,
     pub frame: f32,
+    pub curr_bck: i32,
     pub rate: f32,
     pub looping: bool,
     pub nunchaku: i8,
@@ -694,6 +695,7 @@ impl Stalfos {
             swing: 0.0,
             aim: 0,
             clip: Clip::Wait,
+            curr_bck: 0x4,
             frame: 0.0,
             rate: ONE,
             looping: true,
@@ -758,6 +760,7 @@ impl Stalfos {
     }
 
     fn set_anm(&mut self, clip: Clip, looping: bool, speed: f32) {
+        self.curr_bck = 0x4 + clip as i32;
         self.clip = clip;
         self.frame = 0.0;
         self.rate = speed;
