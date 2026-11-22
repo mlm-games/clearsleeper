@@ -1,6 +1,10 @@
 use bevy_ecs::prelude::*;
 
-use super::ba1::{ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_EMPTY_BOTTLE};
+use super::ba1::{
+    ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_EMPTY_BOTTLE, ITEM_HALF_SOUP_BOTTLE,
+    ITEM_SOUP_BOTTLE,
+};
+use super::combat::Combat;
 use super::events::{SimEvent, SimEvents};
 use super::intent::{DamageIntent, UseIntent};
 use super::inventory::Equipped;
@@ -50,10 +54,14 @@ impl Health {
 pub fn apply_damage(
     intent: Res<DamageIntent>,
     mut health: ResMut<Health>,
+    mut combat: ResMut<Combat>,
     mut events: ResMut<SimEvents>,
 ) {
     if intent.0 > 0 {
         health.damage(intent.0);
+        // `setDamagePoint` clears the soup power-up on a landed blow
+        // (`tww/src/d/actor/d_a_player_main.cpp:4982-4989`, HD equivalent).
+        combat.soup = false;
         if health.units > 0 {
             events.list.push(SimEvent::Hurt);
         }
@@ -113,6 +121,7 @@ pub fn drink(
     mut equipped: ResMut<Equipped>,
     mut health: ResMut<Health>,
     mut magic: ResMut<Magic>,
+    mut combat: ResMut<Combat>,
     mut bottle: ResMut<BottleDrink>,
 ) {
     let edge = intent.0 && !bottle.pressed;
@@ -121,16 +130,32 @@ pub fn drink(
         return;
     }
     for slot in ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS {
-        match equipped.item(slot) {
+        let item = equipped.item(slot);
+        match item {
             RED_POTION => health.units = health.max,
             BLUE_POTION => {
                 health.units = health.max;
                 magic.refill();
             }
             GREEN_POTION => magic.refill(),
+            ITEM_SOUP_BOTTLE | ITEM_HALF_SOUP_BOTTLE => {
+                // Soup refills both meters and doubles sword power until the next blow;
+                // a full soup leaves a half soup behind (`d_a_player_bottle.inc:139-147,168-171`;
+                // HD `wwhd/wwhd_src/d/actor/d_a_player_main_07.cpp:4514-4539`).
+                health.units = health.max;
+                magic.refill();
+                combat.soup = true;
+            }
             _ => continue,
         }
-        equipped.set(slot, ITEM_EMPTY_BOTTLE);
+        equipped.set(
+            slot,
+            if item == ITEM_SOUP_BOTTLE {
+                ITEM_HALF_SOUP_BOTTLE
+            } else {
+                ITEM_EMPTY_BOTTLE
+            },
+        );
         break;
     }
 }
