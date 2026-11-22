@@ -256,6 +256,8 @@ pub struct SeaView {
     pub side: usize,
     pub heights: Vec<f32>,
     pub color: [f32; 3],
+    /// UV scroll for the wave texture, from the frame counter (`d_a_sea.cpp:113-130`).
+    pub scroll: [f32; 2],
 }
 
 pub fn sim_yaw_for_camera(cam_yaw: f32) -> f32 {
@@ -305,10 +307,15 @@ pub fn batch_desc_with_actor(
     npcs: &[NpcDraw<'_>],
     blur: bool,
     weather_pages: usize,
+    sea_pages: usize,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
         (None, None, None, None)
-            if held.is_empty() && npcs.is_empty() && !blur && weather_pages == 0 =>
+            if held.is_empty()
+                && npcs.is_empty()
+                && !blur
+                && weather_pages == 0
+                && sea_pages == 0 =>
         {
             BatchDesc::default()
         }
@@ -331,7 +338,8 @@ pub fn batch_desc_with_actor(
                         })
                         .sum::<usize>()
                     + usize::from(blur)
-                    + weather_pages,
+                    + weather_pages
+                    + sea_pages,
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -446,6 +454,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         &[],
         None,
         &[],
+        None,
     )
 }
 
@@ -461,6 +470,7 @@ pub fn build_frame_with_actor(
     npcs: &[NpcDraw<'_>],
     blur: Option<&SwordBlurDraw<'_>>,
     weather_textures: &[Option<(Vec<u8>, u32, u32)>],
+    sea_texture: Option<&(Vec<u8>, u32, u32)>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
@@ -478,6 +488,7 @@ pub fn build_frame_with_actor(
             } else {
                 weather_textures.len()
             },
+            usize::from(sea_texture.is_some()),
         ),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
@@ -487,6 +498,20 @@ pub fn build_frame_with_actor(
         ..Frame3d::default()
     };
     let eye = frame.cam.eye();
+    // Sea texture sits in the first page after every player, NPC, blur and weather page — the
+    // same slot `batch_desc_with_actor` budgets as the final page.
+    let sea_page = room.map_or(0, |r| r.textures.len()) as u32
+        + actor.map_or(0, |a| used_pages(a).len()) as u32
+        + hair.map_or(0, |h| used_pages(h).len()) as u32
+        + hands.map_or(0, |h| used_pages(h).len()) as u32
+        + held.iter().map(|p| used_pages(p.mesh).len()).sum::<usize>() as u32
+        + npcs.iter().map(|n| used_pages(n.mesh).len()).sum::<usize>() as u32
+        + u32::from(blur.is_some())
+        + if snapshot.billboards.is_empty() && snapshot.oriented_weather.is_empty() {
+            0
+        } else {
+            weather_textures.len() as u32
+        };
     match room {
         Some(room) => {
             for group in &room.groups {
@@ -511,7 +536,17 @@ pub fn build_frame_with_actor(
         None => frame.push(ground_group(snapshot)),
     }
     if let Some(sea) = &snapshot.sea {
-        frame.push(sea_group(sea, eye));
+        frame.push(sea_group(sea, eye, sea_texture.map(|_| sea_page)));
+    }
+    if let Some((rgba, width, height)) = sea_texture {
+        frame.uploads.push(SceneUpload {
+            page: sea_page,
+            x: 0,
+            y: 0,
+            w: *width,
+            h: *height,
+            rgba: rgba.clone(),
+        });
     }
     if snapshot.walls {
         frame.push(walls_group(snapshot, eye));
@@ -1504,7 +1539,7 @@ fn room_group(room: &RoomMesh, group: &RoomGroup, tick: u64) -> MeshGroup {
     }
 }
 
-fn sea_group(sea: &SeaView, eye: Vec3) -> MeshGroup {
+fn sea_group(sea: &SeaView, eye: Vec3, page: Option<u32>) -> MeshGroup {
     use crate::sim::sea::GRID_SIZE;
     let reach = repame_view3d::FAR + GRID_SIZE;
     let reach = reach * reach;
@@ -1544,15 +1579,28 @@ fn sea_group(sea: &SeaView, eye: Vec3) -> MeshGroup {
             let length =
                 (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
             let normal = [normal[0] / length, normal[1] / length, normal[2] / length];
-            let base = group.positions.len() as u32;
-            group.positions.extend(corners);
-            group.colors.extend([sea.color; 4]);
-            group.normals.extend([normal; 4]);
-            group
-                .indices
-                .extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+            // One texture repeat per grid cell, scrolled by the frame's wave phase so the
+            // surface reads as moving water rather than a flat sheet (`d_a_sea.cpp:113-130`).
+            let u0 = x as f32 + sea.scroll[0];
+            let v0 = z as f32 + sea.scroll[1];
+            let uv = [
+                [u0, v0],
+                [u0 + 1.0, v0],
+                [u0 + 1.0, v0 + 1.0],
+                [u0, v0 + 1.0],
+            ];
+            if page.is_some() {
+                group.push_quad_lit_textured(
+                    corners[0], corners[1], corners[2], corners[3], sea.color, normal, uv,
+                );
+            } else {
+                group.push_quad_lit(
+                    corners[0], corners[1], corners[2], corners[3], sea.color, normal,
+                );
+            }
         }
     }
+    group.texture_page = page.unwrap_or(0);
     group.depth_test = true;
     group
 }

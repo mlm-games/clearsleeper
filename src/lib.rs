@@ -187,6 +187,9 @@ pub struct App {
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
     pub weather_textures: Vec<Option<(Vec<u8>, u32, u32)>>,
+    /// `b_sea_tex0and2.bti` from `Always.arc`, decoded to RGBA for the water surface
+    /// (`d_a_sea.cpp:750-810` loads it as the sea's indirect/warp texture).
+    pub sea_texture: Option<(Vec<u8>, u32, u32)>,
     /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
     pub bottle_liquid_model: Option<j3d::bdl::RoomMesh>,
     pub bottle_fairy_model: Option<j3d::bdl::RoomMesh>,
@@ -620,6 +623,7 @@ impl App {
             actor_models: std::collections::HashMap::new(),
             blur_texture: None,
             weather_textures: Vec::new(),
+            sea_texture: assets::load_sea_texture(),
             bottle_liquid_model: None,
             bottle_fairy_model: None,
             camera_model: None,
@@ -4277,11 +4281,15 @@ impl App {
             let full = dif[axis] + tone * (amb[axis] - dif[axis]);
             color[axis] = dif[axis] + self.sea_shade * (full - dif[axis]);
         }
+        // The sea texture scrolls with the wave phase; one UV unit per frame at 60 Hz, the
+        // rate `d_a_sea.cpp:113-130` advances its scroll offsets with.
+        let phase = self.frame as f32 * 0.01;
         Some(view::SeaView {
             origin: sea.origin(),
             side: sim::sea::GRID_CELLS,
             heights: sea.heights().to_vec(),
             color,
+            scroll: [phase, phase * 0.5],
         })
     }
 
@@ -5478,6 +5486,7 @@ pub fn root_view(
             &npcs,
             blur.as_ref(),
             &app.weather_textures,
+            app.sea_texture.as_ref(),
         ),
     };
     let desc = match &app.dff {
@@ -5495,6 +5504,7 @@ pub fn root_view(
             } else {
                 app.weather_textures.len()
             },
+            usize::from(app.sea_texture.is_some()),
         ),
     };
     let cam = app.cam.clone();

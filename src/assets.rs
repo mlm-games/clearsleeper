@@ -1594,6 +1594,15 @@ pub fn load_sea_shade() -> Option<f32> {
     }
 }
 
+/// The sea surface texture `b_sea_tex0and2.bti`, decoded to RGBA so the surface can sample it
+/// with scrolling UVs (`tww/src/d/actor/d_a_sea.cpp:750-810`; HD `wwhd_src/d/actor/d_a_sea.cpp:796`).
+pub fn load_sea_texture() -> Option<(Vec<u8>, u32, u32)> {
+    let root = AssetRoot::from_env().ok()?;
+    let archive = root.read_archive(OBJECT_ALWAYS).ok()?;
+    let image = crate::bti::decode(archive.read(SEA_TEXTURE_ENTRY).ok()?)?;
+    Some((image.pixels, image.width as u32, image.height as u32))
+}
+
 fn sea_shade_from_assets() -> Result<f32, AssetError> {
     let root = AssetRoot::from_env()?;
     let archive = root.read_archive(OBJECT_ALWAYS)?;
