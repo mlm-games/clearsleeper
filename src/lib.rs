@@ -94,6 +94,8 @@ pub struct PartAnims {
     pub leaf_open: Option<j3d::bck::Morph>,
     pub hammer: Option<j3d::bck::Morph>,
     pub grip_brk: Option<j3d::brk::TevRegKey>,
+    pub tip_bpk: Option<j3d::bpk::AnmColor>,
+    pub master_tip_bpk: Option<j3d::bpk::AnmColor>,
     pub grip_btk: Option<j3d::btk::TextureAnimation>,
     pub shield_btk: Option<j3d::btk::TextureAnimation>,
 }
@@ -126,6 +128,9 @@ pub struct App {
     /// The blade's glow aura models, keyed by the sword table in `d_a_player_sword.inc:36-56`.
     pub sword_glow_model: Option<j3d::bdl::RoomMesh>,
     pub master_glow_model: Option<j3d::bdl::RoomMesh>,
+    /// The forward-cut tip-stab models (`CUTFH`/`CUTFM`), attached at the blade's chest joint.
+    pub tip_stab_model: Option<j3d::bdl::RoomMesh>,
+    pub master_tip_stab_model: Option<j3d::bdl::RoomMesh>,
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
@@ -306,6 +311,8 @@ impl App {
             bottle_model: None,
             sword_glow_model: None,
             master_glow_model: None,
+            tip_stab_model: None,
+            master_tip_stab_model: None,
             ba1_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
@@ -422,6 +429,8 @@ impl App {
         if let Some(archive) = assets::load_object_archive(view::LINK_ARCHIVE) {
             app.sword_glow_model = assets::object_model(&archive, 0x4A);
             app.master_glow_model = assets::object_model(&archive, 0x4C);
+            app.tip_stab_model = assets::object_model(&archive, 0x3E);
+            app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
         app.ba1_model = assets::load_ba_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
@@ -487,6 +496,15 @@ impl App {
             }
             if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x66)) {
                 app.part_anims.shield_btk = j3d::btk::parse(&raw).ok();
+            }
+            // The forward-cut tip-stab colour animation, one per sword tier
+            // (`tww/src/d/actor/d_a_player_sword.inc:36-56,99-119`;
+            // `tww/assets/GZLE01/res/Object/LkAnm.h:334-335`).
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x14C)) {
+                app.part_anims.tip_bpk = j3d::bpk::parse(&raw).ok();
+            }
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x14D)) {
+                app.part_anims.master_tip_bpk = j3d::bpk::parse(&raw).ok();
             }
         }
         if let (Ok(anms), Some(model)) = (
@@ -4255,6 +4273,38 @@ pub fn root_view(
                 }
                 part.color = grip_tint.map(|tint| (0, tint));
                 part.uv = grip_uv;
+                held.push(part);
+            }
+        }
+        // The forward cut adds a tip-stab model at the blade's chest joint, coloured by the
+        // sword tier's BPK (`d_a_player_main.cpp:11604-11609`, `d_a_player_sword.inc:36-56`).
+        if snapshot.player_anm.map(|anm| anm.stem) == Some("cutf") {
+            let (model, bpk) = if sword == sim::damage::ITEM_SWORD {
+                (app.tip_stab_model.as_ref(), app.part_anims.tip_bpk.as_ref())
+            } else if sword != sim::inventory::NO_ITEM {
+                (
+                    app.master_tip_stab_model.as_ref(),
+                    app.part_anims.master_tip_bpk.as_ref(),
+                )
+            } else {
+                (None, None)
+            };
+            if let Some(model) = model {
+                let mut part = if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                };
+                if let Some(rgba) = bpk.and_then(|anm| anm.color(0, blade_frame)) {
+                    part.color = Some((
+                        0,
+                        [
+                            rgba[0] as f32 / 255.0,
+                            rgba[1] as f32 / 255.0,
+                            rgba[2] as f32 / 255.0,
+                        ],
+                    ));
+                }
                 held.push(part);
             }
         }

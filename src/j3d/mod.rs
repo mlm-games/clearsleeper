@@ -13,6 +13,7 @@
 
 pub mod bck;
 pub mod bdl;
+pub mod bpk;
 pub mod brk;
 pub mod btk;
 pub mod btp;
