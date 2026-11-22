@@ -2,12 +2,14 @@ use bevy_ecs::prelude::*;
 use glam::Vec2;
 
 use super::area::Area;
+use super::ba1::{ITEM_BOTTLE_SLOT_0, ITEM_BOTTLE_SLOTS, ITEM_FAIRY_BOTTLE};
 use super::collision::Collision;
 use super::events::{SimEvent, SimEvents};
 use super::ground::grounded;
 use super::health::Health;
 use super::hop::Hop;
 use super::intent::{GameOverChoice, MoveIntent};
+use super::inventory::Equipped;
 use super::player::Player;
 use super::roll::Roll;
 use super::swim::Swim;
@@ -36,6 +38,7 @@ pub fn check(
     collision: Option<Res<Collision>>,
     area: Res<Area>,
     mut health: ResMut<Health>,
+    mut equipped: ResMut<Equipped>,
     mut swim: ResMut<Swim>,
     mut roll: ResMut<Roll>,
     mut hop: ResMut<Hop>,
@@ -60,7 +63,17 @@ pub fn check(
                 &mut dialogue,
                 &mut events,
             );
-            health.units = health.max.min(12);
+            // A fairy bottle lets Continue revive at full life and is consumed, the port's
+            // stand-in for the retail game-over fairy choice (`d_a_player_main.cpp:5006`,
+            // `d_item.cpp:1011-1014`; HD `wwhd/wwhd_src/d/actor/d_a_player_main.cpp`).
+            if let Some(slot) = (ITEM_BOTTLE_SLOT_0..ITEM_BOTTLE_SLOT_0 + ITEM_BOTTLE_SLOTS)
+                .find(|&slot| equipped.item(slot) == ITEM_FAIRY_BOTTLE)
+            {
+                equipped.set(slot, super::ba1::ITEM_EMPTY_BOTTLE);
+                health.units = health.max;
+            } else {
+                health.units = health.max.min(12);
+            }
             game_over.active = false;
             *choice = GameOverChoice::None;
             continue;
