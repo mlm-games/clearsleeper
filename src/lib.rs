@@ -106,6 +106,9 @@ pub struct PartAnims {
     pub glow_brk: Option<j3d::brk::TevRegKey>,
     pub master_glow_btk: Option<j3d::btk::TextureAnimation>,
     pub master_glow_brk: Option<j3d::brk::TevRegKey>,
+    pub bottle_btk: Option<j3d::btk::TextureAnimation>,
+    pub liquid_brk: Option<j3d::brk::TevRegKey>,
+    pub firefly_brk: Option<j3d::brk::TevRegKey>,
     pub grip_btk: Option<j3d::btk::TextureAnimation>,
     pub shield_btk: Option<j3d::btk::TextureAnimation>,
 }
@@ -178,6 +181,9 @@ pub struct App {
     pub armos_model: Option<assets::ActorModel>,
     /// The 16x4 `blur.bti` swirl used for the sword trail (Link.arc id 0x70).
     pub blur_texture: Option<(Vec<u8>, u32, u32)>,
+    /// Bottle contents models, shown inside the held bottle (`d_a_player_bottle.inc:32-78`).
+    pub bottle_liquid_model: Option<j3d::bdl::RoomMesh>,
+    pub bottle_fairy_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -362,6 +368,8 @@ impl App {
             chuchu_model: None,
             armos_model: None,
             blur_texture: None,
+            bottle_liquid_model: None,
+            bottle_fairy_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -472,6 +480,9 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_WIND_WAKER_ENTRY);
         app.bottle_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_BOTTLE_ENTRY);
+        app.bottle_liquid_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, "binliquid.bdl");
+        app.bottle_fairy_model = assets::load_actor_model_entry(view::LINK_ARCHIVE, "binfairy.bdl");
         // Blade glow auras are BDL entries 0x4A/0x4C of Link.arc, loaded by id the way retail
         // reads them (`d_a_player_sword.inc:36-56`; `tww/assets/GZLE01/res/Object/Link.h:71,73`).
         if let Some(archive) = assets::load_object_archive(view::LINK_ARCHIVE) {
@@ -574,6 +585,9 @@ impl App {
             app.part_anims.glow_brk = load_brk(&anms, 0x155);
             app.part_anims.master_glow_btk = load_btk(&anms, 0x1DA);
             app.part_anims.master_glow_brk = load_brk(&anms, 0x156);
+            app.part_anims.bottle_btk = load_btk(&anms, 0x16B);
+            app.part_anims.liquid_brk = load_brk(&anms, 0x153);
+            app.part_anims.firefly_brk = load_brk(&anms, 0x152);
         }
         if let (Ok(anms), Some(model)) = (
             assets::AnmArchive::open("files/res/Object/Link.arc"),
@@ -4318,6 +4332,17 @@ pub fn root_view(
     };
     let glow_uv = first_uv(app.part_anims.glow_btk.as_ref(), soup_frame);
     let glow_color = first_color(app.part_anims.glow_brk.as_ref(), soup_frame);
+    let bottle_uv = first_uv(app.part_anims.bottle_btk.as_ref(), snapshot.tick as f32);
+    let bottle_item = app
+        .sim
+        .world
+        .get_resource::<sim::inventory::Equipped>()
+        .and_then(|equipped| {
+            (sim::ba1::ITEM_BOTTLE_SLOT_0
+                ..sim::ba1::ITEM_BOTTLE_SLOT_0 + sim::ba1::ITEM_BOTTLE_SLOTS)
+                .map(|slot| equipped.item(slot))
+                .find(|&item| item != sim::inventory::NO_ITEM)
+        });
     // The shield bck follows the under-body frame while guarding, frame 0 at rest
     // (`tww/src/d/actor/d_a_player_main.cpp:1341,6469-6471`,
     // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3259-3260`).
@@ -4541,7 +4566,29 @@ pub fn root_view(
             .is_some_and(|stem| matches!(stem, "binopena" | "bindrinking"))
         {
             if let Some(model) = app.bottle_model.as_ref() {
-                held.push(view::AttachedPart::hand(model, lhand));
+                let mut part = view::AttachedPart::hand(model, lhand);
+                part.uv = bottle_uv;
+                held.push(part);
+            }
+            // The contents sit inside the bottle body: a coloured liquid for potions, a
+            // pulsating fairy for the fairy bottle (`d_a_player_bottle.inc:39-78`).
+            let contents = match bottle_item {
+                Some(sim::ba1::ITEM_FAIRY_BOTTLE) => app.bottle_fairy_model.as_ref(),
+                Some(0x51..=0x55) => app.bottle_liquid_model.as_ref(),
+                _ => None,
+            };
+            if let Some(model) = contents {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                let (anim, frame) = if bottle_item == Some(sim::ba1::ITEM_FAIRY_BOTTLE) {
+                    (app.part_anims.firefly_brk.as_ref(), snapshot.tick as f32)
+                } else {
+                    (
+                        app.part_anims.liquid_brk.as_ref(),
+                        f32::from(bottle_item.unwrap_or(0x51) - 0x51),
+                    )
+                };
+                part.color = first_color(anim, frame);
+                held.push(part);
             }
         }
     }
