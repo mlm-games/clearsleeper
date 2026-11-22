@@ -474,6 +474,10 @@ pub fn build_frame_with_actor(
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
+        // The decomp clipper opens at 100000 units (tww/src/JSystem/J3DU/J3DUClipper.cpp:20),
+        // far beyond view3d's 2000 default. Raise both planes so distant islands and the sea
+        // horizon draw at the retail distance instead of vanishing at the default cutoff.
+        clip: Some([0.5, 100_000.0]),
         background: Some(snapshot.sky),
         desc: batch_desc_with_actor(
             room,
