@@ -320,12 +320,16 @@ impl Camera {
         self.com_stat & mask != 0
     }
 
-    /// The last block of `dCamera_c::Run`, `d_camera.cpp:1095-1103`: the subject bit goes up when
-    /// the event asked for it (`chkFlag(0x40000)`), or when the direction has pulled in under
-    /// `mCamSetup.SubjectDistance()` with the style's `UNK080` bit up. Retail only sets here; the
-    /// word's clear is `dComIfGp_offCameraAttentionStatus` at `d_camera.cpp:7835`, which the port's
-    /// camera pass does not reach, so a raised bit stays raised.
+    /// The last block of `dCamera_c::Run`, `tww/src/d/d_camera.cpp:1089-1108`
+    /// (`wwhd/wwhd_src/d/d_camera_run.cpp:344-360`): the subject bit goes up when the event
+    /// asked for it (`chkFlag(0x40000)`), or when the direction has pulled in under the hide
+    /// distance with the style's `UNK080` bit up. Retail clears the word every frame in
+    /// `preparation()` (`tww/src/d/d_camera.cpp:7835`,
+    /// `wwhd/wwhd_src/d/d_camera_proc.cpp:293`) before `Run` re-derives
+    /// it; the port recomputes it here so a bit from a past camera can never latch and hide the
+    /// whole player through `player_no_draw`.
     pub fn publish_attention(&mut self) {
+        self.com_stat &= !ATTN_SUBJECT;
         // `chkFlag(0x40000)`, `d_camera.cpp:1095`: the event named the player as its subject.
         const FORCED: u32 = 0x0004_0000;
         if self.event_flags & FORCED != 0 {
