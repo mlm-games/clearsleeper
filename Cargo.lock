@@ -973,7 +973,7 @@ dependencies = [
  "repose-render-wgpu",
  "repose-text",
  "repose-ui",
- "rlobkit-app-events 0.6.3",
+ "rlobkit-app-events",
  "rlobkit-dialogs",
  "serde",
  "serde_json",
@@ -1543,7 +1543,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3627,7 +3627,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4625,7 +4625,7 @@ dependencies = [
  "repose-render-wgpu",
  "repose-text",
  "repose-ui",
- "rlobkit-app-events 0.7.0",
+ "rlobkit-app-events",
  "rustc-hash 2.1.3",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4737,22 +4737,6 @@ dependencies = [
 
 [[package]]
 name = "rlobkit-app-events"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51d45e20a6dadd187de4e7654a1575e5e4f8cfb3d198091ba9d72320aa9559d9"
-dependencies = [
- "jni",
- "jni-min-helper",
- "log",
- "paranoid-android",
- "rlobkit-core 0.6.3",
- "tracing",
- "tracing-log",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "rlobkit-app-events"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36b93447020c1c1b8e787de9d943412491a0439e4d7b9b0d622d71c0ecb29bb0"
@@ -4761,23 +4745,10 @@ dependencies = [
  "jni-min-helper",
  "log",
  "paranoid-android",
- "rlobkit-core 0.7.0",
+ "rlobkit-core",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "rlobkit-core"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e130fa491536a5b2914f201e98d9d8e04b37d6b1bbcf67c7f3a56bb0c8082990"
-dependencies = [
- "bytes",
- "dirs",
- "mime_guess",
- "thiserror 2.0.21",
- "tokio",
 ]
 
 [[package]]
@@ -4795,9 +4766,9 @@ dependencies = [
 
 [[package]]
 name = "rlobkit-dialogs"
-version = "0.6.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "293f50de344e71d5f728bfb5708b781ddefa03e679e14c5d82b322a25931ffaf"
+checksum = "226e54d1696159ec37d8df12f863ccb527cb2d1f8d809861ac2c6f28228445a7"
 dependencies = [
  "bytes",
  "futures-lite",
@@ -4808,7 +4779,7 @@ dependencies = [
  "mime_guess",
  "ndk-context",
  "rfd",
- "rlobkit-core 0.6.3",
+ "rlobkit-core",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -4914,7 +4885,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5413,10 +5384,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6347,7 +6318,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
