@@ -84,6 +84,10 @@ pub struct SaveGame {
     #[serde(default)]
     pub magic: SavedMagic,
     #[serde(default)]
+    pub photos: [u32; 3],
+    #[serde(default)]
+    pub photo_details: [u8; 3],
+    #[serde(default)]
     pub stage: String,
     #[serde(default)]
     pub rooms: Vec<u8>,
@@ -356,6 +360,13 @@ impl App {
         let player = *query.iter(world).next().expect("player exists at boot");
         let health = *world.resource::<Health>();
         let magic = *world.resource::<crate::sim::health::Magic>();
+        let photo = *world.resource::<crate::sim::snap::PhotoCapture>();
+        let mut photos = [0_u32; 3];
+        let mut photo_details = [0_u8; 3];
+        if photo.result != 0 {
+            photos[0] = photo.result;
+            photo_details[0] = photo.detail;
+        }
         let rupees = world.resource::<Rupees>().count;
         let events = world.resource::<EventFlags>().words().to_vec();
         let switches = world.resource::<Switches>().words();
@@ -387,6 +398,8 @@ impl App {
             area: (&area).into(),
             health: (&health).into(),
             magic: (&magic).into(),
+            photos,
+            photo_details,
             stage,
             rooms: self.rooms.clone(),
             rupees,
@@ -465,6 +478,11 @@ impl App {
             world.resource_mut::<CameraYaw>().0 = save.camera_yaw;
             *world.resource_mut::<Health>() = save.health.clone().into();
             *world.resource_mut::<crate::sim::health::Magic>() = save.magic.into();
+            {
+                let mut photo = world.resource_mut::<crate::sim::snap::PhotoCapture>();
+                photo.result = save.photos[0];
+                photo.detail = save.photo_details[0];
+            }
             *world.resource_mut::<Rupees>() = Rupees { count: save.rupees };
             *world.resource_mut::<EventFlags>() =
                 EventFlags::from_words(padded_flags(save.events.as_slice()));
