@@ -255,6 +255,14 @@ pub const LINK_MASTER_GRIP_ENTRY: &str = "swgripms.bdl";
 pub const LINK_SHIELD_ENTRY: &str = "sha.bdl";
 pub const LINK_MIRROR_SHIELD_ENTRY: &str = "shms.bdl";
 
+/// Other held item models. `fan`/`fanb` are the leaf's held and open canopies, the hammer and
+/// telescope their own bodies (`d_a_player_fan.inc:123,153`, `d_a_player_hammer.inc:23`,
+/// `d_a_player_main.cpp:3740`; HD `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:362,1112`).
+pub const LINK_DEKU_LEAF_ENTRY: &str = "fan.bdl";
+pub const LINK_DEKU_LEAF_OPEN_ENTRY: &str = "fanb.bdl";
+pub const LINK_HAMMER_ENTRY: &str = "hammer.bdl";
+pub const LINK_TELESCOPE_ENTRY: &str = "telescope.bdl";
+
 /// The body `res/Object/<name>.arc` carries, read by entry name where one is named.
 ///
 /// Object archives are named for what they hold, and a character archive holds several `bdl`

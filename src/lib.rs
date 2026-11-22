@@ -90,6 +90,10 @@ pub struct PartAnims {
     pub master_blades: [Option<j3d::bck::Morph>; CUT_BLADES.len()],
     pub grip: Option<j3d::bck::Morph>,
     pub shield: Option<j3d::bck::Morph>,
+    pub leaf: Option<j3d::bck::Morph>,
+    pub leaf_open: Option<j3d::bck::Morph>,
+    pub hammer: Option<j3d::bck::Morph>,
+    pub grip_brk: Option<j3d::brk::TevRegKey>,
 }
 
 pub struct App {
@@ -110,6 +114,11 @@ pub struct App {
     pub master_grip_model: Option<j3d::bdl::RoomMesh>,
     pub shield_model: Option<j3d::bdl::RoomMesh>,
     pub mirror_shield_model: Option<j3d::bdl::RoomMesh>,
+    /// Other held item bodies from `Link.arc`.
+    pub leaf_model: Option<j3d::bdl::RoomMesh>,
+    pub leaf_open_model: Option<j3d::bdl::RoomMesh>,
+    pub hammer_model: Option<j3d::bdl::RoomMesh>,
+    pub telescope_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -280,6 +289,10 @@ impl App {
             master_grip_model: None,
             shield_model: None,
             mirror_shield_model: None,
+            leaf_model: None,
+            leaf_open_model: None,
+            hammer_model: None,
+            telescope_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -378,6 +391,14 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_SHIELD_ENTRY);
         app.mirror_shield_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_MIRROR_SHIELD_ENTRY);
+        app.leaf_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_DEKU_LEAF_ENTRY);
+        app.leaf_open_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_DEKU_LEAF_OPEN_ENTRY);
+        app.hammer_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HAMMER_ENTRY);
+        app.telescope_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_TELESCOPE_ENTRY);
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -400,12 +421,39 @@ impl App {
                         anms.morph(assets::AnmRef::Entry(&entry), &model.joint_parents);
                 }
             }
+            // The leaf and hammer drive their own models with a single bck each
+            // (`d_a_player_fan.inc:121,134`, `d_a_player_hammer.inc:21`; HD
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:1358`,
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:1112`).
+            if let Some(model) = app.leaf_model.as_ref() {
+                app.part_anims.leaf = anms.morph(
+                    assets::AnmRef::Entry("bcks/usefanaa.bck"),
+                    &model.joint_parents,
+                );
+            }
+            if let Some(model) = app.leaf_open_model.as_ref() {
+                app.part_anims.leaf_open = anms.morph(
+                    assets::AnmRef::Entry("bcks/fanba.bck"),
+                    &model.joint_parents,
+                );
+            }
+            if let Some(model) = app.hammer_model.as_ref() {
+                app.part_anims.hammer = anms.morph(
+                    assets::AnmRef::Entry("bcks/hammerdam.bck"),
+                    &model.joint_parents,
+                );
+            }
         }
-        if let (Ok(anms), Some(model)) = (
-            assets::AnmArchive::open("files/res/Object/Link.arc"),
-            app.master_grip_model.as_ref(),
-        ) {
-            app.part_anims.grip = anms.morph(assets::AnmRef::Id(0x0F), &model.joint_parents);
+        if let Ok(anms) = assets::AnmArchive::open("files/res/Object/Link.arc") {
+            if let Some(model) = app.master_grip_model.as_ref() {
+                app.part_anims.grip = anms.morph(assets::AnmRef::Id(0x0F), &model.joint_parents);
+            }
+            // The master grip's shine is a two-frame TEV C-register change keyed to the final
+            // Master Sword (`tww/src/d/actor/d_a_player_main.cpp:1222-1254`,
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3141-3169`).
+            if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x56)) {
+                app.part_anims.grip_brk = j3d::brk::parse(&raw).ok();
+            }
         }
         if let (Ok(anms), Some(model)) = (
             assets::AnmArchive::open("files/res/Object/Link.arc"),
@@ -1510,7 +1558,17 @@ impl App {
             .world
             .get_resource::<sim::item_use::ItemUse>()
             .and_then(|state| state.stem)
-            .is_some_and(|stem| !matches!(stem, "grabup" | "grabwait"));
+            .is_some_and(|stem| !matches!(stem, "grabup" | "grabwait"))
+            || self
+                .sim
+                .world
+                .get_resource::<sim::hammer::Cut>()
+                .is_some_and(|cut| cut.kind != sim::hammer::CUT_NONE)
+            || self
+                .sim
+                .world
+                .get_resource::<sim::scope::Scope>()
+                .is_some_and(|scope| scope.active);
         let collision = self.sim.world.get_resource::<sim::collision::Collision>();
         let water = self.sim.world.get_resource::<sim::water::Water>();
         let (ground_y, walls) = match collision {
@@ -4077,6 +4135,22 @@ pub fn root_view(
     } else {
         0.0
     };
+    // The BRK shine is gated on the final Master Sword alone, unlike the wing BCK above
+    // (`tww/src/d/actor/d_a_player_main.cpp:1232-1235`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3145-3151`). The renderer
+    // has no MDL3/TEV C-register path, so the sampled s10 register is used as a vertex tint.
+    let grip_tint = if snapshot.equipment.sword == sim::damage::MASTER_SWORD_3 {
+        app.part_anims.grip_brk.as_ref().and_then(|brk| {
+            let c = brk.tev_color(0, 1.0)?;
+            Some([
+                (1.0 + c[0] as f32 / 1024.0).max(0.0),
+                (1.0 + c[1] as f32 / 1024.0).max(0.0),
+                (1.0 + c[2] as f32 / 1024.0).max(0.0),
+            ])
+        })
+    } else {
+        None
+    };
     // The shield bck follows the under-body frame while guarding, frame 0 at rest
     // (`tww/src/d/actor/d_a_player_main.cpp:1341,6469-6471`,
     // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3259-3260`).
@@ -4133,6 +4207,7 @@ pub fn root_view(
                 if let Some(morph) = app.part_anims.grip.as_ref() {
                     part.anim = Some((morph, grip_frame));
                 }
+                part.color = grip_tint.map(|tint| (0, tint));
                 held.push(part);
             }
         }
@@ -4162,6 +4237,67 @@ pub fn root_view(
                 }
             }
             _ => {}
+        }
+        // Held item bodies. Retail attaches these to lHandA with identity, except the telescope's
+        // fixed offset (`tww/src/d/actor/d_a_player_main.cpp:1139-1159`,
+        // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:2981-3021`).
+        let fan_phase = app
+            .sim
+            .world
+            .get_resource::<sim::deku_leaf::Fan>()
+            .map(|fan| fan.phase);
+        if fan_phase.is_some_and(|phase| phase != sim::deku_leaf::FanPhase::Idle) {
+            let gliding = fan_phase == Some(sim::deku_leaf::FanPhase::Glide);
+            let model = if gliding {
+                app.leaf_open_model.as_ref()
+            } else {
+                app.leaf_model.as_ref()
+            };
+            if let Some(model) = model {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                let morph = if gliding {
+                    app.part_anims.leaf_open.as_ref()
+                } else {
+                    app.part_anims.leaf.as_ref()
+                };
+                if let Some(morph) = morph {
+                    part.anim = Some((morph, 0.0));
+                }
+                held.push(part);
+            }
+        }
+        if app
+            .sim
+            .world
+            .get_resource::<sim::hammer::Cut>()
+            .is_some_and(|cut| cut.kind != sim::hammer::CUT_NONE)
+        {
+            if let Some(model) = app.hammer_model.as_ref() {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                if let Some(morph) = app.part_anims.hammer.as_ref() {
+                    part.anim = Some((morph, 0.0));
+                }
+                held.push(part);
+            }
+        }
+        if app
+            .sim
+            .world
+            .get_resource::<sim::scope::Scope>()
+            .is_some_and(|scope| scope.active)
+        {
+            if let Some(model) = app.telescope_model.as_ref() {
+                let mut part = view::AttachedPart::hand(model, lhand);
+                let deg = std::f32::consts::TAU / 65536.0;
+                part.local = glam::Mat4::from_translation(glam::Vec3::new(8.0, 15.0, 1.0))
+                    * glam::Mat4::from_euler(
+                        glam::EulerRot::XYZ,
+                        -0x4000 as f32 * deg,
+                        0x4444 as f32 * deg,
+                        -0x41F as f32 * deg,
+                    );
+                held.push(part);
+            }
         }
     }
     let frame = match &app.dff {

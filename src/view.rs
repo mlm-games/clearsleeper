@@ -89,6 +89,10 @@ pub struct AttachedPart<'a> {
     /// and Link walks or dashes (`tww/src/d/actor/d_a_player_main.cpp:1320-1337`,
     /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3235-3255`).
     pub sway: f32,
+    /// A material slot and vertex-colour multiplier from a BRK, applied to the matching shape
+    /// (`tww/src/d/actor/d_a_player_main.cpp:1222-1254`,
+    /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3141-3169`).
+    pub color: Option<(u16, [f32; 3])>,
 }
 
 impl<'a> AttachedPart<'a> {
@@ -99,6 +103,7 @@ impl<'a> AttachedPart<'a> {
             anim: None,
             local: Mat4::IDENTITY,
             sway: 0.0,
+            color: None,
         }
     }
 
@@ -110,6 +115,7 @@ impl<'a> AttachedPart<'a> {
             local: Mat4::from_translation(Vec3::new(15.5, 4.75, if mirror { -0.2 } else { 0.0 }))
                 * Mat4::from_rotation_z(-std::f32::consts::FRAC_PI_2),
             sway: 0.0,
+            color: None,
         }
     }
 
@@ -124,6 +130,7 @@ impl<'a> AttachedPart<'a> {
             local: Mat4::from_translation(Vec3::new(-11.25, 4.5, 0.45))
                 * Mat4::from_rotation_z(-0x1C71 as f32 * std::f32::consts::TAU / 65536.0),
             sway: 0.0,
+            color: None,
         }
     }
 }
@@ -562,9 +569,15 @@ pub fn build_frame_with_actor(
                         * Mat4::from_translation(-origin)
                         * body;
                 }
-                for group in
-                    attached_groups(part.mesh, snapshot, held_page, &part_pages, body, &locals)
-                {
+                for group in attached_groups(
+                    part.mesh,
+                    snapshot,
+                    held_page,
+                    &part_pages,
+                    body,
+                    &locals,
+                    part.color,
+                ) {
                     frame.push(group);
                 }
             }
@@ -710,6 +723,23 @@ fn hands_groups(
 /// animated matrix in player-model space. Skinned groups use the part's own EVP1 inverse bind
 /// (which is not `inverse(JNT1 bind world)`, `j3d/bdl.rs:191-194`); direct groups cancel the
 /// part's own bind matrix so the part rests in the body joint's pose.
+fn tinted(group: &RoomGroup, tint: Option<(u16, [f32; 3])>) -> Vec<[f32; 3]> {
+    let Some((slot, multiplier)) = tint.filter(|(slot, _)| group.material == Some(*slot)) else {
+        return group.colors.clone();
+    };
+    group
+        .colors
+        .iter()
+        .map(|c| {
+            [
+                c[0] * multiplier[0],
+                c[1] * multiplier[1],
+                c[2] * multiplier[2],
+            ]
+        })
+        .collect()
+}
+
 fn attached_groups(
     part: &RoomMesh,
     snapshot: &SceneSnapshot,
@@ -717,6 +747,7 @@ fn attached_groups(
     pages: &[u32],
     body: Mat4,
     locals: &[Mat4],
+    tint: Option<(u16, [f32; 3])>,
 ) -> Vec<MeshGroup> {
     if locals.len() != part.joints.len() {
         return Vec::new();
@@ -749,7 +780,7 @@ fn attached_groups(
                 positions: group.positions.clone(),
                 normals: group.normals.clone(),
                 uvs: group.uvs.clone(),
-                colors: group.colors.clone(),
+                colors: tinted(group, tint),
                 indices,
                 joints: group.joint_indices.clone(),
                 weights: group.joint_weights.clone(),
@@ -806,7 +837,7 @@ fn attached_groups(
         let (indices, cull_mode) = group_indices(group);
         out.push(MeshGroup {
             positions,
-            colors: group.colors.clone(),
+            colors: tinted(group, tint),
             normals,
             uvs: group.uvs.clone(),
             indices,

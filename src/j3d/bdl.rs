@@ -275,6 +275,9 @@ pub struct RoomGroup {
     /// `J3DBlendInfo::mBlendMode` (`J3DStruct.h:231`): `GX_BM_NONE` or `GX_BM_BLEND`.
     pub blend: u8,
     pub anim: Option<AnimBinding>,
+    /// The shape's material slot, so material-scoped animations (e.g. the master grip's BRK
+    /// shine) can target this group (`J3DShape::getMaterialID`).
+    pub material: Option<u16>,
 }
 
 impl Default for RoomGroup {
@@ -299,6 +302,7 @@ impl Default for RoomGroup {
             z_update: true,
             blend: GX_BM_NONE,
             anim: None,
+            material: None,
         }
     }
 }
@@ -2029,6 +2033,7 @@ fn read_shapes(
             z_update,
             blend,
             anim,
+            material: shape_materials[shape],
             ..RoomGroup::default()
         };
 
