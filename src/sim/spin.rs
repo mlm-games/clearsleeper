@@ -83,7 +83,6 @@ pub fn control(
                     combat.kind = CutKind::Spin;
                     combat.frame = 0;
                     combat.combo = 0;
-                    combat.queued = false;
                     if let Some(proc) = proc.as_deref_mut() {
                         proc.enter(Proc::CutRoll);
                     }

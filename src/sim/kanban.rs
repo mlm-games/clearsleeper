@@ -894,6 +894,7 @@ fn player_cut_of(watch: &Watch<'_, '_>) -> u8 {
         CutKind::L => CUT_L,
         CutKind::EA => CUT_EA,
         CutKind::EB => CUT_EB,
+        CutKind::Spin => CUT_NONE,
     }
 }
 

@@ -8,8 +8,8 @@ use super::contact_run::ContactBodies;
 use super::damage;
 use super::damage_resolve::{
     AT_SPL_UNK0, AT_SPL_UNK1, AT_TYPE_SWORD, Attacker, CUT_TYPE_CUT_A, CUT_TYPE_CUT_EA,
-    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, HitAudio, HitStop,
-    NAME_PLAYER, PlayerCut, Target,
+    CUT_TYPE_CUT_EB, CUT_TYPE_CUT_F, CUT_TYPE_CUT_L, CUT_TYPE_CUT_R, CUT_TYPE_CUT_ROLL, HitAudio,
+    HitStop, NAME_PLAYER, PlayerCut, Target,
 };
 use super::enemy;
 use super::events::{SimEvent, SimEvents};

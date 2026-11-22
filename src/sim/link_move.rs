@@ -952,6 +952,7 @@ fn cut_proc(kind: CutKind) -> Proc {
         CutKind::L => Proc::CutL,
         CutKind::EA => Proc::CutEa,
         CutKind::EB => Proc::CutEb,
+        CutKind::Spin => Proc::CutRoll,
     }
 }
 
