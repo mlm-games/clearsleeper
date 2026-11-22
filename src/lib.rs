@@ -4404,11 +4404,32 @@ pub fn root_view(
             } else {
                 frame.min(end)
             };
+            let ba1 = app.sim.world.get::<sim::ba1::Ba1>(anm.entity);
+            let joint_control = match (
+                model.mesh.find_node_id(b"head"),
+                model.mesh.find_node_id(b"backbone"),
+                ba1,
+            ) {
+                (Some(head), Some(backbone), Some(ba1)) => Some((
+                    head as u16,
+                    -sim::walk::from_s16(ba1.joint_head_y),
+                    backbone as u16,
+                    sim::walk::from_s16(ba1.joint_backbone_y),
+                )),
+                _ => None,
+            };
+            let cloth = model
+                .mesh
+                .find_node_id(b"footL")
+                .zip(model.cloth.as_ref())
+                .map(|(joint, mesh)| (joint as u16, mesh));
             Some(view::NpcDraw {
                 mesh: &model.mesh,
                 anim: Some((morph, frame)),
                 pos: actor.pos,
                 yaw: sim::walk::from_s16(actor.shape_angle[1]),
+                joint_control,
+                cloth,
             })
         });
     let frame = match &app.dff {

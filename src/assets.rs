@@ -287,6 +287,7 @@ pub fn load_actor_model_entry(
 pub struct ActorModel {
     pub mesh: crate::j3d::bdl::RoomMesh,
     pub morphs: Vec<(i32, crate::j3d::bck::Morph)>,
+    pub cloth: Option<crate::j3d::bdl::RoomMesh>,
 }
 
 /// Grandma's archive holds two BDLs; `ba.bdl` is the body and `ba_cloth.bdl` the cape
@@ -306,7 +307,12 @@ pub fn load_ba_model() -> Option<ActorModel> {
     if let Some(morph) = anms.morph(AnmRef::Id(0x17), &mesh.joint_parents) {
         morphs.push((0x17, morph));
     }
-    Some(ActorModel { mesh, morphs })
+    let cloth = load_actor_model_entry(BA_ARCHIVE, "ba_cloth.bdl");
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth,
+    })
 }
 
 fn actor_model_entry(

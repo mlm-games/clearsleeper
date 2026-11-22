@@ -150,6 +150,11 @@ pub struct NpcDraw<'a> {
     pub anim: Option<(&'a crate::j3d::bck::Morph, f32)>,
     pub pos: Vec3,
     pub yaw: f32,
+    /// Head Y and backbone X deltas post-multiplied onto the already-posed world matrices
+    /// (`tww/src/d/actor/d_a_npc_ba1.cpp:97-113`, HD `d_a_npc_ba1.cpp:205-235`).
+    pub joint_control: Option<(u16, f32, u16, f32)>,
+    /// The cape model hung off the `footL` joint (`d_a_npc_ba1.cpp:2034-2040,294-296`).
+    pub cloth: Option<(u16, &'a RoomMesh)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -268,7 +273,10 @@ pub fn batch_desc_with_actor(
                         .iter()
                         .map(|part| used_pages(part.mesh).len())
                         .sum::<usize>()
-                    + npc.map_or(0, |npc| used_pages(npc.mesh).len()),
+                    + npc.map_or(0, |npc| {
+                        used_pages(npc.mesh).len()
+                            + npc.cloth.map_or(0, |(_, mesh)| used_pages(mesh).len())
+                    }),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -634,9 +642,48 @@ pub fn build_frame_with_actor(
             |(morph, frame)| morph.joint_matrices(frame),
         );
         let to_world = Mat4::from_translation(npc.pos) * Mat4::from_rotation_y(npc.yaw);
-        let placed: Vec<Mat4> = pose.iter().map(|joint| to_world * *joint).collect();
+        let mut placed: Vec<Mat4> = pose.iter().map(|joint| to_world * *joint).collect();
+        if let Some((head, head_y, backbone, backbone_x)) = npc.joint_control {
+            if let Some(matrix) = placed.get_mut(head as usize) {
+                *matrix = *matrix * Mat4::from_rotation_y(head_y);
+            }
+            if let Some(matrix) = placed.get_mut(backbone as usize) {
+                *matrix = *matrix * Mat4::from_rotation_x(backbone_x);
+            }
+        }
         for group in skinned_groups(npc.mesh, npc_page_base, &pages, &placed) {
             frame.push(group);
+        }
+        if let Some((joint, mesh)) = npc.cloth {
+            let cloth_base = npc_page_base + pages.len() as u32;
+            let cloth_pages = used_pages(mesh);
+            for (slot, page) in cloth_pages.iter().enumerate() {
+                let Some(texture) = mesh.textures.get(*page as usize) else {
+                    continue;
+                };
+                frame.uploads.push(SceneUpload {
+                    page: cloth_base + slot as u32,
+                    x: 0,
+                    y: 0,
+                    w: texture.width,
+                    h: texture.height,
+                    rgba: texture.rgba.clone(),
+                });
+            }
+            if let Some(body) = placed.get(joint as usize).copied() {
+                for group in attached_groups(
+                    mesh,
+                    snapshot,
+                    cloth_base,
+                    &cloth_pages,
+                    body,
+                    &mesh.joint_matrices,
+                    None,
+                    None,
+                ) {
+                    frame.push(group);
+                }
+            }
         }
     }
     frame
