@@ -291,7 +291,9 @@ pub fn batch_desc_with_actor(
     weather_pages: usize,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) if held.is_empty() && npcs.is_empty() && !blur && !weather => {
+        (None, None, None, None)
+            if held.is_empty() && npcs.is_empty() && !blur && weather_pages == 0 =>
+        {
             BatchDesc::default()
         }
         _ => BatchDesc {

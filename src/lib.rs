@@ -1904,7 +1904,7 @@ impl App {
                 flake.base_pos + flake.pos - glam::Vec3::Y * (droop * 0.5),
                 glam::Vec2::new(h, h + droop * 0.5),
                 [1.0, 1.0, 1.0],
-                0x78_f32 / 255.0,
+                120.0 / 255.0,
                 0.0,
                 0,
                 true,
@@ -1950,7 +1950,7 @@ impl App {
                 out.push(board(
                     position,
                     glam::Vec2::splat(scales[index] / 8000.0),
-                    [1.0, 1.0, 0xF1_f32 / 255.0],
+                    [1.0, 1.0, 241.0 / 255.0],
                     (alphas[index] / 255.0) * sun.visibility * sun.visibility * fade,
                     lens.angle_deg as f32,
                     page,
@@ -1997,7 +1997,7 @@ impl App {
                     3.0 - 0.22 * sway.sin(),
                     3.0 - 0.22 * (puff.scale.y * 10.0).sin(),
                 ),
-                [0xE5_f32 / 255.0, 1.0, 0xC8_f32 / 255.0],
+                [229.0 / 255.0, 1.0, 200.0 / 255.0],
                 puff.alpha * housi.m5ddc,
                 0.0,
                 3,
@@ -2075,6 +2075,7 @@ impl App {
                         height: 3.0,
                         half: 3.0,
                         anm: None,
+                        modeled: false,
                     });
                 }
                 continue;

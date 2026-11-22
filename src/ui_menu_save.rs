@@ -1177,6 +1177,8 @@ pub fn checksum_of(bytes: &[u8]) -> u64 {
 pub fn blank_save() -> SaveGame {
     crate::save::SaveGame {
         version: SAVE_VERSION,
+        photos: [0; 3],
+        photo_details: [0; 3],
         name: String::new(),
         tick: 0,
         camera_yaw: 0.0,

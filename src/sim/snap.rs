@@ -1681,7 +1681,7 @@ pub struct SnapObj {
 /// The shell-side photo result and the one-frame shutter handshake: `d_snap.cpp` releases the
 /// shutter, lets the frame's actor draws register their proxies, then judges the captured frame
 /// (`d_picture_box.cpp:616-617,673`).
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone, Copy)]
 pub struct PhotoCapture {
     pressed: bool,
     pending: bool,

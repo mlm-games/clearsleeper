@@ -2394,6 +2394,9 @@ pub fn build(
                         actor_anm::toripost.in_set(WwSimSet::Execute),
                         actor_anm::npc_bmsw.in_set(WwSimSet::Execute),
                         actor_anm::bwds.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )
