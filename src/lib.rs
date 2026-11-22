@@ -387,10 +387,11 @@ impl App {
 
     fn step_album(&mut self, _dt: Duration) {
         use crate::ui_menu_collect::{AlbumOutput, PadInput};
+        let input = self.album_input();
         let Some(stage) = self.album.as_mut() else {
             return;
         };
-        stage.input = self.album_input();
+        stage.input = input;
         let pad = &self.sampled_pad;
         let menu_pad = PadInput {
             a: pad.hold.a,
@@ -422,11 +423,15 @@ impl App {
         }
         if stage.shutter_pending {
             stage.shutter_pending = false;
-            let camera = self.sim.world.get_resource::<sim::camera::Camera>();
+            let camera = self
+                .sim
+                .world
+                .get_resource::<sim::camera::Camera>()
+                .copied();
             self.sim
                 .world
                 .resource_mut::<sim::snap::SnapPacket>()
-                .judge_from_registry(camera.as_deref());
+                .judge_from_registry(camera.as_ref());
             stage
                 .input
                 .capture_from(self.sim.world.resource::<sim::snap::SnapPacket>());
