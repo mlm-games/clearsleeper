@@ -2379,6 +2379,9 @@ pub fn build(
                         actor_anm::amos_knight.in_set(WwSimSet::Execute),
                         actor_anm::helmaroc.in_set(WwSimSet::Execute),
                         actor_anm::phantom_ganon.in_set(WwSimSet::Execute),
+                    )
+                        .chain(),
+                    (
                         actor_anm::gohdan.in_set(WwSimSet::Execute),
                         actor_anm::gohma.in_set(WwSimSet::Execute),
                         actor_anm::kalle_demos.in_set(WwSimSet::Execute),

@@ -37,6 +37,7 @@ pub enum Screen {
     GameOver,
     Movie,
     ClearSave,
+    PhotoAlbum,
     Settings,
     QuitConfirm,
 }

@@ -241,6 +241,7 @@ pub struct App {
     title_stage: Option<TitleStage>,
     meter: Option<MeterStage>,
     game_over: Option<GameOverStage>,
+    album: Option<AlbumStage>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
@@ -293,6 +294,200 @@ struct GameOverStage {
     image: Cell<Option<repose_core::ImageHandle>>,
     uploaded: Cell<u64>,
     revision: u64,
+}
+
+struct AlbumStage {
+    album: crate::ui_menu_collect::AlbumBox,
+    host: crate::ui_menu_collect::AlbumHost,
+    tune: crate::ui_menu_collect::AlbumTune,
+    input: crate::ui_menu_collect::AlbumInput,
+    picture_num: u8,
+    capture_step: i32,
+    shutter_pending: bool,
+    draw: Option<crate::ui_menu_collect::AlbumDraw>,
+    canvas: text::raster::Canvas,
+    image: Cell<Option<repose_core::ImageHandle>>,
+    uploaded: Cell<u64>,
+    revision: u64,
+}
+
+impl App {
+    fn open_album(&mut self) {
+        if self.album.is_some() {
+            return;
+        }
+        let Ok(root) = assets::AssetRoot::from_env() else {
+            return;
+        };
+        let Ok(cam) = root.read_archive("files/res/Msg/camres.arc") else {
+            return;
+        };
+        let Ok(msgres) = root.read_archive("files/res/Msg/msgres.arc") else {
+            return;
+        };
+        let (Some(main_bytes), Some(shutter_bytes)) = (
+            cam.read("wipe_01_01.blo").ok(),
+            cam.read("wipe_01_02.blo").ok(),
+        ) else {
+            return;
+        };
+        let (Some(main), Some(shutter)) = (j2d::parse(main_bytes), j2d::parse(shutter_bytes))
+        else {
+            return;
+        };
+        let message = msgres
+            .read("hukidashi_08.blo")
+            .ok()
+            .and_then(j2d::parse)
+            .unwrap_or_default();
+        let mut album = crate::ui_menu_collect::AlbumBox::new(&main, &shutter, &message);
+        let mut out = crate::ui_menu_collect::AlbumOutput::default();
+        let input = self.album_input();
+        album.create(&input, &mut out);
+        let mut host = crate::ui_menu_collect::AlbumHost::default();
+        host.create(&mut 0, &mut out);
+        self.album = Some(AlbumStage {
+            album,
+            host,
+            tune: crate::ui_menu_collect::AlbumTune::default(),
+            input,
+            picture_num: 0,
+            capture_step: 0,
+            shutter_pending: false,
+            draw: None,
+            canvas: text::raster::Canvas::new(640, 480),
+            image: Cell::new(None),
+            uploaded: Cell::new(0),
+            revision: 1,
+        });
+        self.menu.screen = menus::Screen::PhotoAlbum;
+    }
+
+    fn album_input(&self) -> crate::ui_menu_collect::AlbumInput {
+        use crate::ui_menu_collect::AlbumInput;
+        let world = &self.sim.world;
+        let collect = *world.resource::<sim::flags::Collect>();
+        let story = *world.resource::<sim::flags::StoryBits>();
+        let photo = *world.resource::<sim::snap::PhotoCapture>();
+        let mut input = AlbumInput {
+            collect,
+            story,
+            camera_attention: true,
+            camera_slot_item: world.resource::<sim::inventory::Equipped>().item(8),
+            capture_result: photo.result,
+            capture_result_detail: photo.detail,
+            picture_num: 0,
+            picture_status: 0,
+            ..AlbumInput::default()
+        };
+        input.capture_from(world.resource::<sim::snap::SnapPacket>());
+        input
+    }
+
+    fn step_album(&mut self, _dt: Duration) {
+        use crate::ui_menu_collect::{AlbumOutput, PadInput};
+        let Some(stage) = self.album.as_mut() else {
+            return;
+        };
+        stage.input = self.album_input();
+        let pad = self.sampled_pad.unwrap_or_default();
+        let menu_pad = PadInput {
+            a: pad.a,
+            b: pad.b,
+            x: pad.x,
+            y: pad.y,
+            z: pad.z,
+            l: pad.l,
+            r: pad.r,
+            start: pad.start,
+            stick_value: 0.0,
+            stick_angle: 0,
+            ..PadInput::default()
+        };
+        let mut out = AlbumOutput::default();
+        stage.host.execute(
+            &mut stage.album,
+            &stage.input,
+            &menu_pad,
+            &mut out,
+            &stage.tune,
+        );
+        if out.release_shutter {
+            self.sim
+                .world
+                .resource_mut::<sim::snap::SnapPacket>()
+                .release_shutter();
+            stage.shutter_pending = true;
+        }
+        if stage.shutter_pending {
+            stage.shutter_pending = false;
+            let camera = self.sim.world.get_resource::<sim::camera::Camera>();
+            self.sim
+                .world
+                .resource_mut::<sim::snap::SnapPacket>()
+                .judge_from_registry(camera.as_deref());
+            stage
+                .input
+                .capture_from(self.sim.world.resource::<sim::snap::SnapPacket>());
+            stage.capture_step = 5;
+        }
+        if stage.album.get_status() == crate::ui_menu_collect::STATE_CLOSED || out.photo_box_cancel
+        {
+            self.menu.screen = menus::Screen::Playing;
+            self.album = None;
+            return;
+        }
+        stage.draw = Some(stage.album.draw(&stage.tune));
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
+    fn album_view(&self, ctx: &repose_core::RenderContext) -> repose_core::View {
+        let Some(stage) = self.album.as_ref() else {
+            return Spacer();
+        };
+        let handle = match stage.image.get() {
+            Some(handle) => handle,
+            None => {
+                let handle = ctx.alloc_image_handle();
+                stage.image.set(Some(handle));
+                handle
+            }
+        };
+        if stage.uploaded.get() != stage.revision {
+            let mut canvas = text::raster::Canvas::new(640, 480);
+            canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
+            let Some(draw) = stage.draw.as_ref() else {
+                return Spacer();
+            };
+            for (index, text) in draw.panes.texts.iter().enumerate() {
+                if text.visible {
+                    canvas.fill_rect(
+                        [
+                            text.x,
+                            text.y + index as f32 * 26.0,
+                            text.w.min(600.0),
+                            24.0,
+                        ],
+                        [220, 220, 220, 255],
+                    );
+                }
+            }
+            for slot in &draw.photos {
+                canvas.fill_rect(
+                    [
+                        slot.left as f32,
+                        slot.top as f32,
+                        slot.right as f32,
+                        slot.bottom as f32,
+                    ],
+                    [40, 60, 90, 255],
+                );
+            }
+            ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+            stage.uploaded.set(stage.revision);
+        }
+        Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+    }
 }
 
 /// The input log `CS_INPUT_LOG` names, emptied when the session opens it. A line is a tape
@@ -417,6 +612,7 @@ impl App {
             title_stage: None,
             meter: None,
             game_over: None,
+            album: None,
             game_over_failed: false,
             title_actor: None,
             pending_slot: None,
@@ -899,6 +1095,21 @@ impl App {
     /// (the title actor, the game-over sequence) or through the ported menu state machine
     /// behind the file select panes.
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
+        let album_down = held.contains(&PhysicalKey::KeyP);
+        if window_focused
+            && self.assets_installed
+            && album_down
+            && !self.menu_prev.contains(&PhysicalKey::KeyP)
+        {
+            match self.menu.screen {
+                menus::Screen::Playing => self.open_album(),
+                menus::Screen::PhotoAlbum => {
+                    self.menu.screen = menus::Screen::Playing;
+                    self.album = None;
+                }
+                _ => {}
+            }
+        }
         let cmds = if !self.assets_installed && window_focused {
             menus::cmds_from(held, &self.menu_prev)
         } else {
@@ -3914,6 +4125,11 @@ impl App {
             self.clear_pad_edges();
             return;
         }
+        if self.menu.screen == menus::Screen::PhotoAlbum {
+            self.step_album(dt);
+            self.clear_pad_edges();
+            return;
+        }
         let step = self.sim.step;
         self.menu_clock = (self.menu_clock + dt).min(step * self.sim.max_steps.max(1));
         while self.menu_clock >= step {
@@ -5066,6 +5282,7 @@ pub fn root_view(
         menus::Screen::Playing => meter_hud_view(app, ctx),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
+        menus::Screen::PhotoAlbum => app.album_view(ctx),
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
         menus::Screen::Title
@@ -5095,6 +5312,7 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
         menus::Screen::FileSelect
         | menus::Screen::Playing
         | menus::Screen::GameOver
+        | menus::Screen::PhotoAlbum
         | menus::Screen::Movie
         | menus::Screen::ClearSave => Spacer(),
     }
