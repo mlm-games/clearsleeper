@@ -40,6 +40,18 @@ const TURN_SPEED_DROP: f32 = 3.0;
 const TURN_RATE_MAX: f32 = 3.6;
 const TURN_RATE_MIN: f32 = 0.1;
 
+// `setSailAngle` and the wind-to-speed ladder (`tww/src/d/actor/d_a_ship.cpp:754-791,1626-1676`;
+// `wwhd/wwhd_src/d/actor/d_a_ship.cpp:2149-2178,2657-2734`). GameCube numbers are authoritative;
+// HD folds the same factor into `maxSpeed = 55`.
+const SAIL_TARGET: i16 = 0x1555;
+const SAIL_DEADZONE: i16 = 0x800;
+const SAIL_SCALE: i32 = 0x10;
+const SAIL_MAX_STEP: i16 = 0x800;
+const SAIL_MIN_STEP: i16 = 0x20;
+const MAST_FRAME: f32 = 7.0;
+const WIND_SPEED_CAP: f32 = 55.0;
+const TARGET_CAP: f32 = 80.0;
+
 #[derive(Component, Debug, Clone, Copy, Default)]
 pub struct Ship {
     pub speed: f32,
@@ -47,6 +59,12 @@ pub struct Ship {
     pub riding: bool,
     pub warp_y: f32,
     held: bool,
+    /// `mSailAngle`/`m0378`/`m0380` (`d_a_ship.h:320,329,333`; HD `d_a_ship.h:392,401,405`).
+    sail_angle: i16,
+    sail_half: i16,
+    sail_target: i16,
+    sail_on: bool,
+    mast_frame: f32,
 }
 
 pub const CRANE_BASE_ANGLE: i16 = 0x3000;
@@ -186,6 +204,7 @@ impl Ship {
 
 pub fn control(
     sea: Option<Res<Sea>>,
+    weather: Res<super::weather::Weather>,
     intent: Res<MoveIntent>,
     camera: Res<CameraYaw>,
     do_intent: Res<DoIntent>,
@@ -221,6 +240,7 @@ pub fn control(
                     player,
                     &intent,
                     &camera,
+                    &weather,
                     do_intent.0,
                     edge,
                 );
@@ -247,6 +267,7 @@ fn ride(
     player: &mut Player,
     intent: &MoveIntent,
     camera: &CameraYaw,
+    weather: &super::weather::Weather,
     pressed: bool,
     edge: bool,
 ) {
@@ -284,6 +305,12 @@ fn ride(
     }
     let step = (-turn_rate * (ship.tiller >> 6) as f32) as i16;
     actor.angle[1] = actor.angle[1].wrapping_add(step);
+    // `setSailAngle` and the wind-power ladder run every steer tick before the speed
+    // step (`d_a_ship.cpp:1626-1676`; HD `:2657-2734`).
+    set_sail_angle(actor, ship, weather);
+    ship.mast_frame = (ship.mast_frame + 1.0).min(MAST_FRAME + 1.0);
+    ship.sail_on = ship.mast_frame >= MAST_FRAME;
+    let power = wind_power(actor, weather);
     if pressed && ship.speed >= STOP_SPEED {
         add_calc(
             &mut ship.speed,
@@ -292,6 +319,13 @@ fn ride(
             BRAKE_MAX_STEP,
             BRAKE_MIN_STEP,
         );
+    } else if ship.sail_on && power > 0.0 {
+        let target = (power * 2.0).min(TARGET_CAP);
+        if ship.speed < target {
+            ship.speed = target;
+        } else {
+            add_calc(&mut ship.speed, power, 0.1, 0.5, 0.1);
+        }
     } else {
         add_calc(
             &mut ship.speed,
@@ -301,6 +335,49 @@ fn ride(
             ROW_MIN_STEP,
         );
     }
+}
+
+/// `setSailAngle` (`tww/src/d/actor/d_a_ship.cpp:755-791`;
+/// `wwhd/wwhd_src/d/actor/d_a_ship.cpp:2149-2178`). The sail aims ±`0x1555` off the
+/// wind with a `0x800` deadzone, eased by `cLib_addCalcAngleS`. The cloth solve this angle drives
+/// is still omitted (`grid.rs:39-42`); the angle is kept so that model can be wired later.
+fn set_sail_angle(actor: &Actor, ship: &mut Ship, weather: &super::weather::Weather) {
+    let wind = weather.wind_vec();
+    let wind_yaw = super::walk::to_s16(wind.x.atan2(wind.z));
+    let diff = wind_yaw.wrapping_sub(actor.angle[1]);
+    ship.sail_target = if diff > SAIL_DEADZONE {
+        -SAIL_TARGET
+    } else if diff < -SAIL_DEADZONE {
+        SAIL_TARGET
+    } else if ship.sail_target == 0 {
+        if diff >= 0 { -SAIL_TARGET } else { SAIL_TARGET }
+    } else {
+        ship.sail_target
+    };
+    ship.sail_angle = add_calc_angle_s(
+        ship.sail_angle,
+        ship.sail_target,
+        SAIL_SCALE as i16,
+        SAIL_MAX_STEP,
+        SAIL_MIN_STEP,
+    );
+    ship.sail_half = ship.sail_angle >> 1;
+}
+
+/// Wind power after the angle factor (`d_a_ship.cpp:1631-1650`; HD `:2698-2712`). The `0.5`
+/// divisor in the reference doubles the raw power, which HD writes as `strength + strength`.
+fn wind_power(actor: &Actor, weather: &super::weather::Weather) -> f32 {
+    let wind = weather.wind_vec();
+    let wind_yaw = super::walk::to_s16(wind.x.atan2(wind.z));
+    let diff = wind_yaw.wrapping_sub(actor.angle[1]).unsigned_abs() as i32;
+    let factor = if diff < 0x4000 {
+        1.0 - diff as f32 / 0x10000 as f32
+    } else if diff <= 0x6000 {
+        0.75 - (diff - 0x4000) as f32 * 5.493_164e-5
+    } else {
+        (0.3 - (diff - 0x6000) as f32 * 0.000_329_670_35).max(0.0)
+    };
+    (weather.wind_pow() * 2.0).min(1.0) * factor * WIND_SPEED_CAP
 }
 
 fn idle(ship: &mut Ship) {
