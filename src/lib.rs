@@ -96,8 +96,49 @@ pub struct PartAnims {
     pub grip_brk: Option<j3d::brk::TevRegKey>,
     pub tip_bpk: Option<j3d::bpk::AnmColor>,
     pub master_tip_bpk: Option<j3d::bpk::AnmColor>,
+    pub tip_btk: Option<j3d::btk::TextureAnimation>,
+    pub tip_brk: Option<j3d::brk::TevRegKey>,
+    pub master_tip_btk: Option<j3d::btk::TextureAnimation>,
+    pub master_tip_brk: Option<j3d::brk::TevRegKey>,
+    pub takt_brk: Option<j3d::brk::TevRegKey>,
+    pub blade_btk: Option<j3d::btk::TextureAnimation>,
+    pub glow_btk: Option<j3d::btk::TextureAnimation>,
+    pub glow_brk: Option<j3d::brk::TevRegKey>,
+    pub master_glow_btk: Option<j3d::btk::TextureAnimation>,
+    pub master_glow_brk: Option<j3d::brk::TevRegKey>,
     pub grip_btk: Option<j3d::btk::TextureAnimation>,
     pub shield_btk: Option<j3d::btk::TextureAnimation>,
+}
+
+fn load_btk(anms: &assets::AnmArchive, id: u16) -> Option<j3d::btk::TextureAnimation> {
+    j3d::btk::parse(&anms.bytes(assets::AnmRef::Id(id)).ok()?).ok()
+}
+
+fn load_brk(anms: &assets::AnmArchive, id: u16) -> Option<j3d::brk::TevRegKey> {
+    j3d::brk::parse(&anms.bytes(assets::AnmRef::Id(id)).ok()?).ok()
+}
+
+fn first_uv(
+    anim: Option<&j3d::btk::TextureAnimation>,
+    frame: f32,
+) -> Option<(u16, j3d::btk::UvMatrix)> {
+    let anim = anim?;
+    if anim.track_count() == 0 {
+        return None;
+    }
+    Some((0, anim.uv_transform(0, frame)?))
+}
+
+fn first_color(anim: Option<&j3d::brk::TevRegKey>, frame: f32) -> Option<(u16, [f32; 3])> {
+    let c = anim?.tev_color(0, frame)?;
+    Some((
+        0,
+        [
+            (1.0 + c[0] as f32 / 1024.0).max(0.0),
+            (1.0 + c[1] as f32 / 1024.0).max(0.0),
+            (1.0 + c[2] as f32 / 1024.0).max(0.0),
+        ],
+    ))
 }
 
 pub struct App {
@@ -509,6 +550,18 @@ impl App {
             if let Ok(raw) = anms.bytes(assets::AnmRef::Id(0x14D)) {
                 app.part_anims.master_tip_bpk = j3d::bpk::parse(&raw).ok();
             }
+            // Material animations for the tip-stab, Wind Waker, master blade and glow models
+            // (`tww/assets/GZLE01/res/Object/LkAnm.h:337-346,451,473-474`).
+            app.part_anims.tip_btk = load_btk(&anms, 0x159);
+            app.part_anims.tip_brk = load_brk(&anms, 0x150);
+            app.part_anims.master_tip_btk = load_btk(&anms, 0x15A);
+            app.part_anims.master_tip_brk = load_brk(&anms, 0x151);
+            app.part_anims.takt_brk = load_brk(&anms, 0x154);
+            app.part_anims.blade_btk = load_btk(&anms, 0x1C3);
+            app.part_anims.glow_btk = load_btk(&anms, 0x1D9);
+            app.part_anims.glow_brk = load_brk(&anms, 0x155);
+            app.part_anims.master_glow_btk = load_btk(&anms, 0x1DA);
+            app.part_anims.master_glow_brk = load_brk(&anms, 0x156);
         }
         if let (Ok(anms), Some(model)) = (
             assets::AnmArchive::open("files/res/Object/Link.arc"),
@@ -4218,6 +4271,41 @@ pub fn root_view(
         let track = anim.track("SHMSBMAT", 0)?;
         Some((1u16, anim.uv_transform(track, part_btk?.shield)?))
     });
+    // Material animations on the other held parts, sampled at the body cut's frame where the
+    // reference drives them alongside the transform bck (`d_a_player_sword.inc:99-172`,
+    // `d_a_player_tact.inc:42-48`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:2621-2633`).
+    let tip_uv = first_uv(app.part_anims.tip_btk.as_ref(), blade_frame);
+    let tip_color = first_color(app.part_anims.tip_brk.as_ref(), blade_frame);
+    let master_tip_uv = first_uv(app.part_anims.master_tip_btk.as_ref(), blade_frame);
+    let master_tip_color = first_color(app.part_anims.master_tip_brk.as_ref(), blade_frame);
+    let blade_uv = first_uv(app.part_anims.blade_btk.as_ref(), blade_frame);
+    let takt_phase = app.sim.world.get_resource::<sim::tact::Tact>();
+    let takt_color = first_color(
+        app.part_anims.takt_brk.as_ref(),
+        if takt_phase.is_some_and(|tact| {
+            matches!(
+                tact.phase,
+                sim::tact::TactPhase::Play | sim::tact::TactPhase::Direction
+            )
+        }) {
+            1.0
+        } else {
+            0.0
+        },
+    );
+    let soup_frame = if app
+        .sim
+        .world
+        .get_resource::<sim::combat::Combat>()
+        .is_some_and(|c| c.soup)
+    {
+        1.0
+    } else {
+        0.0
+    };
+    let glow_uv = first_uv(app.part_anims.glow_btk.as_ref(), soup_frame);
+    let glow_color = first_color(app.part_anims.glow_brk.as_ref(), soup_frame);
     // The shield bck follows the under-body frame while guarding, frame 0 at rest
     // (`tww/src/d/actor/d_a_player_main.cpp:1341,6469-6471`,
     // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3259-3260`).
@@ -4263,6 +4351,7 @@ pub fn root_view(
                 {
                     part.anim = Some((morph, blade_frame));
                 }
+                part.uv = blade_uv;
                 held.push(part);
             }
             if let Some(model) = app.master_grip_model.as_ref() {
@@ -4282,15 +4371,13 @@ pub fn root_view(
         // The forward cut adds a tip-stab model at the blade's chest joint, coloured by the
         // sword tier's BPK (`d_a_player_main.cpp:11604-11609`, `d_a_player_sword.inc:36-56`).
         if snapshot.player_anm.map(|anm| anm.stem) == Some("cutf") {
-            let (model, bpk) = if sword == sim::damage::ITEM_SWORD {
-                (app.tip_stab_model.as_ref(), app.part_anims.tip_bpk.as_ref())
+            let normal = sword == sim::damage::ITEM_SWORD;
+            let model = if normal {
+                app.tip_stab_model.as_ref()
             } else if sword != sim::inventory::NO_ITEM {
-                (
-                    app.master_tip_stab_model.as_ref(),
-                    app.part_anims.master_tip_bpk.as_ref(),
-                )
+                app.master_tip_stab_model.as_ref()
             } else {
-                (None, None)
+                None
             };
             if let Some(model) = model {
                 let mut part = if sword_on_back {
@@ -4298,16 +4385,24 @@ pub fn root_view(
                 } else {
                     view::AttachedPart::hand(model, lhand)
                 };
-                if let Some(rgba) = bpk.and_then(|anm| anm.color(0, blade_frame)) {
-                    part.color = Some((
-                        0,
-                        [
-                            rgba[0] as f32 / 255.0,
-                            rgba[1] as f32 / 255.0,
-                            rgba[2] as f32 / 255.0,
-                        ],
-                    ));
-                }
+                part.uv = if normal { tip_uv } else { master_tip_uv };
+                part.color = if normal { tip_color } else { master_tip_color }.or_else(|| {
+                    let bpk = if normal {
+                        app.part_anims.tip_bpk.as_ref()
+                    } else {
+                        app.part_anims.master_tip_bpk.as_ref()
+                    };
+                    bpk.and_then(|anm| anm.color(0, blade_frame)).map(|rgba| {
+                        (
+                            0,
+                            [
+                                rgba[0] as f32 / 255.0,
+                                rgba[1] as f32 / 255.0,
+                                rgba[2] as f32 / 255.0,
+                            ],
+                        )
+                    })
+                });
                 held.push(part);
             }
         }
@@ -4315,11 +4410,13 @@ pub fn root_view(
         // (`d_a_player_sword.inc:158-204`), attached at the same hand joint.
         if sword == sim::damage::MASTER_SWORD_3 {
             if let Some(model) = app.master_glow_model.as_ref() {
-                let part = if sword_on_back {
+                let mut part = if sword_on_back {
                     view::AttachedPart::sword_back(model, poda)
                 } else {
                     view::AttachedPart::hand(model, lhand)
                 };
+                part.uv = glow_uv;
+                part.color = glow_color;
                 held.push(part);
             }
         }
@@ -4419,7 +4516,9 @@ pub fn root_view(
             .is_some_and(|tact| tact.phase != sim::tact::TactPhase::Idle)
         {
             if let Some(model) = app.takt_model.as_ref() {
-                held.push(view::AttachedPart::hand(model, lhand));
+                let mut part = view::AttachedPart::hand(model, lhand);
+                part.color = takt_color;
+                held.push(part);
             }
         }
         if app

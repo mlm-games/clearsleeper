@@ -1244,7 +1244,11 @@ fn actors_group(snapshot: &SceneSnapshot, eye: Vec3, npc_model: bool) -> MeshGro
     for actor in &snapshot.actors {
         // A Ba actor is drawn from its own BDL instead of a box; keep the box when the model
         // could not be loaded so the actor never disappears entirely.
-        if npc_model && actor.anm.is_some_and(|anm| anm.archive == "Ba") {
+        if npc_model
+            && actor
+                .anm
+                .is_some_and(|anm| anm.archive == "Ba" || anm.archive == "CC")
+        {
             continue;
         }
         group.push_box(
