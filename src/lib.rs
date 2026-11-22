@@ -68,13 +68,26 @@ pub mod view;
 /// Fixed gameplay tick rate: 30 Hz (NTSC pacing).
 pub const SIM_HZ: f64 = 30.0;
 
+/// Body cut stem → blade-only bck stems. Retail swaps the blade's bck per cut direction while the
+/// body plays its own bck (`tww/src/d/actor/d_a_player_sword.inc:569-571,671-673,773-775,874-876,973-975,1057-1059`;
+/// HD `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:2552-2572`).
+const CUT_BLADES: [(&str, &str, &str); 7] = [
+    ("cuta", "cutaa", "cutams"),
+    ("cutf", "cutfa", "cutfms"),
+    ("cutr", "cutra", "cutrms"),
+    ("cutl", "cutla", "cutlms"),
+    ("cutea", "cuteaa", "cuteams"),
+    ("cuteb", "cuteba", "cutebms"),
+    ("cutturnb", "cutturna", "cutturnms"),
+];
+
 /// BCK poses for the held parts. The blade bcks come from `LkAnm.arc` and are sampled at the
 /// body cut's frame; the grip/shield bcks come from `Link.arc` (`tww/src/d/actor/d_a_player_main.cpp:11939-11950`,
 /// HD `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3424-3439`).
 #[derive(Default)]
 pub struct PartAnims {
-    pub blade: Option<j3d::bck::Morph>,
-    pub master_blade: Option<j3d::bck::Morph>,
+    pub blades: [Option<j3d::bck::Morph>; CUT_BLADES.len()],
+    pub master_blades: [Option<j3d::bck::Morph>; CUT_BLADES.len()],
     pub grip: Option<j3d::bck::Morph>,
     pub shield: Option<j3d::bck::Morph>,
 }
@@ -372,23 +385,21 @@ impl App {
         // Part-local BCK poses. Blade bcks (LkAnm.arc) are keyed to the blade model's own joint
         // tree (tww/src/d/actor/d_a_player_sword.inc:60-67); the grip and shield bcks are entries
         // in Link.arc (tww/src/d/actor/d_a_player_main.cpp:11939-11950).
-        if let (Ok(anms), Some(model)) = (
-            assets::AnmArchive::open(assets::LINK_ANM_ARCHIVE),
-            app.sword_model.as_ref(),
-        ) {
-            app.part_anims.blade = anms.morph(
-                assets::AnmRef::Entry("bcks/cutaa.bck"),
-                &model.joint_parents,
-            );
-        }
-        if let (Ok(anms), Some(model)) = (
-            assets::AnmArchive::open(assets::LINK_ANM_ARCHIVE),
-            app.master_sword_model.as_ref(),
-        ) {
-            app.part_anims.master_blade = anms.morph(
-                assets::AnmRef::Entry("bcks/cutams.bck"),
-                &model.joint_parents,
-            );
+        if let Ok(anms) = assets::AnmArchive::open(assets::LINK_ANM_ARCHIVE) {
+            if let Some(model) = app.sword_model.as_ref() {
+                for (slot, (_, stem, _)) in CUT_BLADES.iter().enumerate() {
+                    let entry = format!("bcks/{stem}.bck");
+                    app.part_anims.blades[slot] =
+                        anms.morph(assets::AnmRef::Entry(&entry), &model.joint_parents);
+                }
+            }
+            if let Some(model) = app.master_sword_model.as_ref() {
+                for (slot, (_, _, stem)) in CUT_BLADES.iter().enumerate() {
+                    let entry = format!("bcks/{stem}.bck");
+                    app.part_anims.master_blades[slot] =
+                        anms.morph(assets::AnmRef::Entry(&entry), &model.joint_parents);
+                }
+            }
         }
         if let (Ok(anms), Some(model)) = (
             assets::AnmArchive::open("files/res/Object/Link.arc"),
@@ -1493,6 +1504,13 @@ impl App {
             Some(player) => (player.pos, player.yaw, player.face),
             None => (area.spawn, area.yaw, area.yaw),
         };
+        let player_speed = player.map_or(0.0, |player| player.speed);
+        let item_in_use = self
+            .sim
+            .world
+            .get_resource::<sim::item_use::ItemUse>()
+            .and_then(|state| state.stem)
+            .is_some_and(|stem| !matches!(stem, "grabup" | "grabwait"));
         let collision = self.sim.world.get_resource::<sim::collision::Collision>();
         let water = self.sim.world.get_resource::<sim::water::Water>();
         let (ground_y, walls) = match collision {
@@ -1546,6 +1564,8 @@ impl App {
                             })
                         })
                 }),
+            player_speed,
+            item_in_use,
             player_no_draw: player.is_some_and(|player| player.no_draw)
                 || self
                     .sim
@@ -4007,14 +4027,42 @@ pub fn root_view(
     let lhand = body_node(b"cl_LhandA", 8);
     let rhand = body_node(b"cl_RhandA", 12);
     let poda = body_node(b"cl_podA", 13);
-    // The blade bck is sampled at the body cut frame during a cut, and at frame 0 at rest
-    // (`tww/src/d/actor/d_a_player_main.cpp:5877`, HD equivalent resets m35EC to 0).
-    let is_cut = matches!(
-        snapshot.player_anm.map(|anm| anm.stem),
-        Some("cuta" | "cutf" | "cutr" | "cutl" | "cutea" | "cuteb" | "cutturnb")
-    );
-    let blade_frame = if is_cut {
+    // Retail swaps the blade's bck with the cut direction and samples it at the body cut's frame;
+    // at rest it holds the first cut's bck at frame 0 (`tww/src/d/actor/d_a_player_sword.inc:569-571`,
+    // `tww/src/d/actor/d_a_player_main.cpp:5877`).
+    let blade_slot = snapshot
+        .player_anm
+        .and_then(|anm| CUT_BLADES.iter().position(|(stem, _, _)| *stem == anm.stem));
+    let blade_frame = if blade_slot.is_some() {
         snapshot.player_anm.map_or(0.0, |anm| anm.frame)
+    } else {
+        0.0
+    };
+    // The sword goes to its back scabbard whenever another item is selected
+    // (`tww/src/d/actor/d_a_player_main.cpp:1269-1277`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186`). The port has no button-to-item
+    // selection, so an item animation standing in for it is the closest available signal.
+    let sword_on_back = snapshot.item_in_use;
+    // The stowed mirror shield sways with the walk/dash cycle; the phase is the under-animation
+    // frame off 22 and the amplitude the speed ratio (`tww/src/d/actor/d_a_player_main.cpp:1320-1337`,
+    // `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3235-3255`).
+    let shield_sway = if snapshot.shield_on_back
+        && snapshot.equipment.shield == sim::inventory::ITEM_MIRROR_SHIELD
+        && matches!(
+            snapshot.player_anm.map(|anm| anm.stem),
+            Some("walk" | "dash")
+        ) {
+        let end = app
+            .player_anim
+            .as_ref()
+            .map_or(30.0, |idle| idle.stem_frame_max("walk"));
+        let frame = snapshot.player_anm.map_or(0.0, |anm| anm.frame);
+        let phase = std::f32::consts::TAU * (frame - 22.0) / end;
+        -5500.0
+            * (snapshot.player_speed / sim::walk::MAX_NORMAL_SPEED).abs()
+            * phase.sin()
+            * std::f32::consts::TAU
+            / 65536.0
     } else {
         0.0
     };
@@ -4045,30 +4093,46 @@ pub fn root_view(
     if !snapshot.player_no_draw {
         let sword = snapshot.equipment.sword;
         if sword == sim::damage::ITEM_SWORD {
-            if let (Some(model), Some(morph)) =
-                (app.sword_model.as_ref(), app.part_anims.blade.as_ref())
-            {
-                let mut part = view::AttachedPart::hand(model, lhand);
-                part.anim = Some((morph, blade_frame));
+            if let Some(model) = app.sword_model.as_ref() {
+                let mut part = if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                };
+                if let Some(morph) = app.part_anims.blades[blade_slot.unwrap_or(0)].as_ref() {
+                    part.anim = Some((morph, blade_frame));
+                }
                 held.push(part);
             }
             if let Some(model) = app.sword_grip_model.as_ref() {
-                held.push(view::AttachedPart::hand(model, lhand));
+                held.push(if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                });
             }
         } else if sword != sim::inventory::NO_ITEM {
-            if let (Some(model), Some(morph)) = (
-                app.master_sword_model.as_ref(),
-                app.part_anims.master_blade.as_ref(),
-            ) {
-                let mut part = view::AttachedPart::hand(model, lhand);
-                part.anim = Some((morph, blade_frame));
+            if let Some(model) = app.master_sword_model.as_ref() {
+                let mut part = if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                };
+                if let Some(morph) = app.part_anims.master_blades[blade_slot.unwrap_or(0)].as_ref()
+                {
+                    part.anim = Some((morph, blade_frame));
+                }
                 held.push(part);
             }
-            if let (Some(model), Some(morph)) =
-                (app.master_grip_model.as_ref(), app.part_anims.grip.as_ref())
-            {
-                let mut part = view::AttachedPart::hand(model, lhand);
-                part.anim = Some((morph, grip_frame));
+            if let Some(model) = app.master_grip_model.as_ref() {
+                let mut part = if sword_on_back {
+                    view::AttachedPart::sword_back(model, poda)
+                } else {
+                    view::AttachedPart::hand(model, lhand)
+                };
+                if let Some(morph) = app.part_anims.grip.as_ref() {
+                    part.anim = Some((morph, grip_frame));
+                }
                 held.push(part);
             }
         }
@@ -4093,6 +4157,7 @@ pub fn root_view(
                         view::AttachedPart::hand(model, rhand)
                     };
                     part.anim = shield_anim;
+                    part.sway = shield_sway;
                     held.push(part);
                 }
             }

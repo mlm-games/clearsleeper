@@ -85,6 +85,10 @@ pub struct AttachedPart<'a> {
     /// shield that is not being wielded (`tww/src/d/actor/d_a_player_main.cpp:1312-1319`,
     /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3231-3234`).
     pub local: Mat4,
+    /// Yaw, in model space about the part's own position, added while the mirror shield is stowed
+    /// and Link walks or dashes (`tww/src/d/actor/d_a_player_main.cpp:1320-1337`,
+    /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3235-3255`).
+    pub sway: f32,
 }
 
 impl<'a> AttachedPart<'a> {
@@ -94,6 +98,7 @@ impl<'a> AttachedPart<'a> {
             body_joint,
             anim: None,
             local: Mat4::IDENTITY,
+            sway: 0.0,
         }
     }
 
@@ -104,6 +109,21 @@ impl<'a> AttachedPart<'a> {
             anim: None,
             local: Mat4::from_translation(Vec3::new(15.5, 4.75, if mirror { -0.2 } else { 0.0 }))
                 * Mat4::from_rotation_z(-std::f32::consts::FRAC_PI_2),
+            sway: 0.0,
+        }
+    }
+
+    /// The sword's scabbard transform on `podA`, used when another item is selected
+    /// (`tww/src/d/actor/d_a_player_main.cpp:1272-1277`,
+    /// `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186`).
+    pub fn sword_back(mesh: &'a RoomMesh, body_joint: usize) -> Self {
+        Self {
+            mesh,
+            body_joint,
+            anim: None,
+            local: Mat4::from_translation(Vec3::new(-11.25, 4.5, 0.45))
+                * Mat4::from_rotation_z(-0x1C71 as f32 * std::f32::consts::TAU / 65536.0),
+            sway: 0.0,
         }
     }
 }
@@ -113,6 +133,12 @@ pub struct SceneSnapshot {
     pub player_pos: Vec3,
     pub player_yaw: f32,
     pub player_face: f32,
+    /// Linear ground speed, for the stowed mirror shield's walk/dash sway
+    /// (`tww/src/d/actor/d_a_player_main.cpp:1331`).
+    pub player_speed: f32,
+    /// Whether a non-grab item animation is playing, i.e. another item is selected, which sends
+    /// the sword to its back scabbard (`tww/src/d/actor/d_a_player_main.cpp:1269-1276`).
+    pub item_in_use: bool,
     pub player_anm: Option<PlayerAnm>,
     /// `checkPlayerNoDraw()` (`d_a_player_main.h:1980`), the gate the player's own draw takes
     /// before it submits its model: something raised `daPyFlg0_NO_DRAW`, or the camera carries
@@ -525,14 +551,20 @@ pub fn build_frame_with_actor(
                     || part.mesh.joint_matrices.clone(),
                     |(m, f)| m.joint_matrices(f),
                 );
-                for group in attached_groups(
-                    part.mesh,
-                    snapshot,
-                    held_page,
-                    &part_pages,
-                    body * part.local,
-                    &locals,
-                ) {
+                let mut body = body * part.local;
+                // Retail yaws the stowed mirror shield about its own origin and restores the
+                // matrix's translation columns (`d_a_player_main.cpp:1325-1337`). Conjugating by
+                // that translation is the same operation in glam's column-vector convention.
+                if part.sway != 0.0 {
+                    let origin = body.w_axis.truncate();
+                    body = Mat4::from_translation(origin)
+                        * Mat4::from_rotation_y(part.sway)
+                        * Mat4::from_translation(-origin)
+                        * body;
+                }
+                for group in
+                    attached_groups(part.mesh, snapshot, held_page, &part_pages, body, &locals)
+                {
                     frame.push(group);
                 }
             }

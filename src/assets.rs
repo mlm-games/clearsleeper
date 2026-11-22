@@ -507,6 +507,16 @@ impl PlayerIdle {
         self.pose_named(demo.map(|(stem, frame)| (stem, frame, false)), idle_frame)
     }
 
+    /// The controller's end frame for a loaded stem, the `mFrameCtrl::getEnd` the mirror shield's
+    /// sway divides its phase by (`tww/src/d/actor/d_a_player_main.cpp:1328-1329`).
+    pub fn stem_frame_max(&self, stem: &str) -> f32 {
+        self.gameplay
+            .iter()
+            .chain(self.demos.iter())
+            .find(|(name, _)| *name == stem)
+            .map_or(1.0, |(_, morph)| morph.frame_max())
+    }
+
     /// The bck gameplay put the body on. `looping` wraps walk and dash the way the retail move
     /// controller does, while a sword cut holds its last frame like a demo (`d_demo.cpp:229`).
     pub fn pose_named(&self, named: Option<(&str, f32, bool)>, idle_frame: f32) -> Vec<glam::Mat4> {
