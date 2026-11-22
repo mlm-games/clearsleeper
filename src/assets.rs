@@ -280,6 +280,34 @@ pub fn load_actor_model_entry(
     actor_model_entry(archive_name, Some(entry_name))
 }
 
+/// An NPC body and the BCKs its own object archive names, each parsed against that body's joint
+/// tree (`tww/src/d/d_npc.cpp:546-563`, `wwhd/wwhd_src/d/d_npc.cpp:58-69`).
+pub struct ActorModel {
+    pub mesh: crate::j3d::bdl::RoomMesh,
+    pub morphs: Vec<(i32, crate::j3d::bck::Morph)>,
+}
+
+/// Grandma's archive holds two BDLs; `ba.bdl` is the body and `ba_cloth.bdl` the cape
+/// (`tww/assets/GZLE01/res/Object/Ba.h:49-55`; HD `wwhd/wwhd_src/include/d/actor/d_a_npc_ba1.h:380-386`).
+pub const BA_ARCHIVE: &str = "Ba";
+pub const BA_OBJECT_ARCHIVE: &str = "files/res/Object/Ba.arc";
+pub const BA_MODEL_ENTRY: &str = "ba.bdl";
+
+pub fn load_ba_model() -> Option<ActorModel> {
+    let mesh = load_actor_model_entry(BA_ARCHIVE, BA_MODEL_ENTRY)?;
+    let anms = AnmArchive::open(BA_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0..=0x08u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    if let Some(morph) = anms.morph(AnmRef::Id(0x17), &mesh.joint_parents) {
+        morphs.push((0x17, morph));
+    }
+    Some(ActorModel { mesh, morphs })
+}
+
 fn actor_model_entry(
     archive_name: &str,
     entry_name: Option<&str>,

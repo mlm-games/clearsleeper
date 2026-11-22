@@ -135,6 +135,17 @@ impl<'a> AttachedPart<'a> {
     }
 }
 
+/// One non-Link actor drawn from its own object archive instead of a box: positioned with the
+/// actor's own transform, posed by the BCK its sim cursor published (`dNpc_setAnmIDRes`,
+/// `tww/src/d/d_npc.cpp:546-563`, HD `d_npc.cpp:58-69`).
+#[derive(Clone, Copy)]
+pub struct NpcDraw<'a> {
+    pub mesh: &'a RoomMesh,
+    pub anim: Option<(&'a crate::j3d::bck::Morph, f32)>,
+    pub pos: Vec3,
+    pub yaw: f32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneSnapshot {
     pub player_pos: Vec3,
@@ -236,9 +247,10 @@ pub fn batch_desc_with_actor(
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
+    npc: Option<&NpcDraw<'_>>,
 ) -> BatchDesc {
     match (room, actor, hair, hands) {
-        (None, None, None, None) if held.is_empty() => BatchDesc::default(),
+        (None, None, None, None) if held.is_empty() && npc.is_none() => BatchDesc::default(),
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
@@ -249,7 +261,8 @@ pub fn batch_desc_with_actor(
                     + held
                         .iter()
                         .map(|part| used_pages(part.mesh).len())
-                        .sum::<usize>(),
+                        .sum::<usize>()
+                    + npc.map_or(0, |npc| used_pages(npc.mesh).len()),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -352,7 +365,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[])
+    build_frame_with_actor(snapshot, cam, room, None, None, None, None, &[], None)
 }
 
 pub fn build_frame_with_actor(
@@ -364,11 +377,12 @@ pub fn build_frame_with_actor(
     hair: Option<&RoomMesh>,
     hands: Option<&RoomMesh>,
     held: &[AttachedPart<'_>],
+    npc: Option<&NpcDraw<'_>>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair, hands, held),
+        desc: batch_desc_with_actor(room, actor, hair, hands, held, npc),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -582,6 +596,40 @@ pub fn build_frame_with_actor(
                 }
             }
             held_page += part_pages.len() as u32;
+        }
+    }
+    if let Some(npc) = npc {
+        // The NPC's pages sit after every player page, the same order the batch counted them.
+        let npc_page_base = room.map_or(0, |room| room.textures.len() as u32)
+            + actor.map_or(0, |mesh| used_pages(mesh).len() as u32)
+            + hair.map_or(0, |mesh| used_pages(mesh).len() as u32)
+            + hands.map_or(0, |mesh| used_pages(mesh).len() as u32)
+            + held
+                .iter()
+                .map(|part| used_pages(part.mesh).len() as u32)
+                .sum::<u32>();
+        let pages = used_pages(npc.mesh);
+        for (slot, page) in pages.iter().enumerate() {
+            let Some(texture) = npc.mesh.textures.get(*page as usize) else {
+                continue;
+            };
+            frame.uploads.push(SceneUpload {
+                page: npc_page_base + slot as u32,
+                x: 0,
+                y: 0,
+                w: texture.width,
+                h: texture.height,
+                rgba: texture.rgba.clone(),
+            });
+        }
+        let pose = npc.anim.map_or_else(
+            || npc.mesh.joint_matrices.clone(),
+            |(morph, frame)| morph.joint_matrices(frame),
+        );
+        let to_world = Mat4::from_translation(npc.pos) * Mat4::from_rotation_y(npc.yaw);
+        let placed: Vec<Mat4> = pose.iter().map(|joint| to_world * *joint).collect();
+        for group in skinned_groups(npc.mesh, npc_page_base, &pages, &placed) {
+            frame.push(group);
         }
     }
     frame
@@ -1104,6 +1152,10 @@ fn actor_look(actor: &ActorView) -> Rgb {
 fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     let mut group = MeshGroup::default();
     for actor in &snapshot.actors {
+        // A Ba actor is drawn from its own BDL instead of a box; the box would hide the model.
+        if actor.anm.is_some_and(|anm| anm.archive == "Ba") {
+            continue;
+        }
         group.push_box(
             actor.pos.x,
             actor.pos.y,

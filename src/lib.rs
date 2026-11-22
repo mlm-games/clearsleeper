@@ -119,6 +119,8 @@ pub struct App {
     pub leaf_open_model: Option<j3d::bdl::RoomMesh>,
     pub hammer_model: Option<j3d::bdl::RoomMesh>,
     pub telescope_model: Option<j3d::bdl::RoomMesh>,
+    /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
+    pub ba1_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -293,6 +295,7 @@ impl App {
             leaf_open_model: None,
             hammer_model: None,
             telescope_model: None,
+            ba1_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -399,6 +402,7 @@ impl App {
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HAMMER_ENTRY);
         app.telescope_model =
             assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_TELESCOPE_ENTRY);
+        app.ba1_model = assets::load_ba_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -4300,6 +4304,36 @@ pub fn root_view(
             }
         }
     }
+    // Grandma is the one actor whose animation is already published to the view. Place her model
+    // with the ECS actor's own transform and pose it with the BCK its cursor named
+    // (tww/src/d/actor/d_a_npc_ba1.cpp:273-299, HD `d_a_npc_ba1.cpp:393-423`).
+    let npc = app
+        .sim
+        .world
+        .get_resource::<sim::actor_anm::ActorAnms>()
+        .and_then(|anms| {
+            anms.0
+                .iter()
+                .find(|anm| anm.archive == sim::actor_anm::BA_ARCHIVE)
+        })
+        .and_then(|anm| {
+            let model = app.ba1_model.as_ref()?;
+            let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
+            let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
+            let end = morph.frame_max().max(1.0);
+            let frame = anm.frame * 2.0;
+            let frame = if anm.looping {
+                frame % end
+            } else {
+                frame.min(end)
+            };
+            Some(view::NpcDraw {
+                mesh: &model.mesh,
+                anim: Some((morph, frame)),
+                pos: actor.pos,
+                yaw: sim::walk::from_s16(actor.shape_angle[1]),
+            })
+        });
     let frame = match &app.dff {
         Some(presented) => j3d::present::frame(presented, camera),
         None => view::build_frame_with_actor(
@@ -4311,6 +4345,7 @@ pub fn root_view(
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
             &held,
+            npc.as_ref(),
         ),
     };
     let desc = match &app.dff {
@@ -4321,6 +4356,7 @@ pub fn root_view(
             app.hair_model.as_ref(),
             app.hands_model.as_ref(),
             &held,
+            npc.as_ref(),
         ),
     };
     let cam = app.cam.clone();
