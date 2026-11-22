@@ -153,15 +153,17 @@ pub fn batch_desc_with_actor(
     room: Option<&RoomMesh>,
     actor: Option<&RoomMesh>,
     hair: Option<&RoomMesh>,
+    hands: Option<&RoomMesh>,
 ) -> BatchDesc {
-    match (room, actor, hair) {
-        (None, None, None) => BatchDesc::default(),
+    match (room, actor, hair, hands) {
+        (None, None, None, None) => BatchDesc::default(),
         _ => BatchDesc {
             layer_size: LAYER_SIZE,
             layers: array_layers(
                 room.map_or(0, |room| room.textures.len())
                     + actor.map_or(0, |actor| used_pages(actor).len())
-                    + hair.map_or(0, |hair| used_pages(hair).len()),
+                    + hair.map_or(0, |hair| used_pages(hair).len())
+                    + hands.map_or(0, |hands| used_pages(hands).len()),
             ),
             filter: SceneFilter::Linear,
             mips: 1,
@@ -264,7 +266,7 @@ pub fn build_frame(snapshot: &SceneSnapshot, cam: OrbitCamera, room: Option<&Roo
         ),
         ..cam
     };
-    build_frame_with_actor(snapshot, cam, room, None, None, None)
+    build_frame_with_actor(snapshot, cam, room, None, None, None, None)
 }
 
 pub fn build_frame_with_actor(
@@ -274,11 +276,12 @@ pub fn build_frame_with_actor(
     actor: Option<&RoomMesh>,
     actor_anim: Option<&crate::assets::PlayerIdle>,
     hair: Option<&RoomMesh>,
+    hands: Option<&RoomMesh>,
 ) -> Frame3d {
     let mut frame = Frame3d {
         cam,
         background: Some(snapshot.sky),
-        desc: batch_desc_with_actor(room, actor, hair),
+        desc: batch_desc_with_actor(room, actor, hair, hands),
         // Retail culls by the view frustum (`J3DShape` / `J3DViewMtx`); the GameCube has
         // no hierarchical-Z test, so the engine's armed-by-default occlusion feed would
         // both cull groups this port never asked it to and append a depth pass + readback
@@ -352,10 +355,24 @@ pub fn build_frame_with_actor(
             None => mesh.joint_matrices.clone(),
         };
         let placed = place_actor(pose.clone(), snapshot);
+        // When hands.bdl supplies a hand, hide cl.bdl's own hand shapes so two hands do not
+        // overlap (tww/src/d/actor/d_a_player_main.cpp:1392-1393,1469-1484). Those shapes are
+        // direct-matrix, so only the static pass needs the filter.
+        let hand_joints: Vec<u16> = if hands.is_some() {
+            [
+                mesh.find_node_id(b"cl_LhandA").unwrap_or(8),
+                mesh.find_node_id(b"cl_RhandA").unwrap_or(12),
+            ]
+            .into_iter()
+            .map(|j| j as u16)
+            .collect()
+        } else {
+            Vec::new()
+        };
         for group in skinned_groups(mesh, page_base, &pages, &placed) {
             frame.push(group);
         }
-        for group in static_actor_groups(mesh, snapshot, page_base, &pages, &pose) {
+        for group in static_actor_groups(mesh, snapshot, page_base, &pages, &pose, &hand_joints) {
             frame.push(group);
         }
         if let Some(hair) = hair {
@@ -380,6 +397,49 @@ pub fn build_frame_with_actor(
                 .position(|name| name == "head_jnt")
                 .unwrap_or(15);
             for group in hair_groups(hair, snapshot, hair_page_base, &hair_pages, &pose, head) {
+                frame.push(group);
+            }
+        }
+        if let Some(hands) = hands {
+            let hand_pages = used_pages(hands);
+            let hand_page_base =
+                page_base + pages.len() as u32 + hair.map_or(0, |h| used_pages(h).len()) as u32;
+            for (slot, page) in hand_pages.iter().enumerate() {
+                let Some(texture) = hands.textures.get(*page as usize) else {
+                    continue;
+                };
+                frame.uploads.push(SceneUpload {
+                    page: hand_page_base + slot as u32,
+                    x: 0,
+                    y: 0,
+                    w: texture.width,
+                    h: texture.height,
+                    rgba: texture.rgba.clone(),
+                });
+            }
+            // Retail overwrites the pose joint of the chosen hands shape with the body's
+            // `cl_LhandA`/`cl_RhandA` world matrix (`d_a_player_main.cpp:1471-1483`;
+            // `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3371-3406`). Bind-pose shape
+            // selection stands in for the reference's per-animation hand pick.
+            let l_src = mesh.find_node_id(b"cl_LhandA").unwrap_or(8) as usize;
+            let r_src = mesh.find_node_id(b"cl_RhandA").unwrap_or(12) as usize;
+            let l_hand = hands.find_node_id(b"cl_LhandD");
+            let r_hand = hands.find_node_id(b"cl_RhandC");
+            let mut selected = Vec::new();
+            if let Some(joint) = l_hand {
+                selected.push((joint as u16, l_src));
+            }
+            if let Some(joint) = r_hand {
+                selected.push((joint as u16, r_src));
+            }
+            for group in hands_groups(
+                hands,
+                snapshot,
+                hand_page_base,
+                &hand_pages,
+                &pose,
+                &selected,
+            ) {
                 frame.push(group);
             }
         }
@@ -452,6 +512,71 @@ fn hair_groups(
         .collect()
 }
 
+/// The selected `hands.bdl` shapes, each placed by the body joint matrix the reference copies
+/// into it (`tww/src/d/actor/d_a_player_main.cpp:1471-1483`,
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3371-3406`). Every hands
+/// joint bind local is identity, so its baked vertices need only `to_world * pose[body_joint]`.
+fn hands_groups(
+    hands: &RoomMesh,
+    snapshot: &SceneSnapshot,
+    page_base: u32,
+    pages: &[u32],
+    pose: &[Mat4],
+    selected: &[(u16, usize)],
+) -> Vec<MeshGroup> {
+    let origin = Vec3::new(
+        snapshot.player_pos.x,
+        snapshot.player_pos.y,
+        snapshot.player_pos.z,
+    );
+    let to_world = Mat4::from_translation(origin) * Mat4::from_rotation_y(-snapshot.player_yaw);
+    hands
+        .groups
+        .iter()
+        .filter_map(|group| {
+            let joint = group.direct_joint?;
+            let (_, src) = selected.iter().find(|(j, _)| *j == joint)?;
+            let transform = to_world * *pose.get(*src)?;
+            let positions = group
+                .positions
+                .iter()
+                .map(|position| {
+                    let point = transform.transform_point3(Vec3::from(*position));
+                    [point.x, point.y, point.z]
+                })
+                .collect();
+            let normals = if group.lit {
+                group
+                    .normals
+                    .iter()
+                    .map(|normal| {
+                        let normal = transform
+                            .transform_vector3(Vec3::from(*normal))
+                            .normalize_or_zero();
+                        [normal.x, normal.y, normal.z]
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let (indices, cull_mode) = group_indices(group);
+            Some(MeshGroup {
+                positions,
+                colors: group.colors.clone(),
+                normals,
+                uvs: group.uvs.clone(),
+                indices,
+                texture_page: actor_page(group, pages, page_base),
+                alpha_cutoff: alpha_cutoff(group.alpha_test.as_ref()),
+                depth_test: group.z_compare,
+                transparent: transparent(group),
+                cull_mode,
+                ..MeshGroup::default()
+            })
+        })
+        .collect()
+}
+
 fn skinned_groups(
     actor: &RoomMesh,
     page_base: u32,
@@ -511,6 +636,7 @@ fn static_actor_groups(
     page_base: u32,
     pages: &[u32],
     pose: &[Mat4],
+    hidden: &[u16],
 ) -> Vec<MeshGroup> {
     let origin = Vec3::new(
         snapshot.player_pos.x,
@@ -522,6 +648,11 @@ fn static_actor_groups(
         .groups
         .iter()
         .filter(|group| group.joint_indices.is_empty())
+        .filter(|group| {
+            !group
+                .direct_joint
+                .is_some_and(|joint| hidden.contains(&joint))
+        })
         .filter_map(|group| {
             let transform = match group.direct_joint {
                 Some(joint) => {

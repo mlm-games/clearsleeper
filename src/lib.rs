@@ -77,6 +77,8 @@ pub struct App {
     /// `katsura.bdl`; retail attaches it to `CL_JNT_HEAD_JNT` rather than drawing the hair shape
     /// in `cl.bdl` (`d_a_player_main.cpp:11598`, `:11934`).
     pub hair_model: Option<j3d::bdl::RoomMesh>,
+    /// The `hands.bdl` parts model, attached to `cl.bdl`'s hand joints.
+    pub hands_model: Option<j3d::bdl::RoomMesh>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     /// A `.dff` recording shown instead of the world, from `CS_DFF`. Its pages
@@ -239,6 +241,7 @@ impl App {
             room: None,
             actor_model: None,
             hair_model: None,
+            hands_model: None,
             player_anim: None,
             dff: None,
             menu: menus::Menu::new(),
@@ -317,6 +320,11 @@ impl App {
         // `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3729`). The port has no outfit
         // state, and `cl.bdl` shape 4 now supplies the real hair, so the wig is left
         // unloaded rather than drawn over it.
+        app.hands_model =
+            assets::load_actor_model_entry(view::LINK_ARCHIVE, assets::LINK_HANDS_ENTRY);
+        if app.hands_model.is_none() {
+            log::warn!("clearsleeper: hands model unavailable");
+        }
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -3899,6 +3907,7 @@ pub fn root_view(
             app.actor_model.as_ref(),
             app.player_anim.as_ref(),
             app.hair_model.as_ref(),
+            app.hands_model.as_ref(),
         ),
     };
     let desc = match &app.dff {
@@ -3907,6 +3916,7 @@ pub fn root_view(
             app.room.as_ref(),
             app.actor_model.as_ref(),
             app.hair_model.as_ref(),
+            app.hands_model.as_ref(),
         ),
     };
     let cam = app.cam.clone();

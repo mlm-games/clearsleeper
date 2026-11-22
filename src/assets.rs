@@ -239,6 +239,11 @@ pub const LINK_MODEL_ENTRY: &str = "cl.bdl";
 /// The hair model the player attaches to `cl.bdl`'s head joint (`d_a_player_main.cpp:11598`).
 pub const LINK_HAIR_ENTRY: &str = "katsura.bdl";
 
+/// The hands parts model. Retail picks one shape per hand from `hands.bdl` and overwrites its
+/// joint matrix with `cl.bdl`'s `cl_LhandA`/`cl_RhandA` (`d_a_player_main.cpp:1471-1483`;
+/// `wwhd/wwhd_src/d/actor/d_a_player_main_01.cpp:3371-3406`).
+pub const LINK_HANDS_ENTRY: &str = "hands.bdl";
+
 /// The body `res/Object/<name>.arc` carries, read by entry name where one is named.
 ///
 /// Object archives are named for what they hold, and a character archive holds several `bdl`
