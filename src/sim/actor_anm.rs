@@ -242,6 +242,16 @@ publish_actor!(
 );
 
 publish_actor!(
+    puppet_ganon,
+    super::puppet_ganon::PuppetGanon,
+    "Bgn",
+    |c: &super::puppet_ganon::PuppetGanon| c.curr_bck,
+    |c: &super::puppet_ganon::PuppetGanon| c.morph.frame,
+    |c: &super::puppet_ganon::PuppetGanon| c.morph.attribute == ACTOR_EMODE_LOOP,
+    0x6,
+    0x10
+);
+publish_actor!(
     bwds,
     super::bwds::Bwds,
     "Bwds",

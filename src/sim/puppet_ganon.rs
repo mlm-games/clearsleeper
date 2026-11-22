@@ -853,6 +853,7 @@ const HIO_M0FC: f32 = 3.25;
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct PuppetGanon {
     pub morph: Frame,
+    pub curr_bck: i32,
     pub prm: u8,
     pub body_draw: i8,
     pub hio_phase: u8,
@@ -968,6 +969,7 @@ impl PuppetGanon {
         let prm = (parameters & PRM_BYTE_MASK) as u8;
         Self {
             morph: Frame::head(),
+            curr_bck: 0x6,
             prm,
             body_draw: 0,
             hio_phase: HIO_M0240,
