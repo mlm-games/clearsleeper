@@ -3,6 +3,9 @@ use glam::Mat4;
 const HEADER_LEN: usize = 0x20;
 const BLOCK_LEN: usize = 8;
 const MAGIC: [u8; 8] = *b"J3D2bdl4";
+/// The older `.bmd` sibling: the same block layout without the DL extensions, used by NPC bodies
+/// such as Chuchu (`J3DModelLoader.h`, `d_a_cc.cpp:2376`). The parser reads only blocks both carry.
+const BMD_MAGIC: [u8; 8] = *b"J3D2bmd3";
 const FORM_STRIDE: usize = 0x10;
 const DESCRIPTOR_STRIDE: usize = 8;
 const JOINT_INIT_STRIDE: usize = 0x40;
@@ -532,7 +535,7 @@ impl Blocks {
         if data.len() < HEADER_LEN {
             return Err(BdlError::Truncated);
         }
-        if data[..8] != MAGIC {
+        if data[..8] != MAGIC && data[..8] != BMD_MAGIC {
             return Err(BdlError::Magic);
         }
         let count = read_u32(data, 12)? as usize;

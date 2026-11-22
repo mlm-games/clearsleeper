@@ -2369,6 +2369,7 @@ pub fn build(
                         zunari::control.in_set(WwSimSet::Execute),
                         ba1::control.in_set(WwSimSet::Execute),
                         actor_anm::ba1.in_set(WwSimSet::Execute),
+                        actor_anm::chuchu.in_set(WwSimSet::Execute),
                         apzl::control.in_set(WwSimSet::Execute),
                         npc_nz::control.in_set(WwSimSet::Execute),
                     )

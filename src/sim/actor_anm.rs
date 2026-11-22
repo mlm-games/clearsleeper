@@ -31,6 +31,7 @@ impl ActorAnm {
 pub struct ActorAnms(pub Vec<ActorAnm>);
 
 pub const BA_ARCHIVE: &str = "Ba";
+pub const CC_ARCHIVE: &str = crate::assets::CC_ARCHIVE;
 
 /// The queue is rebuilt from the actors each tick, the way a frame's presentation list is.
 pub fn clear(mut anms: ResMut<ActorAnms>) {
@@ -59,6 +60,24 @@ pub fn ba1(grandmas: Query<(Entity, &Ba1)>, mut anms: ResMut<ActorAnms>) {
             bck,
             frame: grandma.morf_frame,
             looping: grandma.morf.attribute() == Mode::Loop,
+        });
+    }
+}
+
+/// Chuchu's `mDoExt_McaMorf` cursor, one of the actor-local `ActorFrame`s named in
+/// `anim_clock.rs` (`tww/src/d/actor/d_a_cc.cpp:2375-2388`, HD `d_a_cc.cpp` equivalent).
+pub fn chuchu(chuchus: Query<(Entity, &super::chuchu::Chuchu)>, mut anms: ResMut<ActorAnms>) {
+    for (entity, chuchu) in &chuchus {
+        let bck = chuchu.anim_res;
+        if bck < 0 || !(0x14..=0x22).contains(&bck) {
+            continue;
+        }
+        anms.0.push(ActorAnm {
+            entity,
+            archive: CC_ARCHIVE,
+            bck,
+            frame: chuchu.morph.frame,
+            looping: chuchu.morph.attribute == super::anim_clock::ACTOR_EMODE_LOOP,
         });
     }
 }

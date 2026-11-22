@@ -294,6 +294,28 @@ pub struct ActorModel {
 /// (`tww/assets/GZLE01/res/Object/Ba.h:49-55`; HD `wwhd/wwhd_src/include/d/actor/d_a_npc_ba1.h:380-386`).
 pub const BA_ARCHIVE: &str = "Ba";
 pub const BA_MODEL_ENTRY: &str = "ba.bdl";
+/// Chuchu's body is the older `J3D2bmd3` model `CC_BMD` (id 0x2A) in `Cc.arc`; its animation ids
+/// are `0x14..=0x22` (`tww/assets/GZLE01/res/Object/Cc.h:42,86`).
+pub const CC_ARCHIVE: &str = "CC";
+pub const CC_OBJECT_ARCHIVE: &str = "files/res/Object/Cc.arc";
+pub const CC_MODEL_ID: u16 = 0x2A;
+
+pub fn load_chuchu_model() -> Option<ActorModel> {
+    let archive = load_object_archive(CC_ARCHIVE)?;
+    let mesh = object_model(&archive, CC_MODEL_ID)?;
+    let anms = AnmArchive::open(CC_OBJECT_ARCHIVE).ok()?;
+    let mut morphs = Vec::new();
+    for id in 0x14..=0x22u16 {
+        if let Some(morph) = anms.morph(AnmRef::Id(id), &mesh.joint_parents) {
+            morphs.push((id as i32, morph));
+        }
+    }
+    Some(ActorModel {
+        mesh,
+        morphs,
+        cloth: None,
+    })
+}
 
 pub fn load_ba_model() -> Option<ActorModel> {
     let mesh = load_actor_model_entry(BA_ARCHIVE, BA_MODEL_ENTRY)?;

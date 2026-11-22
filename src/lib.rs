@@ -133,6 +133,7 @@ pub struct App {
     pub master_tip_stab_model: Option<j3d::bdl::RoomMesh>,
     /// Grandma's body and its BCKs from `Ba.arc`, drawn in place of her box.
     pub ba1_model: Option<assets::ActorModel>,
+    pub chuchu_model: Option<assets::ActorModel>,
     /// The player model's standing pose from `LkAnm.arc`; absent on a bind-pose-only source.
     pub player_anim: Option<assets::PlayerIdle>,
     pub part_anims: PartAnims,
@@ -314,6 +315,7 @@ impl App {
             tip_stab_model: None,
             master_tip_stab_model: None,
             ba1_model: None,
+            chuchu_model: None,
             player_anim: None,
             part_anims: PartAnims::default(),
             dff: None,
@@ -433,6 +435,7 @@ impl App {
             app.master_tip_stab_model = assets::object_model(&archive, 0x3F);
         }
         app.ba1_model = assets::load_ba_model();
+        app.chuchu_model = assets::load_chuchu_model();
         app.player_anim = app.actor_model.as_ref().and_then(assets::load_link_idle);
         if app.player_anim.is_none() {
             log::warn!("clearsleeper: player idle animation unavailable");
@@ -4441,9 +4444,14 @@ pub fn root_view(
         .map(|anms| {
             anms.0
                 .iter()
-                .filter(|anm| anm.archive == sim::actor_anm::BA_ARCHIVE)
                 .filter_map(|anm| {
-                    let model = app.ba1_model.as_ref()?;
+                    let model = if anm.archive == sim::actor_anm::BA_ARCHIVE {
+                        app.ba1_model.as_ref()
+                    } else if anm.archive == sim::actor_anm::CC_ARCHIVE {
+                        app.chuchu_model.as_ref()
+                    } else {
+                        None
+                    }?;
                     let (_, morph) = model.morphs.iter().find(|(id, _)| *id == anm.bck)?;
                     let actor = app.sim.world.get::<sim::actor::Actor>(anm.entity)?;
                     let end = morph.frame_max().max(1.0);
@@ -4453,7 +4461,11 @@ pub fn root_view(
                     } else {
                         frame.min(end)
                     };
-                    let ba1 = app.sim.world.get::<sim::ba1::Ba1>(anm.entity);
+                    let ba1 = if anm.archive == sim::actor_anm::BA_ARCHIVE {
+                        app.sim.world.get::<sim::ba1::Ba1>(anm.entity)
+                    } else {
+                        None
+                    };
                     let joint_control = match (
                         model.mesh.find_node_id(b"head"),
                         model.mesh.find_node_id(b"backbone"),
