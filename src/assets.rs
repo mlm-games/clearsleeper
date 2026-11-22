@@ -290,7 +290,6 @@ pub struct ActorModel {
 /// Grandma's archive holds two BDLs; `ba.bdl` is the body and `ba_cloth.bdl` the cape
 /// (`tww/assets/GZLE01/res/Object/Ba.h:49-55`; HD `wwhd/wwhd_src/include/d/actor/d_a_npc_ba1.h:380-386`).
 pub const BA_ARCHIVE: &str = "Ba";
-pub const BA_OBJECT_ARCHIVE: &str = "files/res/Object/Ba.arc";
 pub const BA_MODEL_ENTRY: &str = "ba.bdl";
 
 pub fn load_ba_model() -> Option<ActorModel> {

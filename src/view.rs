@@ -421,7 +421,7 @@ pub fn build_frame_with_actor(
         frame.push(walls_group(snapshot, eye));
     }
     if !snapshot.actors.is_empty() {
-        frame.push(actors_group(snapshot, eye));
+        frame.push(actors_group(snapshot, eye, npc.is_some()));
     }
     for particle in particle_groups(snapshot, eye) {
         frame.push(particle);
@@ -1149,11 +1149,12 @@ fn actor_look(actor: &ActorView) -> Rgb {
     }
 }
 
-fn actors_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
+fn actors_group(snapshot: &SceneSnapshot, eye: Vec3, npc_model: bool) -> MeshGroup {
     let mut group = MeshGroup::default();
     for actor in &snapshot.actors {
-        // A Ba actor is drawn from its own BDL instead of a box; the box would hide the model.
-        if actor.anm.is_some_and(|anm| anm.archive == "Ba") {
+        // A Ba actor is drawn from its own BDL instead of a box; keep the box when the model
+        // could not be loaded so the actor never disappears entirely.
+        if npc_model && actor.anm.is_some_and(|anm| anm.archive == "Ba") {
             continue;
         }
         group.push_box(
