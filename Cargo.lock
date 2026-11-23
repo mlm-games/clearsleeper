@@ -1543,7 +1543,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3627,7 +3627,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4370,15 +4370,15 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "repame-atlas"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd20bb143ea8bf26e5477f859323bda7b67c1c2509d16ba8ddcfb771e6ac8aa0"
+checksum = "dee3c7edec564d5b81de5c42cbc80c7a688610ac7b2d81fad2fb40aeb48c1849"
 
 [[package]]
 name = "repame-audio"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a79052c84fde564699501a322f3cbff0c8fb51c227c044f7a12efdfd125a442"
+checksum = "e388412510a988060a639d145354d3838817e3d103cd1a979f7e017e69bb9a05"
 dependencies = [
  "anyhow",
  "cpal",
@@ -4391,9 +4391,9 @@ dependencies = [
 
 [[package]]
 name = "repame-input"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49c4b60c1c0b621f4f70452693747cd1cdaad59a8405ca2f73f13a7e8f1e1732"
+checksum = "3f0283c990e747dea6c571434d9b64fdcbff4948961e2fbf8857706949860aa0"
 dependencies = [
  "bevy_ecs",
  "glam",
@@ -4404,9 +4404,9 @@ dependencies = [
 
 [[package]]
 name = "repame-reflect"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2f956835e52f4684251d371c315b7e66e795c9b8c552376132ac50f29dec039"
+checksum = "3a421dad28bab471a3e9a83bd323c4514ce10de035629dd66df8d3f98ebc293b"
 dependencies = [
  "bevy_ecs",
  "log",
@@ -4417,9 +4417,9 @@ dependencies = [
 
 [[package]]
 name = "repame-save"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d7b2eb43dd4754096182e6bc8610040112eab5e28e22655b1c36525a239f31"
+checksum = "020a7218e52be8b43b4db10a0aa5dac26fecadb797bda6aeb5bcbadba1ece0dc"
 dependencies = [
  "game-utils",
  "repame-input",
@@ -4431,9 +4431,9 @@ dependencies = [
 
 [[package]]
 name = "repame-shell"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed9e1c4f9e4ab0c7238bbfd15e214356b5579ecfe0f1020f7bd932bc2208ebc7"
+checksum = "c09b8da20c51abda7d421e37a8ff15794d34acd94a49790334d34a0eb660867e"
 dependencies = [
  "anyhow",
  "glam",
@@ -4457,9 +4457,9 @@ dependencies = [
 
 [[package]]
 name = "repame-sim"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e02558f500628770ac63e4d3a5f517fca4ee72ea0900ffd9521e55ac59ed465c"
+checksum = "c547bc3930493c5da971f5e0f7d78e4b6b44884aca5d0679dac8122c070c3e36"
 dependencies = [
  "bevy_ecs",
  "glam",
@@ -4470,9 +4470,9 @@ dependencies = [
 
 [[package]]
 name = "repame-view2d"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50f001cf0a00b655e0dcb296e53e9f288246c3f0e252bf5a612087eac4b0cb32"
+checksum = "011c654afb799f3c2713a0030fbbdd7853382f026a58ace34d4f1a0e1d8bb0f5"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -4492,9 +4492,9 @@ dependencies = [
 
 [[package]]
 name = "repame-view3d"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3b2f7149cfb21e8c9ab1fbddce335e438f163fc749b5567a062298e584d9265"
+checksum = "4e3163fa2a908c2e2a832f137650d347a5d783e332c56aebc6e7e31887b396ee"
 dependencies = [
  "bytemuck",
  "glam",
@@ -4885,7 +4885,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5384,10 +5384,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6318,7 +6318,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
