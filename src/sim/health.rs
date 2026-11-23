@@ -86,7 +86,7 @@ pub fn apply_damage(
 }
 
 /// `dItemNo_*` (`tww/include/d/d_item_data.h:88-90`). Red refills life, green refills magic,
-/// blue refills both; the port has no magic meter, so green is a no-op for now.
+/// blue refills both.
 const RED_POTION: u8 = 0x51;
 const GREEN_POTION: u8 = 0x52;
 const BLUE_POTION: u8 = 0x53;

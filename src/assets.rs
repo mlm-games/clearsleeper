@@ -352,30 +352,31 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Btd", "files/res/Object/Btd.arc", 0x40, 0x8, 0x39),
     ("Bmd", "files/res/Object/Bmd.arc", 0x2B, 0x8, 0x25),
     ("Kamome", "files/res/Object/Kamome.arc", 0x17, 0xC, 0x14),
-    ("P1", "files/res/Object/P1.arc", 0x31, 0x1A, 0x29),
+    ("P1", "files/res/Object/P1.arc", 0x31, 0x4D, 0x5F), // BCK dRes_IDs, not dRes_INDEX (tww P1.h:61-76)
     ("Tc", "files/res/Object/Tc.arc", 0x19, 0x6, 0x16),
     ("Bgn", "files/res/Object/Bgn.arc", 0x13, 0x6, 0x10),
     ("Bwds", "files/res/Object/Bwds.arc", 0x8, 0x4, 0x5),
     ("Btsw", "files/res/Object/Btsw.arc", 0x1A, 0x8, 0x11),
-    ("Niten", "files/res/Object/Niten.arc", 0xD, 0x5, 0xA),
-    ("Ls", "files/res/Object/Ls.arc", 0x1B, 0x8, 0x15),
+    // Third field is a dRes_ID_* (object_model), not a dRes_INDEX_*; wrong ids drop the body.
+    ("Niten", "files/res/Object/Niten.arc", 0x1, 0x3, 0x8), // dRes_ID_NITEN_BDL_MT_e (tww Niten.h)
+    ("Ls", "files/res/Object/Ls.arc", 0xD, 0x0, 0x1F),      // dRes_ID_LS_BDL_LS_e (tww Ls.h)
     ("Md", "files/res/Object/Md.arc", 0x5C, 0x7, 0x59),
     ("Mk", "files/res/Object/Mk.arc", 0x13, 0x5, 0x10),
-    ("Mn", "files/res/Object/Mn.arc", 0x13, 0x6, 0xD),
-    ("Po", "files/res/Object/Po.arc", 0xC, 0x5, 0x9),
+    ("Mn", "files/res/Object/Mn.arc", 0x2, 0x4, 0xB), // dRes_ID_MN_BDL_MN_e (tww Mn.h)
+    ("Po", "files/res/Object/Po.arc", 0x1, 0x0, 0x7), // dRes_ID_PO_BDL_PO_e (tww Po.h)
     ("Rsh", "files/res/Object/Rsh.arc", 0x20, 0x14, 0x1D),
-    ("Sv", "files/res/Object/Sv.arc", 0x12, 0x4, 0xF),
+    ("Sv", "files/res/Object/Sv.arc", 0x1, 0x3, 0xE), // dRes_ID_SV_BDL_SV_e (tww Sv.h)
     ("Hr", "files/res/Object/Hr.arc", 0x14, 0x6, 0xF),
-    ("Ah", "files/res/Object/Ah.arc", 0x9, 0x5, 0x6),
+    ("Ah", "files/res/Object/Ah.arc", 0x2, 0x0, 0x1), // dRes_ID_AH_BDL_AH_e (tww Ah.h)
     ("Ho", "files/res/Object/Ho.arc", 0xF, 0x6, 0x9),
-    ("Hi", "files/res/Object/Hi.arc", 0xA, 0x6, 0x7),
-    ("Km", "files/res/Object/Km.arc", 0xC, 0x9, 0x9),
+    ("Hi", "files/res/Object/Hi.arc", 0x2, 0x0, 0x1), // dRes_ID_HI_BDL_HI_e (tww Hi.h)
+    ("Km", "files/res/Object/Km.arc", 0x2, 0x1, 0x1), // dRes_ID_KM_BDL_KM_e (tww Km.h)
     ("Nz", "files/res/Object/Nz.arc", 0x26, 0x15, 0x23),
     ("P2", "files/res/Object/P2.arc", 0x26, 0x7, 0x23),
     ("Tt", "files/res/Object/Tt.arc", 0x1C, 0x11, 0x19),
     ("Toripost", "files/res/Object/Toripost.arc", 0x9, 0x4, 0x6),
-    ("Bmsw", "files/res/Object/Bmsw.arc", 0x1D, 0x9, 0x16),
-    ("Jb", "files/res/Object/Jb.arc", 0xC, 0x7, 0x9),
+    ("Bmsw", "files/res/Object/Bmsw.arc", 0x3, 0x14, 0x20), // dRes_ID_BMSW_BDL_BM_e (tww Bmsw.h)
+    ("Jb", "files/res/Object/Jb.arc", 0x2, 0x0, 0x1),       // dRes_ID_JB_BDL_JB_e (tww Jb.h)
     ("Rd", "files/res/Object/Rd.arc", 0x17, 0x6, 0x14),
     ("St", "files/res/Object/St.arc", 0x38, 0x4, 0x35),
     ("Bmdhand", "files/res/Object/Bmdhand.arc", 0x9, 0x5, 0x6),
@@ -482,7 +483,7 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Skanran", "files/res/Object/Skanran.arc", 0x7, 0x0, 0x0),
     ("Ebrock", "files/res/Object/Ebrock.arc", 0x4, 0x0, 0x0),
     ("Ekao", "files/res/Object/Ekao.arc", 0x4, 0x0, 0x0),
-    ("VigaH", "files/res/Object/VigaH.arc", 0x7, 0x0, 0x1),
+    ("VigaH", "files/res/Object/VigaH.arc", 0x7, 0x4, 0x4), // tww VigaH.h: VIGAH_BCK=0x4
     ("Lwood", "files/res/Object/Lwood.arc", 0x4, 0x0, 0x0),
     ("Oyashi", "files/res/Object/Oyashi.arc", 0x4, 0x0, 0x0),
     ("Ojtree", "files/res/Object/Ojtree.arc", 0x4, 0x0, 0x0),
@@ -494,7 +495,7 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Olift", "files/res/Object/Olift.arc", 0x4, 0x0, 0x0),
     ("Hten1", "files/res/Object/Hten1.arc", 0x4, 0x0, 0x0),
     ("Hmlif", "files/res/Object/Hmlif.arc", 0x5, 0x0, 0x0),
-    ("Gkai00", "files/res/Object/Gkai00.arc", 0xB, 0x0, 0x1),
+    ("Gkai00", "files/res/Object/Gkai00.arc", 0xB, 0x8, 0x8), // tww Gkai00.h: GKAI00_BCK=0x8
     ("Gbrg00", "files/res/Object/Gbrg00.arc", 0x7, 0x0, 0x0),
     ("Bridge", "files/res/Object/Bridge.arc", 0x4, 0x0, 0x0),
     ("Ylsic", "files/res/Object/Ylsic.arc", 0x4, 0x0, 0x0),
@@ -502,7 +503,7 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("MhmrSW", "files/res/Object/MhmrSW.arc", 0x4, 0x0, 0x0),
     ("Hhbot", "files/res/Object/Hhbot.arc", 0x4, 0x0, 0x0),
     ("Kbota", "files/res/Object/Kbota_00.arc", 0x4, 0x0, 0x0),
-    ("Mmirror", "files/res/Object/Mmirror.arc", 0xA, 0x0, 0x1),
+    ("Mmirror", "files/res/Object/Mmirror.arc", 0xA, 0x6, 0x6), // tww Mmirror.h: MMIRROR_BCK_MSUSW=0x6
     ("Hpbot1", "files/res/Object/Hpbot1.arc", 0x3, 0x0, 0x0),
     ("Itact", "files/res/Object/Itact.arc", 0x3, 0x0, 0x0),
     ("Hsen1", "files/res/Object/Hsen1.arc", 0x5, 0x0, 0x0),
@@ -513,7 +514,7 @@ pub const ACTOR_ARCHIVES: &[(&str, &str, u16, i32, i32)] = &[
     ("Table", "files/res/Object/Table.arc", 0x4, 0x0, 0x0),
     ("Mspot", "files/res/Object/Mspot.arc", 0x4, 0x0, 0x0),
     ("M_door", "files/res/Object/M_door.arc", 0x3, 0x0, 0x0),
-    ("Yaflw00", "files/res/Object/Yaflw00.arc", 0x8, 0x0, 0x1),
+    ("Yaflw00", "files/res/Object/Yaflw00.arc", 0x8, 0x5, 0x5), // tww Yaflw00.h: YAFLW00_BCK=0x5
     ("Ferris", "files/res/Object/Skanran.arc", 0x6, 0x0, 0x0),
     ("Msdan", "files/res/Object/Msdan.arc", 0x4, 0x0, 0x0),
     ("SwHit", "files/res/Object/Always.arc", 0x35, 0x0, 0x0),

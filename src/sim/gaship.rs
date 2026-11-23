@@ -9,8 +9,8 @@ pub const CULL_MAX: [f32; 3] = [40.0, 125.0, 40.0]; // <- f_op_actor_mng.cpp:558
 /// (`d_a_obj_gaship.cpp:13`). `daObjGaship::Act_c::_execute` (`:97-101`) is `set_mtx()`
 /// plus `birth_flag()`: the first only rebuilds the model matrix, and the second spawns
 /// `fpcNm_MAJUU_FLAG_e` (`d_a_obj_gaship.cpp:32`, stage names `MjFlag`/`MtFlag`/`HcFlag`,
-/// `d_stage.cpp:831-833`), a profile with no port in this crate. Both are renderer/output
-/// work, so the tick has nothing to do.
+/// `d_stage.cpp:831-833`), handled by `sim::majuu_flag` when those actors are placed.
+/// Both are renderer/output work, so the tick has nothing to do.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Gaship;
 

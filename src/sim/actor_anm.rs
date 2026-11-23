@@ -140,15 +140,27 @@ publish_actor!(
     0xC,
     0x14
 );
+// `setAnm`'s sim index → `dRes_ID_P1_BCK_*` (index 8 aliases C_TALK01)
+// (tww/src/d/actor/d_a_npc_p1.cpp:246-318; HD d_a_npc_p1.cpp:189-252).
 publish_actor!(
     npc_p1,
     super::npc_p1::NpcP1,
     "P1",
-    |c: &super::npc_p1::NpcP1| c.anm_num,
+    |c: &super::npc_p1::NpcP1| {
+        const IDS: [i32; 17] = [
+            0x5E, 0x59, 0x5A, 0x5B, 0x53, 0x51, 0x52, 0x50, 0x51, 0x5F, 0x58, 0x5D, 0x4D, 0x5C,
+            0x54, 0x55, 0x57,
+        ];
+        usize::try_from(c.anm_num)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |c: &super::npc_p1::NpcP1| c.morph.frame,
     |c: &super::npc_p1::NpcP1| c.morph.attribute == ACTOR_EMODE_LOOP,
-    0x1A,
-    0x29
+    0x4D,
+    0x5F
 );
 publish_actor!(
     npc_tc,
@@ -180,16 +192,25 @@ publish_actor!(
     0x7,
     0x59
 );
-publish_actor!(
-    servant,
-    super::servant::Servant,
-    "Sv",
-    |c: &super::servant::Servant| c.anm,
-    |c: &super::servant::Servant| c.morph_frame,
-    |_c: &super::servant::Servant| false,
-    0x4,
-    0xF
-);
+/// `l_bck_ix_tbl[mNpcNo][mAnm]`: the captain (slot 0) and crew (slots 1..3) use different
+/// `dRes_ID_SV_BCK_*` rows (tww/src/d/actor/d_a_npc_sv.cpp:22-38; HD d_a_npc_sv.cpp:19).
+pub fn servant(entities: Query<(Entity, &super::servant::Servant)>, mut anms: ResMut<ActorAnms>) {
+    const CAPTAIN: [i32; 6] = [0xC, 0x8, 0x9, 0xA, 0xE, 0x6];
+    const CREW: [i32; 6] = [0xD, 0x5, 0xB, 0x4, 0x3, 0x7];
+    for (entity, actor) in &entities {
+        let row = if actor.slot() == 0 { &CAPTAIN } else { &CREW };
+        let Some(&bck) = usize::try_from(actor.anm).ok().and_then(|i| row.get(i)) else {
+            continue;
+        };
+        anms.0.push(ActorAnm {
+            entity,
+            archive: "Sv",
+            bck,
+            frame: actor.morph_frame,
+            looping: false,
+        });
+    }
+}
 publish_actor!(
     npc_p2,
     super::npc_p2::NpcP2,
@@ -230,15 +251,24 @@ publish_actor!(
     0x4,
     0x6
 );
+// `l_bck_ix_tbl`: sim index → `dRes_ID_BMSW_BCK_BM_*` (the body model)
+// (tww/src/d/actor/d_a_npc_bmsw.cpp:116-125; HD d_a_npc_bmsw.cpp:14-15).
 publish_actor!(
     npc_bmsw,
     super::npc_bmsw::NpcBmsw,
     "Bmsw",
-    |c: &super::npc_bmsw::NpcBmsw| c.anm_idx as i32,
+    |c: &super::npc_bmsw::NpcBmsw| {
+        const IDS: [i32; 7] = [0x1B, 0x20, 0x16, 0x17, 0x1F, 0x14, 0x15];
+        usize::try_from(c.anm_idx)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |c: &super::npc_bmsw::NpcBmsw| c.anm_frame as f32,
     |_c: &super::npc_bmsw::NpcBmsw| false,
-    0x9,
-    0x16
+    0x14,
+    0x20
 );
 
 publish_actor!(
@@ -264,15 +294,26 @@ publish_actor!(
 
 // Actors whose BCK id is stored sim-side but which have no frame cursor in the port: pose the
 // bind pose of the selected animation. Still far more faithful than a coloured box.
+// `a_resID_tbl`: sim `bck` → `dRes_ID_LS_BCK_*`
+// (tww/src/d/actor/d_a_npc_ls1.cpp:403-418).
 publish_actor!(
     aryll,
     super::aryll::Aryll,
     "Ls",
-    |c: &super::aryll::Aryll| c.bck as i32,
+    |c: &super::aryll::Aryll| {
+        const IDS: [i32; 14] = [
+            0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0x2, 0x4, 0x3, 0x1F, 0x1E, 0x1, 0x0,
+        ];
+        usize::try_from(c.bck)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |_c: &super::aryll::Aryll| 0.0,
     |_c: &super::aryll::Aryll| false,
-    0x8,
-    0x15
+    0x0,
+    0x1F
 );
 publish_actor!(
     sage,
@@ -284,15 +325,24 @@ publish_actor!(
     0x6,
     0xF
 );
+// `a_resID_tbl`: sim `anm_no` → `dRes_ID_HI_BCK_*` (WAIT01 first)
+// (tww/src/d/actor/d_a_npc_hi1.cpp:201-205; HD d_a_npc_hi1.cpp:32-33).
 publish_actor!(
     npc_hi1,
     super::npc_hi1::NpcHi1,
     "Hi",
-    |c: &super::npc_hi1::NpcHi1| c.anm_no as i32,
+    |c: &super::npc_hi1::NpcHi1| {
+        const IDS: [i32; 2] = [0x1, 0x0];
+        usize::try_from(c.anm_no)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |_c: &super::npc_hi1::NpcHi1| 0.0,
     |_c: &super::npc_hi1::NpcHi1| false,
-    0x6,
-    0x7
+    0x0,
+    0x1
 );
 publish_actor!(
     npc_nz,
@@ -304,25 +354,43 @@ publish_actor!(
     0x15,
     0x23
 );
+// `a_anm_idx_tbl`: sim `anm` → `dRes_ID_KM_BCK_KM_WAIT01_e`
+// (tww/src/d/actor/d_a_npc_km1.cpp:136; HD d_a_npc_km1.cpp:149).
 publish_actor!(
     npc_km1,
     super::npc_km1::NpcKm1,
     "Km",
-    |c: &super::npc_km1::NpcKm1| c.anm as i32,
+    |c: &super::npc_km1::NpcKm1| {
+        const IDS: [i32; 1] = [0x1];
+        usize::try_from(c.anm)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |_c: &super::npc_km1::NpcKm1| 0.0,
     |_c: &super::npc_km1::NpcKm1| false,
-    0x9,
-    0x9
+    0x1,
+    0x1
 );
+// `a_bck_resID_tbl`: sim `anm` → `dRes_ID_JB_BCK_*` (WAIT01 then APPEAR)
+// (tww/src/d/actor/d_a_npc_jb1.cpp:143-147; HD d_a_npc_jb1.cpp:94).
 publish_actor!(
     npc_jb1,
     super::npc_jb1::NpcJb1,
     "Jb",
-    |c: &super::npc_jb1::NpcJb1| c.anm as i32,
+    |c: &super::npc_jb1::NpcJb1| {
+        const IDS: [i32; 2] = [0x1, 0x0];
+        usize::try_from(c.anm)
+            .ok()
+            .and_then(|i| IDS.get(i))
+            .copied()
+            .unwrap_or(-1)
+    },
     |_c: &super::npc_jb1::NpcJb1| 0.0,
     |_c: &super::npc_jb1::NpcJb1| false,
-    0x7,
-    0x9
+    0x0,
+    0x1
 );
 publish_actor!(
     npc_ho,
@@ -334,35 +402,50 @@ publish_actor!(
     0x6,
     0x9
 );
+// `l_bck_ix_tbl`: sim index → `dRes_ID_PO_BCK_*`
+// (tww/src/d/actor/d_a_npc_photo.cpp:506-512; HD d_a_npc_photo.cpp:23-28).
 publish_actor!(
     lenzo,
     super::lenzo::Lenzo,
     "Po",
-    |c: &super::lenzo::Lenzo| c.bck_index as i32,
+    |c: &super::lenzo::Lenzo| {
+        const IDS: [i32; 5] = [0x0, 0x5, 0x6, 0x7, 0x4];
+        IDS.get(c.bck_index as usize).copied().unwrap_or(-1)
+    },
     |_c: &super::lenzo::Lenzo| 0.0,
     |_c: &super::lenzo::Lenzo| false,
-    0x5,
-    0x9
+    0x0,
+    0x7
 );
+// `l_bck_ix_tbl`: sim index → `dRes_ID_MN_BCK_*`
+// (tww/src/d/actor/d_a_npc_mn.cpp:33-41; HD d_a_npc_mn.cpp:30-32).
 publish_actor!(
     marlon,
     super::marlon::Marlon,
     "Mn",
-    |c: &super::marlon::Marlon| c.bck_idx as i32,
+    |c: &super::marlon::Marlon| {
+        const IDS: [i32; 8] = [0x6, 0xA, 0x4, 0x5, 0xB, 0x7, 0x8, 0x9];
+        IDS.get(c.bck_idx as usize).copied().unwrap_or(-1)
+    },
     |_c: &super::marlon::Marlon| 0.0,
     |_c: &super::marlon::Marlon| false,
-    0x6,
-    0xD
+    0x4,
+    0xB
 );
+// `l_bck_ix_tbl`: sim index → `dRes_ID_AH_BCK_AH_WAIT*`
+// (tww/src/d/actor/d_a_npc_ah.cpp:19-22; HD d_a_npc_ah.cpp:18).
 publish_actor!(
     npc_ah,
     super::npc_ah::NpcAh,
     "Ah",
-    |c: &super::npc_ah::NpcAh| c.bck_idx as i32,
+    |c: &super::npc_ah::NpcAh| {
+        const IDS: [i32; 2] = [0x0, 0x1];
+        IDS.get(c.bck_idx as usize).copied().unwrap_or(-1)
+    },
     |_c: &super::npc_ah::NpcAh| 0.0,
     |_c: &super::npc_ah::NpcAh| false,
-    0x5,
-    0x6
+    0x0,
+    0x1
 );
 publish_actor!(
     npc_tt,
@@ -374,15 +457,20 @@ publish_actor!(
     0x11,
     0x19
 );
+// `l_bck_ix_tbl`: sim index → `dRes_ID_NITEN_BCK_*`
+// (tww/src/d/actor/d_a_npc_mt.cpp:30-37; HD d_a_npc_mt.cpp:43).
 publish_actor!(
     npc_mt,
     super::npc_mt::NpcMt,
     "Niten",
-    |c: &super::npc_mt::NpcMt| c.bck_index as i32,
+    |c: &super::npc_mt::NpcMt| {
+        const IDS: [i32; 6] = [0x7, 0x3, 0x4, 0x5, 0x6, 0x8];
+        IDS.get(c.bck_index as usize).copied().unwrap_or(-1)
+    },
     |_c: &super::npc_mt::NpcMt| 0.0,
     |_c: &super::npc_mt::NpcMt| false,
-    0x5,
-    0xA
+    0x3,
+    0x8
 );
 publish_actor!(
     npc_btsw2,
@@ -586,13 +674,13 @@ pub fn tetra(girls: Query<(Entity, &super::zelda::Zelda)>, mut anms: ResMut<Acto
     }
 }
 
-/// The remaining actors publish the bind pose of their wait BCK: the sim stores no frame
-/// cursor for them, but a posed body is still closer than the box fallback. The ids come from
-/// `tww/assets/GZLE01/res/Object/Sss.h:21-24`, `tww/assets/GZLE01/res/Object/Bs.h:48`,
-/// `tww/assets/GZLE01/res/Object/Ac.h:48`, `tww/assets/GZLE01/res/Object/Co.h:71`,
-/// `tww/assets/GZLE01/res/Object/Uk.h:53`, `tww/assets/GZLE01/res/Object/Gp.h:34`,
-/// `tww/assets/GZLE01/res/Object/Pf.h:36` and `tww/assets/GZLE01/res/Object/Always.h:137,155`
-/// (`tww/src/d/actor/d_a_npc_fa1.cpp:951-955`).
+// The remaining actors publish the bind pose of their wait BCK: the sim stores no frame
+// cursor for them, but a posed body is still closer than the box fallback. The ids come from
+// `tww/assets/GZLE01/res/Object/Sss.h:21-24`, `tww/assets/GZLE01/res/Object/Bs.h:48`,
+// `tww/assets/GZLE01/res/Object/Ac.h:48`, `tww/assets/GZLE01/res/Object/Co.h:71`,
+// `tww/assets/GZLE01/res/Object/Uk.h:53`, `tww/assets/GZLE01/res/Object/Gp.h:34`,
+// `tww/assets/GZLE01/res/Object/Pf.h:36` and `tww/assets/GZLE01/res/Object/Always.h:137,155`
+// (`tww/src/d/actor/d_a_npc_fa1.cpp:951-955`).
 publish_actor!(
     dexivine,
     super::sss::Sss,
@@ -981,7 +1069,7 @@ fn scenery_model(name: &str) -> Option<(&'static str, i32)> {
         "Stoudai" => ("Skanran", -1),
         "Ebrock" | "Ebrock2" => ("Ebrock", -1),
         "Ekao" => ("Ekao", -1),
-        "VigaH" => ("VigaH", 0x0),
+        "VigaH" => ("VigaH", 0x4), // dRes_ID_VIGAH_BCK_VIGAH_e (tww/.../res/Object/VigaH.h)
         "lwood" => ("Lwood", -1),
         "Oyashi" => ("Oyashi", -1),
         "Ojtree" => ("Ojtree", -1),
@@ -994,7 +1082,7 @@ fn scenery_model(name: &str) -> Option<(&'static str, i32)> {
         "Olift" => ("Olift", -1),
         "Blift" => ("Hten1", -1),
         "Hmlif" | "Hyuf1" | "Hyuf2" => ("Hmlif", -1),
-        "Gkai00" => ("Gkai00", 0x0),
+        "Gkai00" => ("Gkai00", 0x8), // dRes_ID_GKAI00_BCK_GKAI00_e (tww/.../res/Object/Gkai00.h)
         "Gbrg00" => ("Gbrg00", -1),
         "bridge" => ("Bridge", -1),
         "GiceL" => ("Ylsic", -1),
@@ -1004,7 +1092,7 @@ fn scenery_model(name: &str) -> Option<(&'static str, i32)> {
         "MhmrSW0" => ("MhmrSW", -1),
         "Hhbot1" | "Hhbot1N" => ("Hhbot", -1),
         "Kbota_A" | "Kbota_B" | "KbotaC" => ("Kbota", -1),
-        "MsuSW" | "MsuSWB" => ("Mmirror", 0x0),
+        "MsuSW" | "MsuSWB" => ("Mmirror", 0x6), // dRes_ID_MMIRROR_BCK_MSUSW_e (tww/.../res/Object/Mmirror.h)
         "Hpbot1" | "Vpbot" => ("Hpbot1", -1),
         "SWtact" | "SWtactB" => ("Itact", -1),
         "SW_HIT0" => ("SwHit", -1),
@@ -1014,7 +1102,7 @@ fn scenery_model(name: &str) -> Option<(&'static str, i32)> {
         "Kokiie" => ("Kokiie", -1),
         "Hdai1" | "Hdai2" | "Hdai3" => ("Hdai1", -1),
         "Vtil1" | "Vtil2" | "Vtil3" | "Vtil4" | "Vtil5" => ("Vtil", -1),
-        "WindTag" | "Ybgaf00" => ("Yaflw00", 0x0),
+        "WindTag" | "Ybgaf00" => ("Yaflw00", 0x5), // dRes_ID_YAFLW00_BCK_YAFLW00_e (tww/.../res/Object/Yaflw00.h)
         "LTag0" | "LTag1" | "LTagR0" => ("Mspot", -1),
         _ => return None,
     };
@@ -1433,8 +1521,8 @@ pub fn pickup_bodies(
     }
 }
 
-/// Darknut (`d_a_tn.cpp`, not Tingle — the sim module name is a misnomer). The action maps to
-/// the A-series BCKs in `tww/assets/GZLE01/res/Object/Tn.h:178-179,178-179`.
+// Darknut (`d_a_tn.cpp`, not Tingle — the sim module name is a misnomer). The action maps to
+// the A-series BCKs in `tww/assets/GZLE01/res/Object/Tn.h:178-179,178-179`.
 publish_actor!(
     darknut,
     super::tingle::Tingle,
