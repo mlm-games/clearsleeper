@@ -2559,6 +2559,7 @@ pub fn build(
                         tagba1::control.in_set(WwSimSet::Execute),
                         qdghd::control.in_set(WwSimSet::Execute),
                         syan::control.in_set(WwSimSet::Execute),
+                        item::apply_selection.in_set(WwSimSet::Execute),
                         item::control.in_set(WwSimSet::Execute),
                         item_use::control.in_set(WwSimSet::Execute),
                         boomerang::control.in_set(WwSimSet::Execute),

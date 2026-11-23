@@ -1,7 +1,7 @@
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
-use repose_ui::{Center, Column, Row, Text, ViewExt};
+use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
 
-use crate::menus::{Menu, PAUSE_TABS};
+use crate::menus::PAUSE_TABS;
 use crate::sim::inventory::{Equipped, ItemSelect, NO_ITEM, SLOT_COUNT};
 
 const TITLE_HEX: &str = "#F4EAD5";
@@ -30,28 +30,27 @@ fn heading(text: &str) -> View {
 
 fn item_name(item: u8) -> String {
     match item {
-        0x0B => "Bombs",
-        0x0C => "Bombs x10",
-        0x0D => "Bombs x20",
-        0x0E => "Bombs x30",
-        0x10 => "Arrows",
-        0x11 => "Arrows x20",
-        0x12 => "Arrows x30",
-        0x22 => "Wind Waker",
-        0x23 => "Picto Box",
-        0x26 => "Deluxe Picto Box",
-        0x27 => "Bow",
-        0x29 => "Iron Boots",
-        0x2A => "Magic Armor",
-        0x2D => "Boomerang",
-        0x2F => "Hookshot",
-        0x31 => "Bomb Bag",
-        0x33 => "Skull Hammer",
-        0x34 => "Deku Leaf",
-        NO_ITEM => "---",
+        0x0B => "Bombs".to_string(),
+        0x0C => "Bombs x10".to_string(),
+        0x0D => "Bombs x20".to_string(),
+        0x0E => "Bombs x30".to_string(),
+        0x10 => "Arrows".to_string(),
+        0x11 => "Arrows x20".to_string(),
+        0x12 => "Arrows x30".to_string(),
+        0x22 => "Wind Waker".to_string(),
+        0x23 => "Picto Box".to_string(),
+        0x26 => "Deluxe Picto Box".to_string(),
+        0x27 => "Bow".to_string(),
+        0x29 => "Iron Boots".to_string(),
+        0x2A => "Magic Armor".to_string(),
+        0x2D => "Boomerang".to_string(),
+        0x2F => "Hookshot".to_string(),
+        0x31 => "Bomb Bag".to_string(),
+        0x33 => "Skull Hammer".to_string(),
+        0x34 => "Deku Leaf".to_string(),
+        NO_ITEM => "---".to_string(),
         other => format!("Item {other:#04x}"),
     }
-    .to_string()
 }
 
 /// The in-game pause menu. `d_menu_window.cpp:1437-1580` opens the item page on Start,
@@ -162,7 +161,7 @@ pub fn view(app: &crate::App) -> View {
         3 => {
             children.push(heading("SEA CHART"));
             let charts = world.resource::<crate::sim::flags::Charts>();
-            children.push(label("Charted islands", false, false));
+            children.push(label("Charted islands".to_string(), false, false));
             for index in 0..8 {
                 let mark = if charts.has(index) {
                     "found"
@@ -183,11 +182,22 @@ pub fn view(app: &crate::App) -> View {
             let collect = world.resource::<crate::sim::flags::Collect>();
             let treasures = (0u8..16).filter(|idx| collect.check(*idx) != 0).count();
             children.push(label(format!("Treasures  {treasures}"), false, false));
-            children.push(label("Pictures   see the Photo Album (P)", false, true));
+            children.push(label(
+                "Pictures   A: open Photo Album (P)".to_string(),
+                false,
+                true,
+            ));
         }
     }
     children.push(label(
-        "L/R: tab   Up/Down: cursor   A: choose   X/Y/Z: assign   Esc/B: close".to_string(),
+        "Keys: Esc/Tab pause   I item   N status   M dungeon map   G chart   C collection"
+            .to_string(),
+        false,
+        true,
+    ));
+    children.push(label(
+        "L/R/O: tab   Arrows/WASD: cursor   Q/Space: choose   X/Y/Z: assign   V/B: close"
+            .to_string(),
         false,
         true,
     ));

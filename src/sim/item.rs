@@ -220,6 +220,29 @@ fn launch(
     held.count -= 1;
 }
 
+/// Resolve the X/Y/Z map into the item the next use edge will spend. The map stores
+/// inventory slots, so an item received later still answers the same button
+/// (`dComIfGs_getSelectItem`, tww/include/d/d_com_inf_game.h:1877-1879;
+/// HD wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186). Kept separate from
+/// `control` so that system stays within bevy_ecs's system-parameter limit.
+pub fn apply_selection(
+    select: Res<super::inventory::ItemSelect>,
+    button: Res<super::intent::SelectedButton>,
+    equipped: Res<super::inventory::Equipped>,
+    mut held: ResMut<Held>,
+) {
+    let selected = select.item(usize::from(button.0), &equipped);
+    if selected != super::inventory::NO_ITEM && held.item != selected {
+        held.item = selected;
+        held.count = match selected {
+            FIRST_BOMB..=LAST_BOMB => BOMB_COUNTS[(selected - FIRST_BOMB) as usize],
+            FIRST_ARROW..=LAST_ARROW => ARROW_COUNTS[(selected - FIRST_ARROW) as usize],
+            BOOMERANG | HOOKSHOT => 1,
+            _ => held.count,
+        };
+    }
+}
+
 pub fn control(
     collision: Option<Res<Collision>>,
     intent: Res<UseIntent>,
@@ -227,8 +250,6 @@ pub fn control(
     mut magic: ResMut<super::health::Magic>,
     mut selection: ResMut<arrow::Selection>,
     equipped: Res<super::inventory::Equipped>,
-    select: Res<super::inventory::ItemSelect>,
-    button: Res<super::intent::SelectedButton>,
     pad: Option<Res<super::intent::PadButtons>>,
     mut held: ResMut<Held>,
     mut zones: ResMut<super::flags::ZoneActors>,
@@ -251,20 +272,6 @@ pub fn control(
 ) {
     let pressed = intent.0 && !held.pressed;
     held.pressed = intent.0;
-    // Resolve the item assigned to the use button before the launch edge. The map's slots
-    // name inventory slots, so an item received later still answers the same button.
-    // `dComIfGs_getSelectItem` (tww/include/d/d_com_inf_game.h:1877-1879);
-    // HD wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186.
-    let selected = select.item(usize::from(button.0), &equipped);
-    if selected != super::inventory::NO_ITEM && held.item != selected {
-        held.item = selected;
-        held.count = match selected {
-            FIRST_BOMB..=LAST_BOMB => BOMB_COUNTS[(selected - FIRST_BOMB) as usize],
-            FIRST_ARROW..=LAST_ARROW => ARROW_COUNTS[(selected - FIRST_ARROW) as usize],
-            BOOMERANG | HOOKSHOT => 1,
-            _ => held.count,
-        };
-    }
     // `spActionTrigger` is the R edge (`d_a_player_main.h:1909`,
     // `wwhd/wwhd_src/d/actor/d_a_player_main_02.cpp:2490-2499`); cycling only matters
     // while an arrow is equipped, which `arrow::cycle` checks against the bow slot.

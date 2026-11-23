@@ -11,7 +11,7 @@ use repame_sim::Sim;
 use repame_view3d::{GeomHandle, OrbitCamera, View3dEvent, Viewport3d};
 use repose_core::input::PhysicalKey;
 use repose_core::{ImageFit, Modifier, Signal, signal};
-use repose_ui::{Image, ImageExt, Spacer, ViewExt, ZStack};
+use repose_ui::{Image, ImageExt, Spacer, TextStyle, ViewExt, ZStack};
 
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -507,16 +507,23 @@ impl App {
             let Some(draw) = stage.draw.as_ref() else {
                 return Spacer();
             };
-            for (index, text) in draw.panes.texts.iter().enumerate() {
-                if text.visible {
+            if let Some(assets) = panes::load() {
+                for text in draw.panes.texts.iter().filter(|text| text.visible) {
+                    let size = text.font_size.1.max(12.0);
+                    panes::draw_label(
+                        &mut canvas,
+                        assets,
+                        &text.text,
+                        text.x + text.shift_x,
+                        text.y + text.shift_y,
+                        size,
+                        text.alpha as u32 * 0x0101_0101,
+                    );
+                }
+                for icon in &draw.icons {
                     canvas.fill_rect(
-                        [
-                            text.x,
-                            text.y + index as f32 * 26.0,
-                            text.w.min(600.0),
-                            24.0,
-                        ],
-                        [220, 220, 220, 255],
+                        [icon.x, icon.y, icon.x + icon.w, icon.y + icon.h],
+                        [180, 180, 180, icon.alpha],
                     );
                 }
             }
@@ -536,6 +543,10 @@ impl App {
         }
         Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
     }
+}
+
+fn key_pressed(held: &HashSet<PhysicalKey>, prev: &HashSet<PhysicalKey>, key: PhysicalKey) -> bool {
+    held.contains(&key) && !prev.contains(&key)
 }
 
 /// The input log `CS_INPUT_LOG` names, emptied when the session opens it. A line is a tape
@@ -1195,9 +1206,39 @@ impl App {
         // L/R move between pages. Escape is both the shell's Start and its B, so this reads
         // the physical keys directly rather than the remapped pad bits.
         if self.assets_installed && window_focused {
+            let pad_start = self
+                .sim
+                .world
+                .resource::<sim::intent::PadButtons>()
+                .trig
+                .start;
+            let open_tab = if key_pressed(held, &self.menu_prev, PhysicalKey::KeyI) {
+                Some(0)
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyM) {
+                Some(2)
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyN) {
+                Some(1)
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyG) {
+                Some(3)
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyC) {
+                Some(4)
+            } else {
+                None
+            };
             match self.menu.screen {
-                menus::Screen::Playing if escape_pressed => {
+                menus::Screen::Playing
+                    if escape_pressed
+                        || pad_start
+                        || key_pressed(held, &self.menu_prev, PhysicalKey::Tab) =>
+                {
                     self.menu.pause = menus::PauseState::default();
+                    self.menu.screen = menus::Screen::Pause;
+                }
+                menus::Screen::Playing if open_tab.is_some() => {
+                    self.menu.pause = menus::PauseState {
+                        tab: open_tab.unwrap_or_default(),
+                        ..menus::PauseState::default()
+                    };
                     self.menu.screen = menus::Screen::Pause;
                 }
                 menus::Screen::Pause => {
@@ -1239,7 +1280,7 @@ impl App {
         let pressed =
             |key: PhysicalKey| window_focused && held.contains(&key) && !prev.contains(&key);
         let keys = self.sim.world.resource::<sim::intent::PadButtons>().trig;
-        if pressed(PhysicalKey::Escape) || keys.b {
+        if pressed(PhysicalKey::Escape) || keys.b || keys.start {
             if self.menu.pause.assigning {
                 self.menu.pause.assigning = false;
             } else {
@@ -1269,6 +1310,11 @@ impl App {
             || pressed(PhysicalKey::KeyQ)
             || pressed(PhysicalKey::Space)
             || pressed(PhysicalKey::Enter);
+        if a && self.menu.pause.tab == 4 {
+            // The collection tab opens the photo album (`d_menu_window.cpp:813-890`).
+            self.open_album();
+            return;
+        }
         if a && !self.menu.pause.assigning {
             self.menu.pause.assigning = true;
             self.menu.pause.button = 0;
@@ -1819,6 +1865,15 @@ impl App {
             outcome = stage.game.step(&mut env);
             stage.save_assets.sync_text(&mut stage.game.save, clears);
             stage.revision = stage.revision.wrapping_add(1);
+        } else if self.game_over_failed {
+            // The retail BLO could not bind, so there is no state machine to produce an
+            // outcome. Read the same pad directly rather than leaving the player on a
+            // frozen world with no way out (`d_gameover.cpp:109-166`).
+            if pad.trig_a {
+                outcome = Some(game_over_screen::Outcome::Continue);
+            } else if pad.trig_b {
+                outcome = Some(game_over_screen::Outcome::Title);
+            }
         }
         *self.sim.world.resource_mut::<sim::vibration::Vibration>() = vibration;
         *self.sim.world.resource_mut::<sim::health::Health>() = health;
@@ -5694,6 +5749,15 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
 /// save menu's `_draw2`, composited over the live view.
 fn game_over_overlay(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     let Some(stage) = app.game_over.as_ref() else {
+        if app.game_over_failed {
+            // No BLO bound, so show a minimal prompt instead of a frozen world with no
+            // exit (`d_gameover.cpp:168-175`).
+            return repose_ui::Center(repose_core::Modifier::new().fill_max_size()).child(
+                repose_ui::Text("GAME OVER\nA: Continue   B: Title")
+                    .size(repose_core::Sp(28.0))
+                    .color(repose_core::Color::from_hex("#F4EAD5")),
+            );
+        }
         return Spacer();
     };
     let handle = match stage.image.get() {
@@ -5783,7 +5847,10 @@ fn meter_hud_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::V
 }
 
 fn dialogue_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
-    if !app.dialogue_live || app.dialogue_canvas.pixels.is_empty() {
+    if !app.dialogue_live
+        || app.menu.screen == menus::Screen::Pause
+        || app.dialogue_canvas.pixels.is_empty()
+    {
         return Spacer();
     }
     let handle = match app.dialogue_image.get() {

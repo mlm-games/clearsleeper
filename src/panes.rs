@@ -250,6 +250,38 @@ fn with_fonts<R>(assets: &Assets, run: impl FnOnce(&mut FontBank) -> R) -> R {
     })
 }
 
+/// Draw a short label with the file-select font bank. Shell menus that have no BLO of
+/// their own use this instead of anonymous rectangles so their text is readable.
+pub fn draw_label(
+    canvas: &mut Canvas,
+    assets: &Assets,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: u32,
+) {
+    if text.is_empty() {
+        return;
+    }
+    with_fonts(assets, |fonts| {
+        let Some(slot) = assets.names.first().and_then(|name| assets.font_slot(name)) else {
+            return;
+        };
+        let mut box_ = TextBox::default();
+        box_.initiate(fonts, Some(slot), text.as_bytes(), 0, 0);
+        box_.set_char_color(color);
+        box_.set_grad_color(color);
+        box_.set_font_size(size, size);
+        let width = text.len() as f32 * size;
+        let height = size * 1.4;
+        let layout = box_.draw_self(fonts, [x, y, x + width, y + height], x, y, 0xFF);
+        if let Some(font) = fonts.get(slot) {
+            canvas.draw_layout(&layout, font, [x, y], 0xFF);
+        }
+    });
+}
+
 pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &Assets) {
     // The retail hangs the file select over a night sky and a cloth: the sky
     // is the J3D model `vr_sky.bdl` the `Vrbox` actor loads
