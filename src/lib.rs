@@ -40,6 +40,7 @@ pub mod meter_hud;
 pub mod movie;
 pub mod pad_source;
 pub mod panes;
+pub mod pause_item;
 pub mod pause_menu;
 pub mod quit;
 pub mod report;
@@ -247,6 +248,7 @@ pub struct App {
     meter: Option<MeterStage>,
     game_over: Option<GameOverStage>,
     album: Option<AlbumStage>,
+    item_menu: Option<pause_item::ItemMenuStage>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
@@ -679,6 +681,7 @@ impl App {
             meter: None,
             game_over: None,
             album: None,
+            item_menu: Some(pause_item::ItemMenuStage::default()),
             game_over_failed: false,
             title_actor: None,
             pending_slot: None,
@@ -1315,7 +1318,9 @@ impl App {
             self.open_album();
             return;
         }
-        if a && !self.menu.pause.assigning {
+        // On the ITEM tab the ported retail state machine owns A/X/Y/Z; the shell-level
+        // assignment is only the fallback for the other tabs.
+        if a && self.menu.pause.tab != 0 && !self.menu.pause.assigning {
             self.menu.pause.assigning = true;
             self.menu.pause.button = 0;
         }
@@ -1328,7 +1333,7 @@ impl App {
         } else {
             None
         };
-        if self.menu.pause.assigning {
+        if self.menu.pause.assigning && self.menu.pause.tab != 0 {
             if let Some(button) = assigned {
                 let equipped = *self.sim.world.resource::<sim::inventory::Equipped>();
                 let mut owned: Vec<(usize, u8)> = (0..sim::inventory::SLOT_COUNT)
@@ -4516,6 +4521,43 @@ impl App {
         steps
     }
 
+    /// Step the ported retail item menu for one frame and feed its button assignments into
+    /// the sim's X/Y/Z map. `menu_window_step` is the same system the retail schedule uses.
+    fn step_item_menu(&mut self) {
+        use crate::ui_menu_item::PadState;
+        let trig = self.sim.world.resource::<sim::intent::PadButtons>().trig;
+        let hold = self.sampled_pad.hold;
+        let axis = self.sampled_pad.move_axis;
+        let pad = PadState {
+            a: hold.a || trig.a,
+            b: hold.b || trig.b,
+            z: hold.z || trig.z,
+            x: hold.x || trig.x,
+            y: hold.y || trig.y,
+            start: hold.start || trig.start,
+            up: axis.y > 0.5,
+            down: axis.y < -0.5,
+            left: axis.x < -0.5,
+            right: axis.x > 0.5,
+            lock_l: hold.l,
+            lock_r: hold.r,
+            stick_value: axis.length(),
+            stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
+        };
+        let stage = self
+            .item_menu
+            .get_or_insert_with(pause_item::ItemMenuStage::default);
+        let writes = stage.step(&mut self.sim.world, pad);
+        for (button, slot) in writes {
+            self.sim
+                .world
+                .resource_mut::<sim::inventory::ItemSelect>()
+                .assign(usize::from(button), slot);
+        }
+        stage.draw = pause_item::ItemMenuStage::draw_window(&mut self.sim.world);
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
     pub(crate) fn clear_pad_edges(&mut self) {
         self.sim
             .world
@@ -4537,6 +4579,9 @@ impl App {
         if self.menu.screen == menus::Screen::Pause {
             // The pause menu freezes the simulation: no sim tick, no dialogue or meter
             // advancement, while its own keys are handled once per drawn frame by stage_menu.
+            if self.menu.pause.tab == 0 {
+                self.step_item_menu();
+            }
             self.clear_pad_edges();
             return;
         }
@@ -5708,7 +5753,13 @@ pub fn root_view(
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         menus::Screen::PhotoAlbum => app.album_view(ctx),
-        menus::Screen::Pause => pause_menu::view(app),
+        menus::Screen::Pause => {
+            if app.menu.pause.tab == 0 {
+                item_menu_view(app, ctx)
+            } else {
+                pause_menu::view(app)
+            }
+        }
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
         menus::Screen::Title
@@ -5723,6 +5774,35 @@ pub fn root_view(
         dialogue_view(app, ctx),
         app.touch.view(ctx),
     ])
+}
+
+/// The ported item menu's canvas, composited over the live view while the pause menu's
+/// ITEM tab is open. The fallback is the shell-level tab view when the BLO is unavailable.
+fn item_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.item_menu.as_ref() else {
+        return pause_menu::view(app);
+    };
+    let Some(assets) = panes::load() else {
+        return pause_menu::view(app);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
+        if let Some(draw) = stage.draw.as_ref() {
+            pause_item::ItemMenuStage::render(&mut canvas, assets, draw);
+        }
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
 }
 
 /// The host shell, and the only place it exists: with no asset source installed there is no
