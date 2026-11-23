@@ -40,6 +40,7 @@ pub mod meter_hud;
 pub mod movie;
 pub mod pad_source;
 pub mod panes;
+pub mod pause_menu;
 pub mod quit;
 pub mod report;
 pub mod save;
@@ -584,6 +585,11 @@ impl App {
         Self::with_audio(audio::open())
     }
 
+    /// The stage the pause menu's map tab names.
+    pub fn stage_name(&self) -> &str {
+        &self.stage_name
+    }
+
     fn with_audio(mut audio: repame_audio::Audio) -> Self {
         if let Err(e) = audio::load_cues(&mut audio) {
             log::warn!("clearsleeper: cue bank failed to load ({e})");
@@ -1009,8 +1015,28 @@ impl App {
             !menu && (merged.hold.l || input::target_from_keys(held, window_focused)),
         );
         self.stage_item(!menu && (merged.hold.b || input::item_from_keys(held, window_focused)));
-        self.stage_use(!menu && (merged.hold.x || input::use_from_keys(held, window_focused)));
+        // X/Y/Z each use the item assigned to that button; the pause menu writes the map.
+        // `dComIfGp_getSelectItem` (tww/include/d/d_com_inf_game.h:2918-2939;
+        // HD wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186).
+        self.stage_use(
+            !menu
+                && (merged.hold.x
+                    || merged.hold.y
+                    || merged.hold.z
+                    || input::use_from_keys(held, window_focused)),
+        );
         self.stage_pad(merged.hold, merged.c_axis);
+        let button = if merged.hold.x {
+            0
+        } else if merged.hold.y {
+            1
+        } else if merged.hold.z {
+            2
+        } else {
+            self.sim.world.resource::<sim::intent::SelectedButton>().0
+        };
+        *self.sim.world.resource_mut::<sim::intent::SelectedButton>() =
+            sim::intent::SelectedButton(button);
         self.stage_menu(held, window_focused);
     }
 
@@ -1147,6 +1173,9 @@ impl App {
     /// (the title actor, the game-over sequence) or through the ported menu state machine
     /// behind the file select panes.
     fn stage_menu(&mut self, held: &HashSet<PhysicalKey>, window_focused: bool) {
+        let escape_pressed = window_focused
+            && held.contains(&PhysicalKey::Escape)
+            && !self.menu_prev.contains(&PhysicalKey::Escape);
         let album_down = held.contains(&PhysicalKey::KeyP);
         if window_focused
             && self.assets_installed
@@ -1158,6 +1187,22 @@ impl App {
                 menus::Screen::PhotoAlbum => {
                     self.menu.screen = menus::Screen::Playing;
                     self.album = None;
+                }
+                _ => {}
+            }
+        }
+        // `d_menu_window.cpp:1479-1539` opens the pause menu on Start; B/Start closes it and
+        // L/R move between pages. Escape is both the shell's Start and its B, so this reads
+        // the physical keys directly rather than the remapped pad bits.
+        if self.assets_installed && window_focused {
+            match self.menu.screen {
+                menus::Screen::Playing if escape_pressed => {
+                    self.menu.pause = menus::PauseState::default();
+                    self.menu.screen = menus::Screen::Pause;
+                }
+                menus::Screen::Pause => {
+                    let prev = self.menu_prev.clone();
+                    self.stage_pause(held, &prev, window_focused);
                 }
                 _ => {}
             }
@@ -1179,6 +1224,84 @@ impl App {
                 self.menu.screen = menus::Screen::Title;
             }
             _ => {}
+        }
+    }
+
+    /// One frame of pause-menu input. The arrow keys and WASD move the cursor, L/R change
+    /// page, A selects an item, X/Y/Z assign it to that button, and Escape or B closes.
+    /// `d_menu_window.cpp:1680-1710` uses the same button set for the item page.
+    fn stage_pause(
+        &mut self,
+        held: &HashSet<PhysicalKey>,
+        prev: &HashSet<PhysicalKey>,
+        window_focused: bool,
+    ) {
+        let pressed =
+            |key: PhysicalKey| window_focused && held.contains(&key) && !prev.contains(&key);
+        let keys = self.sim.world.resource::<sim::intent::PadButtons>().trig;
+        if pressed(PhysicalKey::Escape) || keys.b {
+            if self.menu.pause.assigning {
+                self.menu.pause.assigning = false;
+            } else {
+                self.menu.screen = menus::Screen::Playing;
+            }
+            return;
+        }
+        if pressed(PhysicalKey::KeyO) || keys.l {
+            let pause = &mut self.menu.pause;
+            pause.tab = (pause.tab + menus::PAUSE_TABS.len() - 1) % menus::PAUSE_TABS.len();
+            pause.cursor = 0;
+            pause.assigning = false;
+        }
+        if pressed(PhysicalKey::KeyR) || keys.r {
+            let pause = &mut self.menu.pause;
+            pause.tab = (pause.tab + 1) % menus::PAUSE_TABS.len();
+            pause.cursor = 0;
+            pause.assigning = false;
+        }
+        if pressed(PhysicalKey::ArrowUp) || pressed(PhysicalKey::KeyW) {
+            self.menu.pause.cursor = self.menu.pause.cursor.saturating_sub(1);
+        }
+        if pressed(PhysicalKey::ArrowDown) || pressed(PhysicalKey::KeyS) {
+            self.menu.pause.cursor = self.menu.pause.cursor.saturating_add(1).min(15);
+        }
+        let a = keys.a
+            || pressed(PhysicalKey::KeyQ)
+            || pressed(PhysicalKey::Space)
+            || pressed(PhysicalKey::Enter);
+        if a && !self.menu.pause.assigning {
+            self.menu.pause.assigning = true;
+            self.menu.pause.button = 0;
+        }
+        let assigned = if pressed(PhysicalKey::KeyX) || keys.x {
+            Some(0)
+        } else if pressed(PhysicalKey::KeyY) || keys.y {
+            Some(1)
+        } else if pressed(PhysicalKey::KeyZ) || keys.z {
+            Some(2)
+        } else {
+            None
+        };
+        if self.menu.pause.assigning {
+            if let Some(button) = assigned {
+                let equipped = *self.sim.world.resource::<sim::inventory::Equipped>();
+                let mut owned: Vec<(usize, u8)> = (0..sim::inventory::SLOT_COUNT)
+                    .filter_map(|slot| {
+                        let item = equipped.item(slot);
+                        (item != sim::inventory::NO_ITEM).then_some((slot, item))
+                    })
+                    .collect();
+                owned.sort_by_key(|(_, item)| *item);
+                let selected = owned
+                    .get(self.menu.pause.cursor)
+                    .map(|(slot, _)| *slot as u8)
+                    .unwrap_or(sim::inventory::NO_ITEM);
+                self.sim
+                    .world
+                    .resource_mut::<sim::inventory::ItemSelect>()
+                    .assign(button, selected);
+                self.menu.pause.assigning = false;
+            }
         }
     }
 
@@ -4356,6 +4479,12 @@ impl App {
             self.clear_pad_edges();
             return;
         }
+        if self.menu.screen == menus::Screen::Pause {
+            // The pause menu freezes the simulation: no sim tick, no dialogue or meter
+            // advancement, while its own keys are handled once per drawn frame by stage_menu.
+            self.clear_pad_edges();
+            return;
+        }
         let step = self.sim.step;
         self.menu_clock = (self.menu_clock + dt).min(step * self.sim.max_steps.max(1));
         while self.menu_clock >= step {
@@ -5524,6 +5653,7 @@ pub fn root_view(
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         menus::Screen::PhotoAlbum => app.album_view(ctx),
+        menus::Screen::Pause => pause_menu::view(app),
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
         menus::Screen::Title
@@ -5554,6 +5684,7 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
         | menus::Screen::Playing
         | menus::Screen::GameOver
         | menus::Screen::PhotoAlbum
+        | menus::Screen::Pause
         | menus::Screen::Movie
         | menus::Screen::ClearSave => Spacer(),
     }

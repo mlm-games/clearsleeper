@@ -1761,6 +1761,7 @@ pub fn build(
     sim.world.insert_resource(intent::TargetIntent::default());
     sim.world.insert_resource(intent::ItemIntent::default());
     sim.world.insert_resource(intent::UseIntent::default());
+    sim.world.insert_resource(intent::SelectedButton::default());
     sim.world.insert_resource(intent::GameOverChoice::default());
     sim.world.insert_resource(health::Health::default());
     sim.world.insert_resource(health::BottleDrink::default());
@@ -1942,6 +1943,7 @@ pub fn build(
     sim.world.insert_resource(flags::ZoneActors::default());
     sim.world.insert_resource(event::ItemGets::default());
     sim.world.insert_resource(inventory::Equipped::default());
+    sim.world.insert_resource(inventory::ItemSelect::default());
     sim.world.insert_resource(inventory::Got::default());
     sim.world.insert_resource(clock::Clock::default());
     sim.world.insert_resource(schedule::Schedule::from_header(

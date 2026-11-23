@@ -17,7 +17,7 @@ use crate::sim::talk::Dialogue;
 use crate::sim::{
     chest::Chests,
     flags::{Charts, Collect, MemBits},
-    inventory::{Equipped, Got},
+    inventory::{Equipped, Got, ItemSelect},
 };
 use crate::{App, assets};
 
@@ -123,6 +123,8 @@ pub struct SaveGame {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Progress {
     pub equipped: Equipped,
+    #[serde(default)]
+    pub select: ItemSelect,
     pub got: Got,
     pub collect: Collect,
     pub charts: Charts,
@@ -430,6 +432,7 @@ impl App {
             get_bag,
             progress: Progress {
                 equipped: *world.resource::<Equipped>(),
+                select: *world.resource::<ItemSelect>(),
                 got: *world.resource::<Got>(),
                 collect: *world.resource::<Collect>(),
                 charts: *world.resource::<Charts>(),
@@ -479,6 +482,7 @@ impl App {
         {
             let world = &mut self.sim.world;
             world.insert_resource(save.progress.equipped);
+            world.insert_resource(save.progress.select);
             world.insert_resource(save.progress.got);
             world.insert_resource(save.progress.collect);
             world.insert_resource(save.progress.charts);

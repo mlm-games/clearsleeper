@@ -38,9 +38,34 @@ pub enum Screen {
     Movie,
     ClearSave,
     PhotoAlbum,
+    Pause,
     Settings,
     QuitConfirm,
 }
+
+/// State behind the in-game pause menu. `d_menu_window.cpp:1437-1580` opens it on Start and
+/// moves between the item and collection pages with L/R; the port exposes the same pages as
+/// tabs so the full menu is reachable with the keyboard as well.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PauseState {
+    pub tab: usize,
+    pub cursor: usize,
+    pub assigning: bool,
+    pub button: usize,
+}
+
+impl Default for PauseState {
+    fn default() -> Self {
+        Self {
+            tab: 0,
+            cursor: 0,
+            assigning: false,
+            button: 0,
+        }
+    }
+}
+
+pub const PAUSE_TABS: [&str; 5] = ["ITEM", "STATUS", "MAP", "CHART", "COLLECT"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cmd {
@@ -79,6 +104,7 @@ pub struct Menu {
     pub quit_index: usize,
     pub settings_index: usize,
     pub settings: Settings,
+    pub pause: PauseState,
     pub fs: crate::ui_file_select::FileSelect,
     pub card: crate::ui_menu_save::MemCard,
     pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
@@ -103,6 +129,7 @@ impl Menu {
             quit_index: 0,
             settings_index: 0,
             settings: Settings::defaults(),
+            pause: PauseState::default(),
             fs: crate::ui_file_select::FileSelect::default(),
             card: crate::ui_menu_save::MemCard::default(),
             shot: std::cell::Cell::new(None),

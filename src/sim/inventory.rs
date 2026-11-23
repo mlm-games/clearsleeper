@@ -55,6 +55,41 @@ pub fn slot_of(item: u8) -> Option<usize> {
         .map(|(_, slot)| *slot)
 }
 
+/// The X/Y/Z button→inventory-slot map (`mSelectItem` in
+/// `d_com_inf_game.h:506-507`; `dComIfGs_getSelectItem` at `:1877-1879`, and
+/// `dComIfGp_setSelectItem` at `:2926-2939` for the play-side selection). The
+/// retail stores slot indices, not item ids, so a stack can change beneath a
+/// button without the assignment going stale.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ItemSelect {
+    pub slots: [u8; 3],
+    pub active: u8,
+}
+
+impl Default for ItemSelect {
+    fn default() -> Self {
+        Self {
+            slots: [NO_ITEM; 3],
+            active: 0,
+        }
+    }
+}
+
+impl ItemSelect {
+    pub fn assign(&mut self, button: usize, slot: u8) {
+        if let Some(entry) = self.slots.get_mut(button) {
+            *entry = slot;
+            self.active = button as u8;
+        }
+    }
+
+    pub fn item(&self, button: usize, equipped: &Equipped) -> u8 {
+        self.slots
+            .get(button)
+            .map_or(NO_ITEM, |slot| equipped.item(usize::from(*slot)))
+    }
+}
+
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Equipped {
     slots: [u8; SLOT_COUNT],

@@ -27,6 +27,12 @@ pub struct ItemIntent(pub bool);
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct UseIntent(pub bool);
 
+/// Which of the X/Y/Z buttons the frame's use edge came from. Retail resolves
+/// each through `dComIfGp_getSelectItem` (`tww/include/d/d_com_inf_game.h:2918-2939`;
+/// HD `wwhd/wwhd_src/d/actor/d_a_player_main_04.cpp:3180-3186`).
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct SelectedButton(pub u8);
+
 /// The retail pad's face buttons, split the way the shell's pad interface splits them:
 /// [`PadButtons::trig`] is the frame's press edge and [`PadButtons::hold`] the level still
 /// down. The edge is taken while the pad is polled, where retail takes it in
