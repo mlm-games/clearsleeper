@@ -41,8 +41,10 @@ pub mod movie;
 pub mod pad_source;
 pub mod panes;
 pub mod pause_chart;
+pub mod pause_dmap;
 pub mod pause_item;
 pub mod pause_menu;
+pub mod pause_seamap;
 pub mod quit;
 pub mod report;
 pub mod save;
@@ -251,6 +253,8 @@ pub struct App {
     album: Option<AlbumStage>,
     item_menu: Option<pause_item::ItemMenuStage>,
     chart_menu: Option<pause_chart::ChartStage>,
+    dmap: Option<pause_dmap::DMapStage>,
+    seamap: Option<pause_seamap::SeaMapStage>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
@@ -685,6 +689,8 @@ impl App {
             album: None,
             item_menu: Some(pause_item::ItemMenuStage::default()),
             chart_menu: Some(pause_chart::ChartStage::default()),
+            dmap: Some(pause_dmap::DMapStage::default()),
+            seamap: Some(pause_seamap::SeaMapStage::default()),
             game_over_failed: false,
             title_actor: None,
             pending_slot: None,
@@ -1226,8 +1232,10 @@ impl App {
                 Some(1)
             } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyG) {
                 Some(3)
-            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyC) {
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyE) {
                 Some(4)
+            } else if key_pressed(held, &self.menu_prev, PhysicalKey::KeyC) {
+                Some(5)
             } else {
                 None
             };
@@ -1316,7 +1324,7 @@ impl App {
             || pressed(PhysicalKey::KeyQ)
             || pressed(PhysicalKey::Space)
             || pressed(PhysicalKey::Enter);
-        if a && self.menu.pause.tab == 4 {
+        if a && self.menu.pause.tab == 5 {
             // The collection tab opens the photo album (`d_menu_window.cpp:813-890`).
             self.open_album();
             return;
@@ -4584,6 +4592,56 @@ impl App {
         stage.revision = stage.revision.wrapping_add(1);
     }
 
+    /// One frame of the ported dungeon map. The stage's own `DungeonMap` state is created
+    /// lazily from the disc's `dmapres.arc` the first time the tab is opened.
+    fn step_dmap_menu(&mut self) {
+        use crate::ui_menu_dmap::PadInput;
+        let trig = self.sim.world.resource::<sim::intent::PadButtons>().trig;
+        let axis = self.sampled_pad.move_axis;
+        let mut pad = PadInput {
+            trig_a: trig.a,
+            trig_b: trig.b,
+            up: axis.y > 0.5,
+            down: axis.y < -0.5,
+            left: axis.x < -0.5,
+            right: axis.x > 0.5,
+            stick_value: axis.length(),
+            stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
+        };
+        let stage = self.dmap.get_or_insert_with(pause_dmap::DMapStage::default);
+        if !stage.created {
+            stage.created = pause_dmap::DMapStage::create(&mut stage.map);
+        }
+        stage.draw = stage.step(&mut stage.map, &mut pad);
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
+    /// One frame of the ported sea chart (`d_menu_fmap.cpp`).
+    fn step_seamap_menu(&mut self) {
+        use crate::ui_menu_fmap::PadInput;
+        let trig = self.sim.world.resource::<sim::intent::PadButtons>().trig;
+        let axis = self.sampled_pad.move_axis;
+        let pad = PadInput {
+            trig_a: trig.a,
+            trig_b: trig.b,
+            trig_x: trig.x,
+            trig_y: trig.y,
+            trig_z: trig.z,
+            trig_l: trig.l,
+            trig_r: trig.r,
+            trig_start: trig.start,
+            trig_left: axis.x < -0.5,
+            trig_down: axis.y < -0.5,
+            stick_value: axis.length(),
+            stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
+        };
+        let stage = self
+            .seamap
+            .get_or_insert_with(pause_seamap::SeaMapStage::default);
+        stage.step(&mut self.sim.world, pad);
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
     pub(crate) fn clear_pad_edges(&mut self) {
         self.sim
             .world
@@ -4607,8 +4665,12 @@ impl App {
             // advancement, while its own keys are handled once per drawn frame by stage_menu.
             if self.menu.pause.tab == 0 {
                 self.step_item_menu();
+            } else if self.menu.pause.tab == 2 {
+                self.step_dmap_menu();
             } else if self.menu.pause.tab == 3 {
                 self.step_chart_menu();
+            } else if self.menu.pause.tab == 4 {
+                self.step_seamap_menu();
             }
             self.clear_pad_edges();
             return;
@@ -5783,7 +5845,9 @@ pub fn root_view(
         menus::Screen::PhotoAlbum => app.album_view(ctx),
         menus::Screen::Pause => match app.menu.pause.tab {
             0 => item_menu_view(app, ctx),
+            2 => dmap_menu_view(app, ctx),
             3 => chart_menu_view(app, ctx),
+            4 => seamap_menu_view(app, ctx),
             _ => pause_menu::view(app),
         },
         // The shell's own screens belong to the pre-boot session; a session that somehow
@@ -5824,6 +5888,62 @@ fn item_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::V
         canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
         if let Some(draw) = stage.draw.as_ref() {
             pause_item::ItemMenuStage::render(&mut canvas, assets, draw);
+        }
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+/// The ported dungeon map's canvas, composited over the live view on the MAP tab.
+fn dmap_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.dmap.as_ref() else {
+        return pause_menu::view(app);
+    };
+    let Some(assets) = panes::load() else {
+        return pause_menu::view(app);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
+        if let Some(draw) = stage.draw.as_ref() {
+            pause_dmap::DMapStage::render(&mut canvas, assets, draw);
+        }
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+/// The ported sea map's canvas, composited over the live view on the SEA tab.
+fn seamap_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.seamap.as_ref() else {
+        return pause_menu::view(app);
+    };
+    let Some(assets) = panes::load() else {
+        return pause_menu::view(app);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
+        if let Some(draw) = stage.draw.as_ref() {
+            pause_seamap::SeaMapStage::render(&mut canvas, assets, draw);
         }
         ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
         stage.uploaded.set(stage.revision);

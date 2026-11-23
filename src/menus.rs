@@ -65,7 +65,7 @@ impl Default for PauseState {
     }
 }
 
-pub const PAUSE_TABS: [&str; 5] = ["ITEM", "STATUS", "MAP", "CHART", "COLLECT"];
+pub const PAUSE_TABS: [&str; 6] = ["ITEM", "STATUS", "MAP", "CHART", "SEA", "COLLECT"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cmd {

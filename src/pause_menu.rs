@@ -190,7 +190,7 @@ pub fn view(app: &crate::App) -> View {
         }
     }
     children.push(label(
-        "Keys: Esc/Tab pause   I item   N status   M dungeon map   G chart   C collection"
+        "Keys: Esc/Tab pause   I item   N status   M dungeon map   G chart   E sea   C collection"
             .to_string(),
         false,
         true,
