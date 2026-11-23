@@ -40,6 +40,7 @@ pub mod meter_hud;
 pub mod movie;
 pub mod pad_source;
 pub mod panes;
+pub mod pause_chart;
 pub mod pause_item;
 pub mod pause_menu;
 pub mod quit;
@@ -249,6 +250,7 @@ pub struct App {
     game_over: Option<GameOverStage>,
     album: Option<AlbumStage>,
     item_menu: Option<pause_item::ItemMenuStage>,
+    chart_menu: Option<pause_chart::ChartStage>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
@@ -682,6 +684,7 @@ impl App {
             game_over: None,
             album: None,
             item_menu: Some(pause_item::ItemMenuStage::default()),
+            chart_menu: Some(pause_chart::ChartStage::default()),
             game_over_failed: false,
             title_actor: None,
             pending_slot: None,
@@ -4558,6 +4561,29 @@ impl App {
         stage.revision = stage.revision.wrapping_add(1);
     }
 
+    /// One frame of the ported sea-chart state machine. `d_menu_fmap2.cpp` reads the
+    /// face buttons and the main stick, both already staged into the sim's pad resources.
+    fn step_chart_menu(&mut self) {
+        use crate::ui_menu_fmap2::ChartPadInput;
+        let hold = self.sampled_pad.hold;
+        let axis = self.sampled_pad.move_axis;
+        let pad = ChartPadInput {
+            trig_a: hold.a,
+            trig_b: hold.b,
+            lock_l: hold.l,
+            lock_r: hold.r,
+            stick_value: axis.length(),
+            stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
+            opt_ruby: false,
+        };
+        let stage = self
+            .chart_menu
+            .get_or_insert_with(pause_chart::ChartStage::default);
+        pause_chart::ChartStage::step(&mut self.sim.world, pad);
+        stage.draw = pause_chart::ChartStage::draw(&mut self.sim.world);
+        stage.revision = stage.revision.wrapping_add(1);
+    }
+
     pub(crate) fn clear_pad_edges(&mut self) {
         self.sim
             .world
@@ -4581,6 +4607,8 @@ impl App {
             // advancement, while its own keys are handled once per drawn frame by stage_menu.
             if self.menu.pause.tab == 0 {
                 self.step_item_menu();
+            } else if self.menu.pause.tab == 3 {
+                self.step_chart_menu();
             }
             self.clear_pad_edges();
             return;
@@ -5753,13 +5781,11 @@ pub fn root_view(
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         menus::Screen::PhotoAlbum => app.album_view(ctx),
-        menus::Screen::Pause => {
-            if app.menu.pause.tab == 0 {
-                item_menu_view(app, ctx)
-            } else {
-                pause_menu::view(app)
-            }
-        }
+        menus::Screen::Pause => match app.menu.pause.tab {
+            0 => item_menu_view(app, ctx),
+            3 => chart_menu_view(app, ctx),
+            _ => pause_menu::view(app),
+        },
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
         menus::Screen::Title
@@ -5798,6 +5824,34 @@ fn item_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::V
         canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
         if let Some(draw) = stage.draw.as_ref() {
             pause_item::ItemMenuStage::render(&mut canvas, assets, draw);
+        }
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
+}
+
+/// The ported sea chart's canvas, composited over the live view on the CHART tab.
+fn chart_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.chart_menu.as_ref() else {
+        return pause_menu::view(app);
+    };
+    let Some(assets) = panes::load() else {
+        return pause_menu::view(app);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [8, 12, 20, 255]);
+        if let Some(draw) = stage.draw.as_ref() {
+            pause_chart::ChartStage::render(&mut canvas, assets, draw);
         }
         ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
         stage.uploaded.set(stage.revision);
