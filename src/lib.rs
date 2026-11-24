@@ -1448,7 +1448,14 @@ impl App {
         let action = self.menu.step(cmds);
         if before == menus::Screen::Title && self.menu.screen == menus::Screen::FileSelect {
             // The retail file select needs the disc's panes; without a source it is not a
-            // screen the shell can show.
+            // screen the shell can show. On the web this is the native start UI's Load Disc
+            // entry, so confirm opens the page's file picker instead.
+            #[cfg(target_arch = "wasm32")]
+            {
+                if self.menu.title_index == 0 {
+                    web::request_disc_file();
+                }
+            }
             self.menu.screen = menus::Screen::Title;
         }
         match action {

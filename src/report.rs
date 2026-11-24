@@ -3,8 +3,8 @@
 //! A wasm build aborts rather than unwinds, so a panic reaches the page as a trap
 //! (`RuntimeError: unreachable executed`) that carries nothing but the fact that the instance
 //! died. The hook here reports the message first: `console.error` keeps it in the browser's log
-//! and `window.__clearsleeperPanic`, which `index.html` defines, puts it on the drop zone's
-//! status line, where a dropped disc's failure belongs. Other platforms already print panics, so
+//! and `window.__clearsleeperPanic`, which `index.html` defines, lets the page show it on the
+//! native start screen's status line, where a dropped disc's failure belongs. Other platforms already print panics, so
 //! there the report is nothing and the hook hands off to the one it replaced.
 
 use std::panic::PanicHookInfo;

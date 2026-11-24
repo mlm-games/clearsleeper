@@ -20,11 +20,37 @@ extern "C" {
     /// browser's console the way the desktop build writes it to its log file.
     #[wasm_bindgen(js_name = clearsleeperLog)]
     fn clearsleeper_log(text: &str);
+
+    /// The page's hidden file input, opened by the native start UI's Load Disc button.
+    #[wasm_bindgen(js_name = clearsleeperPickDisc)]
+    fn js_pick_disc();
 }
 
 /// One line of the input log, printed to the browser's console.
 pub fn log_line(text: &str) {
     clearsleeper_log(text);
+}
+
+thread_local! {
+    /// Disc acquisition progress, reported by the page and drawn by the native start UI.
+    static DISC_STATUS: std::cell::RefCell<String> =
+        const { std::cell::RefCell::new(String::new()) };
+}
+
+/// The page's latest disc status, drawn on the native start screen.
+pub fn disc_status() -> String {
+    DISC_STATUS.with(|slot| slot.borrow().clone())
+}
+
+/// Called by the page while it reads and installs a disc image.
+#[wasm_bindgen(js_name = clearsleeperDiscStatus)]
+pub fn set_disc_status(text: &str) {
+    DISC_STATUS.with(|slot| *slot.borrow_mut() = text.to_owned());
+}
+
+/// Open the page's file picker from the native start UI's Load Disc button.
+pub fn request_disc_file() {
+    js_pick_disc();
 }
 
 /// The largest image the page should hand over, which `index.html` checks the picked file

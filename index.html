@@ -25,94 +25,43 @@
       height: 100%;
       display: block;
     }
-    #disc-drop {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      display: grid;
-      place-items: center;
-      padding: 1.5rem;
-      background: #86AD81;
-      font: 16px/1.5 system-ui, sans-serif;
-      color: #10231b;
-    }
-    #disc-drop.drag #disc-card {
-      border-color: #10231b;
-    }
-    #disc-card {
-      max-width: 30rem;
-      padding: 1.5rem 1.75rem;
-      border: 2px dashed rgba(16, 35, 27, 0.45);
-      border-radius: 0.75rem;
-      background: rgba(255, 255, 255, 0.35);
-      text-align: center;
-    }
-    #disc-card h1 {
-      margin: 0 0 0.5rem;
-      font-size: 1.5rem;
-    }
-    #disc-card p {
-      margin: 0.5rem 0 0;
-    }
-    #disc-pick {
-      display: inline-block;
-      margin-top: 1rem;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      background: #10231b;
-      color: #f4fff9;
-      cursor: pointer;
-    }
-    #disc-pick input {
-      display: none;
-    }
-    #disc-note {
-      opacity: 0.7;
-      font-size: 0.85rem;
-    }
-    #disc-status {
-      min-height: 1.5rem;
-      font-weight: 600;
-    }
-    #disc-status[data-kind="error"] {
-      color: #7a1414;
-    }
   </style>
 </head>
 
 <body>
-  <div id="disc-drop">
-    <div id="disc-card">
-      <h1>ClearSleeper</h1>
-      <p id="disc-hint">Drop a GameCube disc image to play: an ISO/GCM dump or an RVZ.</p>
-      <label id="disc-pick">Choose a file<input id="disc-file" type="file" accept=".iso,.gcm,.rvz" /></label>
-      <p id="disc-status" role="status"></p>
-      <p id="disc-note">The image is read in this tab and kept in this browser for next time.
-        Nothing is uploaded. Clear this site's data to choose a different image.</p>
-    </div>
-  </div>
+  <input id="disc-file" type="file" accept=".iso,.gcm,.rvz" hidden />
 
   <script type="module">
-    const drop = document.getElementById("disc-drop");
-    const status = document.getElementById("disc-status");
     const file = document.getElementById("disc-file");
+    const hint = "Drop a GameCube disc image here, or choose Load Disc.";
 
-    const say = (text, kind = "") => {
-      status.textContent = text;
-      if (kind) {
-        status.dataset.kind = kind;
-      } else {
-        delete status.dataset.kind;
+    // The start screen is native Rust; the page only reports progress to it.
+    let statusText = "";
+    const pushStatus = () => {
+      const bindings = window.wasmBindings;
+      if (bindings && typeof bindings.clearsleeperDiscStatus === "function") {
+        bindings.clearsleeperDiscStatus(statusText);
       }
     };
+    const say = (text, _kind = "") => {
+      statusText = text;
+      pushStatus();
+    };
+
+    // Called by the native start UI's Load Disc button.
+    window.clearsleeperPickDisc = () => file.click();
 
     // Trunk's glue sets `window.wasmBindings` and then fires this event, so either order works.
     const bindingsReady = () => new Promise((resolve) => {
+      const ready = (bindings) => {
+        pushStatus();
+        resolve(bindings);
+      };
       if (window.wasmBindings) {
-        resolve(window.wasmBindings);
+        ready(window.wasmBindings);
         return;
       }
-      addEventListener("TrunkApplicationStarted", () => resolve(window.wasmBindings), { once: true });
+      addEventListener("TrunkApplicationStarted", () => ready(window.wasmBindings), { once: true });
     });
 
     // A dropped image is kept here so a reload does not ask for the disc again. IndexedDB stores
@@ -185,13 +134,34 @@
 
     let installing = false;
     let booted = false;
+    let booting = false;
+    const RELOAD_KEY = "cs-disc-reload";
 
-    // The Rust side reports a panic here before the wasm build aborts, so the status line keeps
-    // the reason a bare trap would hide.
+    // The canvas starts with the native Rust start screen. A disc is then installed into a
+    // fresh instance on reload, which is the construction path that loads the game's assets.
+    async function startShell() {
+      if (booted || booting) {
+        return;
+      }
+      booting = true;
+      const bindings = await bindingsReady();
+      try {
+        bindings.boot();
+        booted = true;
+      } catch (error) {
+        say(`ClearSleeper failed to start: ${panicReport || error}`);
+      } finally {
+        booting = false;
+      }
+    }
+
+    // The Rust side reports a panic here before the wasm build aborts. Keep it for the caller's
+    // catch block to show: pushing it into wasm from inside a panicking wasm call would reenter
+    // an instance that is about to abort.
     let panicReport = "";
     window.__clearsleeperPanic = (text) => {
       panicReport = text;
-      say(text, "error");
+      console.error(text);
     };
 
     async function startImage(bytes, label) {
@@ -203,19 +173,11 @@
         summary = bindings.installDiscImage(bytes);
       } catch (error) {
         // The Rust side answers with the typed failure for this image.
-        say(panicReport || `${error}`, "error");
+        say(panicReport || `${error}`);
         return false;
       }
       say(`Starting ClearSleeper on ${summary}…`);
       panicReport = "";
-      try {
-        bindings.boot();
-      } catch (error) {
-        say(`ClearSleeper failed to start: ${panicReport || error}`, "error");
-        return false;
-      }
-      booted = true;
-      drop.remove();
       return true;
     }
 
@@ -243,7 +205,6 @@
           say(
             `${picked.name} is ${megabytes(picked.size)} MB; this build reads images up to ` +
               `${megabytes(limit)} MB`,
-            "error",
           );
           return;
         }
@@ -252,11 +213,13 @@
         try {
           bytes = new Uint8Array(await picked.arrayBuffer());
         } catch (error) {
-          say(`Could not read ${picked.name}: ${error}`, "error");
+          say(`Could not read ${picked.name}: ${error}`);
           return;
         }
         if (await startImage(bytes, picked.name)) {
-          keepForNextVisit(picked);
+          await keepForNextVisit(picked);
+          sessionStorage.setItem(RELOAD_KEY, "1");
+          location.reload();
         }
       } finally {
         installing = false;
@@ -284,7 +247,7 @@
         const limit = imageLimit(bindings);
         if (cached.size > limit) {
           await clearCached();
-          say(`${label} is ${megabytes(cached.size)} MB; choose a smaller image`, "error");
+          say(`${label} is ${megabytes(cached.size)} MB; choose a smaller image`);
           return;
         }
         say(`Reading ${label} (${megabytes(cached.size)} MB)…`);
@@ -293,35 +256,39 @@
           bytes = new Uint8Array(await cached.arrayBuffer());
         } catch (error) {
           await clearCached();
-          say(`Could not read the saved image: ${error}. Choose the file again.`, "error");
+          say(`Could not read the saved image: ${error}. Choose the file again.`);
           return;
         }
         if (!(await startImage(bytes, label))) {
           await clearCached();
-          say("The saved disc image could not be used. Choose the file again.", "error");
+          say("The saved disc image could not be used. Choose the file again.");
+          return;
         }
+        await startShell();
       } finally {
+        installing = false;
         if (!booted) {
-          installing = false;
+          startShell();
         }
       }
     }
 
     addEventListener("dragenter", (event) => {
       event.preventDefault();
-      drop.classList.add("drag");
+      say("Release to install the disc image…");
     });
     addEventListener("dragover", (event) => {
       event.preventDefault();
-      drop.classList.add("drag");
+      say("Release to install the disc image…");
     });
-    addEventListener("dragleave", () => drop.classList.remove("drag"));
+    addEventListener("dragleave", () => say(hint));
     addEventListener("drop", (event) => {
       event.preventDefault();
-      drop.classList.remove("drag");
       const picked = event.dataTransfer?.files?.[0];
       if (picked) {
         install(picked);
+      } else {
+        say(hint);
       }
     });
     file.addEventListener("change", () => {
@@ -335,7 +302,29 @@
     // session can be read back or replayed the way the desktop build's log file is.
     window.clearsleeperLog = (text) => console.log(text);
 
-    restore();
+    async function startup() {
+      say(hint);
+      if (sessionStorage.getItem(RELOAD_KEY) === "1") {
+        sessionStorage.removeItem(RELOAD_KEY);
+        say("Restoring the saved disc image…");
+        await restore();
+        return;
+      }
+      await startShell();
+      // A return visit should not need another drop: a saved image is restored in the fresh
+      // instance the reload creates, after the native start screen has already appeared.
+      let cached = null;
+      try {
+        cached = await readCached();
+      } catch (error) {
+        console.warn("ClearSleeper: could not read the saved disc image", error);
+      }
+      if (cached) {
+        sessionStorage.setItem(RELOAD_KEY, "1");
+        location.reload();
+      }
+    }
+    startup();
   </script>
 </body>
 
