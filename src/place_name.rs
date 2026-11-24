@@ -66,7 +66,7 @@ impl PlaceNameCard {
             self.process.create(&env, &layout);
             if let Some(texture) = ui_overlay::name_texture(u32::from(index)) {
                 if let Ok(dvd) = root.read(texture.trim_start_matches('/')) {
-                    self.process.card.change_texture(dvd);
+                    self.process.card.change_texture(&dvd);
                 }
             }
             self.active = true;

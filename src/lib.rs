@@ -5420,7 +5420,7 @@ pub fn root_view(
         if let Some((entity, models)) = app.title_actor.zip(app.title_models.as_ref()) {
             if let Some(title) = app.sim.world.get::<sim::title::Title>(entity) {
                 let snapshot = app.snapshot();
-                let frame = view::build_title_frame(&snapshot, app.cam.clone(), title, models);
+                let frame = view::build_title_frame(&snapshot, app.cam.get(), title, models);
                 let desc = frame.desc.clone();
                 stack.push(Viewport3d(
                     frame,
