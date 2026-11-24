@@ -82,16 +82,21 @@ impl ItemMenuStage {
         if !world.contains_resource::<ui::MenuWindow>() {
             return;
         }
-        let screen = world.get::<crate::j2d::Screens>().and_then(|screens| {
-            screens
-                .cache
-                .iter()
-                .find(|(label, _)| label == ui::SCREEN_LABEL)
-                .map(|(_, screen)| screen.clone())
-        });
+        let screen = world
+            .get_resource::<crate::j2d::Screens>()
+            .and_then(|screens| {
+                screens
+                    .cache
+                    .iter()
+                    .find(|(label, _)| label == ui::SCREEN_LABEL)
+                    .map(|(_, screen)| screen.clone())
+            });
         let equipped = *world.resource::<crate::sim::inventory::Equipped>();
         let record = *world.resource::<ui::ItemRecord>();
-        let env = world.get::<ui::MenuEnv>().cloned().unwrap_or_default();
+        let env = world
+            .get_resource::<ui::MenuEnv>()
+            .cloned()
+            .unwrap_or_default();
         let mut out = std::mem::take(&mut *world.resource_mut::<ui::MenuOutput>());
         {
             let mut window = world.resource_mut::<ui::MenuWindow>();
