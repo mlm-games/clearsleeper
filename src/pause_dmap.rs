@@ -107,11 +107,7 @@ impl DMapStage {
         true
     }
 
-    pub fn step(
-        &mut self,
-        map: &mut ui::DungeonMap,
-        pad: &mut ui::PadInput,
-    ) -> Option<ui::MapDraw> {
+    pub fn step(map: &mut ui::DungeonMap, pad: &mut ui::PadInput) -> Option<ui::MapDraw> {
         let floors = NoFloors;
         let archives = crate::assets::load_msg_archives();
         let fonts = FontBank::default();

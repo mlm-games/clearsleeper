@@ -36,6 +36,32 @@ const START_BUTTON: Control = Control {
     center: [0.5, 0.075],
     radius: 0.038,
 };
+// Dusklight's touch layout exposes the full GameCube button set: X/Y/Z, L/R and the
+// menu pages, so the pause menu's assignment and tab keys work on touch too.
+const X_BUTTON: Control = Control {
+    center: [0.885, 0.555],
+    radius: 0.06,
+};
+const Y_BUTTON: Control = Control {
+    center: [0.785, 0.455],
+    radius: 0.055,
+};
+const Z_BUTTON: Control = Control {
+    center: [0.885, 0.375],
+    radius: 0.05,
+};
+const L_BUTTON: Control = Control {
+    center: [0.125, 0.45],
+    radius: 0.05,
+};
+const R_BUTTON: Control = Control {
+    center: [0.125, 0.30],
+    radius: 0.05,
+};
+const MENU_BUTTON: Control = Control {
+    center: [0.5, 0.16],
+    radius: 0.038,
+};
 
 const PAD_COLOR: [u8; 4] = [235, 235, 235, 110];
 const A_COLOR: [u8; 4] = [80, 140, 235, 150];
@@ -95,6 +121,35 @@ pub fn read(window: (u32, u32), touches: &[(u64, f32, f32)]) -> TouchFrame {
         if inside(point, window, &START_BUTTON) {
             frame.pad.hold.start = true;
             frame.keys.push(PhysicalKey::Escape);
+            continue;
+        }
+        if inside(point, window, &X_BUTTON) {
+            frame.pad.hold.x = true;
+            frame.keys.push(PhysicalKey::KeyX);
+            continue;
+        }
+        if inside(point, window, &Y_BUTTON) {
+            frame.pad.hold.y = true;
+            frame.keys.push(PhysicalKey::KeyY);
+            continue;
+        }
+        if inside(point, window, &Z_BUTTON) {
+            frame.pad.hold.z = true;
+            frame.keys.push(PhysicalKey::KeyZ);
+            continue;
+        }
+        if inside(point, window, &L_BUTTON) {
+            frame.pad.hold.l = true;
+            frame.keys.push(PhysicalKey::KeyO);
+            continue;
+        }
+        if inside(point, window, &R_BUTTON) {
+            frame.pad.hold.r = true;
+            frame.keys.push(PhysicalKey::KeyR);
+            continue;
+        }
+        if inside(point, window, &MENU_BUTTON) {
+            frame.keys.push(PhysicalKey::KeyI);
             continue;
         }
         if frame.stylus.is_none() {
@@ -299,6 +354,41 @@ fn draw(canvas: &mut Canvas, pad: &PadSnapshot) {
             },
         ],
     );
+    face_button(canvas, &X_BUTTON, A_COLOR, pad.hold.x, &GLYPH_X, window);
+    face_button(canvas, &Y_BUTTON, A_COLOR, pad.hold.y, &GLYPH_Y, window);
+    face_button(canvas, &Z_BUTTON, A_COLOR, pad.hold.z, &GLYPH_Z, window);
+    face_button(canvas, &L_BUTTON, B_COLOR, pad.hold.l, &GLYPH_L, window);
+    face_button(canvas, &R_BUTTON, B_COLOR, pad.hold.r, &GLYPH_R, window);
+    circle(
+        canvas,
+        center_px(&MENU_BUTTON, window),
+        radius_px(&MENU_BUTTON, window),
+        START_COLOR,
+    );
+}
+
+fn face_button(
+    canvas: &mut Canvas,
+    control: &Control,
+    color: [u8; 4],
+    held: bool,
+    letter: &[[u8; 3]; 5],
+    window: (u32, u32),
+) {
+    let center = center_px(control, window);
+    let radius = radius_px(control, window);
+    circle(
+        canvas,
+        center,
+        radius,
+        [
+            color[0],
+            color[1],
+            color[2],
+            if held { 220 } else { color[3] },
+        ],
+    );
+    glyph(canvas, center, radius, letter);
 }
 
 /// A circle with a rim, in the canvas's own pixels.
@@ -327,6 +417,11 @@ fn circle(canvas: &mut Canvas, center: Vec2, radius: f32, fill: [u8; 4]) {
 /// The letters, three cells wide and five tall, one bit per cell.
 const GLYPH_A: [[u8; 3]; 5] = [[0, 1, 0], [1, 0, 1], [1, 1, 1], [1, 0, 1], [1, 0, 1]];
 const GLYPH_B: [[u8; 3]; 5] = [[1, 1, 0], [1, 0, 1], [1, 1, 0], [1, 0, 1], [1, 1, 0]];
+const GLYPH_X: [[u8; 3]; 5] = [[1, 0, 1], [1, 0, 1], [0, 1, 0], [1, 0, 1], [1, 0, 1]];
+const GLYPH_Y: [[u8; 3]; 5] = [[1, 0, 1], [1, 0, 1], [0, 1, 0], [0, 1, 0], [0, 1, 0]];
+const GLYPH_Z: [[u8; 3]; 5] = [[1, 1, 1], [0, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1]];
+const GLYPH_L: [[u8; 3]; 5] = [[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 1, 1]];
+const GLYPH_R: [[u8; 3]; 5] = [[1, 1, 0], [1, 0, 1], [1, 1, 0], [1, 0, 1], [1, 0, 1]];
 
 /// Draw a letter in the middle of a button.
 fn glyph(canvas: &mut Canvas, center: Vec2, radius: f32, glyph: &[[u8; 3]; 5]) {

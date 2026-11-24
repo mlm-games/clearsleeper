@@ -72,9 +72,8 @@ impl ItemMenuStage {
     }
 
     pub fn draw_window(world: &mut World) -> Option<crate::ui_menu_item::WindowDraw> {
-        world
-            .resource_mut::<crate::ui_menu_item::MenuWindow>()
-            .map(|window| window.draw())
+        let mut window = world.resource_mut::<crate::ui_menu_item::MenuWindow>();
+        Some(window.draw())
     }
 
     /// Rasterise the port's quad/text descriptors onto the shared 640x480 canvas.
