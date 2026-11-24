@@ -31,6 +31,17 @@ impl Assets {
     fn font_slot(&self, name: &str) -> Option<usize> {
         self.names.iter().position(|entry| entry == name)
     }
+
+    /// The font bank named by this screen's BLO, for menu state machines that render text
+    /// through their own `FontBank` resource rather than this module's canvas helpers.
+    pub fn font_bank(&self) -> FontBank {
+        FontBank::with_fonts(
+            self.font_data
+                .iter()
+                .map(|bytes| ResFont::from_bytes(bytes))
+                .collect(),
+        )
+    }
 }
 
 pub fn load() -> Option<&'static Assets> {

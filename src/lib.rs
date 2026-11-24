@@ -1246,6 +1246,9 @@ impl App {
                         || key_pressed(held, &self.menu_prev, PhysicalKey::Tab) =>
                 {
                     self.menu.pause = menus::PauseState::default();
+                    if let Some(stage) = self.item_menu.as_mut() {
+                        stage.opened = false;
+                    }
                     self.menu.screen = menus::Screen::Pause;
                 }
                 menus::Screen::Playing if open_tab.is_some() => {
@@ -1253,6 +1256,9 @@ impl App {
                         tab: open_tab.unwrap_or_default(),
                         ..menus::PauseState::default()
                     };
+                    if let Some(stage) = self.item_menu.as_mut() {
+                        stage.opened = false;
+                    }
                     self.menu.screen = menus::Screen::Pause;
                 }
                 menus::Screen::Pause => {
@@ -4558,7 +4564,7 @@ impl App {
         let stage = self
             .item_menu
             .get_or_insert_with(pause_item::ItemMenuStage::default);
-        let writes = pause_item::ItemMenuStage::step(&mut self.sim.world, pad);
+        let writes = stage.step(&mut self.sim.world, pad);
         for (button, slot) in writes {
             self.sim
                 .world

@@ -10,6 +10,7 @@ use crate::sim;
 /// The port keeps its state in ECS resources so the same system the retail schedule uses can
 /// step it here; its `select_item_writes` are the X/Y/Z assignments the sim consumes.
 pub struct ItemMenuStage {
+    pub opened: bool,
     pub draw: Option<crate::ui_menu_item::WindowDraw>,
     pub image: Cell<Option<ImageHandle>>,
     pub uploaded: Cell<u64>,
@@ -19,6 +20,7 @@ pub struct ItemMenuStage {
 impl Default for ItemMenuStage {
     fn default() -> Self {
         Self {
+            opened: false,
             draw: None,
             image: Cell::new(None),
             uploaded: Cell::new(0),
@@ -45,6 +47,20 @@ impl ItemMenuStage {
             return;
         }
         world.insert_resource(screens);
+        let Ok(root) = crate::assets::AssetRoot::from_env() else {
+            return;
+        };
+        if let Some(blo) = crate::panes::Assets::load_from(
+            &root,
+            "files/res/Msg/itemres.arc",
+            None,
+            ui::SCREEN_LABEL,
+        ) {
+            let fonts = blo.font_bank();
+            if fonts.len() != 0 {
+                world.insert_resource(fonts);
+            }
+        }
         world.insert_resource(crate::assets::load_msg_archives());
         world.insert_resource(ui::MenuWindow::new());
         world.insert_resource(ui::PadState::default());
@@ -55,14 +71,48 @@ impl ItemMenuStage {
         world.insert_resource(ui::MenuOutput::default());
     }
 
-    /// One frame of the ported state machine. Returns the button→slot writes it produced.
-    pub fn step(world: &mut World, pad: crate::ui_menu_item::PadState) -> Vec<(u8, u8)> {
+    /// Open the ported window directly. `menu_window_step` only opens on a Start edge, but the
+    /// shell turns Escape into B on every non-Title screen, so the pause key can never reach it.
+    /// Create the item page and enter `STATE_ITEM_OPEN` here instead
+    /// (`d_menu_window.cpp:1509-1539`; the retail `dMs_item_create` call is `item_create`).
+    pub fn open(&mut self, world: &mut World) {
         use crate::ui_menu_item as ui;
+        Self::install(world);
+        self.opened = true;
         if !world.contains_resource::<ui::MenuWindow>() {
-            Self::install(world);
-            if !world.contains_resource::<ui::MenuWindow>() {
-                return Vec::new();
-            }
+            return;
+        }
+        let screen = world.get::<crate::j2d::Screens>().and_then(|screens| {
+            screens
+                .cache
+                .iter()
+                .find(|(label, _)| label == ui::SCREEN_LABEL)
+                .map(|(_, screen)| screen.clone())
+        });
+        let equipped = *world.resource::<crate::sim::inventory::Equipped>();
+        let record = *world.resource::<ui::ItemRecord>();
+        let env = world.get::<ui::MenuEnv>().cloned().unwrap_or_default();
+        let mut out = std::mem::take(&mut *world.resource_mut::<ui::MenuOutput>());
+        {
+            let mut window = world.resource_mut::<ui::MenuWindow>();
+            window.item_create(screen.as_ref(), &equipped, &record, &env, &mut out);
+            window.state = ui::STATE_ITEM_OPEN;
+            window.flag_set(ui::WINDOW_DRAW_ON);
+            window.menu_status = ui::MENU_STATUS_ITEM;
+            window.open_timer = 0;
+        }
+        *world.resource_mut::<ui::MenuOutput>() = out;
+    }
+
+    /// One frame of the ported state machine. Returns the button→slot writes it produced.
+    pub fn step(&mut self, world: &mut World, pad: crate::ui_menu_item::PadState) -> Vec<(u8, u8)> {
+        use crate::ui_menu_item as ui;
+        Self::install(world);
+        if !world.contains_resource::<ui::MenuWindow>() {
+            return Vec::new();
+        }
+        if !self.opened {
+            self.open(world);
         }
         *world.resource_mut::<ui::PadState>() = pad;
         if world.run_system_cached(ui::menu_window_step).is_err() {
