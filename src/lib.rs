@@ -223,6 +223,11 @@ pub struct App {
     save_dir: PathBuf,
     name: String,
     menu_prev: HashSet<PhysicalKey>,
+    /// Frames to ignore pause-close after opening; Escape is remapped to B in menus, so a
+    /// slightly long hold would otherwise close the menu on the very next frame.
+    pause_close_guard: u8,
+    /// File-select action waiting for the retail slide-out animation to finish.
+    pending_file_action: Option<menus::Action>,
     pad_prev: input::ButtonBits,
     sampled_pad: input::PadSnapshot,
     menu_clock: Duration,
@@ -310,6 +315,7 @@ struct GameOverStage {
 }
 
 struct AlbumStage {
+    return_screen: menus::Screen,
     album: crate::ui_menu_collect::AlbumBox,
     host: crate::ui_menu_collect::AlbumHost,
     tune: crate::ui_menu_collect::AlbumTune,
@@ -359,6 +365,7 @@ impl App {
         let mut picture_num = input.picture_num;
         host.create(&mut picture_num, &mut out);
         self.album = Some(AlbumStage {
+            return_screen: self.menu.screen,
             album,
             host,
             tune: crate::ui_menu_collect::AlbumTune::default(),
@@ -489,7 +496,9 @@ impl App {
         }
         if stage.album.get_status() == crate::ui_menu_collect::STATE_CLOSED || out.photo_box_cancel
         {
-            self.menu.screen = menus::Screen::Playing;
+            // Return to the screen the album was opened from: the collection tab resumes
+            // the menu (tww d_menu_collect.cpp:3897-3913), gameplay resumes the world.
+            self.menu.screen = stage.return_screen;
             self.album = None;
             return;
         }
@@ -668,6 +677,8 @@ impl App {
             save_dir: save::slots_dir(),
             name: save::DEFAULT_NAME.to_string(),
             menu_prev: HashSet::new(),
+            pause_close_guard: 0,
+            pending_file_action: None,
             pad_prev: input::ButtonBits::default(),
             sampled_pad: input::PadSnapshot::default(),
             menu_clock: Duration::ZERO,
@@ -1246,6 +1257,7 @@ impl App {
                         || key_pressed(held, &self.menu_prev, PhysicalKey::Tab) =>
                 {
                     self.menu.pause = menus::PauseState::default();
+                    self.pause_close_guard = 2;
                     if let Some(stage) = self.item_menu.as_mut() {
                         stage.opened = false;
                     }
@@ -1256,6 +1268,7 @@ impl App {
                         tab: open_tab.unwrap_or_default(),
                         ..menus::PauseState::default()
                     };
+                    self.pause_close_guard = 2;
                     if let Some(stage) = self.item_menu.as_mut() {
                         stage.opened = false;
                     }
@@ -1299,8 +1312,27 @@ impl App {
     ) {
         let pressed =
             |key: PhysicalKey| window_focused && held.contains(&key) && !prev.contains(&key);
+        if self.pause_close_guard > 0 {
+            self.pause_close_guard -= 1;
+            return;
+        }
         let keys = self.sim.world.resource::<sim::intent::PadButtons>().trig;
-        if pressed(PhysicalKey::Escape) || keys.b || keys.start {
+        // Retail gates close on the item page having no note or subwindow open
+        // (d_menu_window.cpp:1682, d_menu_item.cpp:2145-2147); let the ported state
+        // machine consume B in that case instead of dropping the whole menu.
+        let ported_busy = self.menu.pause.tab == 0
+            && self
+                .sim
+                .world
+                .get_resource::<crate::ui_menu_item::MenuWindow>()
+                .is_some_and(|window| {
+                    window.state != crate::ui_menu_item::STATE_NO_MENU
+                        && window
+                            .item
+                            .as_ref()
+                            .is_some_and(|item| item.note_check() || item.sub_win)
+                });
+        if !ported_busy && (pressed(PhysicalKey::Escape) || keys.b || keys.start) {
             if self.menu.pause.assigning {
                 self.menu.pause.assigning = false;
             } else {
@@ -1308,15 +1340,11 @@ impl App {
             }
             return;
         }
-        if pressed(PhysicalKey::KeyO) || keys.l {
+        // Retail's L/R flip between the item and collection pages
+        // (d_menu_window.cpp:1692-1743), not a linear cycle through every tab.
+        if pressed(PhysicalKey::KeyO) || keys.l || pressed(PhysicalKey::KeyR) || keys.r {
             let pause = &mut self.menu.pause;
-            pause.tab = (pause.tab + menus::PAUSE_TABS.len() - 1) % menus::PAUSE_TABS.len();
-            pause.cursor = 0;
-            pause.assigning = false;
-        }
-        if pressed(PhysicalKey::KeyR) || keys.r {
-            let pause = &mut self.menu.pause;
-            pause.tab = (pause.tab + 1) % menus::PAUSE_TABS.len();
+            pause.tab = if pause.tab == 0 { 5 } else { 0 };
             pause.cursor = 0;
             pause.assigning = false;
         }
@@ -1334,42 +1362,6 @@ impl App {
             // The collection tab opens the photo album (`d_menu_window.cpp:813-890`).
             self.open_album();
             return;
-        }
-        // On the ITEM tab the ported retail state machine owns A/X/Y/Z; the shell-level
-        // assignment is only the fallback for the other tabs.
-        if a && self.menu.pause.tab != 0 && !self.menu.pause.assigning {
-            self.menu.pause.assigning = true;
-            self.menu.pause.button = 0;
-        }
-        let assigned = if pressed(PhysicalKey::KeyX) || keys.x {
-            Some(0)
-        } else if pressed(PhysicalKey::KeyY) || keys.y {
-            Some(1)
-        } else if pressed(PhysicalKey::KeyZ) || keys.z {
-            Some(2)
-        } else {
-            None
-        };
-        if self.menu.pause.assigning && self.menu.pause.tab != 0 {
-            if let Some(button) = assigned {
-                let equipped = *self.sim.world.resource::<sim::inventory::Equipped>();
-                let mut owned: Vec<(usize, u8)> = (0..sim::inventory::SLOT_COUNT)
-                    .filter_map(|slot| {
-                        let item = equipped.item(slot);
-                        (item != sim::inventory::NO_ITEM).then_some((slot, item))
-                    })
-                    .collect();
-                owned.sort_by_key(|(_, item)| *item);
-                let selected = owned
-                    .get(self.menu.pause.cursor)
-                    .map(|(slot, _)| *slot as u8)
-                    .unwrap_or(sim::inventory::NO_ITEM);
-                self.sim
-                    .world
-                    .resource_mut::<sim::inventory::ItemSelect>()
-                    .assign(button, selected);
-                self.menu.pause.assigning = false;
-            }
         }
     }
 
@@ -1429,6 +1421,18 @@ impl App {
     /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
     /// save.
     fn stage_file_select(&mut self) {
+        if let Some(action) = self.pending_file_action {
+            // Retail slides the panes out before the chosen file starts
+            // (tww d_file_select.cpp:294-357, HD d_file_select.cpp:1141-1150).
+            if self.menu.fs.close() {
+                self.pending_file_action = None;
+                self.apply_menu_action(Some(action));
+            }
+            self.menu
+                .revision
+                .set(self.menu.revision.get().wrapping_add(1));
+            return;
+        }
         if !self.menu.tick_file_select() {
             return;
         }
@@ -1437,7 +1441,7 @@ impl App {
         fs.move_step(&pad, card, None);
         if let Some(slot) = self.menu.fs.slot_picked.take() {
             let action = self.menu.file_select_pick(slot);
-            self.apply_menu_action(Some(action));
+            self.pending_file_action = Some(action);
             return;
         }
         if self.menu.fs.is_select_end() == crate::ui_file_select::SELECT_END_RETURN {
@@ -4545,13 +4549,15 @@ impl App {
         let trig = self.sim.world.resource::<sim::intent::PadButtons>().trig;
         let hold = self.sampled_pad.hold;
         let axis = self.sampled_pad.move_axis;
+        // Retail's menu reads press edges for face buttons (`d_menu_item.cpp:2148-2182`,
+        // `d_menu_fmap2.cpp:769,1674`); levels would repeat assignment and note close.
         let pad = PadState {
-            a: hold.a || trig.a,
-            b: hold.b || trig.b,
-            z: hold.z || trig.z,
-            x: hold.x || trig.x,
-            y: hold.y || trig.y,
-            start: hold.start || trig.start,
+            a: trig.a,
+            b: trig.b,
+            z: trig.z,
+            x: trig.x,
+            y: trig.y,
+            start: trig.start,
             up: axis.y > 0.5,
             down: axis.y < -0.5,
             left: axis.x < -0.5,
@@ -4581,9 +4587,10 @@ impl App {
         use crate::ui_menu_fmap2::ChartPadInput;
         let hold = self.sampled_pad.hold;
         let axis = self.sampled_pad.move_axis;
+        let trig = self.sim.world.resource::<sim::intent::PadButtons>().trig;
         let pad = ChartPadInput {
-            trig_a: hold.a,
-            trig_b: hold.b,
+            trig_a: trig.a,
+            trig_b: trig.b,
             lock_l: hold.l,
             lock_r: hold.r,
             stick_value: axis.length(),

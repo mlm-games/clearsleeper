@@ -1375,7 +1375,18 @@ impl FileSelect {
                     );
                     summary.extra = self.data_extra[index] == 1;
                     summary.name = save.name.clone();
-                    summary.date = ticks_to_date(save.tick);
+                    // Retail shows the save's wall-clock time (tww d_file_select.cpp:3453-3467);
+                    // the 2000-01-01 epoch used by ticks_to_calendar is 946684800 unix seconds.
+                    // Old saves without the stamp fall back to play time.
+                    summary.date = if save.saved_at > 946_684_800 {
+                        ticks_to_date(
+                            save.saved_at
+                                .saturating_sub(946_684_800)
+                                .saturating_mul(SIM_HZ as u64),
+                        )
+                    } else {
+                        ticks_to_date(save.tick)
+                    };
                     summary.new_game = save.name.is_empty();
                     summary.broken = false;
                     self.summary[index] = summary;

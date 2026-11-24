@@ -170,7 +170,10 @@ impl Menu {
             })
             .collect();
         self.fs.set_save_data(&self.card);
-        self.fs.select_num = self.slot as u8;
+        // Both trees reset focus to the first slot on entry (tww d_file_select.cpp:138,
+        // HD d_file_select.cpp:528-535); the last-played slot is not the starting cursor.
+        self.slot = 0;
+        self.fs.select_num = 0;
     }
 
     /// Follows the menu cursor so the highlighted slot matches the drawn pane.

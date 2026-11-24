@@ -76,6 +76,9 @@ pub struct SaveGame {
     #[serde(default = "default_name")]
     pub name: String,
     pub tick: u64,
+    /// Wall-clock time of the last save, as unix seconds; the file-select date uses it.
+    #[serde(default)]
+    pub saved_at: u64,
     pub camera_yaw: f32,
     pub player: SavedPlayer,
     pub area: SavedArea,
@@ -409,6 +412,9 @@ impl App {
             version: SAVE_VERSION,
             name: self.name.clone(),
             tick,
+            saved_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs()),
             camera_yaw,
             player: (&player).into(),
             area: (&area).into(),

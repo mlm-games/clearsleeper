@@ -202,7 +202,7 @@ pub fn view(app: &crate::App) -> View {
         true,
     ));
     children.push(label(
-        "L/R/O: tab   Arrows/WASD: cursor   Q/Space: choose   X/Y/Z: assign   V/B: close"
+        "L/R: item<->collection   Arrows/WASD: cursor   Q/Space: choose   X/Y/Z: assign   V/B: close"
             .to_string(),
         false,
         true,

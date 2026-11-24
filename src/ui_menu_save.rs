@@ -1181,6 +1181,7 @@ pub fn blank_save() -> SaveGame {
         photo_details: [0; 3],
         name: String::new(),
         tick: 0,
+        saved_at: 0,
         camera_yaw: 0.0,
         player: crate::save::SavedPlayer {
             pos: [0.0; 3],

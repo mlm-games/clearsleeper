@@ -32,6 +32,12 @@ impl Default for ItemMenuStage {
 impl ItemMenuStage {
     pub fn install(world: &mut World) {
         use crate::ui_menu_item as ui;
+        // The stage is re-entered every frame; recreating MenuWindow here would discard the
+        // open page and its cursor before the state machine could advance.
+        // `d_menu_window.cpp:710` constructs dMi_c once per session.
+        if world.contains_resource::<ui::MenuWindow>() {
+            return;
+        }
 
         let Ok(root) = crate::assets::AssetRoot::from_env() else {
             return;
