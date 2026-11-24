@@ -46,6 +46,7 @@ pub mod pause_dmap;
 pub mod pause_item;
 pub mod pause_menu;
 pub mod pause_seamap;
+pub mod place_name;
 pub mod quit;
 pub mod report;
 pub mod save;
@@ -261,6 +262,7 @@ pub struct App {
     chart_menu: Option<pause_chart::ChartStage>,
     dmap: Option<pause_dmap::DMapStage>,
     seamap: Option<pause_seamap::SeaMapStage>,
+    place_name: Option<place_name::PlaceNameCard>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
     pending_slot: Option<usize>,
@@ -737,6 +739,7 @@ impl App {
             chart_menu: Some(pause_chart::ChartStage::default()),
             dmap: Some(pause_dmap::DMapStage::default()),
             seamap: Some(pause_seamap::SeaMapStage::default()),
+            place_name: Some(place_name::PlaceNameCard::default()),
             game_over_failed: false,
             title_actor: None,
             pending_slot: None,
@@ -4582,6 +4585,10 @@ impl App {
     pub fn advance(&mut self, dt: Duration) -> u32 {
         self.frame += 1;
         self.log_input();
+        let request = *self.sim.world.resource::<sim::event::PlaceNameRequest>();
+        if let Some(card) = self.place_name.as_mut() {
+            card.step(request.index, request.sequence);
+        }
         if self.intro.is_some() {
             self.step_intro(dt);
             self.clear_pad_edges();
@@ -5984,9 +5991,14 @@ pub fn root_view(
         | menus::Screen::Movie
         | menus::Screen::ClearSave => Spacer(),
     };
+    let place_name = app
+        .place_name
+        .as_ref()
+        .map_or(Spacer(), |card| card.view(ctx));
     ZStack(Modifier::new().fill_max_size()).child([
         viewport,
         overlay,
+        place_name,
         dialogue_view(app, ctx),
         app.touch.view(ctx),
     ])

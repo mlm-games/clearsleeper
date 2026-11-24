@@ -1982,6 +1982,8 @@ pub fn build(
         .insert_resource(crate::assets::load_ba_anms().unwrap_or_default());
     sim.world.insert_resource(msg::MsgBox::default());
     sim.world
+        .insert_resource(event::PlaceNameRequest::default());
+    sim.world
         .insert_resource(crate::assets::load_msg_table().unwrap_or_default());
     sim.world.insert_resource(death::GameOver::default());
     sim.world.insert_resource(transition::NextStage::default());

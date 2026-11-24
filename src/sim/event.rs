@@ -62,6 +62,14 @@ const DIRECTOR_ACTIONS: &[&str] = &[
     "PLAYER_DRAW",
     "PLAYER_NODRAW",
 ];
+/// The `dComIfGp_setStageNameOn(tlpNo)` request from a `TELOP_ON` cut
+/// (tww/src/d/d_event_data.cpp:321-322, d_com_inf_game.h:303-307).
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct PlaceNameRequest {
+    pub index: u8,
+    pub sequence: u32,
+}
+
 const MESSAGE_ACTIONS: &[&str] = &[
     "WAIT",
     "CREATE_MSG",
@@ -985,6 +993,8 @@ pub struct StageIo<'w> {
     pub wipe: ResMut<'w, Wipe>,
     pub vibration: ResMut<'w, Vibration>,
     pub events: ResMut<'w, SimEvents>,
+    /// `TELOP_ON`'s `tlpNo`, consumed by the shell's place-name card.
+    pub place_name: ResMut<'w, PlaceNameRequest>,
     /// `dPa_control_c::getEmitterManager()`, the manager `JStudio_JParticle::TCreateObject` was
     /// built around (`d_demo.cpp:688`).
     pub jpa: ResMut<'w, Jpa>,
@@ -1105,6 +1115,7 @@ pub fn control(
                 &mut io.jpa,
                 &mut props,
                 &mut io.day,
+                &mut io.place_name,
             );
         }
     }
@@ -3623,6 +3634,7 @@ fn special_proc(
     jpa: &mut super::jpa::Jpa,
     props: &mut Props<'_, '_, '_>,
     day: &mut super::daynight::DayNight,
+    place_name: &mut PlaceNameRequest,
 ) {
     let Some(staff) = list.staffs.get(run.staff) else {
         return;
@@ -3636,7 +3648,7 @@ fn special_proc(
         STAFF_LIGHT => light(run, list, flags, day),
         STAFF_TIMEKEEPER => timekeeper(run, list, flags),
         STAFF_DIRECTOR => director(run, list, flags, next, props, day),
-        STAFF_MESSAGE => message(run, list, flags, msg, table),
+        STAFF_MESSAGE => message(run, list, flags, msg, table, place_name),
         STAFF_SOUND => sound(run, list, flags, props),
         STAFF_PACKAGE => package(run, list, flags, story, next, props, msg, table, jpa, day),
         _ => {}
@@ -4108,8 +4120,15 @@ fn message(
     flags: &mut EventFlags,
     msg: &mut MsgBox,
     table: &MsgTable,
+    place_name: &mut PlaceNameRequest,
 ) {
     let action = act_index(run, list, MESSAGE_ACTIONS);
+    if action == 7 && run.advance > 0 {
+        // TELOP_ON: publish the place-name index for the shell to draw.
+        let index = list.cut_number(run.cut as usize, "tlpNo").unwrap_or(0) as u8;
+        place_name.index = index;
+        place_name.sequence = place_name.sequence.wrapping_add(1);
+    }
     if run.advance > 0 {
         match action {
             0 | 7 => wait_start(run, list),
