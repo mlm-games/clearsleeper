@@ -43,7 +43,7 @@ pub fn view(menu: &Menu) -> View {
     #[cfg(target_arch = "wasm32")]
     let labels: &[&str] = &["Load Disc", "Settings", "Quit"];
     #[cfg(not(target_arch = "wasm32"))]
-    let labels: &[&str] = crate::menus::TITLE_ITEMS;
+    let labels: &[&str] = &crate::menus::TITLE_ITEMS;
 
     let mut buttons = Vec::with_capacity(labels.len());
     for (index, label) in labels.iter().enumerate() {
@@ -84,13 +84,16 @@ pub fn view(menu: &Menu) -> View {
         status_line("VERSION", env!("CARGO_PKG_VERSION")),
     ];
 
-    let page_status = crate::web::disc_status();
-    if !page_status.is_empty() {
-        children.push(
-            Text(page_status)
-                .size(Sp(16.0))
-                .color(Color::from_hex(CURSOR_HEX)),
-        );
+    #[cfg(target_arch = "wasm32")]
+    {
+        let page_status = crate::web::disc_status();
+        if !page_status.is_empty() {
+            children.push(
+                Text(page_status)
+                    .size(Sp(16.0))
+                    .color(Color::from_hex(CURSOR_HEX)),
+            );
+        }
     }
     children.push(
         Text("Up/Down or stick: move   A/Space: choose   B/Esc: back".to_string())
