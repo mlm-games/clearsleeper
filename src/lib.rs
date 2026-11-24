@@ -5432,9 +5432,7 @@ pub fn root_view(
                 ));
             }
         }
-        // Native start UI (Dusklight prelaunch style) over the 3D title scene, instead of
-        // compositing the retail BLO panes onto a canvas.
-        stack.push(start_ui::view(&app.menu));
+        stack.push(title_screen_view(app, ctx));
         stack.push(app.touch.view(ctx));
         return ZStack(Modifier::new().fill_max_size()).child(stack);
     }
@@ -6145,7 +6143,7 @@ fn chart_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::
 /// Dusklight's own launcher keeps. Once a disc is installed [`root_view`] never reaches here.
 fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::View {
     match app.menu.screen {
-        menus::Screen::Title => menus::title_view(&app.menu),
+        menus::Screen::Title => start_ui::view(&app.menu),
         menus::Screen::Settings => menus::settings_view(&app.menu),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
         // A session only starts with an asset source (`start_new`), and the retail file

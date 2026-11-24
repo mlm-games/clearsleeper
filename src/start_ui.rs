@@ -1,10 +1,11 @@
 //! Native start UI, following Dusklight's prelaunch screen (`dusklight/src/dusk/ui/prelaunch.cpp`):
 //! a menu column, a disc-status panel and a version line, built from repose views rather than
-//! composited BLO panes. The title's 3D ship remains behind it in `root_view`.
+//! composited BLO panes. Shown by the pre-boot shell before a disc is installed; the retail
+//! title's logo panes stay on the in-game `Screen::Title`.
 
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
 use repose_material::material3::{Button, ButtonConfig, TextButton};
-use repose_ui::{Column, Row, Text, TextStyle, ViewExt};
+use repose_ui::{Column, Row, Text, ViewExt};
 
 use crate::menus::{Menu, TITLE_ITEMS};
 
@@ -56,13 +57,16 @@ pub fn view(menu: &Menu) -> View {
         ));
     }
 
-    let disc = crate::assets::AssetRoot::from_env()
-        .ok()
-        .and_then(|root| root.read_archive("files/res/Msg/fmapres.arc").ok())
-        .map_or_else(
-            || "no disc".to_string(),
-            |_| "GZLE01 · The Wind Waker".to_string(),
-        );
+    let disc = match crate::assets::installed_disc_summary() {
+        Some(summary) => match summary.title {
+            Some(title) => format!("{} · {title}", summary.game_id),
+            None => summary.game_id,
+        },
+        None => match crate::assets::AssetRoot::from_env() {
+            Ok(_) => "development tree".to_string(),
+            Err(_) => "no disc".to_string(),
+        },
+    };
 
     Column(Modifier::new().gap(18.dp()).padding(28.dp())).child([
         Text("The Legend of Zelda".to_string())
@@ -74,6 +78,11 @@ pub fn view(menu: &Menu) -> View {
         Column(Modifier::new().gap(10.dp())).child(buttons),
         status_line("DISC", &disc),
         status_line("VERSION", env!("CARGO_PKG_VERSION")),
+        Text(
+            "Pass --disc <image>, put disc.iso beside the app, or drop the image here".to_string(),
+        )
+        .size(Sp(14.0))
+        .color(Color::from_hex(DIM_HEX)),
         Text("Up/Down or stick: move   A/Space: choose   B/Esc: back".to_string())
             .size(Sp(14.0))
             .color(Color::from_hex(DIM_HEX)),

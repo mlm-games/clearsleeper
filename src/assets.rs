@@ -174,6 +174,11 @@ fn installed_disc() -> Option<Arc<DiscImage>> {
     slot.clone()
 }
 
+/// The installed image's identity for the start UI's disc panel.
+pub fn installed_disc_summary() -> Option<DiscSummary> {
+    installed_disc().map(|image| image.summary())
+}
+
 fn open_rel(bytes: Vec<u8>, path: PathBuf) -> Result<Rel, AssetError> {
     if bytes.len() >= 4 && bytes[..4] == YAZ0_MAGIC {
         let raw = yaz0_decode(&bytes, &path)?;
