@@ -10,6 +10,16 @@ const CURSOR_HEX: &str = "#FFD86B";
 const PANEL_HEX: &str = "#0B1522";
 const PANEL_ALPHA: u8 = 190;
 
+fn tab(text: String, cursor: bool) -> View {
+    let color = if cursor {
+        Color::from_hex(CURSOR_HEX)
+    } else {
+        Color::from_hex(DIM_HEX)
+    };
+    let marker = if cursor { ">" } else { " " };
+    Text(format!("{marker}{text}")).size(Sp(15.0)).color(color)
+}
+
 fn label(text: String, cursor: bool, dim: bool) -> View {
     let color = if cursor {
         Color::from_hex(CURSOR_HEX)
@@ -66,13 +76,9 @@ pub fn view(app: &crate::App) -> View {
     children.push(heading("PAUSE"));
     let mut tabs = Vec::new();
     for (index, name) in PAUSE_TABS.iter().enumerate() {
-        tabs.push(label(
-            name.to_string(),
-            index == pause.tab,
-            index != pause.tab,
-        ));
+        tabs.push(tab(name.to_string(), index == pause.tab));
     }
-    children.push(Row(Modifier::new().gap(18.dp()).hit_passthrough()).child(tabs));
+    children.push(Row(Modifier::new().gap(8.dp()).hit_passthrough()).child(tabs));
 
     match pause.tab {
         0 => {

@@ -1336,9 +1336,18 @@ impl FileSelect {
                     self.data_broken[index] = 0;
                     self.data_extra[index] = 0;
                     self.data_extra_link[index] = 0;
+                    // A blank slot starts with three full hearts like a new save
+                    // (tww d_save.cpp:25-28; HD d_file_select.cpp:745-747). Only the
+                    // display summary was empty; `blank_save()` carries the real values.
+                    let blank = SlotSummary::from_save(&crate::ui_menu_save::blank_save());
                     self.summary[index] = SlotSummary {
                         name: SLOT_NEW_NAME.to_string(),
                         new_game: true,
+                        hearts: blank.hearts,
+                        heart_rem: blank.heart_rem,
+                        max_hearts: blank.max_hearts,
+                        heart_shown: blank.heart_shown,
+                        heart_texture: blank.heart_texture,
                         ..Default::default()
                     };
                 }
@@ -2033,10 +2042,10 @@ impl FileSelect {
                 ),
                 (
                     grey(self.colors.erase_black[0].a),
-                    pale(self.colors.erase_white[1].a),
+                    pale(self.colors.erase_white[0].a),
                 ),
                 (
-                    grey(self.colors.erase_black[0].a),
+                    grey(self.colors.erase_black[1].a),
                     pale(self.colors.erase_white[1].a),
                 ),
             )
@@ -2075,7 +2084,7 @@ impl FileSelect {
             }
             _ => {
                 self.panes.slots.key[2][0].pane_trans(0.0, self.slide);
-                if self.panes.slots.slot_mark[0].is_visible() {
+                if self.panes.slots.slot_mark[2].is_visible() {
                     self.panes.slots.slot_mark[2].pane_trans(0.0, self.slide);
                     self.panes.slots.slot_mark_key[2].pane_trans(0.0, self.slide);
                 }
