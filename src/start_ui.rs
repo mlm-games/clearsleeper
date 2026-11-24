@@ -5,7 +5,7 @@
 
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
 use repose_material::material3::{Button, ButtonConfig, TextButton};
-use repose_ui::{Column, Row, Text, ViewExt};
+use repose_ui::{Center, Column, Row, Text, ViewExt};
 
 use crate::menus::{Menu, TITLE_ITEMS};
 
@@ -45,7 +45,7 @@ fn status_line(label: &str, value: &str) -> View {
     ])
 }
 
-/// The native start screen shown over the title's 3D scene.
+/// The native prelaunch screen the shell shows before a disc is installed.
 pub fn view(menu: &Menu) -> View {
     let mut buttons = Vec::with_capacity(TITLE_ITEMS.len());
     for (index, label) in TITLE_ITEMS.iter().enumerate() {
@@ -68,26 +68,35 @@ pub fn view(menu: &Menu) -> View {
         },
     };
 
-    Column(Modifier::new().gap(18.dp()).padding(28.dp())).child([
-        Text("The Legend of Zelda".to_string())
-            .size(Sp(20.0))
-            .color(Color::from_hex(ACCENT_HEX)),
-        Text("The Wind Waker".to_string())
-            .size(Sp(48.0))
-            .color(Color::from_hex(TITLE_HEX)),
-        Column(Modifier::new().gap(10.dp())).child(buttons),
-        status_line("DISC", &disc),
-        status_line("VERSION", env!("CARGO_PKG_VERSION")),
-        Text(
-            "Pass --disc <image>, put disc.iso beside the app, or drop the image here".to_string(),
+    Center(Modifier::new().fill_max_size().hit_passthrough()).child(
+        Column(
+            Modifier::new()
+                .gap(18.dp())
+                .padding(28.dp())
+                .hit_passthrough(),
         )
-        .size(Sp(14.0))
-        .color(Color::from_hex(DIM_HEX)),
-        Text("Up/Down or stick: move   A/Space: choose   B/Esc: back".to_string())
+        .child([
+            Text("The Legend of Zelda".to_string())
+                .size(Sp(20.0))
+                .color(Color::from_hex(ACCENT_HEX)),
+            Text("The Wind Waker".to_string())
+                .size(Sp(48.0))
+                .color(Color::from_hex(TITLE_HEX)),
+            Column(Modifier::new().gap(10.dp())).child(buttons),
+            status_line("DISC", &disc),
+            status_line("VERSION", env!("CARGO_PKG_VERSION")),
+            Text(
+                "Pass --disc <image>, put disc.iso beside the app, or drop the image here"
+                    .to_string(),
+            )
             .size(Sp(14.0))
             .color(Color::from_hex(DIM_HEX)),
-        Text("Touch: D-pad + A/B/Start   Gamepad: stick + face buttons".to_string())
-            .size(Sp(14.0))
-            .color(Color::from_hex(DIM_HEX)),
-    ])
+            Text("Up/Down or stick: move   A/Space: choose   B/Esc: back".to_string())
+                .size(Sp(14.0))
+                .color(Color::from_hex(DIM_HEX)),
+            Text("Touch: D-pad + A/B/Start   Gamepad: stick + face buttons".to_string())
+                .size(Sp(14.0))
+                .color(Color::from_hex(DIM_HEX)),
+        ]),
+    )
 }
