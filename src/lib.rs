@@ -743,7 +743,10 @@ impl App {
             place_name: Some(place_name::PlaceNameCard::default()),
             game_over_failed: false,
             title_actor: None,
-            title_models: None, // diagnostic: bisect boot crash
+            title_models: {
+                crate::web::boot_step("title-models");
+                view::TitleModels::load()
+            },
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,
@@ -752,7 +755,8 @@ impl App {
             dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
-        // diagnostic: message-screen binding disabled
+        crate::web::boot_step("message-bindings");
+        text::overlay::bind_message_screens(&mut app.sim.world);
         #[cfg(not(target_arch = "wasm32"))]
         {
             app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
@@ -767,6 +771,7 @@ impl App {
                 uploaded: Cell::new(0),
                 revision: 0,
             });
+        crate::web::boot_step("meter-assets");
         app.meter = assets::AssetRoot::from_env()
             .ok()
             .and_then(|root| meter_hud::MeterAssets::load(&root))
@@ -5342,7 +5347,9 @@ pub fn run() {
         }
     }
 
+    crate::web::boot_step("new_live");
     let mut app = App::new_live();
+    crate::web::boot_step("new_live-done");
     let mut last = Instant::now();
     let root = move |sched: &mut repose_core::runtime::Scheduler,
                      ctx: &repose_core::RenderContext| {
@@ -5368,6 +5375,7 @@ pub fn run() {
         repame_shell::run_desktop("clearsleeper", size, root)
             .expect("clearsleeper failed to start");
     }
+    crate::web::boot_step("run-web");
     #[cfg(target_arch = "wasm32")]
     {
         let _ = repame_shell::run_web(root);

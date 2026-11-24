@@ -47,6 +47,19 @@ pub fn install_disc_image(bytes: Vec<u8>) -> Result<String, JsValue> {
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen(inline_js = "
+export function clearsleeper_boot_step(step) { document.title = 'CS: ' + step; }
+")]
+extern "C" {
+    fn clearsleeper_boot_step(step: &str);
+}
+
+/// Visible boot marker for diagnosing traps that carry no panic message.
+pub fn boot_step(step: &str) {
+    #[cfg(target_arch = "wasm32")]
+    clearsleeper_boot_step(step);
+}
+
 /// Start the shell loop over the installed image.
 #[wasm_bindgen(js_name = boot)]
 pub fn boot() {
