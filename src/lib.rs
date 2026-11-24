@@ -743,7 +743,7 @@ impl App {
             place_name: Some(place_name::PlaceNameCard::default()),
             game_over_failed: false,
             title_actor: None,
-            title_models: view::TitleModels::load(),
+            title_models: None, // diagnostic: bisect boot crash
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,

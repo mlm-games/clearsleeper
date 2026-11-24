@@ -943,8 +943,9 @@ fn skin_binding(
                 .ok_or(BdlError::Envelope)?
         } else {
             // Without an `EVP1` the skin matrix falls back to the joint's bind world, so the
-            // vertex leaves the joint's space through that one.
-            joint_matrices[joint]
+            // vertex leaves the joint's space through that one. Bounds-check: the title
+            // archives carry envelopes whose target need not have a JNT1 row of its own.
+            *joint_matrices.get(joint).ok_or(BdlError::Range)?
         });
         return Ok(binding);
     }
