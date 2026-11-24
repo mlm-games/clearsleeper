@@ -27,6 +27,15 @@ impl ui::StageFloors for NoFloors {
     }
 }
 
+/// Live facts the ported map needs, gathered from the sim by the caller.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DMapFacts {
+    pub dungeon_item: u8,
+    pub player_pos: [f32; 3],
+    pub visited_room: [u8; ui::VISITED_ROOM_WORDS],
+    pub stay_room: i32,
+}
+
 /// The ported dungeon map (`d_menu_dmap.cpp`), driven from the pause menu's MAP tab.
 pub struct DMapStage {
     pub map: ui::DungeonMap,
@@ -51,7 +60,7 @@ impl Default for DMapStage {
 }
 
 impl DMapStage {
-    pub fn create(map: &mut ui::DungeonMap) -> bool {
+    pub fn create(map: &mut ui::DungeonMap, facts: &DMapFacts) -> bool {
         let Ok(root) = crate::assets::AssetRoot::from_env() else {
             return false;
         };
@@ -76,18 +85,18 @@ impl DMapStage {
         let (len, layout) = (MsgLenState::default(), MsgLayoutState::default());
         let env = ui::MapEnv {
             floors: &floors,
-            player_pos: [0.0; 3],
+            player_pos: facts.player_pos,
             priest_flag: 0,
             priest_pos: [0.0; 3],
             cb1_player_pos: None,
             stage_type: 0,
             save_index: 0,
             stage_map: None,
-            stay_room: -1,
+            stay_room: facts.stay_room,
             doors: &[],
             treasures: &[],
-            dungeon_item: 0,
-            visited_room: [0; ui::VISITED_ROOM_WORDS],
+            dungeon_item: facts.dungeon_item,
+            visited_room: facts.visited_room,
             tbox_bits: 0,
             collect_bits: [0; 8],
             opt_ruby: false,
@@ -107,25 +116,29 @@ impl DMapStage {
         true
     }
 
-    pub fn step(map: &mut ui::DungeonMap, pad: &mut ui::PadInput) -> Option<ui::MapDraw> {
+    pub fn step(
+        map: &mut ui::DungeonMap,
+        facts: &DMapFacts,
+        pad: &mut ui::PadInput,
+    ) -> Option<ui::MapDraw> {
         let floors = NoFloors;
         let archives = crate::assets::load_msg_archives();
         let fonts = FontBank::default();
         let (len, layout) = (MsgLenState::default(), MsgLayoutState::default());
         let env = ui::MapEnv {
             floors: &floors,
-            player_pos: [0.0; 3],
+            player_pos: facts.player_pos,
             priest_flag: 0,
             priest_pos: [0.0; 3],
             cb1_player_pos: None,
             stage_type: 0,
             save_index: 0,
             stage_map: None,
-            stay_room: -1,
+            stay_room: facts.stay_room,
             doors: &[],
             treasures: &[],
-            dungeon_item: 0,
-            visited_room: [0; ui::VISITED_ROOM_WORDS],
+            dungeon_item: facts.dungeon_item,
+            visited_room: facts.visited_room,
             tbox_bits: 0,
             collect_bits: [0; 8],
             opt_ruby: false,

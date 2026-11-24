@@ -38,6 +38,7 @@ pub enum Screen {
     Movie,
     ClearSave,
     PhotoAlbum,
+    NameEntry,
     Pause,
     Settings,
     QuitConfirm,
@@ -105,6 +106,9 @@ pub struct Menu {
     pub settings_index: usize,
     pub settings: Settings,
     pub pause: PauseState,
+    /// Name typed on the new-file screen before the game starts (tww d_s_name.cpp:1312-1370).
+    pub name_entry: String,
+    pub name_slot: usize,
     pub fs: crate::ui_file_select::FileSelect,
     pub card: crate::ui_menu_save::MemCard,
     pub shot: std::cell::Cell<Option<repose_core::ImageHandle>>,
@@ -130,6 +134,8 @@ impl Menu {
             settings_index: 0,
             settings: Settings::defaults(),
             pause: PauseState::default(),
+            name_entry: String::new(),
+            name_slot: 0,
             fs: crate::ui_file_select::FileSelect::default(),
             card: crate::ui_menu_save::MemCard::default(),
             shot: std::cell::Cell::new(None),
@@ -496,4 +502,22 @@ fn setting_value_text(row: usize, value: u8) -> String {
         .get(row)
         .and_then(|names| names.get(usize::from(value)))
         .map_or_else(|| value.to_string(), |name| (*name).to_string())
+}
+
+/// The new-file name entry panel (`tww/src/d/d_s_name.cpp:1312-1370`; HD
+/// `wwhd_src/d/d_file_select.cpp:669-678`). The shell has no text-field widget, so the
+/// letters come from physical key edges staged by `stage_menu`.
+pub fn name_entry_view(menu: &Menu) -> View {
+    let name = if menu.name_entry.is_empty() {
+        "_".to_string()
+    } else {
+        format!("{}_", menu.name_entry)
+    };
+    panel(vec![
+        Text("Enter your name".to_string())
+            .size(Sp(28.0))
+            .color(Color::from_hex(CURSOR_HEX)),
+        Text(name).size(Sp(36.0)).color(Color::from_hex(TITLE_HEX)),
+        hint("A-Z: type   Backspace: delete   Enter: confirm   Escape: cancel"),
+    ])
 }

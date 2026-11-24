@@ -562,6 +562,39 @@ impl App {
     }
 }
 
+fn letter_key(key: PhysicalKey) -> Option<char> {
+    use PhysicalKey::*;
+    Some(match key {
+        KeyA => 'A',
+        KeyB => 'B',
+        KeyC => 'C',
+        KeyD => 'D',
+        KeyE => 'E',
+        KeyF => 'F',
+        KeyG => 'G',
+        KeyH => 'H',
+        KeyI => 'I',
+        KeyJ => 'J',
+        KeyK => 'K',
+        KeyL => 'L',
+        KeyM => 'M',
+        KeyN => 'N',
+        KeyO => 'O',
+        KeyP => 'P',
+        KeyQ => 'Q',
+        KeyR => 'R',
+        KeyS => 'S',
+        KeyT => 'T',
+        KeyU => 'U',
+        KeyV => 'V',
+        KeyW => 'W',
+        KeyX => 'X',
+        KeyY => 'Y',
+        KeyZ => 'Z',
+        _ => return None,
+    })
+}
+
 fn key_pressed(held: &HashSet<PhysicalKey>, prev: &HashSet<PhysicalKey>, key: PhysicalKey) -> bool {
     held.contains(&key) && !prev.contains(&key)
 }
@@ -1225,6 +1258,36 @@ impl App {
                 _ => {}
             }
         }
+        if self.menu.screen == menus::Screen::NameEntry && window_focused {
+            for key in held
+                .iter()
+                .copied()
+                .filter(|key| !self.menu_prev.contains(key))
+            {
+                if let Some(letter) = letter_key(key) {
+                    if self.menu.name_entry.len() < 8 {
+                        self.menu.name_entry.push(letter);
+                    }
+                } else if key == PhysicalKey::Backspace {
+                    self.menu.name_entry.pop();
+                } else if key == PhysicalKey::Enter || key == PhysicalKey::Space {
+                    let name = self.menu.name_entry.clone();
+                    let slot = self.menu.name_slot;
+                    if !name.is_empty() {
+                        self.name = name;
+                    }
+                    self.menu.screen = menus::Screen::Playing;
+                    self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
+                    self.open_new_slot(slot);
+                    self.menu_prev.clone_from(held);
+                    return;
+                } else if key == PhysicalKey::Escape {
+                    self.menu.screen = menus::Screen::Title;
+                    self.menu_prev.clone_from(held);
+                    return;
+                }
+            }
+        }
         // `d_menu_window.cpp:1479-1539` opens the pause menu on Start; B/Start closes it and
         // L/R move between pages. Escape is both the shell's Start and its B, so this reads
         // the physical keys directly rather than the remapped pad bits.
@@ -1488,9 +1551,11 @@ impl App {
             self.menu.screen = menus::Screen::Title;
             return;
         }
-        self.name = save::DEFAULT_NAME.to_owned();
-        self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
-        self.open_new_slot(slot);
+        // A new file goes through the naming step before the opening scene
+        // (tww d_s_name.cpp:1165-1171, HD d_file_select.cpp:669-678).
+        self.menu.name_entry = save::DEFAULT_NAME.to_owned();
+        self.menu.name_slot = slot;
+        self.menu.screen = menus::Screen::NameEntry;
     }
 
     fn open_new_slot(&mut self, slot: usize) {
@@ -4621,11 +4686,38 @@ impl App {
             stick_value: axis.length(),
             stick_angle: sim::walk::to_s16(axis.x.atan2(-axis.y)),
         };
+        // Feed the map the items the player actually owns and where they stand
+        // (tww d_menu_dmap.cpp:434-458, HD hd_menu_button_mapping.cpp:47-51).
+        let dungeon_item = self.sim.world.resource::<sim::flags::MemBits>().byte();
+        let player_pos = self
+            .sim
+            .world
+            .iter::<sim::player::Player>()
+            .next()
+            .map_or([0.0; 3], |p| [p.pos.x, p.pos.y, p.pos.z]);
+        let visited = self.stage_progress.values().next().map_or(
+            [0; crate::ui_menu_dmap::VISITED_ROOM_WORDS],
+            |entry| {
+                let mut words = [0; crate::ui_menu_dmap::VISITED_ROOM_WORDS];
+                for (index, open) in entry.opened.iter().take(16).enumerate() {
+                    if *open {
+                        words[index / 8] |= 1 << (index % 8);
+                    }
+                }
+                words
+            },
+        );
+        let facts = pause_dmap::DMapFacts {
+            dungeon_item,
+            player_pos,
+            visited_room: visited,
+            stay_room: -1,
+        };
         let stage = self.dmap.get_or_insert_with(pause_dmap::DMapStage::default);
         if !stage.created {
-            stage.created = pause_dmap::DMapStage::create(&mut stage.map);
+            stage.created = pause_dmap::DMapStage::create(&mut stage.map, &facts);
         }
-        stage.draw = pause_dmap::DMapStage::step(&mut stage.map, &mut pad);
+        stage.draw = pause_dmap::DMapStage::step(&mut stage.map, &facts, &mut pad);
         stage.revision = stage.revision.wrapping_add(1);
     }
 
@@ -5292,6 +5384,9 @@ pub fn root_view(
     if app.intro.is_some() {
         return intro_view(app, ctx);
     }
+    if app.menu.screen == menus::Screen::NameEntry {
+        return menus::name_entry_view(&app.menu);
+    }
     if app.menu.screen == menus::Screen::Title {
         return ZStack(Modifier::new().fill_max_size())
             .child([title_screen_view(app, ctx), app.touch.view(ctx)]);
@@ -5868,6 +5963,7 @@ pub fn root_view(
         menus::Screen::Title
         | menus::Screen::Settings
         | menus::Screen::QuitConfirm
+        | menus::Screen::NameEntry
         | menus::Screen::Movie
         | menus::Screen::ClearSave => Spacer(),
     };
@@ -6007,6 +6103,7 @@ fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::V
         | menus::Screen::GameOver
         | menus::Screen::PhotoAlbum
         | menus::Screen::Pause
+        | menus::Screen::NameEntry
         | menus::Screen::Movie
         | menus::Screen::ClearSave => Spacer(),
     }

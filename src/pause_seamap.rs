@@ -5,23 +5,46 @@ use repose_core::ImageHandle;
 use crate::sim::flags;
 use crate::ui_menu_fmap as ui;
 
-struct NoChart;
-impl ui::ChartTable for NoChart {
+/// Chart points come from the chart bits the player owns (tww d_menu_fmap.cpp:894-989).
+struct SimChart<'a> {
+    charts: &'a flags::Charts,
+}
+
+impl ui::ChartTable for SimChart<'_> {
     fn num(&self) -> usize {
-        0
+        49
     }
-    fn at(&self, _index: usize) -> ui::ChartPoint {
-        ui::ChartPoint::default()
+
+    fn at(&self, index: usize) -> ui::ChartPoint {
+        ui::ChartPoint {
+            grid_no: (index % 7) as i8,
+            collect_map_no: index as i8,
+            cmap_no: index as i8,
+            map_type: i8::from(self.charts.has(index)),
+            ..Default::default()
+        }
     }
 }
 
-struct NoMarks;
-impl ui::IslandMarkTable for NoMarks {
+/// Island marks come from the save's arrival bits (tww d_menu_fmap.cpp:732-754),
+/// laid out on the chart's 7x7 grid, with the arrived flag in field_0x6.
+struct SimMarks<'a> {
+    arrived: &'a flags::Arrivals,
+}
+
+impl ui::IslandMarkTable for SimMarks<'_> {
     fn count(&self) -> usize {
-        0
+        self.arrived.bytes().len()
     }
-    fn at(&self, _index: usize) -> ui::IslandMark {
-        ui::IslandMark::default()
+
+    fn at(&self, index: usize) -> ui::IslandMark {
+        ui::IslandMark {
+            sector_x: (index % 7) as i8,
+            sector_y: (index / 7) as i8,
+            field_0x2: 0,
+            field_0x4: 0,
+            field_0x6: u8::from(self.arrived.is_arrived(index)),
+        }
     }
 }
 
@@ -81,11 +104,16 @@ impl SeaMapStage {
         let Some(blo) = crate::j2d::parse(&screen_bytes) else {
             return;
         };
-        // These blank tables are only a fallback: the disc's own chart and mark data would
-        // be handed to the same traits by the shell when it owns a save file.
-        let (chart, marks, textures, text) = (NoChart, NoMarks, NoTextures, NoText);
         let arrivals = world.resource::<flags::Arrivals>();
         let charts = world.resource::<flags::Charts>();
+        // Chart points and island marks come from the save's chart/arrival bits
+        // (tww d_menu_fmap.cpp:732-754, 894-989).
+        let (chart, marks, textures, text) = (
+            SimChart { charts },
+            SimMarks { arrivals },
+            NoTextures,
+            NoText,
+        );
         let events = world.resource::<flags::EventFlags>();
         let regs = world.resource::<flags::StoryBits>();
         let collect = world.resource::<flags::Collect>();
