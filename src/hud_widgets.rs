@@ -53,7 +53,7 @@ impl Default for HudWidgets {
     }
 }
 
-fn screen(screens: &Screens, label: &str) -> Option<&j2d::Screen> {
+fn screen<'a>(screens: &'a Screens, label: &str) -> Option<&'a j2d::Screen> {
     screens
         .cache
         .iter()

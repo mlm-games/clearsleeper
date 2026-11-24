@@ -110,7 +110,7 @@ impl SeaMapStage {
         // (tww d_menu_fmap.cpp:732-754, 894-989).
         let (chart, marks, textures, text) = (
             SimChart { charts },
-            SimMarks { arrivals },
+            SimMarks { arrived: arrivals },
             NoTextures,
             NoText,
         );

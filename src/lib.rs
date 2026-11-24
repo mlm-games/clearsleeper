@@ -771,6 +771,7 @@ impl App {
             .map(|assets| MeterStage {
                 assets,
                 meter: meter_hud::Meter::default(),
+                hud: hud_widgets::HudWidgets::default(),
                 canvas: text::raster::Canvas::new(640, 480),
                 image: Cell::new(None),
                 uploaded: Cell::new(0),
@@ -4713,10 +4714,9 @@ impl App {
         // Feed the map the items the player actually owns and where they stand
         // (tww d_menu_dmap.cpp:434-458, HD hd_menu_button_mapping.cpp:47-51).
         let dungeon_item = self.sim.world.resource::<sim::flags::MemBits>().byte();
-        let player_pos = self
-            .sim
-            .world
-            .iter::<sim::player::Player>()
+        let mut player_query = self.sim.world.query::<&sim::player::Player>();
+        let player_pos = player_query
+            .iter(&self.sim.world)
             .next()
             .map_or([0.0; 3], |p| [p.pos.x, p.pos.y, p.pos.z]);
         let visited = self.stage_progress.values().next().map_or(
