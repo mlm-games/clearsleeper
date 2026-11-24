@@ -631,6 +631,14 @@ fn slot_file(dir: &Path, slot: usize) -> SaveFile {
     SaveFile::in_dir(dir, format!("slot{slot}.ron"), SAVE_VERSION)
 }
 
+/// A redundant copy of the same slot, written alongside the primary. The GameCube
+/// memcard manager reads two copies and recovers a slot from the backup when the
+/// first checksum fails (`tww/src/m_Do/m_Do_MemCardRWmng.cpp:109-182`); the file-based
+/// store mirrors that with a second file.
+fn slot_backup_file(dir: &Path, slot: usize) -> SaveFile {
+    SaveFile::in_dir(dir, format!("slot{slot}.bak.ron"), SAVE_VERSION)
+}
+
 fn store_at(path: &Path) -> anyhow::Result<SaveFile> {
     let dir = path
         .parent()
@@ -681,9 +689,13 @@ pub fn read_slot_state_in(dir: &Path, slot: usize) -> SlotRead {
         // progress left, so it is adopted rather than reset to a new file.
         Err(error @ SaveError::Corrupt { .. }) => {
             log::warn!("clearsleeper: {error}");
-            match adopt_slot(dir, slot, &file) {
-                Legacy::Adopted(save) => SlotRead::Loaded(save),
-                _ => SlotRead::Corrupt,
+            // Recover from the redundant copy before falling back to a legacy file.
+            match slot_backup_file(dir, slot).load::<SaveGame>() {
+                Ok(Some(save)) => SlotRead::Loaded(save),
+                _ => match adopt_slot(dir, slot, &file) {
+                    Legacy::Adopted(save) => SlotRead::Loaded(save),
+                    _ => SlotRead::Corrupt,
+                },
             }
         }
         // Unreadable is a refusal: a file that may still be intact is never
@@ -709,9 +721,14 @@ pub fn read_slot_in(dir: &Path, slot: usize) -> Option<SaveGame> {
 }
 
 pub fn write_slot_in(dir: &Path, slot: usize, save: &SaveGame) -> anyhow::Result<()> {
-    slot_file(dir, slot)
-        .save(save)
-        .map_err(|error| anyhow::anyhow!("writing {}: {error}", slot_path_in(dir, slot).display()))
+    slot_file(dir, slot).save(save).map_err(|error| {
+        anyhow::anyhow!("writing {}: {error}", slot_path_in(dir, slot).display())
+    })?;
+    // Best-effort mirror: a failure here must not make the primary save fail.
+    if let Err(error) = slot_backup_file(dir, slot).save(save) {
+        log::warn!("clearsleeper: backup slot {slot} failed: {error}");
+    }
+    Ok(())
 }
 
 fn adopt_slot(dir: &Path, slot: usize, file: &SaveFile) -> Legacy<SaveGame> {
