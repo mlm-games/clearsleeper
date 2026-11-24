@@ -2548,10 +2548,12 @@ pub fn build(
                         ff::control.in_set(WwSimSet::Execute),
                     )
                         .chain(),
-                    (combat::tick_gates.in_set(WwSimSet::Execute),).chain(),
-                    (item::apply_selection
-                        .in_set(WwSimSet::Execute)
-                        .before(item::control),)
+                    (
+                        combat::tick_gates.in_set(WwSimSet::Execute),
+                        item::apply_selection
+                            .in_set(WwSimSet::Execute)
+                            .before(item::control),
+                    )
                         .chain(),
                     (
                         combat::control.in_set(WwSimSet::Execute),

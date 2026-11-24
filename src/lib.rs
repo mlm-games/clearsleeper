@@ -4558,7 +4558,7 @@ impl App {
         let stage = self
             .item_menu
             .get_or_insert_with(pause_item::ItemMenuStage::default);
-        let writes = stage.step(&mut self.sim.world, pad);
+        let writes = pause_item::ItemMenuStage::step(&mut self.sim.world, pad);
         for (button, slot) in writes {
             self.sim
                 .world
@@ -4612,7 +4612,7 @@ impl App {
         if !stage.created {
             stage.created = pause_dmap::DMapStage::create(&mut stage.map);
         }
-        stage.draw = stage.step(&mut stage.map, &mut pad);
+        stage.draw = pause_dmap::DMapStage::step(&mut stage.map, &mut pad);
         stage.revision = stage.revision.wrapping_add(1);
     }
 

@@ -73,7 +73,7 @@ impl ItemMenuStage {
 
     pub fn draw_window(world: &mut World) -> Option<crate::ui_menu_item::WindowDraw> {
         world
-            .get_mut::<crate::ui_menu_item::MenuWindow>()
+            .resource_mut::<crate::ui_menu_item::MenuWindow>()
             .map(|window| window.draw())
     }
 
