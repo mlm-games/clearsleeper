@@ -30,6 +30,7 @@ pub mod dzs;
 mod end_scene;
 pub mod game_over_screen;
 pub mod gx_decode;
+pub mod hud_widgets;
 pub mod input;
 pub mod input_tape;
 pub mod intro;
@@ -294,6 +295,7 @@ struct TitleStage {
 struct MeterStage {
     assets: meter_hud::MeterAssets,
     meter: meter_hud::Meter,
+    hud: hud_widgets::HudWidgets,
     canvas: text::raster::Canvas,
     image: Cell<Option<repose_core::ImageHandle>>,
     uploaded: Cell<u64>,
@@ -745,6 +747,7 @@ impl App {
             dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
+        text::overlay::bind_message_screens(&mut app.sim.world);
         #[cfg(not(target_arch = "wasm32"))]
         {
             app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
@@ -1826,12 +1829,26 @@ impl App {
             return;
         };
         stage.meter.update(health, &stage.assets);
-        let key = stage.meter.row_key();
-        if stage.painted.as_ref() == Some(&key) {
-            return;
-        }
-        stage.painted = Some(key);
+        let rupees = self.sim.world.resource::<sim::pickup::Rupees>().count as i32;
+        let clock = *self.sim.world.resource::<sim::clock::Clock>();
+        let events = *self.sim.world.resource::<sim::flags::EventFlags>();
+        let equipped = *self.sim.world.resource::<sim::inventory::Equipped>();
+        let facts = hud_widgets::HudFacts {
+            rupees,
+            keys: 0,
+            events,
+            equip: (0..sim::inventory::SLOT_COUNT)
+                .map(|slot| equipped.item(slot))
+                .collect(),
+            day_hour: (clock.time / 3600.0) as i32,
+            day_minute: ((clock.time % 3600.0) / 60.0) as i32,
+            map_alpha: 255,
+            stage_type: 0,
+        };
+        // The full HUD animates every frame, so repaint the whole canvas rather than
+        // early-outing on the heart row's key.
         stage.canvas.clear();
+        stage.hud.step(&stage.assets, &facts, &mut stage.canvas);
         stage.meter.render(&mut stage.canvas, &stage.assets);
         stage.revision = stage.revision.wrapping_add(1);
     }

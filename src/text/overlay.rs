@@ -120,3 +120,52 @@ pub fn fallback_font() -> ResFont {
 pub fn table_name() -> &'static str {
     COLOR_TABLE
 }
+
+/// Bind the retail message window's own pane geometry into the `TextScreen` resource.
+/// Without this every dialogue line renders at (0,0) in the default 64px box
+/// (`d_msg.cpp:311` binds `hukidashi_00.blo`; HD drives the same panes through
+/// `hd_screen_msg_window_main.cpp`).
+pub fn bind_message_screens(world: &mut bevy_ecs::prelude::World) {
+    use crate::assets::AssetRoot;
+    use crate::text::msgbox::MSG2_PANES;
+
+    let Ok(root) = AssetRoot::from_env() else {
+        return;
+    };
+    let Ok(archive) = root.read_archive("files/res/Msg/msgres.arc") else {
+        return;
+    };
+    let msg2 = archive
+        .read("hukidashi_00.blo")
+        .ok()
+        .and_then(crate::j2d::parse);
+    let msg1 = archive
+        .read("hukidashi_09.blo")
+        .ok()
+        .and_then(crate::j2d::parse);
+    let Some(mut screens) = world.get_resource_mut::<super::driver::TextScreen>() else {
+        return;
+    };
+    if let Some(screen) = msg2 {
+        for (index, target) in screens.msg2.text.iter_mut().enumerate().take(MSG2_PANES) {
+            if let Some(pane) = screen.panes.get(index) {
+                let b = pane.bounds;
+                target.bounds = [b.x, b.y, b.x + b.w, b.y + b.h];
+                target.alpha = pane.alpha;
+                target.visible = pane.visible;
+            }
+        }
+    }
+    if let Some(screen) = msg1 {
+        for (index, target) in screens.msg1.text.iter_mut().enumerate() {
+            if let Some(target) = target.as_mut() {
+                if let Some(pane) = screen.panes.get(index) {
+                    let b = pane.bounds;
+                    target.bounds = [b.x, b.y, b.x + b.w, b.y + b.h];
+                    target.alpha = pane.alpha;
+                    target.visible = pane.visible;
+                }
+            }
+        }
+    }
+}
