@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::archive::{Archive, AssetError, Rel, YAZ0_MAGIC, yaz0_decode};
-use crate::disc::DiscImage;
+use crate::disc::{DiscImage, DiscSummary};
 
 /// The extracted tree [`AssetRoot::from_env`] reads when no disc image is installed. A
 /// development fallback on every platform - a dump on disk, a debugger watching loose files -

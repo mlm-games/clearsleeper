@@ -5,7 +5,7 @@
 
 use repose_core::{Color, Modifier, Sp, UnitExt, View};
 use repose_material::material3::{Button, ButtonConfig, TextButton};
-use repose_ui::{Center, Column, Row, Text, ViewExt};
+use repose_ui::{Center, Column, Row, Text, TextStyle, ViewExt};
 
 use crate::menus::{Menu, TITLE_ITEMS};
 
