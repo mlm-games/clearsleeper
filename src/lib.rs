@@ -265,6 +265,7 @@ pub struct App {
     place_name: Option<place_name::PlaceNameCard>,
     game_over_failed: bool,
     title_actor: Option<Entity>,
+    title_models: Option<view::TitleModels>,
     pending_slot: Option<usize>,
     dialogue_canvas: text::raster::Canvas,
     dialogue_live: bool,
@@ -742,6 +743,7 @@ impl App {
             place_name: Some(place_name::PlaceNameCard::default()),
             game_over_failed: false,
             title_actor: None,
+            title_models: view::TitleModels::load(),
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,
@@ -5412,8 +5414,26 @@ pub fn root_view(
         return menus::name_entry_view(&app.menu);
     }
     if app.menu.screen == menus::Screen::Title {
-        return ZStack(Modifier::new().fill_max_size())
-            .child([title_screen_view(app, ctx), app.touch.view(ctx)]);
+        let mut stack = Vec::new();
+        // The ship, subtitle and kirari are real models driven by the ported title actor
+        // (tww d_a_title.cpp:532-574); the retail logo panes sit over them.
+        if let Some((entity, models)) = app.title_actor.zip(app.title_models.as_ref()) {
+            if let Some(title) = app.sim.world.get::<sim::title::Title>(entity) {
+                let snapshot = app.snapshot();
+                let frame = view::build_title_frame(&snapshot, app.cam.clone(), title, models);
+                let desc = frame.desc.clone();
+                stack.push(Viewport3d(
+                    frame,
+                    GeomHandle::new(),
+                    "scene.title",
+                    desc,
+                    |_| {},
+                ));
+            }
+        }
+        stack.push(title_screen_view(app, ctx));
+        stack.push(app.touch.view(ctx));
+        return ZStack(Modifier::new().fill_max_size()).child(stack);
     }
     if matches!(
         app.menu.screen,

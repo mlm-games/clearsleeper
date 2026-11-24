@@ -1699,3 +1699,74 @@ fn walls_group(snapshot: &SceneSnapshot, eye: Vec3) -> MeshGroup {
     group.depth_test = true;
     group
 }
+
+/// The title scene's ship, subtitle and kirari models. The GameCube creates all three from
+/// `Tlogo.arc` (`tww/src/d/actor/d_a_title.cpp:124-140`; the ids are
+/// `dRes_ID_TLOGO_BDL_TITLE_SHIP_e=0xD`, `_SUBTITLE_START_ANIM_e=0xC`,
+/// `_SUBTITLE_KIRARI_e=0xB` in `Tlogo.h`).
+pub struct TitleModels {
+    pub ship: RoomMesh,
+    pub subtitle: RoomMesh,
+    pub kirari: RoomMesh,
+}
+
+impl TitleModels {
+    pub fn load() -> Option<Self> {
+        Some(Self {
+            ship: crate::assets::load_actor_model_entry("Tlogo", "title_ship.bdl")?,
+            subtitle: crate::assets::load_actor_model_entry("Tlogo", "subtitle_start_anim.bdl")?,
+            kirari: crate::assets::load_actor_model_entry("Tlogo", "subtitle_kirari.bdl")?,
+        })
+    }
+}
+
+/// Build the title frame from the same `NpcDraw` groups the in-game scene uses, placing each
+/// model at the transform the ported `Title::set_mtx` publishes
+/// (`tww/src/d/actor/d_a_title.cpp:565-574`, HD `hd_scene_title.cpp:141-173`).
+pub fn build_title_frame(
+    snapshot: &SceneSnapshot,
+    cam: OrbitCamera,
+    title: &crate::sim::title::Title,
+    models: &TitleModels,
+) -> Frame3d {
+    let npcs = [
+        NpcDraw {
+            mesh: &models.ship,
+            anim: None,
+            pos: title.ship_base,
+            yaw: f32::from(title.ship_rotate_y) * core::f32::consts::TAU / 65536.0f32,
+            joint_control: None,
+            cloth: None,
+        },
+        NpcDraw {
+            mesh: &models.subtitle,
+            anim: None,
+            pos: title.subtitle_base,
+            yaw: f32::from(title.subtitle_rotate_y) * core::f32::consts::TAU / 65536.0f32,
+            joint_control: None,
+            cloth: None,
+        },
+        NpcDraw {
+            mesh: &models.kirari,
+            anim: None,
+            pos: title.kirari_base,
+            yaw: 0.0,
+            joint_control: None,
+            cloth: None,
+        },
+    ];
+    build_frame_with_actor(
+        snapshot,
+        cam,
+        None,
+        None,
+        None,
+        None,
+        None,
+        &[],
+        &npcs,
+        None,
+        &[],
+        None,
+    )
+}
