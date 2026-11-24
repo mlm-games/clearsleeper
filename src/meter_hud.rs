@@ -15,9 +15,7 @@ use crate::bti::{self, Image};
 use crate::j2d::{ScreenPane, Screens};
 use crate::sim::health::Health;
 use crate::text::raster::Canvas;
-use crate::ui_meter_gauges;
 use crate::ui_meter_vitals::{self, Vitals, VitalsEnv};
-use crate::ui_meter_widgets;
 
 pub const MENU_ARCHIVE: &str = "files/res/Msg/menures.arc";
 
@@ -32,22 +30,8 @@ pub struct MeterAssets {
 impl MeterAssets {
     pub fn load(root: &AssetRoot) -> Option<Self> {
         let archive = root.read_archive(MENU_ARCHIVE).ok()?;
-        let mut screens = Screens::default();
-        // d_meter.cpp:7734-7748 and d_meter_01.cpp:2153-2163 bind this whole set; the
-        // heart row was the only one the shell loaded before the full widget wiring.
-        for label in [
-            ui_meter_widgets::SCREEN_PARTS1,
-            ui_meter_widgets::SCREEN_PARTS2,
-            ui_meter_widgets::SCREEN_PARTS3,
-            ui_meter_widgets::SCREEN_CHOICE_ROAD,
-            ui_meter_gauges::SCREEN_TIME_SWIM1,
-            ui_meter_gauges::SCREEN_TIME_SWIM2,
-        ] {
-            if let Ok(bytes) = archive.read(label) {
-                screens.load(label, &bytes);
-            }
-        }
         let bytes = archive.read(ui_meter_vitals::PARTS1).ok()?;
+        let mut screens = Screens::default();
         screens.load(ui_meter_vitals::PARTS1, &bytes)?;
         let mut textures = HashMap::new();
         for name in archive.entries() {
