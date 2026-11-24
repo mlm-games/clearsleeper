@@ -752,7 +752,7 @@ impl App {
             dialogue_revision: 0,
             quit: quit::Quit::default(),
         };
-        text::overlay::bind_message_screens(&mut app.sim.world);
+        // diagnostic: message-screen binding disabled
         #[cfg(not(target_arch = "wasm32"))]
         {
             app.dff = std::env::var_os("CS_DFF").map(|path| j3d::present::load(path.as_ref()));
