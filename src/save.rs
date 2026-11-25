@@ -412,8 +412,10 @@ impl App {
             version: SAVE_VERSION,
             name: self.name.clone(),
             tick,
-            saved_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
+            // `SystemTime` is unimplemented on wasm32-unknown-unknown and panics there.
+            // `web_time` provides the same wall clock on the web and std on native targets.
+            saved_at: web_time::SystemTime::now()
+                .duration_since(web_time::UNIX_EPOCH)
                 .map_or(0, |d| d.as_secs()),
             camera_yaw,
             player: (&player).into(),

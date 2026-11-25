@@ -4615,7 +4615,14 @@ impl App {
             card.step(request.index, request.sequence);
         }
         if self.intro.is_some() {
-            self.step_intro(dt);
+            // The retail opening (`d_s_open.cpp`) is skippable with A; without that the
+            // storybook takes minutes of real time and there is no visible way forward.
+            let pad_a = self.sim.world.resource::<sim::intent::PadButtons>().trig.a;
+            if pad_a {
+                self.enter_play();
+            } else {
+                self.step_intro(dt);
+            }
             self.clear_pad_edges();
             return 0;
         }
