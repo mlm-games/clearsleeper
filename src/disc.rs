@@ -121,6 +121,9 @@ pub enum DiscError {
     BadFst { at: usize, detail: &'static str },
     /// The table holds no such path, or the path names a directory.
     MissingFile { path: String },
+    /// The container can only be read through a filesystem path, which a browser drop cannot
+    /// provide. `nod` needs this for NFS (the Wii U VC wrapper).
+    NeedsPath { format: &'static str },
     /// `nod` refused the compressed container or a block of it.
     Compressed { detail: String },
 }
@@ -154,6 +157,10 @@ impl std::fmt::Display for DiscError {
                 write!(f, "the disc's file table is malformed at {at:#x}: {detail}")
             }
             Self::MissingFile { path } => write!(f, "the disc image holds no {path}"),
+            Self::NeedsPath { format } => write!(
+                f,
+                "{format} images need a filesystem path; open them in the desktop app or drop an extracted folder"
+            ),
             Self::Compressed { detail } => {
                 write!(f, "the compressed image could not be read: {detail}")
             }
@@ -448,12 +455,15 @@ impl DiscImage {
         }
         match magic {
             // `nod` detects the container from these magics and hands back the same game
-            // partition for each: WIA/RVZ, WBFS, CISO, TGC, GCZ and NFS (the Wii U VC
-            // wrapper). Dusklight accepts the same set at its prelaunch file picker, so a
-            // dump in any of them mounts here as it does there.
-            WIA_MAGIC | CISO_MAGIC | GCZ_MAGIC | WBFS_MAGIC | TGC_MAGIC | NFS_MAGIC => {
+            // partition for each: WIA/RVZ, WBFS, CISO, TGC and GCZ. Dusklight accepts the
+            // same set at its prelaunch file picker, so a dump in any of them mounts here.
+            WIA_MAGIC | CISO_MAGIC | GCZ_MAGIC | WBFS_MAGIC | TGC_MAGIC => {
                 Self::open_container(bytes)
             }
+            // Wii U VC (NFS) is the one format `nod` cannot read from bytes.
+            NFS_MAGIC => Err(DiscError::NeedsPath {
+                format: "NFS (Wii U VC)",
+            }),
             _ => Self::open_raw(bytes),
         }
     }

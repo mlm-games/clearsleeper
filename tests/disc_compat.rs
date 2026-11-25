@@ -129,13 +129,8 @@ fn wii_and_nfs_headers_go_through_nod() {
     let mut nfs = wind_waker_image();
     nfs[..4].copy_from_slice(b"EGGS");
     match DiscImage::open(nfs) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("nfs error: {error:?}");
-            assert!(
-                !matches!(error, DiscError::BadMagic { .. }),
-                "the NFS magic was read as a GameCube image"
-            );
-        }
+        Err(DiscError::NeedsPath { format }) => assert_eq!(format, "NFS (Wii U VC)"),
+        Err(_) => panic!("NFS bytes must be refused with NeedsPath"),
+        Ok(_) => panic!("a stub NFS image must not mount"),
     }
 }

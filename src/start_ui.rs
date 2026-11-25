@@ -99,6 +99,12 @@ pub fn view(menu: &Menu) -> View {
             );
         }
     }
+    #[cfg(target_arch = "wasm32")]
+    children.push(
+        Text("NFS (Wii U VC): use Load Folder or the desktop app".to_string())
+            .size(Sp(14.0))
+            .color(Color::from_hex(DIM_HEX)),
+    );
     children.push(
         Text("Up/Down or stick: move   A/Space: choose   B/Esc: back".to_string())
             .size(Sp(14.0))
