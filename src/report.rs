@@ -27,13 +27,16 @@ extern "C" {
 /// before.
 pub fn install() {
     static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        let previous = std::panic::take_hook();
-        std::panic::set_hook(Box::new(move |info| {
-            report(&message(info));
-            previous(info);
-        }));
-    });
+    ONCE.call_once(install_again);
+}
+
+/// Force our hook back in after the windowing layer replaces it.
+pub fn install_again() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        report(&message(info));
+        previous(info);
+    }));
 }
 
 fn message(info: &PanicHookInfo<'_>) -> String {

@@ -25,11 +25,24 @@
       height: 100%;
       display: block;
     }
+    #cs-panic {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      padding: 1.5rem;
+      overflow: auto;
+      background: #1b0f0f;
+      color: #ffd9d9;
+      font: 14px/1.5 ui-monospace, monospace;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 
 <body>
   <input id="disc-file" type="file" accept=".iso,.gcm,.rvz" hidden />
+  <div id="cs-panic"></div>
 
   <script type="module">
     const file = document.getElementById("disc-file");
@@ -162,6 +175,9 @@
     window.__clearsleeperPanic = (text) => {
       panicReport = text;
       console.error(text);
+      const overlay = document.getElementById("cs-panic");
+      overlay.textContent = `ClearSleeper stopped:\n${text}`;
+      overlay.style.display = "block";
     };
 
     async function startImage(bytes, label) {

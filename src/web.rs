@@ -76,6 +76,14 @@ pub fn install_disc_image(bytes: Vec<u8>) -> Result<String, JsValue> {
 /// Start the shell loop over the installed image.
 #[wasm_bindgen(js_name = boot)]
 pub fn boot() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static BOOTED: AtomicBool = AtomicBool::new(false);
+    if BOOTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     crate::report::install();
     crate::run();
+    // `repose_platform::run_web_app` installs its own panic hook, dropping the file:line
+    // this build reports. Put ours back so a boot panic names its source.
+    crate::report::install_again();
 }
