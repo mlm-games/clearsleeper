@@ -21,4 +21,4 @@ jobs:
         --target wasm32-unknown-unknown
       include-android: true
       upload-artifacts: true
-      app-slug: clearsleeper
+      app-slug: clearsleeper-desktop

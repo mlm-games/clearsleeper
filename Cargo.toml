@@ -43,7 +43,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "clearsleeper"
+name = "clearsleeper-desktop"
 path = "src/main.rs"
 
 [package.metadata.android]
