@@ -62,20 +62,6 @@
     // wgpu 30's first boot future is WebGPU detection: it reads navigator.gpu and awaits
     // request_adapter. That future is the task that traps with "index out of bounds" here.
     // repose enables the GL backend alongside WebGPU, so hide the property to select WebGL.
-    if (typeof Navigator !== "undefined") {
-      const hideGpu = () => undefined;
-      try {
-        Object.defineProperty(Navigator.prototype, "gpu", {
-          configurable: true,
-          get: hideGpu,
-        });
-      } catch {
-        Object.defineProperty(navigator, "gpu", {
-          configurable: true,
-          get: hideGpu,
-        });
-      }
-    }
 
     // The start screen is native Rust; the page only reports progress to it.
     let statusText = "";
