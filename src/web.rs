@@ -24,6 +24,10 @@ extern "C" {
     /// The page's hidden file input, opened by the native start UI's Load Disc button.
     #[wasm_bindgen(js_name = clearsleeperPickDisc)]
     fn js_pick_disc();
+
+    /// The page's hidden directory input, opened by the native start UI's Load Folder button.
+    #[wasm_bindgen(js_name = clearsleeperPickFolder)]
+    fn js_pick_folder();
 }
 
 /// One line of the input log, printed to the browser's console.
@@ -53,6 +57,11 @@ pub fn request_disc_file() {
     js_pick_disc();
 }
 
+/// Open the page's folder picker from the native start UI's Load Folder button.
+pub fn request_disc_folder() {
+    js_pick_folder();
+}
+
 /// The largest image the page should hand over, which `index.html` checks the picked file
 /// against: `wasm-bindgen`'s glue copies the bytes into wasm memory before this entry runs, and
 /// an allocation there aborts the tab, so an image over the limit is refused in the page.
@@ -69,6 +78,33 @@ pub fn disc_image_limit() -> f64 {
 pub fn install_disc_image(bytes: Vec<u8>) -> Result<String, JsValue> {
     crate::report::install();
     assets::install_disc_image(bytes)
+        .map(|summary| summary.to_string())
+        .map_err(|error| JsValue::from_str(&error.to_string()))
+}
+
+/// Install an extracted disc tree handed over by the folder picker. `bytes` holds every file
+/// concatenated in `paths` order; `lengths` says where each one ends.
+#[wasm_bindgen(js_name = installExtracted)]
+pub fn install_extracted(
+    paths: Vec<String>,
+    lengths: Vec<u32>,
+    bytes: Vec<u8>,
+) -> Result<String, JsValue> {
+    crate::report::install();
+    if paths.len() != lengths.len() {
+        return Err(JsValue::from_str("the folder's paths and lengths disagree"));
+    }
+    let mut cursor = 0usize;
+    let mut files = Vec::with_capacity(paths.len());
+    for (path, len) in paths.into_iter().zip(lengths) {
+        let end = cursor.saturating_add(len as usize);
+        let data = bytes.get(cursor..end).ok_or_else(|| {
+            JsValue::from_str("the folder's file bytes are shorter than its lengths")
+        })?;
+        files.push((path, data.to_vec()));
+        cursor = end;
+    }
+    assets::install_extracted_memory(files)
         .map(|summary| summary.to_string())
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }

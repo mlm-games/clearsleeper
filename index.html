@@ -41,12 +41,14 @@
 </head>
 
 <body>
-  <input id="disc-file" type="file" accept=".iso,.gcm,.rvz" hidden />
+  <input id="disc-file" type="file" accept=".iso,.gcm,.gcz,.ciso,.wbfs,.wia,.rvz,.tgc,.nfs" multiple hidden />
+  <input id="disc-folder" type="file" webkitdirectory directory hidden />
   <div id="cs-panic"></div>
 
   <script type="module">
     const file = document.getElementById("disc-file");
-    const hint = "Drop a GameCube disc image here, or choose Load Disc.";
+    const folder = document.getElementById("disc-folder");
+    const hint = "Drop a disc image or folder here, or choose Load Disc / Load Folder.";
 
     // js-sys's future queue drains tasks from a wasm-bindgen Closure via queueMicrotask.
     // A future that schedules another task while the queue is draining re-enters that same
@@ -88,8 +90,9 @@
       pushStatus();
     };
 
-    // Called by the native start UI's Load Disc button.
+    // Called by the native start UI's buttons.
     window.clearsleeperPickDisc = () => file.click();
+    window.clearsleeperPickFolder = () => folder.click();
 
     // Trunk's glue sets `window.wasmBindings` and then fires this event, so either order works.
     const bindingsReady = () => new Promise((resolve) => {
@@ -109,14 +112,18 @@
     // only by this origin and is never uploaded.
     const DB_NAME = "clearsleeper";
     const STORE = "disc";
+    const EXTRACT_STORE = "extract";
     const KEY = "image";
 
     function openDb() {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
+        const request = indexedDB.open(DB_NAME, 2);
         request.onupgradeneeded = () => {
           if (!request.result.objectStoreNames.contains(STORE)) {
             request.result.createObjectStore(STORE);
+          }
+          if (!request.result.objectStoreNames.contains(EXTRACT_STORE)) {
+            request.result.createObjectStore(EXTRACT_STORE);
           }
         };
         request.onsuccess = () => resolve(request.result);
@@ -161,6 +168,35 @@
           tx.objectStore(STORE).delete(KEY);
           tx.oncomplete = resolve;
           tx.onerror = () => reject(tx.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    async function readCachedExtract() {
+      const db = await openDb();
+      try {
+        return await new Promise((resolve, reject) => {
+          const tx = db.transaction(EXTRACT_STORE, "readonly");
+          const request = tx.objectStore(EXTRACT_STORE).get(KEY);
+          request.onsuccess = () => resolve(request.result ?? null);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        db.close();
+      }
+    }
+
+    async function writeCachedExtract(files) {
+      const db = await openDb();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(EXTRACT_STORE, "readwrite");
+          tx.objectStore(EXTRACT_STORE).put(files, KEY);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
         });
       } finally {
         db.close();
@@ -269,6 +305,100 @@
       }
     }
 
+    async function walkEntry(entry, prefix, out) {
+      if (entry.isFile) {
+        const picked = await new Promise((resolve, reject) => entry.file(resolve, reject));
+        out.push({ path: prefix + picked.name, file: picked });
+        return;
+      }
+      if (!entry.isDirectory) {
+        return;
+      }
+      const reader = entry.createReader();
+      const next = prefix + entry.name + "/";
+      for (;;) {
+        const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        if (!batch.length) {
+          break;
+        }
+        for (const child of batch) {
+          await walkEntry(child, next, out);
+        }
+      }
+    }
+
+    async function extractedArgs(out) {
+      const paths = [];
+      const lengths = [];
+      const chunks = [];
+      let total = 0;
+      for (const item of out) {
+        const bytes = new Uint8Array(await item.file.arrayBuffer());
+        paths.push(item.path);
+        lengths.push(bytes.length);
+        chunks.push(bytes);
+        total += bytes.length;
+      }
+      const bytes = new Uint8Array(total);
+      let at = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.length;
+      }
+      return [paths, lengths, bytes];
+    }
+
+    async function installExtract(entries) {
+      if (installing || booted) {
+        return;
+      }
+      installing = true;
+      try {
+        const bindings = await bindingsReady();
+        const out = [];
+        for (const entry of entries) {
+          await walkEntry(entry, "", out);
+        }
+        if (!out.length) {
+          say("That folder holds no files.");
+          return;
+        }
+        say(`Reading ${out.length} files from the extracted disc…`);
+        panicReport = "";
+        let summary;
+        try {
+          summary = bindings.installExtracted(...(await extractedArgs(out)));
+        } catch (error) {
+          say(panicReport || `${error}`);
+          return;
+        }
+        say(`Starting ClearSleeper on ${summary}…`);
+        await writeCachedExtract(out.map((item) => ({ path: item.path, file: item.file })));
+        sessionStorage.setItem(RELOAD_KEY, "1");
+        location.reload();
+      } finally {
+        installing = false;
+      }
+    }
+
+    async function restoreExtract() {
+      const cached = await readCachedExtract();
+      if (!cached || !cached.length) {
+        return false;
+      }
+      const bindings = await bindingsReady();
+      say(`Restoring ${cached.length} files from the extracted disc…`);
+      panicReport = "";
+      try {
+        bindings.installExtracted(...(await extractedArgs(cached)));
+      } catch (error) {
+        say(panicReport || `${error}`);
+        return false;
+      }
+      await startShell();
+      return true;
+    }
+
     async function restore() {
       if (installing || booted) {
         return;
@@ -327,6 +457,14 @@
     addEventListener("dragleave", () => say(hint));
     addEventListener("drop", (event) => {
       event.preventDefault();
+      const items = [...(event.dataTransfer?.items ?? [])];
+      const directories = items
+        .filter((item) => item.kind === "file" && item.webkitGetAsEntry?.()?.isDirectory)
+        .map((item) => item.webkitGetAsEntry());
+      if (directories.length) {
+        installExtract(directories);
+        return;
+      }
       const picked = event.dataTransfer?.files?.[0];
       if (picked) {
         install(picked);
@@ -340,6 +478,12 @@
         install(picked);
       }
     });
+    folder.addEventListener("change", () => {
+      const entries = [...(folder.webkitEntries ?? [])];
+      if (entries.length) {
+        installExtract(entries);
+      }
+    });
 
     // The web build logs the frame's input to the console (the wasm side calls this), so a
     // session can be read back or replayed the way the desktop build's log file is.
@@ -349,8 +493,10 @@
       say(hint);
       if (sessionStorage.getItem(RELOAD_KEY) === "1") {
         sessionStorage.removeItem(RELOAD_KEY);
-        say("Restoring the saved disc image…");
-        await restore();
+        say("Restoring the saved disc source…");
+        if (!(await restoreExtract())) {
+          await restore();
+        }
         return;
       }
       await startShell();
@@ -363,6 +509,17 @@
         console.warn("ClearSleeper: could not read the saved disc image", error);
       }
       if (cached) {
+        sessionStorage.setItem(RELOAD_KEY, "1");
+        location.reload();
+        return;
+      }
+      let savedTree = null;
+      try {
+        savedTree = await readCachedExtract();
+      } catch (error) {
+        console.warn("ClearSleeper: could not read the saved extracted tree", error);
+      }
+      if (savedTree?.length) {
         sessionStorage.setItem(RELOAD_KEY, "1");
         location.reload();
       }

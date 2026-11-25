@@ -44,6 +44,8 @@ pub struct AssetRoot {
 enum Source {
     Files(PathBuf),
     Disc(Arc<DiscImage>),
+    /// A dropped folder: the extracted tree held in memory under its relative paths.
+    Memory(Arc<std::collections::HashMap<String, Vec<u8>>>),
 }
 
 impl AssetRoot {
@@ -55,6 +57,15 @@ impl AssetRoot {
         if let Some(image) = installed_disc() {
             return Ok(Self {
                 source: Source::Disc(image),
+            });
+        }
+        if let Some(files) = EXTRACTED_MEMORY
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+        {
+            return Ok(Self {
+                source: Source::Memory(files),
             });
         }
         if let Some(root) = EXTRACTED
@@ -94,7 +105,7 @@ impl AssetRoot {
     pub fn fs_root(&self) -> Option<&Path> {
         match &self.source {
             Source::Files(root) => Some(root),
-            Source::Disc(_) => None,
+            Source::Disc(_) | Source::Memory(_) => None,
         }
     }
 
@@ -104,6 +115,7 @@ impl AssetRoot {
         match &self.source {
             Source::Files(root) => root.join(rel),
             Source::Disc(image) => image.path(rel),
+            Source::Memory(_) => PathBuf::from(format!("EXTRACT:{rel}")),
         }
     }
 
@@ -128,6 +140,14 @@ impl AssetRoot {
                     source,
                 },
             }),
+            Source::Memory(files) => {
+                files
+                    .get(rel)
+                    .cloned()
+                    .ok_or_else(|| AssetError::MissingFile {
+                        path: self.path(rel),
+                    })
+            }
         }
     }
 
@@ -141,6 +161,18 @@ impl AssetRoot {
         match &self.source {
             Source::Files(root) => Ok(Box::new(std::fs::File::open(root.join(rel))?)),
             Source::Disc(image) => Ok(image.stream(rel)?),
+            Source::Memory(files) => files
+                .get(rel)
+                .cloned()
+                .map(|bytes| {
+                    Box::new(std::io::Cursor::new(bytes)) as Box<dyn crate::disc::AssetStream>
+                })
+                .ok_or_else(|| {
+                    AssetError::MissingFile {
+                        path: self.path(rel),
+                    }
+                    .into()
+                }),
         }
     }
 
@@ -170,6 +202,11 @@ static INSTALLED: std::sync::Mutex<Option<Arc<DiscImage>>> = std::sync::Mutex::n
 /// the environment. Dusklight accepts a folder at its prelaunch picker; this is the same seam.
 static EXTRACTED: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
+/// The extracted tree handed over by the web folder picker, keyed by the relative paths the
+/// asset layer already asks for.
+static EXTRACTED_MEMORY: std::sync::Mutex<Option<Arc<std::collections::HashMap<String, Vec<u8>>>>> =
+    std::sync::Mutex::new(None);
+
 /// Install an extracted tree as the session's asset source.
 pub fn install_extracted(path: &Path) {
     let mut disc = INSTALLED.lock().unwrap_or_else(|error| error.into_inner());
@@ -179,15 +216,42 @@ pub fn install_extracted(path: &Path) {
     *slot = Some(path.to_path_buf());
 }
 
-/// A summary for the start UI's disc panel when the source is an extracted tree.
-pub fn extracted_summary(path: &Path) -> DiscSummary {
+fn extract_summary(title: Option<String>, files: usize) -> DiscSummary {
     DiscSummary {
         game_id: "EXTRACT".to_string(),
-        title: path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned()),
-        files: 0,
+        title,
+        files,
     }
+}
+
+/// A summary for an extracted tree installed from a directory path.
+pub fn extracted_summary(path: &Path) -> DiscSummary {
+    extract_summary(
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned()),
+        0,
+    )
+}
+
+/// Install an extracted tree handed over by the web folder picker.
+pub fn install_extracted_memory(files: Vec<(String, Vec<u8>)>) -> Result<DiscSummary, AssetError> {
+    if files.is_empty() {
+        return Err(AssetError::MissingFile {
+            path: PathBuf::from("EXTRACT:<empty folder>"),
+        });
+    }
+    let count = files.len();
+    let map = Arc::new(
+        files
+            .into_iter()
+            .collect::<std::collections::HashMap<_, _>>(),
+    );
+    *INSTALLED.lock().unwrap_or_else(|error| error.into_inner()) = None;
+    *EXTRACTED.lock().unwrap_or_else(|error| error.into_inner()) = None;
+    *EXTRACTED_MEMORY
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) = Some(map);
+    Ok(extract_summary(Some("extracted folder".to_string()), count))
 }
 
 /// Parse a disc image and install it as the source [`AssetRoot::from_env`] answers with. The
@@ -208,9 +272,26 @@ fn installed_disc() -> Option<Arc<DiscImage>> {
     slot.clone()
 }
 
-/// The installed image's identity for the start UI's disc panel.
+/// The installed source's identity for the start UI's disc panel.
 pub fn installed_disc_summary() -> Option<DiscSummary> {
-    installed_disc().map(|image| image.summary())
+    if let Some(image) = installed_disc() {
+        return Some(image.summary());
+    }
+    if let Some(files) = EXTRACTED_MEMORY
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .as_ref()
+    {
+        return Some(extract_summary(
+            Some("extracted folder".to_string()),
+            files.len(),
+        ));
+    }
+    EXTRACTED
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .as_ref()
+        .map(|path| extracted_summary(path))
 }
 
 fn open_rel(bytes: Vec<u8>, path: PathBuf) -> Result<Rel, AssetError> {

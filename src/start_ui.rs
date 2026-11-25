@@ -60,6 +60,10 @@ pub fn view(menu: &Menu) -> View {
         };
         buttons.push(menu_button(menu.title_index == index, label, on_click));
     }
+    #[cfg(target_arch = "wasm32")]
+    buttons.push(menu_button(false, "Load Folder", || {
+        crate::web::request_disc_folder()
+    }));
 
     let disc = match crate::assets::installed_disc_summary() {
         Some(summary) => match summary.title {
