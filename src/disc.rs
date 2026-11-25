@@ -30,11 +30,14 @@
 //! and `size`. The root's `size` is the entry count, which is also where the names start:
 //! `12 * count` bytes into the table.
 //!
-//! An RVZ container is not an image: it stores the disc's sectors compressed, so it is unwrapped
-//! through `nod` and its table is handed to the same parser here. The port reads the four
-//! GameCube discs the decompilation targets (GZLE01, GZLP01, GZLJ01, D44J01, the versions the
-//! `tww` spec's README lists); any other image is a typed error rather than a session without
-//! assets.
+//! A compressed container is not an image: it stores the disc's sectors in another layout, so
+//! it is unwrapped through `nod` and its partition's table is handed to the same parser here.
+//! `nod` reads WIA/RVZ, WBFS, CISO, TGC, GCZ and NFS (the Wii U VC wrapper), plus raw GameCube
+//! and Wii images; Dusklight's prelaunch picker accepts the same set, so a dump in any of them
+//! mounts here as it does there. GameCube prints are checked against the four discs the
+//! decompilation targets (GZLE01, GZLP01, GZLJ01, D44J01); a Wii or Wii U VC wrapper is judged by
+//! the partition's contents instead, and a wrong image is a typed error rather than a session
+//! without assets.
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -105,10 +108,6 @@ pub enum DiscError {
     TooLarge { len: usize, limit: usize },
     /// The magic at `0x1C` is not the GameCube one.
     BadMagic { actual: [u8; 4] },
-    /// The image is a Wii disc, which stores its files under a partition this port does not read.
-    WiiDisc { game_id: String },
-    /// A container this build does not unwrap.
-    UnsupportedContainer { format: &'static str },
     /// An RVZ container whose version byte is not the one `nod` reads.
     RvzVersion { version: u8 },
     /// A readable image that is not one of the discs the port has assets for.
@@ -136,14 +135,6 @@ impl std::fmt::Display for DiscError {
                 f,
                 "no GameCube boot magic at 0x1C (found {:02X?}); this is not a GameCube disc",
                 actual
-            ),
-            Self::WiiDisc { game_id } => write!(
-                f,
-                "the image is the Wii disc {game_id}; this port reads GameCube discs"
-            ),
-            Self::UnsupportedContainer { format } => write!(
-                f,
-                "{format} images are not supported; drop an ISO/GCM dump or an RVZ"
             ),
             Self::RvzVersion { version } => write!(
                 f,
@@ -446,17 +437,18 @@ impl DiscImage {
         let magic = [bytes[0], bytes[1], bytes[2], bytes[3]];
         if magic[..RVZ_MAGIC.len()] == RVZ_MAGIC {
             return match magic[3] {
-                1 => Self::open_rvz(bytes),
+                1 => Self::open_container(bytes),
                 version => Err(DiscError::RvzVersion { version }),
             };
         }
         match magic {
-            WIA_MAGIC => Self::open_rvz(bytes),
-            CISO_MAGIC => Err(DiscError::UnsupportedContainer { format: "CISO" }),
-            GCZ_MAGIC => Err(DiscError::UnsupportedContainer { format: "GCZ" }),
-            WBFS_MAGIC => Err(DiscError::UnsupportedContainer { format: "WBFS" }),
-            TGC_MAGIC => Err(DiscError::UnsupportedContainer { format: "TGC" }),
-            NFS_MAGIC => Err(DiscError::UnsupportedContainer { format: "NFS" }),
+            // `nod` detects the container from these magics and hands back the same game
+            // partition for each: WIA/RVZ, WBFS, CISO, TGC, GCZ and NFS (the Wii U VC
+            // wrapper). Dusklight accepts the same set at its prelaunch file picker, so a
+            // dump in any of them mounts here as it does there.
+            WIA_MAGIC | CISO_MAGIC | GCZ_MAGIC | WBFS_MAGIC | TGC_MAGIC | NFS_MAGIC => {
+                Self::open_container(bytes)
+            }
             _ => Self::open_raw(bytes),
         }
     }
@@ -466,9 +458,9 @@ impl DiscImage {
             return Err(DiscError::Truncated { len: bytes.len() });
         }
         if bytes[WII_MAGIC_AT..WII_MAGIC_AT + 4] == WII_MAGIC {
-            return Err(DiscError::WiiDisc {
-                game_id: game_id(&bytes[..GAME_ID_LEN]),
-            });
+            // A raw Wii image is a disc `nod` reads through its data partition just like a
+            // container; hand it over rather than refusing the platform.
+            return Self::open_container(bytes);
         }
         if bytes[GAME_MAGIC_AT..GAME_MAGIC_AT + 4] != GAME_MAGIC {
             return Err(DiscError::BadMagic {
@@ -503,20 +495,22 @@ impl DiscImage {
         })
     }
 
-    fn open_rvz(bytes: Vec<u8>) -> Result<Self, DiscError> {
+    fn open_container(bytes: Vec<u8>) -> Result<Self, DiscError> {
         let disc = nod::Disc::new_stream(Box::new(ImageStream::new(Arc::new(bytes))))
             .map_err(container_error)?;
         let header = disc.header();
         let id = game_id(&header.game_id);
-        if header.is_wii() {
-            return Err(DiscError::WiiDisc { game_id: id });
-        }
-        if !header.is_gamecube() {
+        if !header.is_gamecube() && !header.is_wii() {
             return Err(DiscError::BadMagic {
                 actual: header.gcn_magic,
             });
         }
-        wind_waker(&id)?;
+        // A Wii disc carries its files in the same data-partition FST as a GameCube disc;
+        // `nod` decrypts and exposes that partition identically. The game-id allow-list only
+        // applies to GameCube prints - a Wii or Wii U VC wrapper is judged by its contents.
+        if header.is_gamecube() {
+            wind_waker(&id)?;
+        }
         let title = title(&header.game_title);
         // The partition's table is the disc's own, so the parser here owns the path semantics for
         // both containers; `nod`'s node values carry the offsets `open_file` seeks to.

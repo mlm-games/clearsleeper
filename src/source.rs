@@ -23,7 +23,8 @@ pub const DEFAULT_DISC_NAMES: [&str; 2] = ["disc.iso", "disc.rvz"];
 
 /// The desktop entry's one-line usage, printed for `--help` and after a launch error.
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
-pub const USAGE: &str = "usage: clearsleeper [--disc <image.iso|image.gcm|image.rvz>] [<image>]";
+pub const USAGE: &str =
+    "usage: clearsleeper [--disc <image.iso|image.gcm|image.rvz|extracted-folder>] [<image>]";
 
 #[derive(Debug)]
 pub enum SourceError {
@@ -86,6 +87,12 @@ impl std::error::Error for SourceError {
 /// Read `path` and install it as the session's image, through the same seam the web drop zone
 /// and the Android picker call.
 pub fn install_file(path: &Path) -> Result<DiscSummary, SourceError> {
+    if path.is_dir() {
+        // An extracted disc tree is a source in its own right: `AssetRoot` reads loose files
+        // from it exactly as it reads them from `CS_ASSETS`, with no image to parse.
+        crate::assets::install_extracted(path);
+        return Ok(crate::assets::extracted_summary(path));
+    }
     let bytes = std::fs::read(path).map_err(|source| SourceError::Read {
         path: path.to_path_buf(),
         source,

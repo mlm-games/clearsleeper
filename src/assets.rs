@@ -57,6 +57,15 @@ impl AssetRoot {
                 source: Source::Disc(image),
             });
         }
+        if let Some(root) = EXTRACTED
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+        {
+            return Ok(Self {
+                source: Source::Files(root),
+            });
+        }
         if let Some(value) = std::env::var_os(ASSETS_ENV).filter(|value| !value.is_empty()) {
             return Ok(Self {
                 source: Source::Files(PathBuf::from(value)),
@@ -155,6 +164,31 @@ fn missing_root() -> AssetError {
 /// The disc image an installed source was parsed from - the web drop zone's, the desktop
 /// entry's, the Android picker's - which [`AssetRoot::from_env`] answers with.
 static INSTALLED: std::sync::Mutex<Option<Arc<DiscImage>>> = std::sync::Mutex::new(None);
+
+/// An extracted disc tree installed as the source instead of an image: the same loose files a
+/// development `CS_ASSETS` tree holds, but picked as a folder at launch rather than named in
+/// the environment. Dusklight accepts a folder at its prelaunch picker; this is the same seam.
+static EXTRACTED: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Install an extracted tree as the session's asset source.
+pub fn install_extracted(path: &Path) {
+    let mut disc = INSTALLED.lock().unwrap_or_else(|error| error.into_inner());
+    *disc = None;
+    drop(disc);
+    let mut slot = EXTRACTED.lock().unwrap_or_else(|error| error.into_inner());
+    *slot = Some(path.to_path_buf());
+}
+
+/// A summary for the start UI's disc panel when the source is an extracted tree.
+pub fn extracted_summary(path: &Path) -> DiscSummary {
+    DiscSummary {
+        game_id: "EXTRACT".to_string(),
+        title: path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned()),
+        files: 0,
+    }
+}
 
 /// Parse a disc image and install it as the source [`AssetRoot::from_env`] answers with. The
 /// bytes are taken by value, so a platform that already holds them in a shareable buffer does
