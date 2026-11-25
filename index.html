@@ -48,6 +48,15 @@
     const file = document.getElementById("disc-file");
     const hint = "Drop a GameCube disc image here, or choose Load Disc.";
 
+    // js-sys's future queue drains tasks from a wasm-bindgen Closure via queueMicrotask.
+    // A future that schedules another task while the queue is draining re-enters that same
+    // Closure, which wasm-bindgen rejects with "closure invoked recursively or after being
+    // dropped" (the stack seen at boot). A promise hop keeps nested scheduling on a later
+    // tick, which is what js-sys's own fallback does when queueMicrotask is absent.
+    globalThis.queueMicrotask = (fn) => {
+      Promise.resolve().then(fn);
+    };
+
     // The start screen is native Rust; the page only reports progress to it.
     let statusText = "";
     const pushStatus = () => {
