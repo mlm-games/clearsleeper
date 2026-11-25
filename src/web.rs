@@ -11,6 +11,24 @@
 
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen::prelude::wasm_bindgen(inline_js = "
+export function clearsleeper_report_boot_error(message) {
+    if (typeof window !== 'undefined' && typeof window.__clearsleeperPanic === 'function') {
+        window.__clearsleeperPanic(message);
+    } else {
+        console.error(message);
+    }
+}
+")]
+extern "C" {
+    fn clearsleeper_report_boot_error(message: &str);
+}
+
+/// Surface a failure to start the shell on the page instead of leaving a blank canvas.
+pub fn report_boot_error(message: &str) {
+    clearsleeper_report_boot_error(message);
+}
+
 use crate::assets;
 use crate::disc::MAX_IMAGE_BYTES;
 
@@ -77,9 +95,15 @@ pub fn disc_image_limit() -> f64 {
 #[wasm_bindgen(js_name = installDiscImage)]
 pub fn install_disc_image(bytes: Vec<u8>) -> Result<String, JsValue> {
     crate::report::install();
-    assets::install_disc_image(bytes)
-        .map(|summary| summary.to_string())
-        .map_err(|error| JsValue::from_str(&error.to_string()))
+    let summary =
+        assets::install_disc_image(bytes).map_err(|error| JsValue::from_str(&error.to_string()))?;
+    if let Err(detail) = assets::verify_playable() {
+        assets::clear_installed();
+        return Err(JsValue::from_str(&format!(
+            "{summary} mounted but cannot start: {detail}"
+        )));
+    }
+    Ok(summary.to_string())
 }
 
 /// Install an extracted disc tree handed over by the folder picker. `bytes` holds every file
@@ -104,9 +128,15 @@ pub fn install_extracted(
         files.push((path, data.to_vec()));
         cursor = end;
     }
-    assets::install_extracted_memory(files)
-        .map(|summary| summary.to_string())
-        .map_err(|error| JsValue::from_str(&error.to_string()))
+    let summary = assets::install_extracted_memory(files)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    if let Err(detail) = assets::verify_playable() {
+        assets::clear_installed();
+        return Err(JsValue::from_str(&format!(
+            "{summary} mounted but cannot start: {detail}"
+        )));
+    }
+    Ok(summary.to_string())
 }
 
 /// Start the shell loop over the installed image.

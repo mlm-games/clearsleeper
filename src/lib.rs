@@ -1268,6 +1268,20 @@ impl App {
                 _ => {}
             }
         }
+        if self.menu.screen == menus::Screen::NameEntry {
+            if self.menu.name_confirm.take() {
+                let name = self.menu.name_entry.clone();
+                let slot = self.menu.name_slot;
+                if !name.is_empty() {
+                    self.name = name;
+                }
+                self.menu.screen = menus::Screen::Playing;
+                self.reset_world_at(assets::PROLOGUE_STAGE, assets::PROLOGUE_SPAWN_POINT);
+                self.open_new_slot(slot);
+                self.menu_prev.clone_from(held);
+                return;
+            }
+        }
         if self.menu.screen == menus::Screen::NameEntry && window_focused {
             for key in held
                 .iter()
@@ -5378,7 +5392,9 @@ pub fn run() {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        let _ = repame_shell::run_web(root);
+        if let Err(error) = repame_shell::run_web(root) {
+            web::report_boot_error(&format!("the window could not start: {error:?}"));
+        }
     }
 }
 
@@ -5419,7 +5435,8 @@ pub fn root_view(
         return intro_view(app, ctx);
     }
     if app.menu.screen == menus::Screen::NameEntry {
-        return menus::name_entry_view(&app.menu);
+        return ZStack(Modifier::new().fill_max_size())
+            .child([menus::name_entry_view(&app.menu), app.touch.view(ctx)]);
     }
     if app.menu.screen == menus::Screen::Title {
         let mut stack = Vec::new();
@@ -6301,14 +6318,27 @@ pub extern "C" fn android_main(android_app: winit::platform::android::activity::
     if let Some(dir) = android_app.internal_data_path() {
         game_utils::set_android_data_dir(dir);
     }
-    match android::install_source(&android_app) {
-        Ok(Some(summary)) => log::info!("clearsleeper: disc image {summary}"),
-        Ok(None) => log::warn!(
-            "clearsleeper: no disc image picked or found; {} is unset on a device, so the \
-             session boots without assets",
-            assets::ASSETS_ENV
-        ),
-        Err(error) => log::error!("clearsleeper: disc image rejected ({error})"),
+    // A cancelled or rejected pick gets two more attempts before the no-source shell takes
+    // over; otherwise one accidental back press strands the player on a screen whose Play
+    // entry cannot open the picker again.
+    let mut source = None;
+    for attempt in 0..3 {
+        match android::install_source(&android_app) {
+            Ok(Some(summary)) => {
+                log::info!("clearsleeper: disc image {summary}");
+                source = Some(());
+                break;
+            }
+            Ok(None) => log::warn!(
+                "clearsleeper: pick {} cancelled; {} is unset on a device",
+                attempt + 1,
+                assets::ASSETS_ENV
+            ),
+            Err(error) => log::error!("clearsleeper: disc image rejected ({error})"),
+        }
+    }
+    if source.is_none() {
+        log::warn!("clearsleeper: no disc image installed; showing the no-source shell");
     }
     let mut app = App::new_live();
     let mut last = std::time::Instant::now();

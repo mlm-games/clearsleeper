@@ -35,6 +35,8 @@ pub enum SourceError {
     },
     /// The bytes read are not an image [`DiscImage::open`](crate::disc::DiscImage::open) accepts.
     Image { path: PathBuf, source: DiscError },
+    /// The source mounted, but the assets a session needs are missing.
+    NotPlayable { path: PathBuf, detail: &'static str },
     /// The platform picker could not hand a document over.
     #[cfg(target_os = "android")]
     Picker {
@@ -59,6 +61,9 @@ impl std::fmt::Display for SourceError {
             Self::Image { path, source } => {
                 write!(f, "cannot use the disc image {}: {source}", path.display())
             }
+            Self::NotPlayable { path, detail } => {
+                write!(f, "{} mounted but cannot start: {detail}", path.display())
+            }
             #[cfg(target_os = "android")]
             Self::Picker { source } => write!(f, "the file picker failed: {source}"),
             #[cfg(target_os = "android")]
@@ -75,6 +80,7 @@ impl std::error::Error for SourceError {
         match self {
             Self::Read { source, .. } => Some(source),
             Self::Image { source, .. } => Some(source),
+            Self::NotPlayable { .. } => None,
             #[cfg(target_os = "android")]
             Self::Picker { source } => Some(source),
             #[cfg(target_os = "android")]
@@ -91,7 +97,15 @@ pub fn install_file(path: &Path) -> Result<DiscSummary, SourceError> {
         // An extracted disc tree is a source in its own right: `AssetRoot` reads loose files
         // from it exactly as it reads them from `CS_ASSETS`, with no image to parse.
         crate::assets::install_extracted(path);
-        return Ok(crate::assets::extracted_summary(path));
+        return if let Err(detail) = crate::assets::verify_playable() {
+            crate::assets::clear_installed();
+            Err(SourceError::NotPlayable {
+                path: path.to_path_buf(),
+                detail,
+            })
+        } else {
+            Ok(crate::assets::extracted_summary(path))
+        };
     }
     let mut handle = std::fs::File::open(path).map_err(|source| SourceError::Read {
         path: path.to_path_buf(),
@@ -106,10 +120,20 @@ pub fn install_file(path: &Path) -> Result<DiscSummary, SourceError> {
     drop(handle);
     if head == 4 && &magic == b"EGGS" {
         // `nod` reads NFS (Wii U VC) images by path, not from a byte stream.
-        return crate::assets::install_disc_path(path).map_err(|source| SourceError::Image {
-            path: path.to_path_buf(),
-            source,
-        });
+        let summary =
+            crate::assets::install_disc_path(path).map_err(|source| SourceError::Image {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        return if let Err(detail) = crate::assets::verify_playable() {
+            crate::assets::clear_installed();
+            Err(SourceError::NotPlayable {
+                path: path.to_path_buf(),
+                detail,
+            })
+        } else {
+            Ok(summary)
+        };
     }
     let bytes = std::fs::read(path).map_err(|source| SourceError::Read {
         path: path.to_path_buf(),
@@ -122,10 +146,19 @@ pub fn install_file(path: &Path) -> Result<DiscSummary, SourceError> {
 /// are taken as they were handed over, so a platform holding a shareable buffer does not copy
 /// the disc.
 pub fn install_bytes(label: &Path, bytes: impl Into<Vec<u8>>) -> Result<DiscSummary, SourceError> {
-    crate::assets::install_disc_image(bytes).map_err(|source| SourceError::Image {
-        path: label.to_path_buf(),
-        source,
-    })
+    let summary =
+        crate::assets::install_disc_image(bytes).map_err(|source| SourceError::Image {
+            path: label.to_path_buf(),
+            source,
+        })?;
+    if let Err(detail) = crate::assets::verify_playable() {
+        crate::assets::clear_installed();
+        return Err(SourceError::NotPlayable {
+            path: label.to_path_buf(),
+            detail,
+        });
+    }
+    Ok(summary)
 }
 
 /// Install the first candidate that exists, in the order given. `None` when none is there; an

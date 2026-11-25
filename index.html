@@ -41,7 +41,7 @@
 </head>
 
 <body>
-  <input id="disc-file" type="file" accept=".iso,.gcm,.gcz,.ciso,.wbfs,.wia,.rvz,.tgc,.nfs" multiple hidden />
+  <input id="disc-file" type="file" accept=".iso,.gcm,.ciso,.wbfs,.wia,.rvz" multiple hidden />
   <input id="disc-folder" type="file" webkitdirectory directory hidden />
   <div id="cs-panic"></div>
 
@@ -95,8 +95,13 @@
     window.clearsleeperPickFolder = () => folder.click();
 
     // Trunk's glue sets `window.wasmBindings` and then fires this event, so either order works.
-    const bindingsReady = () => new Promise((resolve) => {
+    const bindingsReady = () => new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("WebAssembly did not finish loading; reload the page.")),
+        20000,
+      );
       const ready = (bindings) => {
+        clearTimeout(timer);
         pushStatus();
         resolve(bindings);
       };
@@ -107,23 +112,22 @@
       addEventListener("TrunkApplicationStarted", () => ready(window.wasmBindings), { once: true });
     });
 
-    // A dropped image is kept here so a reload does not ask for the disc again. IndexedDB stores
-    // the File as a browser-managed blob, not a copy in the page's heap; the image is still read
-    // only by this origin and is never uploaded.
+    addEventListener("unhandledrejection", (event) => {
+      say(`ClearSleeper error: ${event.reason}`);
+    });
+
+    // One active source record: an image or an extracted folder, never both. A reload restores
+    // exactly what was last chosen, so an old folder cannot beat a newly picked image.
     const DB_NAME = "clearsleeper";
-    const STORE = "disc";
-    const EXTRACT_STORE = "extract";
-    const KEY = "image";
+    const STORE = "source";
+    const KEY = "active";
 
     function openDb() {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 2);
+        const request = indexedDB.open(DB_NAME, 3);
         request.onupgradeneeded = () => {
           if (!request.result.objectStoreNames.contains(STORE)) {
             request.result.createObjectStore(STORE);
-          }
-          if (!request.result.objectStoreNames.contains(EXTRACT_STORE)) {
-            request.result.createObjectStore(EXTRACT_STORE);
           }
         };
         request.onsuccess = () => resolve(request.result);
@@ -135,8 +139,7 @@
       const db = await openDb();
       try {
         return await new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readonly");
-          const request = tx.objectStore(STORE).get(KEY);
+          const request = db.transaction(STORE, "readonly").objectStore(STORE).get(KEY);
           request.onsuccess = () => resolve(request.result ?? null);
           request.onerror = () => reject(request.error);
         });
@@ -145,15 +148,13 @@
       }
     }
 
-    async function writeCached(blob) {
+    async function writeCached(record) {
       const db = await openDb();
       try {
         await new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readwrite");
-          tx.objectStore(STORE).put(blob, KEY);
-          tx.oncomplete = resolve;
-          tx.onerror = () => reject(tx.error);
-          tx.onabort = () => reject(tx.error);
+          const request = db.transaction(STORE, "readwrite").objectStore(STORE).put(record, KEY);
+          request.onsuccess = resolve;
+          request.onerror = () => reject(request.error);
         });
       } finally {
         db.close();
@@ -164,23 +165,8 @@
       const db = await openDb();
       try {
         await new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readwrite");
-          tx.objectStore(STORE).delete(KEY);
-          tx.oncomplete = resolve;
-          tx.onerror = () => reject(tx.error);
-        });
-      } finally {
-        db.close();
-      }
-    }
-
-    async function readCachedExtract() {
-      const db = await openDb();
-      try {
-        return await new Promise((resolve, reject) => {
-          const tx = db.transaction(EXTRACT_STORE, "readonly");
-          const request = tx.objectStore(EXTRACT_STORE).get(KEY);
-          request.onsuccess = () => resolve(request.result ?? null);
+          const request = db.transaction(STORE, "readwrite").objectStore(STORE).delete(KEY);
+          request.onsuccess = resolve;
           request.onerror = () => reject(request.error);
         });
       } finally {
@@ -188,19 +174,9 @@
       }
     }
 
-    async function writeCachedExtract(files) {
-      const db = await openDb();
-      try {
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction(EXTRACT_STORE, "readwrite");
-          tx.objectStore(EXTRACT_STORE).put(files, KEY);
-          tx.oncomplete = resolve;
-          tx.onerror = () => reject(tx.error);
-          tx.onabort = () => reject(tx.error);
-        });
-      } finally {
-        db.close();
-      }
+    async function readCachedExtract() {
+      const cached = await readCached();
+      return cached?.kind === "extract" ? cached.files : null;
     }
 
     const imageLimit = (bindings) =>
@@ -209,7 +185,10 @@
     const megabytes = (bytes) => (bytes / 1048576).toFixed(0);
 
     let installing = false;
+    // `booted` is the shell loop (the native launcher while no source is installed).
+    // `sessionStarted` is a committed source; only that closes the pickers.
     let booted = false;
+    let sessionStarted = false;
     let booting = false;
     const RELOAD_KEY = "cs-disc-reload";
 
@@ -255,6 +234,7 @@
         say(panicReport || `${error}`);
         return false;
       }
+      sessionStarted = true;
       say(`Starting ClearSleeper on ${summary}…`);
       panicReport = "";
       return true;
@@ -265,7 +245,7 @@
         if (navigator.storage && navigator.storage.persist) {
           await navigator.storage.persist();
         }
-        await writeCached(picked);
+        await writeCached({ kind: "image", file: picked, name: picked.name });
       } catch (error) {
         // A full disk or a browser without large IndexedDB blobs only costs the next upload.
         console.warn("ClearSleeper: could not keep the disc image for next time", error);
@@ -273,7 +253,7 @@
     }
 
     async function install(picked) {
-      if (installing || booted) {
+      if (installing || sessionStarted) {
         return;
       }
       installing = true;
@@ -305,24 +285,35 @@
       }
     }
 
-    async function walkEntry(entry, prefix, out) {
+    // The asset layer asks for `files/res/...`, so a dropped or picked folder is rebased on
+    // the disc root before it is handed over or cached, whatever the browser reports.
+    const discPath = (path) => {
+      const at = path.indexOf("files/");
+      if (at >= 0) {
+        return path.slice(at);
+      }
+      const slash = path.indexOf("/");
+      return slash >= 0 ? path.slice(slash + 1) : path;
+    };
+
+    async function walkEntry(entry, prefix, out, root) {
       if (entry.isFile) {
         const picked = await new Promise((resolve, reject) => entry.file(resolve, reject));
-        out.push({ path: prefix + picked.name, file: picked });
+        out.push({ path: discPath(prefix + picked.name), file: picked });
         return;
       }
       if (!entry.isDirectory) {
         return;
       }
       const reader = entry.createReader();
-      const next = prefix + entry.name + "/";
+      const next = root ? "" : prefix + entry.name + "/";
       for (;;) {
         const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
         if (!batch.length) {
           break;
         }
         for (const child of batch) {
-          await walkEntry(child, next, out);
+          await walkEntry(child, next, out, false);
         }
       }
     }
@@ -351,13 +342,13 @@
     async function installExtract(entries) {
       const out = [];
       for (const entry of entries) {
-        await walkEntry(entry, "", out);
+        await walkEntry(entry, "", out, true);
       }
       await installExtractFiles(out);
     }
 
     async function installExtractFiles(out) {
-      if (installing || booted) {
+      if (installing || sessionStarted) {
         return;
       }
       installing = true;
@@ -376,8 +367,16 @@
           say(panicReport || `${error}`);
           return;
         }
+        sessionStarted = true;
         say(`Starting ClearSleeper on ${summary}…`);
-        await writeCachedExtract(out.map((item) => ({ path: item.path, file: item.file })));
+        try {
+          await writeCached({
+            kind: "extract",
+            files: out.map((item) => ({ path: item.path, file: item.file })),
+          });
+        } catch (error) {
+          say(`ClearSleeper will start, but the folder could not be saved: ${error}`);
+        }
         sessionStorage.setItem(RELOAD_KEY, "1");
         location.reload();
       } finally {
@@ -386,7 +385,13 @@
     }
 
     async function restoreExtract() {
-      const cached = await readCachedExtract();
+      let cached = null;
+      try {
+        cached = await readCachedExtract();
+      } catch (error) {
+        console.warn("ClearSleeper: could not read the saved extracted tree", error);
+        return false;
+      }
       if (!cached || !cached.length) {
         return false;
       }
@@ -399,12 +404,13 @@
         say(panicReport || `${error}`);
         return false;
       }
+      sessionStarted = true;
       await startShell();
       return true;
     }
 
     async function restore() {
-      if (installing || booted) {
+      if (installing || sessionStarted) {
         return;
       }
       installing = true;
@@ -419,18 +425,21 @@
         if (!cached) {
           return;
         }
+        if (cached.kind !== "image") {
+          return;
+        }
         const label = cached.name || "saved disc image";
         const bindings = await bindingsReady();
         const limit = imageLimit(bindings);
-        if (cached.size > limit) {
+        if (cached.file.size > limit) {
           await clearCached();
-          say(`${label} is ${megabytes(cached.size)} MB; choose a smaller image`);
+          say(`${label} is ${megabytes(cached.file.size)} MB; choose a smaller image`);
           return;
         }
         say(`Reading ${label} (${megabytes(cached.size)} MB)…`);
         let bytes;
         try {
-          bytes = new Uint8Array(await cached.arrayBuffer());
+          bytes = new Uint8Array(await cached.file.arrayBuffer());
         } catch (error) {
           await clearCached();
           say(`Could not read the saved image: ${error}. Choose the file again.`);
@@ -490,7 +499,7 @@
       }
       // Browsers without webkitEntries still put the relative path on each picked File.
       const out = [...(folder.files ?? [])].map((picked) => ({
-        path: picked.webkitRelativePath || picked.name,
+        path: discPath(picked.webkitRelativePath || picked.name),
         file: picked,
       }));
       installExtractFiles(out);
@@ -520,17 +529,6 @@
         console.warn("ClearSleeper: could not read the saved disc image", error);
       }
       if (cached) {
-        sessionStorage.setItem(RELOAD_KEY, "1");
-        location.reload();
-        return;
-      }
-      let savedTree = null;
-      try {
-        savedTree = await readCachedExtract();
-      } catch (error) {
-        console.warn("ClearSleeper: could not read the saved extracted tree", error);
-      }
-      if (savedTree?.length) {
         sessionStorage.setItem(RELOAD_KEY, "1");
         location.reload();
       }

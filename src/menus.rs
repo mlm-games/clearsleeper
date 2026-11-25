@@ -108,6 +108,7 @@ pub struct Menu {
     pub pause: PauseState,
     /// Name typed on the new-file screen before the game starts (tww d_s_name.cpp:1312-1370).
     pub name_entry: String,
+    pub name_confirm: Rc<Cell<bool>>,
     pub name_slot: usize,
     pub fs: crate::ui_file_select::FileSelect,
     pub card: crate::ui_menu_save::MemCard,
@@ -135,6 +136,7 @@ impl Menu {
             settings: Settings::defaults(),
             pause: PauseState::default(),
             name_entry: String::new(),
+            name_confirm: Rc::new(Cell::new(false)),
             name_slot: 0,
             fs: crate::ui_file_select::FileSelect::default(),
             card: crate::ui_menu_save::MemCard::default(),
@@ -519,5 +521,17 @@ pub fn name_entry_view(menu: &Menu) -> View {
             .color(Color::from_hex(CURSOR_HEX)),
         Text(name).size(Sp(36.0)).color(Color::from_hex(TITLE_HEX)),
         hint("A-Z: type   Backspace: delete   Enter: confirm   Escape: cancel"),
+        Button(
+            Modifier::new(),
+            {
+                let confirm = menu.name_confirm.clone();
+                move || confirm.set(true)
+            },
+            ButtonConfig {
+                modifier: Modifier::new().width(260.dp()),
+                ..Default::default()
+            },
+            || Text("Use default name / Continue".to_string()).size(Sp(20.0)),
+        ),
     ])
 }

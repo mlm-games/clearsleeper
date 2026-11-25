@@ -13,11 +13,31 @@ pub struct TitleAssets {
 
 impl TitleAssets {
     pub fn load(root: &AssetRoot) -> Option<Self> {
-        let path = format!("files/res/Object/{}.arc", title::ARCHIVE);
-        let archive = root.read_archive(&path).ok()?;
-        let screen = j2d::parse(archive.read(title::SCREEN_FILE).ok()?)?;
-        let images = PaneImages::load(&archive);
-        Some(Self { screen, images })
+        // The title logo is regional: the US dump carries TlogoE/title_logo_e.blo, Japan
+        // carries Tlogo/title_logo.blo, and PAL uses the TlogoE0 family. Try the edition the
+        // mounted disc reports first, then the remaining pairs, so an accepted dump cannot be
+        // locked out by a hard-coded US path.
+        let japan = matches!(root.game_id(), Some("GZLJ01" | "D44J01"));
+        let mut pairs = vec![
+            ("TlogoE", "title_logo_e.blo"),
+            ("Tlogo", "title_logo.blo"),
+            ("TlogoE0", "title_logo_e0.blo"),
+        ];
+        if japan {
+            pairs.swap(0, 1);
+        }
+        for (archive_name, screen_file) in pairs {
+            let path = format!("files/res/Object/{archive_name}.arc");
+            let Ok(archive) = root.read_archive(&path) else {
+                continue;
+            };
+            let Some(screen) = archive.read(screen_file).ok().and_then(j2d::parse) else {
+                continue;
+            };
+            let images = PaneImages::load(&archive);
+            return Some(Self { screen, images });
+        }
+        None
     }
 }
 

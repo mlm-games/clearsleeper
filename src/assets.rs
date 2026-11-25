@@ -109,6 +109,14 @@ impl AssetRoot {
         }
     }
 
+    /// The disc's game id, when the source is an image rather than an extracted tree.
+    pub fn game_id(&self) -> Option<&str> {
+        match &self.source {
+            Source::Disc(image) => Some(image.game_id()),
+            _ => None,
+        }
+    }
+
     /// The label an asset path carries in errors: its path under the extracted root, or
     /// `GAMEID:relative` when it came out of an image.
     pub fn path(&self, rel: &str) -> PathBuf {
@@ -274,6 +282,37 @@ pub fn install_disc_path(path: &std::path::Path) -> Result<DiscSummary, crate::d
     let summary = image.summary();
     *INSTALLED.lock().unwrap_or_else(|error| error.into_inner()) = Some(image);
     Ok(summary)
+}
+
+/// The boundary between a source that mounts and a source that can actually reach file select.
+/// Every path into a session passes here before the shell stops showing the launcher.
+pub fn verify_playable() -> Result<(), &'static str> {
+    let root = AssetRoot::from_env().map_err(|_| "no asset source is installed")?;
+    if crate::title_screen::TitleAssets::load(&root).is_none() {
+        return Err("the title screen assets are missing");
+    }
+    if crate::panes::load().is_none() {
+        return Err("the file-select panes are missing");
+    }
+    if !crate::assets::load_msg_archives().available() {
+        return Err("the message archives are missing");
+    }
+    if load_stage_tables(SEA_STAGE).is_none() {
+        return Err("the starting stage tables are missing");
+    }
+    if load_stage_at(SEA_STAGE, STAGE_SPAWN_POINT).is_none() {
+        return Err("the starting stage is missing");
+    }
+    Ok(())
+}
+
+/// Drop a source that mounted but failed [`verify_playable`], so the launcher stays usable.
+pub fn clear_installed() {
+    *INSTALLED.lock().unwrap_or_else(|error| error.into_inner()) = None;
+    *EXTRACTED.lock().unwrap_or_else(|error| error.into_inner()) = None;
+    *EXTRACTED_MEMORY
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) = None;
 }
 
 fn installed_disc() -> Option<Arc<DiscImage>> {
