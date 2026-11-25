@@ -267,6 +267,15 @@ pub fn install_disc_image(
     Ok(summary)
 }
 
+/// Mount a disc from a path, for containers `nod` can only read through a file (NFS, the Wii U
+/// VC wrapper). The image stays on disk; only the parsed partition is held in the session.
+pub fn install_disc_path(path: &std::path::Path) -> Result<DiscSummary, crate::disc::DiscError> {
+    let image = Arc::new(DiscImage::open_path(path)?);
+    let summary = image.summary();
+    *INSTALLED.lock().unwrap_or_else(|error| error.into_inner()) = Some(image);
+    Ok(summary)
+}
+
 fn installed_disc() -> Option<Arc<DiscImage>> {
     let slot = INSTALLED.lock().unwrap_or_else(|error| error.into_inner());
     slot.clone()

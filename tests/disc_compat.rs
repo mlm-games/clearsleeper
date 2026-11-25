@@ -64,6 +64,20 @@ fn raw_game_cube_image_reads_an_asset() {
 }
 
 #[test]
+fn path_based_mount_reads_an_asset() {
+    let path = std::env::temp_dir().join(format!("cs-path-{}", std::process::id()));
+    std::fs::write(&path, wind_waker_image()).expect("write image to a path");
+    let image = DiscImage::open_path(&path).expect("mount a disc through nod::Disc::new(path)");
+    assert_eq!(
+        image
+            .read("files/Test.txt")
+            .expect("read asset from a path-mounted disc"),
+        b"CLEAR SLEEPER TEST"
+    );
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
 fn wii_and_nfs_headers_go_through_nod() {
     let mut wii = wind_waker_image();
     wii[..6].copy_from_slice(b"RZDE01");

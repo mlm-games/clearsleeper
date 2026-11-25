@@ -93,6 +93,24 @@ pub fn install_file(path: &Path) -> Result<DiscSummary, SourceError> {
         crate::assets::install_extracted(path);
         return Ok(crate::assets::extracted_summary(path));
     }
+    let mut handle = std::fs::File::open(path).map_err(|source| SourceError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut magic = [0u8; 4];
+    let head =
+        std::io::Read::read(&mut handle, &mut magic).map_err(|source| SourceError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    drop(handle);
+    if head == 4 && &magic == b"EGGS" {
+        // `nod` reads NFS (Wii U VC) images by path, not from a byte stream.
+        return crate::assets::install_disc_path(path).map_err(|source| SourceError::Image {
+            path: path.to_path_buf(),
+            source,
+        });
+    }
     let bytes = std::fs::read(path).map_err(|source| SourceError::Read {
         path: path.to_path_buf(),
         source,

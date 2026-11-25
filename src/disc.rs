@@ -498,6 +498,17 @@ impl DiscImage {
     fn open_container(bytes: Vec<u8>) -> Result<Self, DiscError> {
         let disc = nod::Disc::new_stream(Box::new(ImageStream::new(Arc::new(bytes))))
             .map_err(container_error)?;
+        Self::from_disc(disc)
+    }
+
+    /// Mount a disc from a file path. `nod` needs a path for containers that cannot seek a
+    /// byte slice - notably NFS, the Wii U VC wrapper - so desktop launches hand it one.
+    pub fn open_path(path: &std::path::Path) -> Result<Self, DiscError> {
+        let disc = nod::Disc::new(path).map_err(container_error)?;
+        Self::from_disc(disc)
+    }
+
+    fn from_disc(disc: nod::Disc) -> Result<Self, DiscError> {
         let header = disc.header();
         let id = game_id(&header.game_id);
         if !header.is_gamecube() && !header.is_wii() {
