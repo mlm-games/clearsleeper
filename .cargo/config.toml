@@ -1,6 +1,9 @@
 [target.wasm32-unknown-unknown]
 rustflags = [
     "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
+    # App construction builds a large ECS world on the stack; the default 1 MiB wasm
+    # stack overflows there and lands as a "memory access out of bounds" trap at boot.
+    "-C", "link-arg=-zstack-size=67108864",
     "-C", "link-arg=--shared-memory",
     "-C", "link-arg=--max-memory=4294967296",
     "-C", "link-arg=--import-memory",
