@@ -1,0 +1,1177 @@
+//! Voxel chunk mesher: game-owned grid in, [`MeshGroup`]s out.
+
+use std::collections::{HashMap, HashSet};
+
+use super::mesh::{MeshGroup, Rgb, shade_for_dir};
+
+/// Chunk edge in cells. Matches the rustbox `CHUNK_SIZE` convention (and the
+/// [`ChunkCache`](crate::ChunkCache) key convention).
+pub const CHUNK_SIZE: i32 = 16;
+
+/// Voxel block shape (mirrors the rustbox `BlockShape` set the mesher was
+/// proven against; games map their own shapes onto these).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum VoxelShape {
+    /// Full 1x1x1 cube.
+    #[default]
+    Full,
+    /// Bottom half slab (y in `[0, 0.5]`).
+    Half,
+    /// Top half slab (y in `[0.5, 1]`).
+    TopHalf,
+    /// 45-degree ramp rising toward local +X.
+    Slope,
+    /// 45-degree ramp rising toward local -X.
+    DSlope,
+    /// Quarter corner ramp rising toward local +X,+Z.
+    Corner,
+    /// Peak sloping down toward local +X,+Z.
+    OuterCorner,
+    /// Full-height quarter against local -X/-Z, cut along `x + z = 1`.
+    VerticalSlope,
+    /// 1x1x0.5 slab against the local -Z face.
+    VerticalSlab,
+    /// Thin top slab (y in `[1 - THIN, 1]`).
+    Thin,
+}
+
+/// Thickness of [`VoxelShape::Thin`] slabs (matches `THIN_HEIGHT`).
+pub const THIN_HEIGHT: f32 = 0.16;
+
+/// One voxel cell. `kind` is a game id (`classify`/`is_solid`/tint resolve
+/// it); `rot` is yaw steps (90 degrees each, same convention as the rustbox
+/// renderer: local verts rotate into the world by `rot * 90` degrees).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Cell {
+    pub kind: u32,
+    pub shape: VoxelShape,
+    pub rot: u8,
+    pub waterlogged: bool,
+}
+
+impl Cell {
+    pub fn full(kind: u32) -> Self {
+        Self {
+            kind,
+            shape: VoxelShape::Full,
+            rot: 0,
+            waterlogged: false,
+        }
+    }
+}
+
+/// Caller-owned grid. Must answer across chunk borders (neighbor lookups
+/// cross them, that is what fixes seam holes). `None` = air.
+pub trait VoxelSource {
+    fn get(&self, cell: [i32; 3]) -> Option<Cell>;
+}
+
+impl VoxelSource for HashMap<[i32; 3], Cell> {
+    fn get(&self, cell: [i32; 3]) -> Option<Cell> {
+        self.get(&cell).copied()
+    }
+}
+
+/// Face classification for culling (mirrors `rustbox-mesh` `FaceKind`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FaceKind {
+    /// Air, spawn markers, pulse-off blocks: emits nothing, occludes nothing.
+    Empty,
+    /// Solid geometry: emits faces, occludes neighbors.
+    Opaque,
+    /// Water: separate transparent pass, occludes like opaque against water.
+    Fluid,
+}
+
+/// Mesher parameters. `classify`/`is_solid` mirror the rustbox split:
+/// `classify` answers visibility (pulse-off reads `Empty` here), `is_solid`
+/// answers physics solidity (pulse blocks stay solid while hidden).
+pub struct ChunkMeshInput<F, G> {
+    /// Visibility per kind (`Empty` skips the cell entirely).
+    pub classify: F,
+    /// Solidity per kind (occlusion + water-cover tests).
+    pub is_solid: G,
+    /// Base tint per kind (linear RGB; missing kinds read white).
+    pub kind_tint: HashMap<u32, Rgb>,
+    /// Kindxshape pairs replaced by pack models (skipped, like the rustbox
+    /// overlay path).
+    pub skip_overlay: HashSet<(u32, VoxelShape)>,
+    /// Global water plane Y (`None` = no plane). Cells below it (or
+    /// waterlogged) take the submerged tint on the exact path.
+    pub water_level: Option<i32>,
+    /// Tint for submerged opaque faces.
+    pub submerged_tint: Rgb,
+    /// Alpha for the water pass (rustbox ships 0.72).
+    pub water_alpha: f32,
+    /// Emit normals + shade-baked tints (lit path). Off = flat exact colors.
+    pub lit: bool,
+    /// Emit full-quad 0..1 uvs (game assigns pages after upload). Off =
+    /// untextured (tint only).
+    pub textured: bool,
+}
+
+impl ChunkMeshInput<fn(u32) -> FaceKind, fn(u32) -> bool> {
+    fn all_opaque(_: u32) -> FaceKind {
+        FaceKind::Opaque
+    }
+
+    fn all_solid(_: u32) -> bool {
+        true
+    }
+}
+
+impl Default for ChunkMeshInput<fn(u32) -> FaceKind, fn(u32) -> bool> {
+    fn default() -> Self {
+        Self {
+            classify: Self::all_opaque,
+            is_solid: Self::all_solid,
+            kind_tint: HashMap::new(),
+            skip_overlay: HashSet::new(),
+            water_level: None,
+            submerged_tint: [0.55, 0.62, 0.78],
+            water_alpha: 0.72,
+            lit: false,
+            textured: false,
+        }
+    }
+}
+
+/// One chunk's built geometry: one [`MeshGroup`] per opaque kind (bind one
+/// material per group downstream) plus the transparent water group.
+/// Ready for [`ChunkCache::store`](super::chunk::ChunkCache::store).
+#[derive(Clone, Debug, Default)]
+pub struct ChunkMeshOutput {
+    pub opaque: HashMap<u32, MeshGroup>,
+    pub water: MeshGroup,
+    /// Greedy-merged quads (subset of opaque), stats/tests.
+    pub merged_quads: usize,
+    /// Exact fallback quads (shaped cells, submerged Fulls), stats/tests.
+    pub fallback_quads: usize,
+}
+
+impl ChunkMeshOutput {
+    pub fn is_empty(&self) -> bool {
+        self.water.is_empty() && self.opaque.values().all(|g| g.is_empty())
+    }
+
+    pub fn tri_count(&self) -> usize {
+        self.water.tri_count() + self.opaque.values().map(|g| g.tri_count()).sum::<usize>()
+    }
+
+    /// Every group (opaque per kind, then water when non-empty), for
+    /// [`ChunkCache::store`](super::chunk::ChunkCache::store).
+    pub fn groups(&self) -> Vec<&MeshGroup> {
+        let mut out: Vec<&MeshGroup> = self.opaque.values().collect();
+        if !self.water.is_empty() {
+            out.push(&self.water);
+        }
+        out
+    }
+}
+
+pub const DIRS: [[i32; 3]; 6] = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+];
+
+/// Rotate a world-space face dir into a block's shape-local frame (inverse
+/// of the renderer's local-to-world yaw).
+pub fn world_dir_to_local(dir: [i32; 3], rot: u8) -> [i32; 3] {
+    match rot % 4 {
+        0 => dir,
+        1 => [-dir[2], dir[1], dir[0]],
+        2 => [-dir[0], dir[1], -dir[2]],
+        3 => [dir[2], dir[1], -dir[0]],
+        _ => dir,
+    }
+}
+
+/// Does a neighbor fully cover the face between us and it? Conservative:
+/// only axis-aligned Full neighbors occlude; slabs occlude only the side
+/// they fill; slopes/corners never occlude (no hole-punching);
+/// `VerticalSlab` only its own slab plane.
+pub fn neighbor_occludes(neighbor: &Cell, face_dir_world: [i32; 3], neighbor_solid: bool) -> bool {
+    if !neighbor_solid {
+        return false;
+    }
+    let local_dir = world_dir_to_local(face_dir_world, neighbor.rot);
+    match neighbor.shape {
+        VoxelShape::Full => true,
+        VoxelShape::Half => local_dir == [0, -1, 0],
+        VoxelShape::TopHalf => local_dir == [0, 1, 0],
+        VoxelShape::Thin => local_dir == [0, 1, 0],
+        VoxelShape::VerticalSlab => local_dir == [0, 0, -1],
+        _ => false,
+    }
+}
+
+/// Can our face toward `dir` be culled at all? Shaped sides are never culled
+/// (seams can't punch holes); only box faces and slab caps participate.
+fn our_side_full(shape: VoxelShape, dir: [i32; 3]) -> bool {
+    match shape {
+        VoxelShape::Full => true,
+        VoxelShape::Half => dir != [0, 1, 0],
+        VoxelShape::TopHalf => dir != [0, -1, 0],
+        VoxelShape::Thin => dir != [0, -1, 0],
+        VoxelShape::VerticalSlab => true,
+        _ => dir == [0, -1, 0],
+    }
+}
+
+fn tint_of(
+    input: &ChunkMeshInput<impl Fn(u32) -> FaceKind, impl Fn(u32) -> bool>,
+    kind: u32,
+) -> Rgb {
+    input
+        .kind_tint
+        .get(&kind)
+        .copied()
+        .unwrap_or([1.0, 1.0, 1.0])
+}
+
+fn is_submerged<F, G>(cell: [i32; 3], block: &Cell, input: &ChunkMeshInput<F, G>) -> bool {
+    if block.waterlogged {
+        return true;
+    }
+    if let Some(wl) = input.water_level {
+        return cell[1] < wl;
+    }
+    false
+}
+
+fn chunk_origin(cpos: [i32; 3]) -> [i32; 3] {
+    [
+        cpos[0] * CHUNK_SIZE,
+        cpos[1] * CHUNK_SIZE,
+        cpos[2] * CHUNK_SIZE,
+    ]
+}
+
+/// Build one chunk's meshes from a [`VoxelSource`].
+///
+/// Appends into `output` (which the caller clears or recreates per build:
+/// reusing one output across builds accumulates geometry and stats).
+/// Per-kind groups split by material downstream; the water group rides
+/// separately as the transparent pass.
+pub fn build_chunk_mesh<S, F, G>(
+    grid: &S,
+    cpos: [i32; 3],
+    input: &ChunkMeshInput<F, G>,
+    output: &mut ChunkMeshOutput,
+) where
+    S: VoxelSource,
+    F: Fn(u32) -> FaceKind,
+    G: Fn(u32) -> bool,
+{
+    let origin = chunk_origin(cpos);
+    let mut full_cells: HashMap<u32, Vec<[i32; 3]>> = HashMap::new();
+    let mut fallback: Vec<([i32; 3], Cell)> = Vec::new();
+
+    for lx in 0..CHUNK_SIZE {
+        for ly in 0..CHUNK_SIZE {
+            for lz in 0..CHUNK_SIZE {
+                let cell = [origin[0] + lx, origin[1] + ly, origin[2] + lz];
+                let Some(block) = grid.get(cell) else {
+                    continue;
+                };
+                if (input.classify)(block.kind) == FaceKind::Empty {
+                    continue;
+                }
+                if (input.classify)(block.kind) == FaceKind::Fluid {
+                    continue; // water pass below
+                }
+                if input.skip_overlay.contains(&(block.kind, block.shape)) {
+                    continue;
+                }
+                if block.shape == VoxelShape::Full
+                    && block.rot == 0
+                    && !is_submerged(cell, &block, input)
+                {
+                    full_cells.entry(block.kind).or_default().push(cell);
+                } else {
+                    fallback.push((cell, block));
+                }
+            }
+        }
+    }
+
+    for (kind, cells) in full_cells {
+        let cells: Vec<[i32; 3]> = cells
+            .into_iter()
+            .filter(|cell| {
+                grid.get(*cell).is_none_or(|b| {
+                    !input.skip_overlay.contains(&(b.kind, b.shape))
+                        && (input.classify)(b.kind) == FaceKind::Opaque
+                })
+            })
+            .collect();
+        if cells.is_empty() {
+            continue;
+        }
+        let mesh = output.opaque.entry(kind).or_insert_with(|| MeshGroup {
+            depth_test: true,
+            ..Default::default()
+        });
+        let before = mesh.tri_count();
+        greedy_full_faces(grid, &cells, input, mesh);
+        output.merged_quads += mesh.tri_count() - before;
+    }
+
+    for (cell, block) in &fallback {
+        let mut tint = tint_of(input, block.kind);
+        if is_submerged(*cell, block, input) {
+            tint = input.submerged_tint;
+        }
+        let mesh = output
+            .opaque
+            .entry(block.kind)
+            .or_insert_with(|| MeshGroup {
+                depth_test: true,
+                ..Default::default()
+            });
+        let before = mesh.tri_count();
+        push_shaped_faces(grid, *cell, block, tint, input, mesh);
+        output.fallback_quads += mesh.tri_count() - before;
+    }
+
+    for lx in 0..CHUNK_SIZE {
+        for ly in 0..CHUNK_SIZE {
+            for lz in 0..CHUNK_SIZE {
+                let cell = [origin[0] + lx, origin[1] + ly, origin[2] + lz];
+                let Some(block) = grid.get(cell) else {
+                    continue;
+                };
+                if (input.classify)(block.kind) != FaceKind::Fluid {
+                    continue;
+                }
+                for dir in DIRS {
+                    let ncell = [cell[0] + dir[0], cell[1] + dir[1], cell[2] + dir[2]];
+                    let covered = match grid.get(ncell) {
+                        None => false,
+                        Some(nb) => {
+                            (input.classify)(nb.kind) == FaceKind::Fluid
+                                || ((input.is_solid)(nb.kind)
+                                    && (input.classify)(nb.kind) == FaceKind::Opaque)
+                        }
+                    };
+                    if covered {
+                        continue;
+                    }
+                    let f = [cell[0] as f32, cell[1] as f32, cell[2] as f32];
+                    push_water_quad(&mut output.water, f, dir, input);
+                }
+            }
+        }
+    }
+
+    output.opaque.retain(|_, m| !m.is_empty());
+}
+
+/// Push one quad into a group through the matching [`MeshGroup`] helper
+/// (flat / lit / textured / lit+textured, one style per group, never
+/// mixed). `shade` bakes the directional contrast; `normal` is the exact
+/// face normal (axis faces) or geometric normal (shaped fallback).
+#[allow(clippy::too_many_arguments)]
+fn push_face(
+    group: &mut MeshGroup,
+    quad: [[f32; 3]; 4],
+    tint: Rgb,
+    dir: [i32; 3],
+    normal: [f32; 3],
+    lit: bool,
+    textured: bool,
+) {
+    let shaded = {
+        let s = shade_for_dir(dir);
+        [tint[0] * s, tint[1] * s, tint[2] * s]
+    };
+    let uvs = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+    let [a, b, c, d] = quad;
+    match (lit, textured) {
+        (false, false) => group.push_quad(a, b, c, d, shaded),
+        (true, false) => group.push_quad_lit(a, b, c, d, shaded, normal),
+        (false, true) => group.push_quad_textured(a, b, c, d, shaded, uvs),
+        (true, true) => group.push_quad_lit_textured(a, b, c, d, shaded, normal, uvs),
+    }
+}
+
+fn full_face_quad(origin: [f32; 3], dir: [i32; 3]) -> [[f32; 3]; 4] {
+    let [x, y, z] = origin;
+    match dir {
+        [1, 0, 0] => [
+            [x + 1.0, y, z],
+            [x + 1.0, y + 1.0, z],
+            [x + 1.0, y + 1.0, z + 1.0],
+            [x + 1.0, y, z + 1.0],
+        ],
+        [-1, 0, 0] => [
+            [x, y, z + 1.0],
+            [x, y + 1.0, z + 1.0],
+            [x, y + 1.0, z],
+            [x, y, z],
+        ],
+        [0, 1, 0] => [
+            [x, y + 1.0, z],
+            [x, y + 1.0, z + 1.0],
+            [x + 1.0, y + 1.0, z + 1.0],
+            [x + 1.0, y + 1.0, z],
+        ],
+        [0, -1, 0] => [
+            [x, y, z],
+            [x + 1.0, y, z],
+            [x + 1.0, y, z + 1.0],
+            [x, y, z + 1.0],
+        ],
+        [0, 0, 1] => [
+            [x, y, z + 1.0],
+            [x + 1.0, y, z + 1.0],
+            [x + 1.0, y + 1.0, z + 1.0],
+            [x, y + 1.0, z + 1.0],
+        ],
+        _ => [
+            [x, y, z],
+            [x, y + 1.0, z],
+            [x + 1.0, y + 1.0, z],
+            [x + 1.0, y, z],
+        ],
+    }
+}
+
+/// Greedy-merge Full faces: per direction, per slice perpendicular to it, a
+/// 16x16 occupancy mask of unoccluded faces, then maximal-rect expansion.
+fn greedy_full_faces<S, F, G>(
+    grid: &S,
+    cells: &[[i32; 3]],
+    input: &ChunkMeshInput<F, G>,
+    mesh: &mut MeshGroup,
+) where
+    S: VoxelSource,
+    F: Fn(u32) -> FaceKind,
+    G: Fn(u32) -> bool,
+{
+    let tint = cells
+        .first()
+        .and_then(|c| grid.get(*c))
+        .map(|b| tint_of(input, b.kind))
+        .unwrap_or([1.0, 1.0, 1.0]);
+
+    for dir in DIRS {
+        let mut slices: HashMap<i32, Vec<[i32; 3]>> = HashMap::new();
+        for &cell in cells {
+            let ncell = [cell[0] + dir[0], cell[1] + dir[1], cell[2] + dir[2]];
+            let occluded = match grid.get(ncell) {
+                None => false,
+                Some(nb) => {
+                    (input.classify)(nb.kind) == FaceKind::Opaque
+                        && (input.is_solid)(nb.kind)
+                        && neighbor_occludes(&nb, [-dir[0], -dir[1], -dir[2]], true)
+                }
+            };
+            if occluded {
+                continue;
+            }
+            let slice = match dir {
+                [1, 0, 0] | [-1, 0, 0] => cell[0],
+                [0, 1, 0] | [0, -1, 0] => cell[1],
+                _ => cell[2],
+            };
+            slices.entry(slice).or_default().push(cell);
+        }
+
+        for (_slice, members) in slices {
+            let mut mask = [[false; 16]; 16];
+            for &cell in &members {
+                let (u, v) = mask_coords(cell, dir);
+                if (0..16).contains(&u) && (0..16).contains(&v) {
+                    mask[v as usize][u as usize] = true;
+                }
+            }
+            let mut visited = [[false; 16]; 16];
+            for v in 0..16usize {
+                for u in 0..16usize {
+                    if !mask[v][u] || visited[v][u] {
+                        continue;
+                    }
+                    let mut w = 1;
+                    while u + w < 16 && mask[v][u + w] && !visited[v][u + w] {
+                        w += 1;
+                    }
+                    let mut h = 1;
+                    'outer: while v + h < 16 {
+                        for k in 0..w {
+                            if !mask[v + h][u + k] || visited[v + h][u + k] {
+                                break 'outer;
+                            }
+                        }
+                        h += 1;
+                    }
+                    for dv in 0..h {
+                        for du in 0..w {
+                            visited[v + dv][u + du] = true;
+                        }
+                    }
+                    let (origin, eu, ev) = merged_quad_frame(&members, dir, u, v, w, h);
+                    let quad = [
+                        origin,
+                        [origin[0] + eu[0], origin[1] + eu[1], origin[2] + eu[2]],
+                        [
+                            origin[0] + eu[0] + ev[0],
+                            origin[1] + eu[1] + ev[1],
+                            origin[2] + eu[2] + ev[2],
+                        ],
+                        [origin[0] + ev[0], origin[1] + ev[1], origin[2] + ev[2]],
+                    ];
+                    let normal = [dir[0] as f32, dir[1] as f32, dir[2] as f32];
+                    push_face(mesh, quad, tint, dir, normal, input.lit, input.textured);
+                }
+            }
+        }
+    }
+}
+
+/// Mask coords (u,v) for a cell on a face perpendicular to `dir`.
+fn mask_coords(cell: [i32; 3], dir: [i32; 3]) -> (i32, i32) {
+    let lx = cell[0].rem_euclid(CHUNK_SIZE);
+    let ly = cell[1].rem_euclid(CHUNK_SIZE);
+    let lz = cell[2].rem_euclid(CHUNK_SIZE);
+    match dir {
+        [1, 0, 0] | [-1, 0, 0] => (lz, ly),
+        [0, 1, 0] | [0, -1, 0] => (lx, lz),
+        _ => (lx, ly),
+    }
+}
+
+/// World-space frame for a merged rect: origin + edge vectors.
+/// Reconstructs from the slice members' plane coordinate so chunks away
+/// from the origin stay exact.
+fn merged_quad_frame(
+    members: &[[i32; 3]],
+    dir: [i32; 3],
+    u: usize,
+    v: usize,
+    w: usize,
+    h: usize,
+) -> ([f32; 3], [f32; 3], [f32; 3]) {
+    let any = members[0];
+    let ox = any[0].div_euclid(CHUNK_SIZE) * CHUNK_SIZE;
+    let oy = any[1].div_euclid(CHUNK_SIZE) * CHUNK_SIZE;
+    let oz = any[2].div_euclid(CHUNK_SIZE) * CHUNK_SIZE;
+    match dir {
+        [1, 0, 0] => {
+            let px = members.iter().map(|c| c[0]).max().unwrap_or(ox) + 1;
+            (
+                [px as f32, oy as f32 + v as f32, oz as f32 + u as f32],
+                [0.0, h as f32, 0.0],
+                [0.0, 0.0, w as f32],
+            )
+        }
+        [-1, 0, 0] => {
+            let px = members.iter().map(|c| c[0]).min().unwrap_or(ox);
+            (
+                [px as f32, oy as f32 + v as f32, oz as f32 + u as f32],
+                [0.0, 0.0, w as f32],
+                [0.0, h as f32, 0.0],
+            )
+        }
+        [0, 1, 0] => {
+            let py = members.iter().map(|c| c[1]).max().unwrap_or(oy) + 1;
+            (
+                [ox as f32 + u as f32, py as f32, oz as f32 + v as f32],
+                [0.0, 0.0, h as f32],
+                [w as f32, 0.0, 0.0],
+            )
+        }
+        [0, -1, 0] => {
+            let py = members.iter().map(|c| c[1]).min().unwrap_or(oy);
+            (
+                [ox as f32 + u as f32, py as f32, oz as f32 + v as f32],
+                [w as f32, 0.0, 0.0],
+                [0.0, 0.0, h as f32],
+            )
+        }
+        [0, 0, 1] => {
+            let pz = members.iter().map(|c| c[2]).max().unwrap_or(oz) + 1;
+            (
+                [ox as f32 + u as f32, oy as f32 + v as f32, pz as f32],
+                [w as f32, 0.0, 0.0],
+                [0.0, h as f32, 0.0],
+            )
+        }
+        _ => {
+            let pz = members.iter().map(|c| c[2]).min().unwrap_or(oz);
+            (
+                [ox as f32 + u as f32, oy as f32 + v as f32, pz as f32],
+                [0.0, h as f32, 0.0],
+                [w as f32, 0.0, 0.0],
+            )
+        }
+    }
+}
+
+/// Exact per-face quads for shaped (non-Full) cells: Half/TopHalf/Thin as
+/// true boxes; other shapes as full-cube faces with rotation-aware culling
+/// (conservative, never punches holes).
+fn push_shaped_faces<S, F, G>(
+    grid: &S,
+    cell: [i32; 3],
+    block: &Cell,
+    tint: Rgb,
+    input: &ChunkMeshInput<F, G>,
+    mesh: &mut MeshGroup,
+) where
+    S: VoxelSource,
+    F: Fn(u32) -> FaceKind,
+    G: Fn(u32) -> bool,
+{
+    let (y0, y1): (f32, f32) = match block.shape {
+        VoxelShape::Half => (0.0, 0.5),
+        VoxelShape::TopHalf => (0.5, 1.0),
+        VoxelShape::Thin => (1.0 - THIN_HEIGHT, 1.0),
+        _ => (0.0, 1.0),
+    };
+    let f = [cell[0] as f32, cell[1] as f32, cell[2] as f32];
+    for dir in DIRS {
+        let ncell = [cell[0] + dir[0], cell[1] + dir[1], cell[2] + dir[2]];
+        let occluded = match grid.get(ncell) {
+            None => false,
+            Some(nb) => {
+                (input.classify)(nb.kind) == FaceKind::Opaque
+                    && (input.is_solid)(nb.kind)
+                    && neighbor_occludes(&nb, [-dir[0], -dir[1], -dir[2]], true)
+                    && our_side_full(block.shape, dir)
+            }
+        };
+        if occluded {
+            continue;
+        }
+        let quad = shaped_face_quad(f, dir, y0, y1);
+        let normal = [dir[0] as f32, dir[1] as f32, dir[2] as f32];
+        push_face(mesh, quad, tint, dir, normal, input.lit, input.textured);
+    }
+}
+
+fn shaped_face_quad(f: [f32; 3], dir: [i32; 3], y0: f32, y1: f32) -> [[f32; 3]; 4] {
+    let [x, y, z] = f;
+    match dir {
+        [1, 0, 0] => [
+            [x + 1.0, y + y0, z],
+            [x + 1.0, y + y1, z],
+            [x + 1.0, y + y1, z + 1.0],
+            [x + 1.0, y + y0, z + 1.0],
+        ],
+        [-1, 0, 0] => [
+            [x, y + y0, z + 1.0],
+            [x, y + y1, z + 1.0],
+            [x, y + y1, z],
+            [x, y + y0, z],
+        ],
+        [0, 1, 0] => [
+            [x, y + y1, z],
+            [x, y + y1, z + 1.0],
+            [x + 1.0, y + y1, z + 1.0],
+            [x + 1.0, y + y1, z],
+        ],
+        [0, -1, 0] => [
+            [x, y + y0, z],
+            [x + 1.0, y + y0, z],
+            [x + 1.0, y + y0, z + 1.0],
+            [x, y + y0, z + 1.0],
+        ],
+        [0, 0, 1] => [
+            [x, y + y0, z + 1.0],
+            [x + 1.0, y + y0, z + 1.0],
+            [x + 1.0, y + y1, z + 1.0],
+            [x, y + y1, z + 1.0],
+        ],
+        _ => [
+            [x, y + y0, z],
+            [x, y + y1, z],
+            [x + 1.0, y + y1, z],
+            [x + 1.0, y + y0, z],
+        ],
+    }
+}
+
+fn push_water_quad<F, G>(
+    water: &mut MeshGroup,
+    f: [f32; 3],
+    dir: [i32; 3],
+    input: &ChunkMeshInput<F, G>,
+) {
+    if water.positions.is_empty() && water.indices.is_empty() {
+        water.transparent = true;
+        water.depth_test = true;
+        water.alpha = input.water_alpha.clamp(0.0, 1.0);
+    }
+    let quad = full_face_quad(f, dir);
+    let normal = [dir[0] as f32, dir[1] as f32, dir[2] as f32];
+    let tint = [1.0, 1.0, 1.0];
+    push_face(water, quad, tint, dir, normal, input.lit, input.textured);
+}
+
+/// Aggregated view of a [`VoxelSource`] at `stride` cells per coarse cell,
+/// used by [`build_chunk_mesh_lod`]. One coarse cell covers a
+/// `stride`-cubed block: it is solid when any sub-cell is (conservative, a
+/// coarse mesh never punches holes a fine one would not have), takes the
+/// first solid kind found in fixed axis order, and is fluid only when no
+/// opaque sub-cell exists.
+struct CoarseVoxels<'a, S, F> {
+    source: &'a S,
+    stride: i32,
+    origin: [i32; 3],
+    classify: &'a F,
+}
+
+impl<S, F> VoxelSource for CoarseVoxels<'_, S, F>
+where
+    S: VoxelSource,
+    F: Fn(u32) -> FaceKind,
+{
+    fn get(&self, cell: [i32; 3]) -> Option<Cell> {
+        let base = [
+            self.origin[0] + cell[0] * self.stride,
+            self.origin[1] + cell[1] * self.stride,
+            self.origin[2] + cell[2] * self.stride,
+        ];
+        let mut fluid: Option<u32> = None;
+        for dz in 0..self.stride {
+            for dy in 0..self.stride {
+                for dx in 0..self.stride {
+                    let Some(block) = self.source.get([base[0] + dx, base[1] + dy, base[2] + dz])
+                    else {
+                        continue;
+                    };
+                    match (self.classify)(block.kind) {
+                        FaceKind::Empty => {}
+                        FaceKind::Opaque => return Some(Cell::full(block.kind)),
+                        FaceKind::Fluid => fluid = fluid.or(Some(block.kind)),
+                    }
+                }
+            }
+        }
+        fluid.map(Cell::full)
+    }
+}
+
+/// Appends `src`'s geometry to `dst`, offsetting indices; copies the pass
+/// flags when `dst` is still empty.
+fn append_group(dst: &mut MeshGroup, src: &MeshGroup) {
+    if src.is_empty() {
+        return;
+    }
+    if dst.is_empty() {
+        dst.transparent = src.transparent;
+        dst.depth_test = src.depth_test;
+        dst.alpha = src.alpha;
+        dst.alpha_cutoff = src.alpha_cutoff;
+        dst.texture_page = src.texture_page;
+        dst.material = src.material;
+        dst.material_index = src.material_index;
+        dst.pick_id = src.pick_id;
+    }
+    let base = dst.positions.len() as u32;
+    dst.positions.extend_from_slice(&src.positions);
+    dst.colors.extend_from_slice(&src.colors);
+    dst.normals.extend_from_slice(&src.normals);
+    dst.uvs.extend_from_slice(&src.uvs);
+    dst.indices
+        .extend(src.indices.iter().map(|index| index + base));
+}
+
+/// Scales a coarse chunk's geometry into world space: coarse cell `c`
+/// becomes `origin + c * stride`.
+fn scale_group(group: &mut MeshGroup, stride: i32, origin: [i32; 3]) {
+    let stride = stride as f32;
+    for p in &mut group.positions {
+        p[0] = origin[0] as f32 + p[0] * stride;
+        p[1] = origin[1] as f32 + p[1] * stride;
+        p[2] = origin[2] as f32 + p[2] * stride;
+    }
+}
+
+/// Builds one chunk's meshes at a coarser level: `stride^3` source blocks
+/// aggregate into one coarse cell, the coarse grid runs through the same
+/// greedy mesher as [`build_chunk_mesh`], and the result is scaled back into
+/// world space. `stride == 1` is exactly [`build_chunk_mesh`].
+///
+/// Level-`stride` chunks cover `CHUNK_SIZE * stride` world units, so the
+/// chunk grid coarsens with the level by the same factor (a level-2 chunk is
+/// the area of four level-1 chunks); callers stream coarse chunk
+/// coordinates, not the fine ones. `stride` is clamped to `1..=CHUNK_SIZE`,
+/// and appends into `output` like the fine path.
+pub fn build_chunk_mesh_lod<S, F, G>(
+    grid: &S,
+    cpos: [i32; 3],
+    stride: i32,
+    input: &ChunkMeshInput<F, G>,
+    output: &mut ChunkMeshOutput,
+) where
+    S: VoxelSource,
+    F: Fn(u32) -> FaceKind,
+    G: Fn(u32) -> bool,
+{
+    let stride = stride.clamp(1, CHUNK_SIZE);
+    if stride == 1 {
+        build_chunk_mesh(grid, cpos, input, output);
+        return;
+    }
+    let origin = chunk_origin(cpos);
+    let coarse = CoarseVoxels {
+        source: grid,
+        stride,
+        origin,
+        classify: &input.classify,
+    };
+    let mut coarse_out = ChunkMeshOutput::default();
+    build_chunk_mesh(&coarse, [0, 0, 0], input, &mut coarse_out);
+    for group in coarse_out.opaque.values_mut() {
+        scale_group(group, stride, origin);
+    }
+    scale_group(&mut coarse_out.water, stride, origin);
+    output.merged_quads += coarse_out.merged_quads;
+    output.fallback_quads += coarse_out.fallback_quads;
+    for (kind, group) in coarse_out.opaque {
+        append_group(output.opaque.entry(kind).or_default(), &group);
+    }
+    append_group(&mut output.water, &coarse_out.water);
+    output.opaque.retain(|_, group| !group.is_empty());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Default input shape used across the voxel tests.
+    type TestInput = ChunkMeshInput<fn(u32) -> FaceKind, fn(u32) -> bool>;
+
+    const GRASS: u32 = 1;
+    const STONE: u32 = 2;
+    const WATER: u32 = 9;
+
+    fn classify(kind: u32) -> FaceKind {
+        match kind {
+            WATER => FaceKind::Fluid,
+            0 => FaceKind::Empty,
+            _ => FaceKind::Opaque,
+        }
+    }
+
+    fn is_solid(_: u32) -> bool {
+        true
+    }
+
+    fn input() -> TestInput {
+        ChunkMeshInput {
+            classify,
+            is_solid,
+            kind_tint: HashMap::from([(GRASS, [0.3, 0.7, 0.2]), (STONE, [0.5, 0.5, 0.5])]),
+            skip_overlay: HashSet::new(),
+            water_level: None,
+            submerged_tint: [0.55, 0.62, 0.78],
+            water_alpha: 0.72,
+            lit: false,
+            textured: false,
+        }
+    }
+
+    fn grid_of(cells: &[([i32; 3], Cell)]) -> HashMap<[i32; 3], Cell> {
+        cells.iter().cloned().collect()
+    }
+
+    #[test]
+    fn merged_frame_winds_outward() {
+        for dir in DIRS {
+            let (_, eu, ev) = merged_quad_frame(&[[0, 0, 0]], dir, 0, 0, 2, 3);
+            let cross = [
+                eu[1] * ev[2] - eu[2] * ev[1],
+                eu[2] * ev[0] - eu[0] * ev[2],
+                eu[0] * ev[1] - eu[1] * ev[0],
+            ];
+            for axis in 0..3 {
+                let want = dir[axis] as f32;
+                if want == 0.0 {
+                    assert_eq!(
+                        cross[axis], 0.0,
+                        "dir {:?} axis {} not axis aligned",
+                        dir, axis
+                    );
+                } else {
+                    assert!(
+                        cross[axis] * want > 0.0,
+                        "greedy quad for dir {:?} winds inward (cross {:?})",
+                        dir,
+                        cross
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn greedy_merges_flat_ground() {
+        let mut cells = Vec::new();
+        for x in 0..8 {
+            for z in 0..8 {
+                cells.push(([x, 0, z], Cell::full(GRASS)));
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        let mesh = &out.opaque[&GRASS];
+        let quads = mesh.tri_count() / 2;
+        assert!(
+            quads <= 12,
+            "expected greedy merge, got {quads} quads ({} tris)",
+            mesh.tri_count()
+        );
+        assert!(out.merged_quads > 0);
+        assert!(super::super::chunk::validate_group(mesh));
+    }
+
+    #[test]
+    fn interior_faces_culled() {
+        let mut cells = Vec::new();
+        for x in 0..2 {
+            for y in 0..2 {
+                for z in 0..2 {
+                    cells.push(([x, y, z], Cell::full(STONE)));
+                }
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        assert_eq!(out.opaque[&STONE].tri_count() / 2, 6);
+    }
+
+    #[test]
+    fn rotation_aware_occlusion() {
+        let slab = Cell {
+            kind: STONE,
+            shape: VoxelShape::VerticalSlab,
+            rot: 0,
+            waterlogged: false,
+        };
+        assert!(neighbor_occludes(&slab, [0, 0, -1], true));
+        assert!(!neighbor_occludes(&slab, [0, 0, 1], true));
+        let slab180 = Cell { rot: 2, ..slab };
+        assert!(!neighbor_occludes(&slab180, [0, 0, -1], true));
+        assert!(neighbor_occludes(&slab180, [0, 0, 1], true));
+        let slope = Cell {
+            shape: VoxelShape::Slope,
+            ..slab
+        };
+        assert!(!neighbor_occludes(&slope, [1, 0, 0], true));
+        assert!(!neighbor_occludes(&slope, [0, 1, 0], true));
+    }
+
+    #[test]
+    fn empty_kind_culls() {
+        assert_eq!(classify(0), FaceKind::Empty);
+        let grid = grid_of(&[([0, 0, 0], Cell::full(0))]);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn shaped_cells_take_exact_fallback() {
+        let grid = grid_of(&[(
+            [0, 0, 0],
+            Cell {
+                kind: STONE,
+                shape: VoxelShape::Slope,
+                rot: 0,
+                waterlogged: false,
+            },
+        )]);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        let mesh = &out.opaque[&STONE];
+        assert!(out.fallback_quads > 0);
+        assert_eq!(out.merged_quads, 0);
+        assert!(mesh.tri_count() > 0);
+        assert!(super::super::chunk::validate_group(mesh));
+    }
+
+    #[test]
+    fn half_slab_is_a_true_box() {
+        let grid = grid_of(&[(
+            [0, 0, 0],
+            Cell {
+                kind: STONE,
+                shape: VoxelShape::Half,
+                rot: 0,
+                waterlogged: false,
+            },
+        )]);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        let mesh = &out.opaque[&STONE];
+        assert_eq!(mesh.tri_count() / 2, 6);
+        let top = mesh
+            .positions
+            .iter()
+            .map(|p| p[1])
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!((top - 0.5).abs() < 1e-6, "slab top at 0.5: {top}");
+    }
+
+    #[test]
+    fn water_emits_transparent_group() {
+        let grid = grid_of(&[([0, 0, 0], Cell::full(WATER))]);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        assert!(out.opaque.is_empty());
+        assert!(out.water.transparent);
+        assert!((out.water.alpha - 0.72).abs() < 1e-6);
+        assert_eq!(out.water.tri_count() / 2, 6);
+    }
+
+    #[test]
+    fn water_covered_faces_cull() {
+        let grid = grid_of(&[
+            ([0, 0, 0], Cell::full(WATER)),
+            ([0, 1, 0], Cell::full(STONE)),
+        ]);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        assert_eq!(out.water.tri_count() / 2, 5, "top face culled");
+    }
+
+    #[test]
+    fn untextured_default_has_no_uvs() {
+        let mut cells = Vec::new();
+        for x in 0..2 {
+            for z in 0..2 {
+                cells.push(([x, 0, z], Cell::full(GRASS)));
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut out);
+        assert!(out.opaque[&GRASS].uvs.is_empty());
+        assert!(out.opaque[&GRASS].normals.is_empty());
+    }
+
+    #[test]
+    fn lit_build_carries_normals_and_shade() {
+        let mut cells = Vec::new();
+        for x in 0..2 {
+            for z in 0..2 {
+                cells.push(([x, 0, z], Cell::full(GRASS)));
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut inp = input();
+        inp.lit = true;
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &inp, &mut out);
+        let mesh = &out.opaque[&GRASS];
+        assert_eq!(mesh.normals.len(), mesh.positions.len());
+        assert!(mesh.colors.contains(&[0.3, 0.7, 0.2]));
+        assert!(mesh.colors.iter().any(|c| c[0] < 0.3));
+    }
+
+    #[test]
+    fn seam_faces_cull_across_chunks() {
+        let grid = grid_of(&[
+            ([15, 0, 0], Cell::full(STONE)),
+            ([16, 0, 0], Cell::full(STONE)),
+        ]);
+        let mut left = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut left);
+        let mut right = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [1, 0, 0], &input(), &mut right);
+        let total = left.tri_count() / 2 + right.tri_count() / 2;
+        assert_eq!(total, 10, "12 faces minus 2 shared: {total}");
+    }
+
+    /// Stride 1 is the fine path, triangle for triangle.
+    #[test]
+    fn lod_stride_one_matches_the_fine_path() {
+        let grid = grid_of(&[
+            ([0, 0, 0], Cell::full(GRASS)),
+            ([5, 0, 3], Cell::full(STONE)),
+        ]);
+        let mut fine = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut fine);
+        let mut lod = ChunkMeshOutput::default();
+        build_chunk_mesh_lod(&grid, [0, 0, 0], 1, &input(), &mut lod);
+        assert_eq!(lod.tri_count(), fine.tri_count());
+        assert_eq!(
+            lod.opaque[&GRASS].tri_count(),
+            fine.opaque[&GRASS].tri_count()
+        );
+        assert!(super::super::chunk::validate_group(&lod.opaque[&GRASS]));
+    }
+
+    /// `stride^3` blocks aggregate into one coarse cell, and the coarse mesh
+    /// comes back scaled into world units.
+    #[test]
+    fn lod_aggregates_blocks_into_coarse_cells() {
+        let mut cells = Vec::new();
+        for x in 0..2 {
+            for y in 0..2 {
+                for z in 0..2 {
+                    cells.push(([x, y, z], Cell::full(STONE)));
+                }
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut out = ChunkMeshOutput::default();
+        build_chunk_mesh_lod(&grid, [0, 0, 0], 2, &input(), &mut out);
+        let mesh = &out.opaque[&STONE];
+        assert_eq!(mesh.tri_count() / 2, 6, "one coarse cube");
+        let max = |axis: usize| {
+            mesh.positions
+                .iter()
+                .map(|p| p[axis])
+                .fold(f32::MIN, f32::max)
+        };
+        assert!(
+            (max(0) - 2.0).abs() < 1e-6,
+            "x scaled to 2 units: {}",
+            max(0)
+        );
+        assert!(
+            (max(1) - 2.0).abs() < 1e-6,
+            "y scaled to 2 units: {}",
+            max(1)
+        );
+        assert!(
+            (max(2) - 2.0).abs() < 1e-6,
+            "z scaled to 2 units: {}",
+            max(2)
+        );
+        assert!(super::super::chunk::validate_group(mesh));
+    }
+
+    /// A comb mesh collapses to a slab at stride 2: the level really trades
+    /// triangles, not just vertex positions.
+    #[test]
+    fn lod_trades_detail_for_triangle_count() {
+        let mut cells = Vec::new();
+        for x in (0..16).step_by(2) {
+            for z in 0..16 {
+                cells.push(([x, 0, z], Cell::full(GRASS)));
+            }
+        }
+        let grid = grid_of(&cells);
+        let mut fine = ChunkMeshOutput::default();
+        build_chunk_mesh(&grid, [0, 0, 0], &input(), &mut fine);
+        let mut coarse = ChunkMeshOutput::default();
+        build_chunk_mesh_lod(&grid, [0, 0, 0], 2, &input(), &mut coarse);
+        assert!(
+            coarse.tri_count() * 4 < fine.tri_count(),
+            "coarse {} tris vs fine {}",
+            coarse.tri_count(),
+            fine.tri_count()
+        );
+    }
+}

@@ -70,3 +70,6 @@ target_sdk_version = 35
 
 [profile.dev]
 opt-level = 1
+
+[patch.crates-io]
+repame-view3d = { path = "vendor/repame-view3d" }
