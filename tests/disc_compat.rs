@@ -77,6 +77,38 @@ fn path_based_mount_reads_an_asset() {
     std::fs::remove_file(&path).ok();
 }
 
+/// A real Wii container can be checked locally with `CS_WII_FIXTURE=<image>`. CI has no disc
+/// dump, so the test is a no-op there rather than a false failure.
+#[test]
+fn wii_container_reads_a_real_asset() {
+    let Some(path) = std::env::var_os("CS_WII_FIXTURE") else {
+        return;
+    };
+    let image = DiscImage::open_path(std::path::Path::new(&path)).expect("mount a Wii container");
+    assert_eq!(
+        image.game_id().len(),
+        6,
+        "a Wii container reports its game id"
+    );
+    let paths = image.paths();
+    assert!(!paths.is_empty(), "a Wii container has files");
+    let mut read_one = None;
+    for wanted in paths.iter().filter(|path| !path.ends_with('/')).take(32) {
+        match image.read(&format!("files/{wanted}")) {
+            Ok(bytes) if !bytes.is_empty() => {
+                read_one = Some((wanted.clone(), bytes.len()));
+                break;
+            }
+            _ => continue,
+        }
+    }
+    let (wanted, len) = read_one.expect("a non-empty asset in the Wii partition");
+    println!(
+        "wii fixture: {} files, read {wanted} ({len} bytes)",
+        paths.len()
+    );
+}
+
 #[test]
 fn wii_and_nfs_headers_go_through_nod() {
     let mut wii = wind_waker_image();

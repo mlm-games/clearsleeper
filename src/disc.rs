@@ -38,6 +38,11 @@
 //! decompilation targets (GZLE01, GZLP01, GZLJ01, D44J01); a Wii or Wii U VC wrapper is judged by
 //! the partition's contents instead, and a wrong image is a typed error rather than a session
 //! without assets.
+//!
+//! `nod` reads NFS (the Wii U VC wrapper) from a filesystem path, not from a byte stream, so a
+//! browser drop of an NFS image is refused with that typed reason. Desktop launches use
+//! [`DiscImage::open_path`] and mount it; on the web, an extracted folder from a Wii U VC dump
+//! works through the in-memory extracted source.
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
