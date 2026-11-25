@@ -349,16 +349,20 @@
     }
 
     async function installExtract(entries) {
+      const out = [];
+      for (const entry of entries) {
+        await walkEntry(entry, "", out);
+      }
+      await installExtractFiles(out);
+    }
+
+    async function installExtractFiles(out) {
       if (installing || booted) {
         return;
       }
       installing = true;
       try {
         const bindings = await bindingsReady();
-        const out = [];
-        for (const entry of entries) {
-          await walkEntry(entry, "", out);
-        }
         if (!out.length) {
           say("That folder holds no files.");
           return;
@@ -482,7 +486,14 @@
       const entries = [...(folder.webkitEntries ?? [])];
       if (entries.length) {
         installExtract(entries);
+        return;
       }
+      // Browsers without webkitEntries still put the relative path on each picked File.
+      const out = [...(folder.files ?? [])].map((picked) => ({
+        path: picked.webkitRelativePath || picked.name,
+        file: picked,
+      }));
+      installExtractFiles(out);
     });
 
     // The web build logs the frame's input to the console (the wasm side calls this), so a
