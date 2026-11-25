@@ -67,7 +67,7 @@ pub fn view(menu: &Menu) -> View {
 
     let disc = match crate::assets::installed_disc_summary() {
         Some(summary) => match summary.title {
-            Some(title) => format!("{} · {title}", summary.game_id),
+            Some(title) => format!("{} - {title}", summary.game_id),
             None => summary.game_id,
         },
         None => match crate::assets::AssetRoot::from_env() {
