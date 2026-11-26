@@ -121,7 +121,6 @@ impl OptionMenuStage {
         menu.title_move();
         menu.cursor_move();
         menu.draw();
-        menu.panes.show_all();
         self.revision = self.revision.wrapping_add(1);
     }
 
