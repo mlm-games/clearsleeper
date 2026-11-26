@@ -45,6 +45,7 @@ pub mod pause_chart;
 pub mod pause_dmap;
 pub mod pause_item;
 pub mod pause_menu;
+pub mod pause_option;
 pub mod pause_seamap;
 pub mod place_name;
 pub mod quit;
@@ -260,6 +261,7 @@ pub struct App {
     game_over: Option<GameOverStage>,
     album: Option<AlbumStage>,
     item_menu: Option<pause_item::ItemMenuStage>,
+    option_menu: Option<pause_option::OptionMenuStage>,
     chart_menu: Option<pause_chart::ChartStage>,
     dmap: Option<pause_dmap::DMapStage>,
     seamap: Option<pause_seamap::SeaMapStage>,
@@ -738,6 +740,7 @@ impl App {
             game_over: None,
             album: None,
             item_menu: Some(pause_item::ItemMenuStage::default()),
+            option_menu: Some(pause_option::OptionMenuStage::default()),
             chart_menu: Some(pause_chart::ChartStage::default()),
             dmap: Some(pause_dmap::DMapStage::default()),
             seamap: Some(pause_seamap::SeaMapStage::default()),
@@ -1035,6 +1038,30 @@ impl App {
             None => self.stage_keys_with(&sched.held_keys, sched.window_focused, pad, frame.pad),
         }
         self.stage_stylus(sched, frame.stylus);
+        if self.menu.screen == menus::Screen::Settings {
+            pause_option::OptionMenuStage::install(&mut self.sim.world);
+            let (attention, ruby, vibration, sound) =
+                (0..4).fold((0u8, 0u8, 0u8, 0u8), |mut values, row| {
+                    let (value, _, _) = self.menu.settings.row(row).unwrap_or((0, 0, 0));
+                    match row {
+                        0 => values.0 = value,
+                        1 => values.1 = value,
+                        2 => values.2 = value,
+                        _ => values.3 = value,
+                    }
+                    values
+                });
+            if let Some(stage) = self.option_menu.as_mut() {
+                stage.sync(
+                    &mut self.sim.world,
+                    attention,
+                    ruby,
+                    vibration,
+                    sound,
+                    self.menu.settings_index,
+                );
+            }
+        }
     }
 
     /// The shell's keys as the game reads them: the move axis, the debug and action keys, the
@@ -1368,7 +1395,9 @@ impl App {
                 _ => {}
             }
         }
-        let cmds = if !self.assets_installed && window_focused {
+        let cmds = if window_focused
+            && (!self.assets_installed || self.menu.screen == menus::Screen::Settings)
+        {
             menus::cmds_from(held, &self.menu_prev)
         } else {
             Vec::new()
@@ -1378,13 +1407,16 @@ impl App {
             self.stage_host_screens(&cmds);
             return;
         }
-        match self.menu.screen {
-            menus::Screen::Settings | menus::Screen::QuitConfirm => {
-                // Only the pre-boot shell enters these; return to the retail title instead of
-                // drawing the shell over a session that has the disc.
-                self.menu.screen = menus::Screen::Title;
+        if self.menu.screen == menus::Screen::Settings {
+            self.menu.step(&cmds);
+            if self.menu.screen != menus::Screen::Settings {
+                self.menu.screen = menus::Screen::Playing;
             }
-            _ => {}
+        }
+        if key_pressed(held, &self.menu_prev, PhysicalKey::KeyO)
+            && self.menu.screen == menus::Screen::Playing
+        {
+            self.menu.screen = menus::Screen::Settings;
         }
     }
 
@@ -6024,6 +6056,7 @@ pub fn root_view(
     );
     let overlay = match app.menu.screen {
         menus::Screen::Playing => meter_hud_view(app, ctx),
+        menus::Screen::Settings => option_menu_view(app, ctx),
         menus::Screen::FileSelect => menus::file_select_view(&app.menu, ctx),
         menus::Screen::GameOver => game_over_overlay(app, ctx),
         menus::Screen::PhotoAlbum => app.album_view(ctx),
@@ -6037,7 +6070,6 @@ pub fn root_view(
         // The shell's own screens belong to the pre-boot session; a session that somehow
         // lands on one of them draws the retail frame alone rather than the shell over it.
         menus::Screen::Title
-        | menus::Screen::Settings
         | menus::Screen::QuitConfirm
         | menus::Screen::NameEntry
         | menus::Screen::Movie
@@ -6169,13 +6201,56 @@ fn chart_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::
     Image(Modifier::new().fill_max_size(), handle).image_fit(ImageFit::Contain)
 }
 
+/// The retail option screen, rasterised from `optres.arc`'s `option.blo`.
+fn option_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
+    let Some(stage) = app.option_menu.as_ref() else {
+        return menus::settings_view(&app.menu);
+    };
+    let Some(root) = assets::AssetRoot::from_env().ok() else {
+        return menus::settings_view(&app.menu);
+    };
+    let Some(assets) = panes::Assets::load_from(
+        &root,
+        pause_option::SCREEN_ARCHIVE,
+        None,
+        pause_option::SCREEN_LABEL,
+    ) else {
+        return menus::settings_view(&app.menu);
+    };
+    let Some(menu) = app.sim.world.get_resource::<pause_option::OptionMenu>() else {
+        return menus::settings_view(&app.menu);
+    };
+    let Some(screens) = app.sim.world.get_resource::<j2d::Screens>() else {
+        return menus::settings_view(&app.menu);
+    };
+    let Some(screen) = screens.get(pause_option::SCREEN_LABEL) else {
+        return menus::settings_view(&app.menu);
+    };
+    let handle = match stage.image.get() {
+        Some(handle) => handle,
+        None => {
+            let handle = ctx.alloc_image_handle();
+            stage.image.set(Some(handle));
+            handle
+        }
+    };
+    if stage.uploaded.get() != stage.revision {
+        let mut canvas = text::raster::Canvas::new(640, 480);
+        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [0, 0, 0, 200]);
+        stage.render(&mut canvas, &assets, screen, menu);
+        ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
+        stage.uploaded.set(stage.revision);
+    }
+    Image(Modifier::new().fill_max_size(), handle).image_fit(repose_core::ImageFit::Contain)
+}
+
 /// The host shell, and the only place it exists: with no asset source installed there is no
 /// retail screen to draw, so the shell's title, options and quit stand in - the boundary
 /// Dusklight's own launcher keeps. Once a disc is installed [`root_view`] never reaches here.
-fn pre_boot_view(app: &App, _ctx: &repose_core::RenderContext) -> repose_core::View {
+fn pre_boot_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core::View {
     match app.menu.screen {
         menus::Screen::Title => start_ui::view(&app.menu),
-        menus::Screen::Settings => menus::settings_view(&app.menu),
+        menus::Screen::Settings => option_menu_view(app, ctx),
         menus::Screen::QuitConfirm => menus::quit_confirm_view(&app.menu),
         // A session only starts with an asset source (`start_new`), and the retail file
         // select needs the disc's panes, so neither belongs to the pre-boot shell.

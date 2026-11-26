@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 
 use crate::j2d::{Kind, Screen, ScreenPane};
@@ -588,6 +590,72 @@ impl Default for OptionPanes {
 }
 
 impl OptionPanes {
+    /// Every live pane keyed by its BLO name, for the generic screen rasteriser.
+    /// Make every bound pane visible for the shell's static render; the cursor and value
+    /// panes are still positioned and tinted by the option state machine.
+    pub fn show_all(&mut self) {
+        let mut panes: Vec<&mut Pane> = vec![
+            &mut self.title,
+            &mut self.note_frame,
+            &mut self.note_flag,
+            &mut self.note_title,
+            &mut self.note_anchor,
+            &mut self.no_key,
+            &mut self.backdrop,
+        ];
+        panes.extend(self.icon.iter_mut());
+        panes.extend(self.icon_shadow.iter_mut());
+        panes.extend(self.note_text.iter_mut());
+        panes.extend(self.note_bar.iter_mut());
+        panes.extend(self.row.iter_mut());
+        panes.extend(self.attention.iter_mut());
+        panes.extend(self.vibration.iter_mut());
+        panes.extend(self.sound.iter_mut());
+        panes.extend(self.cursor.iter_mut());
+        panes.extend(self.backing.iter_mut());
+        for pane in panes {
+            if pane.found {
+                pane.now_alpha = 255;
+                pane.visible = true;
+            }
+        }
+    }
+
+    pub fn live(&self) -> HashMap<&str, &Pane> {
+        let mut out = HashMap::new();
+        out.insert(self.title.tag, &self.title);
+        out.insert(self.note_frame.tag, &self.note_frame);
+        out.insert(self.note_flag.tag, &self.note_flag);
+        for pane in self.icon.iter().chain(self.icon_shadow.iter()) {
+            out.insert(pane.tag, pane);
+        }
+        for pane in self.note_text.iter() {
+            out.insert(pane.tag, pane);
+        }
+        out.insert(self.note_title.tag, &self.note_title);
+        out.insert(self.note_anchor.tag, &self.note_anchor);
+        out.insert(self.no_key.tag, &self.no_key);
+        for pane in self.note_bar.iter() {
+            out.insert(pane.tag, pane);
+        }
+        for pane in self.row.iter() {
+            out.insert(pane.tag, pane);
+        }
+        for pane in self
+            .attention
+            .iter()
+            .chain(self.vibration.iter())
+            .chain(self.sound.iter())
+        {
+            out.insert(pane.tag, pane);
+        }
+        for pane in self.cursor.iter().chain(self.backing.iter()) {
+            out.insert(pane.tag, pane);
+        }
+        out.insert(self.backdrop.tag, &self.backdrop);
+        out
+    }
+
     pub fn bind(&mut self, screen: &Screen) {
         self.title.parts_set_opt(screen);
         self.note_frame.parts_set_opt(screen);

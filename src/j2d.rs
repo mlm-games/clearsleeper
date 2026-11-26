@@ -411,6 +411,13 @@ impl Screens {
             .find(|(name, _)| name == label)
             .map(|(_, screen)| screen)
     }
+
+    pub fn get(&self, label: &str) -> Option<&Screen> {
+        self.cache
+            .iter()
+            .find(|(name, _)| name == label)
+            .map(|(_, screen)| screen)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

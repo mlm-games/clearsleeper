@@ -156,7 +156,16 @@ impl Assets {
             }
             None => stage,
         };
-        let screen = crate::j2d::parse(inner.read(label).ok()?)?;
+        let bytes = inner.read(label).ok()?;
+        let decoded = if bytes.starts_with(&crate::archive::YAZ0_MAGIC) {
+            match crate::archive::yaz0_decode(bytes, label) {
+                Ok(bytes) => bytes,
+                Err(_) => return None,
+            }
+        } else {
+            bytes.to_vec()
+        };
+        let screen = crate::j2d::parse(&decoded)?;
         let parts = inner
             .read(crate::ui_file_select_parts::PARTS_LABEL)
             .ok()
@@ -172,6 +181,20 @@ impl Assets {
             };
             if let Some(image) = bti::decode(bytes) {
                 textures.insert(name.to_string(), image);
+            }
+        }
+        // The option screen's panes name font/icon textures that live in the message font
+        // archive rather than in optres.arc; file select's textures are in its own archive.
+        if let Ok(font_archive) = root.read_archive(FONT_ARCHIVE) {
+            for name in font_archive.entries() {
+                if !name.ends_with(".bti") || textures.contains_key(name) {
+                    continue;
+                }
+                if let Ok(bytes) = font_archive.read(name) {
+                    if let Some(image) = bti::decode(bytes) {
+                        textures.insert(name.to_string(), image);
+                    }
+                }
             }
         }
         let mut names = Vec::new();
@@ -428,6 +451,23 @@ fn draw_screen_impl(
                     Kind::Picture => draw_picture(canvas, assets, node, pane, rect, alpha[index]),
                     Kind::TextBox => {
                         draw_text(canvas, fonts, assets, node, pane, rect, alpha[index])
+                    }
+                    Kind::Window if node.contents_texture.is_some() => {
+                        let mut contents = node.clone();
+                        contents.texture = node.contents_texture.clone();
+                        draw_picture(canvas, assets, &contents, pane, rect, alpha[index]);
+                    }
+                    Kind::Window => {
+                        let color = pane.map_or(node.color_white, |p| {
+                            (u32::from(p.white.r) << 16)
+                                | (u32::from(p.white.g) << 8)
+                                | u32::from(p.white.b)
+                        });
+                        let a = (alpha[index] * 255.0) as u8;
+                        canvas.fill_rect(
+                            rect,
+                            [(color >> 16) as u8, (color >> 8) as u8, color as u8, a],
+                        );
                     }
                     _ => {}
                 }
