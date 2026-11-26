@@ -132,13 +132,23 @@ impl OptionMenuStage {
         screen: &j2d::Screen,
         menu: &ui::OptionMenu,
     ) {
-        let owned = owned_panes(&menu.panes, screen);
+        // The picture's tone pair must not come from the BLO here: option.blo's note
+        // frames carry green pairs, which turn the grayscale note textures into flat
+        // green blocks. `J2DPicture`'s own default is black=0/white=0xffffffff
+        // (`J2DPicture.cpp:143-144`; HD `J2DPicture.cpp:38,135`), so apply that pair
+        // to every pane, bound or not, before the screen is rasterised.
+        let mut neutral = screen.clone();
+        for pane in &mut neutral.panes {
+            pane.color_black = 0;
+            pane.color_white = 0xFFFF_FFFF;
+        }
+        let owned = owned_panes(&menu.panes);
         let live: HashMap<&str, &SavePane> = owned.iter().map(|(k, v)| (*k, v)).collect();
-        crate::panes::draw_screen_table(canvas, assets, screen, &live);
+        crate::panes::draw_screen_table(canvas, assets, &neutral, &live);
     }
 }
 
-fn save_pane(pane: &ui::Pane, screen: &j2d::Screen) -> SavePane {
+fn save_pane(pane: &ui::Pane) -> SavePane {
     let mut out = SavePane::default();
     out.tag = pane.tag;
     out.found = pane.found;
@@ -153,23 +163,11 @@ fn save_pane(pane: &ui::Pane, screen: &j2d::Screen) -> SavePane {
     out.now_alpha = pane.now_alpha;
     out.user_area = pane.user_area;
     out.texture = pane.texture;
-    // `J2DPicture` keeps its own black/white tone pair from the PIC1 stream and
-    // blends them with the texel in TEV stage 1 (`J2DPicture.cpp:494-535`; HD
-    // `J2DPicture.cpp:136-141` reads the same two words). The option state machine's
-    // `color` is the text/icon colour, not that pair, and `option.blo` authors the
-    // note frames as greens and the cursor plates as yellows, so replacing the pair
-    // with the live colour turns those panes into flat, wrongly tinted blocks.
-    let (black, white) =
-        screen
-            .find(pane.tag)
-            .map_or(([0, 0, 0, 255], [255, 255, 255, 255]), |node| {
-                (
-                    crate::j2d::unpack_color(node.color_black),
-                    crate::j2d::unpack_color(node.color_white),
-                )
-            });
-    out.black = crate::ui_menu_save::Color::new(black[0], black[1], black[2], black[3]);
-    out.white = crate::ui_menu_save::Color::new(white[0], white[1], white[2], white[3]);
+    // `J2DPicture`'s default tone pair (`J2DPicture.cpp:143-144`; HD
+    // `J2DPicture.cpp:38,135`), not the BLO's green note pairs: the option state
+    // machine never changes this pair at runtime.
+    out.black = crate::ui_menu_save::Color::new(0, 0, 0, 0);
+    out.white = crate::ui_menu_save::Color::new(255, 255, 255, 255);
     out.rotation = pane.rotation;
     out.rotate_x = pane.rotate_x;
     out.rotate_y = pane.rotate_y;
@@ -183,10 +181,10 @@ fn save_pane(pane: &ui::Pane, screen: &j2d::Screen) -> SavePane {
     out
 }
 
-fn owned_panes<'a>(panes: &'a ui::OptionPanes, screen: &j2d::Screen) -> HashMap<&'a str, SavePane> {
+fn owned_panes<'a>(panes: &'a ui::OptionPanes) -> HashMap<&'a str, SavePane> {
     panes
         .live()
         .into_iter()
-        .map(|(k, v)| (k, save_pane(v, screen)))
+        .map(|(k, v)| (k, save_pane(v)))
         .collect()
 }
