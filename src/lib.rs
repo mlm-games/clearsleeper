@@ -1402,6 +1402,7 @@ impl App {
         } else {
             Vec::new()
         };
+        let settings_pressed = key_pressed(held, &self.menu_prev, PhysicalKey::KeyO);
         self.menu_prev.clone_from(held);
         if !self.assets_installed {
             self.stage_host_screens(&cmds);
@@ -1413,9 +1414,7 @@ impl App {
                 self.menu.screen = menus::Screen::Playing;
             }
         }
-        if key_pressed(held, &self.menu_prev, PhysicalKey::KeyO)
-            && self.menu.screen == menus::Screen::Playing
-        {
+        if settings_pressed && self.menu.screen == menus::Screen::Playing {
             self.menu.screen = menus::Screen::Settings;
         }
     }

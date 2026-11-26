@@ -15,6 +15,19 @@ use crate::ui_menu_save::{Pane, SavePanes};
 
 const NESTED_ARCHIVE: &str = "dat/file_select.arc";
 const FONT_ARCHIVE: &str = "files/res/Msg/fontres.arc";
+const MENU_ARCHIVE: &str = "files/res/Msg/menures.arc";
+
+/// `yazirushi_012.bti` is stored Yaz0-compressed inside `optres.arc`, just like
+/// `option.blo` is; the resource loader decompresses before handing the TIMG to
+/// `JUTTexture` (`JKRFileLoader::getGlbResource`).
+fn decode_bti(bytes: &[u8], label: &str) -> Option<Image> {
+    let decoded = if bytes.starts_with(&crate::archive::YAZ0_MAGIC) {
+        crate::archive::yaz0_decode(bytes, label).ok()?
+    } else {
+        bytes.to_vec()
+    };
+    bti::decode(&decoded)
+}
 
 /// `MENU_CLOTH_TYPE_FILE_SELECT`'s cloth colour (`d_menu_cloth.cpp:66-69`).
 const CLOTH_COLOR: [u8; 4] = [0xBE, 0xB4, 0x64, 0xAA];
@@ -179,19 +192,23 @@ impl Assets {
             let Some(bytes) = inner.read(name).ok() else {
                 continue;
             };
-            if let Some(image) = bti::decode(bytes) {
+            if let Some(image) = decode_bti(bytes, name) {
                 textures.insert(name.to_string(), image);
             }
         }
-        // The option screen's panes name font/icon textures that live in the message font
-        // archive rather than in optres.arc; file select's textures are in its own archive.
-        if let Ok(font_archive) = root.read_archive(FONT_ARCHIVE) {
+        // `dMenu_Option_c::screenSet` resolves PIC1 textures through the global
+        // resource loader (`d_menu_option.cpp:47-48`), so the note/cursor pictures
+        // come from `menures.arc`, not from `optres.arc` or the font archive.
+        for texture_archive in [FONT_ARCHIVE, MENU_ARCHIVE] {
+            let Ok(font_archive) = root.read_archive(texture_archive) else {
+                continue;
+            };
             for name in font_archive.entries() {
                 if !name.ends_with(".bti") || textures.contains_key(name) {
                     continue;
                 }
                 if let Ok(bytes) = font_archive.read(name) {
-                    if let Some(image) = bti::decode(bytes) {
+                    if let Some(image) = decode_bti(bytes, name) {
                         textures.insert(name.to_string(), image);
                     }
                 }
