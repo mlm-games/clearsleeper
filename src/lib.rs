@@ -4639,6 +4639,10 @@ impl App {
     }
 
     pub fn advance(&mut self, dt: Duration) -> u32 {
+        if FORCE_SETTINGS.swap(false, std::sync::atomic::Ordering::Relaxed) {
+            self.intro = None;
+            self.menu.screen = menus::Screen::Settings;
+        }
         self.frame += 1;
         self.log_input();
         let request = *self.sim.world.resource::<sim::event::PlaceNameRequest>();
@@ -5380,6 +5384,8 @@ impl Default for App {
 /// extracted [`assets::ASSETS_ENV`] tree. An image that is named or found but unreadable exits
 /// with the typed reason on stderr rather than opening a window over a session without assets.
 #[cfg(not(target_os = "android"))]
+static FORCE_SETTINGS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn run() {
     use std::time::Duration;
     use web_time::Instant;

@@ -132,6 +132,21 @@ impl OptionMenuStage {
         screen: &j2d::Screen,
         menu: &ui::OptionMenu,
     ) {
+        // The option screen is drawn inside the Collection menu's parchment
+        // frame (`dMenu_Collect_c::_create`, d_menu_collect.cpp:3636-3662), not
+        // over the bare play scene. Draw that frame first so the green note
+        // panes land on the retail backing.
+        if let Ok(root) = crate::assets::AssetRoot::from_env() {
+            if let Some(frame) = crate::panes::Assets::load_from(
+                &root,
+                "files/res/Msg/clctres.arc",
+                None,
+                "scrn/menu_collect_01.blo",
+            ) {
+                let none = HashMap::new();
+                crate::panes::draw_screen_table(canvas, &frame, &frame.screen, &none);
+            }
+        }
         let owned = owned_panes(&menu.panes, screen);
         let live: HashMap<&str, &SavePane> = owned.iter().map(|(k, v)| (*k, v)).collect();
         crate::panes::draw_screen_table(canvas, assets, screen, &live);
