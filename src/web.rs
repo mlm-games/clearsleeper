@@ -139,11 +139,6 @@ pub fn install_extracted(
     Ok(summary.to_string())
 }
 
-#[wasm_bindgen(js_name = forceSettings)]
-pub fn force_settings() {
-    crate::FORCE_SETTINGS.store(true, std::sync::atomic::Ordering::Relaxed);
-}
-
 /// Start the shell loop over the installed image.
 #[wasm_bindgen(js_name = boot)]
 pub fn boot() {
