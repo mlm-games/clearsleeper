@@ -275,6 +275,7 @@ pub struct App {
     dialogue_canvas: text::raster::Canvas,
     dialogue_live: bool,
     bridged_msg_code: u32,
+    prologue_line: usize,
     dialogue_image: Cell<Option<repose_core::ImageHandle>>,
     dialogue_uploaded: Cell<u64>,
     dialogue_revision: u64,
@@ -755,6 +756,7 @@ impl App {
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,
             bridged_msg_code: 0,
+            prologue_line: 0,
             dialogue_image: Cell::new(None),
             dialogue_uploaded: Cell::new(0),
             dialogue_revision: 0,
@@ -2119,10 +2121,52 @@ impl App {
             .world
             .get_resource::<sim::msg::MsgBox>()
             .map_or(0, |box_| box_.message_code());
-        if std::env::var_os("CS_MSG_DEBUG").is_some() && code != 0 {
-            eprintln!(
-                "MSG_DEBUG code={:#x} bridged={:#x}",
-                code, self.bridged_msg_code
+        // The prologue's opening demo carries no JMSG blocks in the port's timeline.
+        // Retail's sister wake-up dialogue is a fixed set of `zel_00` entries
+        // (`d_a_npc_ls1.cpp`); open them in order while the start event runs.
+        const PROLOGUE_LINES: [u32; 6] = [0xBCE, 0xBD0, 0xBD1, 0xBD2, 0xBD3, 0xBD4];
+        let event_running = self
+            .sim
+            .world
+            .get_resource::<sim::event::ActiveEvent>()
+            .is_some_and(|event| event.running_front().is_some());
+        let driver_live = self
+            .sim
+            .world
+            .get_resource::<text::driver::TextDriver>()
+            .is_some_and(|driver| driver.live);
+        if self.stage_name == "sea"
+            && event_running
+            && !driver_live
+            && self.prologue_line < PROLOGUE_LINES.len()
+        {
+            let code = PROLOGUE_LINES[self.prologue_line];
+            self.prologue_line += 1;
+            self.bridged_msg_code = code;
+            let clear_count = self
+                .sim
+                .world
+                .get_resource::<text::driver::TextDriver>()
+                .map_or(0, |driver| driver.flags.clear_count);
+            let archives = assets::load_msg_archives();
+            let player_pos = self
+                .sim
+                .world
+                .get_resource::<sim::area::Area>()
+                .map_or(glam::Vec3::ZERO, |area| area.spawn);
+            self.sim.world.resource_scope(
+                |world, mut info: bevy_ecs::change_detection::Mut<text::msgproc::MsgGameInfo>| {
+                    let mut procs = world.resource_mut::<text::msgproc::MsgProcs>();
+                    text::msgproc::fop_msgm_message_set(
+                        &mut procs,
+                        &mut info,
+                        &archives,
+                        clear_count,
+                        code,
+                        None,
+                        player_pos,
+                    );
+                },
             );
         }
         if code != 0 && code != self.bridged_msg_code {
