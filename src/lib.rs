@@ -1547,25 +1547,6 @@ impl App {
     /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
     /// save.
     fn stage_file_select(&mut self) {
-        if std::env::var_os("CS_FS_DEBUG").is_some() {
-            let pad = self.file_select_pad();
-            eprintln!(
-                "CS_FS_DEBUG screen={:?} open_done={} timer={} timer2={} proc={} trig_a={} hold_a={} slot={:?} pending={:?} end={} e={} f41={} intro={}",
-                self.menu.screen,
-                self.menu.fs.open_done,
-                self.menu.fs.timer,
-                self.menu.fs.timer2,
-                self.menu.fs.proc,
-                pad.trig_a,
-                pad.hold_a,
-                self.menu.fs.slot_picked,
-                self.pending_file_action,
-                self.menu.fs.select_end,
-                self.menu.fs.flag_392e,
-                self.menu.fs.flag_3941,
-                self.intro.is_some()
-            );
-        }
         if let Some(action) = self.pending_file_action {
             // Retail slides the panes out before the chosen file starts
             // (tww d_file_select.cpp:294-357, HD d_file_select.cpp:1141-1150).
@@ -1789,6 +1770,14 @@ impl App {
                 self.enter_play();
                 return;
             }
+            // The retail keeps the sky and its Vrkumo cloud dome alive through the
+            // storybook (`dKyw_wether_move_draw2` runs on its own process). Without
+            // these the prologue renders a flat blue sky with no clouds.
+            let _ = self.sim.world.run_system_cached(sim::weather::control_draw);
+            let _ = self
+                .sim
+                .world
+                .run_system_cached(sim::weather::control_clouds);
         }
         if budget == 0 {
             self.intro_clock = 0.0;

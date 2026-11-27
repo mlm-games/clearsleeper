@@ -1531,12 +1531,6 @@ impl FileSelect {
         let (temp2, temp3) = self.rec_row_trance_out();
         let temp4 = self.rec_info_pane_move(0.0, 0.0, IDX_44 as f32, 0.0, 0, 0, 1);
         let temp5 = self.menu_pane_move(0.0, IDX_42 as f32, 0, 0, 1);
-        if std::env::var_os("CS_FS_DEBUG").is_some() && self.timer < 20 {
-            eprintln!(
-                "CLOSE_END timer={} t1={} t2={} t3={} t4={} t5={}",
-                self.timer, temp1, temp2, temp3, temp4, temp5
-            );
-        }
         temp1 && temp2 && temp3 && temp4 && temp5
     }
 
