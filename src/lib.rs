@@ -2132,16 +2132,19 @@ impl App {
                 .world
                 .get_resource::<sim::area::Area>()
                 .map_or(glam::Vec3::ZERO, |area| area.spawn);
-            let mut procs = self.sim.world.resource_mut::<text::msgproc::MsgProcs>();
-            let mut info = self.sim.world.resource_mut::<text::msgproc::MsgGameInfo>();
-            text::msgproc::fop_msgm_message_set(
-                &mut procs,
-                &mut info,
-                &archives,
-                clear_count,
-                code,
-                None,
-                player_pos,
+            self.sim.world.resource_scope(
+                |world, mut info: bevy_ecs::change_detection::Mut<text::msgproc::MsgGameInfo>| {
+                    let mut procs = world.resource_mut::<text::msgproc::MsgProcs>();
+                    text::msgproc::fop_msgm_message_set(
+                        &mut procs,
+                        &mut info,
+                        &archives,
+                        clear_count,
+                        code,
+                        None,
+                        player_pos,
+                    );
+                },
             );
         }
         let live = self
