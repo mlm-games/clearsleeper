@@ -2119,6 +2119,12 @@ impl App {
             .world
             .get_resource::<sim::msg::MsgBox>()
             .map_or(0, |box_| box_.message_code());
+        if std::env::var_os("CS_MSG_DEBUG").is_some() && code != 0 {
+            eprintln!(
+                "MSG_DEBUG code={:#x} bridged={:#x}",
+                code, self.bridged_msg_code
+            );
+        }
         if code != 0 && code != self.bridged_msg_code {
             self.bridged_msg_code = code;
             let clear_count = self
