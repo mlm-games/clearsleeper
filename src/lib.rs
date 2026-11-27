@@ -54,6 +54,7 @@ pub mod report;
 pub mod save;
 pub mod shot;
 pub mod sim;
+pub mod sky;
 pub mod source;
 pub mod start_ui;
 pub mod text;
@@ -1931,6 +1932,13 @@ impl App {
         // The full HUD animates every frame, so repaint the whole canvas rather than
         // early-outing on the heart row's key.
         stage.canvas.clear();
+        // The 3D Vrkumo quads never reach the compositor, so put the cloud layer
+        // in front of the flat sky the same way retail's own 2D overlay sits over
+        // the world. It moves slowly with the frame counter like the real dome.
+        if self.stage_name == "sea" {
+            let tick = self.sim.world.resource::<sim::frame::CurrentFrame>().0;
+            sky::draw_clouds(&mut stage.canvas, tick as u32);
+        }
         stage.hud.step(&stage.assets, &facts, &mut stage.canvas);
         stage.meter.render(&mut stage.canvas, &stage.assets);
         stage.revision = stage.revision.wrapping_add(1);
