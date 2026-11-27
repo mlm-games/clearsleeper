@@ -1735,20 +1735,28 @@ pub fn load_weather_textures(stage: &str) -> Vec<Option<(Vec<u8>, u32, u32)>> {
             Some((image.pixels, image.width as u32, image.height as u32))
         })
         .collect::<Vec<_>>();
-    // Vrkumo cloud layers use three BTI entries from the stage archive
-    // (`tww/src/d/d_kankyo_wether.cpp:818-834`;
-    // `wwhd/wwhd_src/d/d_kankyo_wether.cpp:2830-2846`).
-    if let Ok(map) = root.read_archive(&stage_map(stage)) {
-        for name in ["cloud_01.bti", "cloud_02.bti", "cloud_03.bti"] {
-            let image = map
-                .read(name)
-                .ok()
-                .and_then(crate::bti::decode)
-                .map(|image| (image.pixels, image.width as u32, image.height as u32));
-            pages.push(image);
+    // Vrkumo cloud layers use three BTI entries. The GameCube decomp picks
+    // `cloud_0X.bti` when the stage carries `vr_box`, otherwise `cloudtx_0X.bti`
+    // (`tww/src/d/d_kankyo_wether.cpp:818-834`; HD `:2830-2846`). The latter live
+    // alongside the sky in `Stage/Name/Stage.arc`, not in the current stage's map.
+    let cloud_tex = |name: &str| {
+        for archive in [stage_map(stage), stage_map("Name")] {
+            let Ok(map) = root.read_archive(&archive) else {
+                continue;
+            };
+            let bundled = format!("tex/{name}");
+            for candidate in [name.to_owned(), bundled] {
+                if let Some(image) = map.read(&candidate).ok().and_then(crate::bti::decode) {
+                    return Some((image.pixels, image.width as u32, image.height as u32));
+                }
+            }
         }
-    } else {
-        pages.resize(WeatherPage::COUNT, None);
+        None
+    };
+    for index in 1..=3 {
+        let name = format!("cloud_{index:02}.bti");
+        let fallback = format!("cloudtx_{index:02}.bti");
+        pages.push(cloud_tex(&name).or_else(|| cloud_tex(&fallback)));
     }
     pages
 }
