@@ -2820,12 +2820,15 @@ impl App {
         let vrkumo_count = weather.vrkumo_count.max(0) as usize;
         if std::env::var_os("CS_CLOUD_DEBUG").is_some() {
             eprintln!(
-                "CLOUD_DEBUG stage={:?} count={} strength={} status={} first_alpha={}",
+                "CLOUD_DEBUG stage={:?} count={} strength={} first_alpha={} tex_pages={} vrkumo_tex={:?}",
                 self.stage_name,
                 vrkumo_count,
                 weather.vrkumo_strength,
-                weather.vrkumo_status,
-                weather.vrkumo.inst.first().map(|c| c.alpha).unwrap_or(-1.0)
+                weather.vrkumo.inst.first().map(|c| c.alpha).unwrap_or(-1.0),
+                self.weather_textures.len(),
+                (6..9)
+                    .map(|i| self.weather_textures.get(i).is_some_and(|t| t.is_some()))
+                    .collect::<Vec<_>>()
             );
         }
         if vrkumo_count > 0 {
