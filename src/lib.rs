@@ -23,6 +23,7 @@ pub mod archive;
 pub mod assets;
 pub mod audio;
 pub mod bti;
+pub mod cloth;
 pub mod config;
 pub mod dff;
 pub mod disc;
@@ -6235,7 +6236,7 @@ fn option_menu_view(app: &App, ctx: &repose_core::RenderContext) -> repose_core:
     };
     if stage.uploaded.get() != stage.revision {
         let mut canvas = text::raster::Canvas::new(640, 480);
-        canvas.fill_rect([0.0, 0.0, 640.0, 480.0], [0, 0, 0, 200]);
+        crate::cloth::draw_backdrop(&mut canvas, false, 0.0);
         stage.render(&mut canvas, &assets, screen, menu);
         ctx.set_image_rgba8(handle, 640, 480, canvas.pixels, true);
         stage.uploaded.set(stage.revision);

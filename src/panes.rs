@@ -29,9 +29,6 @@ fn decode_bti(bytes: &[u8], label: &str) -> Option<Image> {
     bti::decode(&decoded)
 }
 
-/// `MENU_CLOTH_TYPE_FILE_SELECT`'s cloth colour (`d_menu_cloth.cpp:66-69`).
-const CLOTH_COLOR: [u8; 4] = [0xBE, 0xB4, 0x64, 0xAA];
-
 pub struct Assets {
     pub screen: Screen,
     pub parts: Option<crate::ui_file_select_parts::Parts>,
@@ -343,11 +340,11 @@ pub fn draw_file_select(canvas: &mut Canvas, panes: &FileSelectPanes, assets: &A
     // drawn into, so the backdrop is the cloth colour at the cloth's own alpha
     // (`d_menu_cloth.cpp:66-69`) over the layer behind.
     //
-    // `file_select.blo`'s BACK pane binds `sky_cloth.bti`, which is on no disc:
-    // `J2DPicture` looks its texture up by name (`J2DPicture.cpp:185-187`) and
-    // draws nothing when the name is missing (`J2DPicture.cpp:234-236`), so the
-    // retail leaves that pane empty as well.
-    canvas.fill_rect([0.0, 0.0, 640.0, 480.0], CLOTH_COLOR);
+    // `file_select.blo`'s BACK pane binds `sky_cloth.bti`, which is on no disc;
+    // the retail draws the parchment with the runtime `dMCloth_c` mesh instead
+    // (`d_s_name.cpp:342-352`). Paint the same silhouette into the canvas so the
+    // world behind the menu does not show through the semi-transparent BLO panes.
+    crate::cloth::draw_backdrop(canvas, true, 0.0);
     draw_screen_impl(canvas, assets, &assets.screen, &live_table(panes), false);
     crate::ui_file_select_parts::draw(canvas, assets);
 }
