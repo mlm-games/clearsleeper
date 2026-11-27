@@ -1658,11 +1658,27 @@ impl App {
         let mut machine = intro::Intro::default();
         machine.start(&mut fonts, &archives);
         // The opening keeps the full cloud dome (`g_env_light.mVrkumoCount = 70` in
-        // the Name scene, and the prologue shows the same sky). Force it on because
-        // the storybook does not run the weather process that eases it in.
+        // the Name scene, and the prologue shows the same sky). The storybook does
+        // not run the weather processes, so seed the ring directly the way
+        // `vrkumo_move` (`d_kankyo_rain.cpp:2755-2947`) leaves it once armed.
         if let Some(mut weather) = self.sim.world.get_resource_mut::<sim::weather::Weather>() {
             weather.vrkumo_strength = 1.0;
             weather.vrkumo_count = 70;
+            weather.vrkumo_status = 1;
+            for (index, cloud) in weather.vrkumo.inst.iter_mut().enumerate() {
+                let bearing = index as f32 * std::f32::consts::TAU / 70.0;
+                let distance = 12000.0 + (index % 7) as f32 * 300.0;
+                cloud.status = 1;
+                cloud.position = glam::Vec3::new(
+                    distance * bearing.sin(),
+                    700.0 + (index % 5) as f32 * 180.0,
+                    distance * bearing.cos(),
+                );
+                cloud.height = 400.0 + (index % 3) as f32 * 200.0;
+                cloud.alpha = if index < 70 { 0.85 } else { 0.0 };
+                cloud.dist_falloff = 0.8;
+                cloud.speed = 0.5 + (index % 4) as f32 * 0.2;
+            }
         }
         self.intro_clock = 0.0;
         self.intro = Some(IntroStage {
