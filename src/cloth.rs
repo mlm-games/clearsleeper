@@ -17,7 +17,11 @@ const MENU_SKY: [u8; 4] = [0x2E, 0x3C, 0x56, 0xFF];
 /// Mirrored edge factor: 0 at the corners of the cloth, 1 along the straight edges.
 /// This is `(fx + fy) * 0.2` from `d_menu_cloth.cpp:841-849`.
 fn edge_factor(i: usize) -> f32 {
-    let mirrored = if i > GRID / 2 { GRID - i - 1 } else { i } as f32;
+    let mirrored = if i > GRID / 2 {
+        GRID.saturating_sub(i + 1)
+    } else {
+        i
+    } as f32;
     (mirrored * 0.2).min(1.0)
 }
 
@@ -54,7 +58,7 @@ pub fn draw_backdrop(canvas: &mut Canvas, file_select: bool, t: f32) {
 
     // Shadow pass: same silhouette, offset down/right (`plot_shadow` in the retail).
     let shadow_off = 5.0f32;
-    for i in 0..cols {
+    for i in 0..cols - 1 {
         let j = i + 1;
         let x0 = left + (right - left) * i as f32 / (cols - 1) as f32;
         let x1 = left + (right - left) * j as f32 / (cols - 1) as f32;
@@ -66,7 +70,7 @@ pub fn draw_backdrop(canvas: &mut Canvas, file_select: bool, t: f32) {
     }
 
     // Cloth pass with wavy top/bottom edges.
-    for i in 0..cols {
+    for i in 0..cols - 1 {
         let j = i + 1;
         let x0 = left + (right - left) * i as f32 / (cols - 1) as f32;
         let x1 = left + (right - left) * j as f32 / (cols - 1) as f32;
