@@ -1550,14 +1550,20 @@ impl App {
         if std::env::var_os("CS_FS_DEBUG").is_some() {
             let pad = self.file_select_pad();
             eprintln!(
-                "CS_FS_DEBUG screen={:?} open_done={} timer={} proc={} trig_a={} trig_start={} hold_a={}",
+                "CS_FS_DEBUG screen={:?} open_done={} timer={} timer2={} proc={} trig_a={} hold_a={} slot={:?} pending={:?} end={} e={} f41={} intro={}",
                 self.menu.screen,
                 self.menu.fs.open_done,
                 self.menu.fs.timer,
+                self.menu.fs.timer2,
                 self.menu.fs.proc,
                 pad.trig_a,
-                pad.trig_start,
-                pad.hold_a
+                pad.hold_a,
+                self.menu.fs.slot_picked,
+                self.pending_file_action,
+                self.menu.fs.select_end,
+                self.menu.fs.flag_392e,
+                self.menu.fs.flag_3941,
+                self.intro.is_some()
             );
         }
         if let Some(action) = self.pending_file_action {
