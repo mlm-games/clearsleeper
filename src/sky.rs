@@ -9,15 +9,15 @@ pub fn draw_clouds(canvas: &mut Canvas, tick: u32) {
     // Each cluster is a handful of overlapping ellipses with a soft alpha falloff;
     // the retail texture is an intensity map with a feathered edge.
     const CLUSTERS: [(f32, f32, f32, u32); 9] = [
-        (0.08, 0.30, 1.0, 0),
-        (0.20, 0.24, 1.2, 1),
-        (0.33, 0.32, 0.8, 2),
-        (0.46, 0.20, 1.1, 3),
-        (0.58, 0.28, 0.9, 4),
-        (0.70, 0.23, 1.3, 5),
-        (0.82, 0.31, 0.9, 6),
-        (0.93, 0.25, 1.0, 7),
-        (0.50, 0.12, 0.7, 8),
+        (0.08, 0.10, 1.0, 0),
+        (0.20, 0.06, 1.2, 1),
+        (0.33, 0.13, 0.8, 2),
+        (0.46, 0.04, 1.1, 3),
+        (0.58, 0.11, 0.9, 4),
+        (0.70, 0.05, 1.3, 5),
+        (0.82, 0.12, 0.9, 6),
+        (0.93, 0.07, 1.0, 7),
+        (0.50, 0.02, 0.7, 8),
     ];
     for (cx, cy, scale, seed) in CLUSTERS {
         let drift = ((tick as f32 * 0.004 + seed as f32 * 1.7).sin() * 6.0).max(-6.0);
@@ -25,10 +25,10 @@ pub fn draw_clouds(canvas: &mut Canvas, tick: u32) {
         let base_y = cy * 480.0;
         for lobe in 0..5 {
             let a = lobe as f32 * 2.39996 + seed as f32;
-            let ox = a.cos() * 42.0 * scale;
-            let oy = a.sin() * 13.0 * scale;
-            let rx = (52.0 + (lobe % 3) as f32 * 18.0) * scale;
-            let ry = (16.0 + (lobe % 2) as f32 * 9.0) * scale;
+            let ox = a.cos() * 30.0 * scale;
+            let oy = a.sin() * 10.0 * scale;
+            let rx = (36.0 + (lobe % 3) as f32 * 14.0) * scale;
+            let ry = (13.0 + (lobe % 2) as f32 * 7.0) * scale;
             let x0 = (base_x + ox - rx).max(0.0) as usize;
             let x1 = (base_x + ox + rx).min(640.0) as usize;
             let y0 = (base_y + oy - ry).max(0.0) as usize;
