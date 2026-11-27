@@ -1793,14 +1793,6 @@ impl App {
                 self.enter_play();
                 return;
             }
-            // The retail keeps the sky and its Vrkumo cloud dome alive through the
-            // storybook (`dKyw_wether_move_draw2` runs on its own process). Without
-            // these the prologue renders a flat blue sky with no clouds.
-            let _ = self.sim.world.run_system_cached(sim::weather::control_draw);
-            let _ = self
-                .sim
-                .world
-                .run_system_cached(sim::weather::control_clouds);
         }
         if budget == 0 {
             self.intro_clock = 0.0;
@@ -2818,19 +2810,6 @@ impl App {
         // Vrkumo: cloud layers on a world-space dome, drawn with depth test off the way HD does
         // (`wwhd/wwhd_src/d/d_kankyo_rain_drawVrkumo.cpp:152-166`).
         let vrkumo_count = weather.vrkumo_count.max(0) as usize;
-        if std::env::var_os("CS_CLOUD_DEBUG").is_some() {
-            eprintln!(
-                "CLOUD_DEBUG stage={:?} count={} strength={} first_alpha={} tex_pages={} vrkumo_tex={:?}",
-                self.stage_name,
-                vrkumo_count,
-                weather.vrkumo_strength,
-                weather.vrkumo.inst.first().map(|c| c.alpha).unwrap_or(-1.0),
-                self.weather_textures.len(),
-                (6..9)
-                    .map(|i| self.weather_textures.get(i).is_some_and(|t| t.is_some()))
-                    .collect::<Vec<_>>()
-            );
-        }
         if vrkumo_count > 0 {
             for (index, cloud) in weather.vrkumo.inst.iter().take(vrkumo_count).enumerate() {
                 if cloud.alpha <= 0.0 {
@@ -2865,7 +2844,7 @@ impl App {
                     color: [0.85, 0.87, 0.92],
                     alpha: cloud.alpha.clamp(0.0, 1.0),
                     page: assets::WeatherPage::vrkumo(index % 3),
-                    textured: false,
+                    textured: true,
                     depth_test: false,
                 });
             }
