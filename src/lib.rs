@@ -1657,6 +1657,13 @@ impl App {
         text::driver::load_fonts(&mut fonts);
         let mut machine = intro::Intro::default();
         machine.start(&mut fonts, &archives);
+        // The opening keeps the full cloud dome (`g_env_light.mVrkumoCount = 70` in
+        // the Name scene, and the prologue shows the same sky). Force it on because
+        // the storybook does not run the weather process that eases it in.
+        if let Some(mut weather) = self.sim.world.get_resource_mut::<sim::weather::Weather>() {
+            weather.vrkumo_strength = 1.0;
+            weather.vrkumo_count = 70;
+        }
         self.intro_clock = 0.0;
         self.intro = Some(IntroStage {
             intro: machine,
