@@ -985,7 +985,8 @@ impl App {
         self.title_actor = None;
         self.stage_progress.clear();
         self.sim = Sim::new(Duration::from_secs_f64(1.0 / SIM_HZ));
-        self.stage = assets::load_stage_tables(stage);
+        self.stage = assets::load_stage_tables(stage)
+            .map(|tables| tables.with_room_actors(&assets::load_room_actors(stage)));
         // The stage's event-info table names the demo a PLYR row starts, and the new-game boot
         // path must carry it too. tww/src/d/d_stage.cpp:2246,
         // tww/src/d/d_event_manager.cpp:347-348; wwhd/wwhd_src/d/d_stage_3.cpp:172-175,
@@ -5026,7 +5027,9 @@ impl App {
             self.begin_movie(ui_file_select::SceneName::Ending);
             return;
         }
-        let Some(tables) = assets::load_stage_tables(&dest.stage) else {
+        let Some(tables) = assets::load_stage_tables(&dest.stage)
+            .map(|tables| tables.with_room_actors(&assets::load_room_actors(&dest.stage)))
+        else {
             return;
         };
         let rooms = assets::room_set_for(&tables, dest.room);

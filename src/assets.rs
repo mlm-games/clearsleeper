@@ -1646,6 +1646,21 @@ pub fn load_stage_tables(stage: &str) -> Option<crate::dzs::StageTables> {
     }
 }
 
+/// Room `ACTR` records for the start room set. These carry actors like the ship
+/// deck's `Ls1` sister, which the stage table alone does not name.
+pub fn load_room_actors(stage: &str) -> Vec<crate::dzs::StageActor> {
+    let Ok(root) = AssetRoot::from_env() else {
+        return Vec::new();
+    };
+    let Ok(tables) = stage_tables(&root, stage) else {
+        return Vec::new();
+    };
+    let rooms = start_set(&tables);
+    room_set_from_assets(&root, &tables, &rooms, &fresh_layer(&tables))
+        .map(|set| set.actors)
+        .unwrap_or_default()
+}
+
 /// One `PLYR` row of a room: where the player wakes up on entering through that point, and the
 /// row's own parameter word (its start event lives in bits 24-31, `d_a_player_main.h:1881`).
 #[derive(Clone, Copy, Debug, PartialEq)]

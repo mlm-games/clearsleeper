@@ -740,6 +740,15 @@ impl StageTables {
         self
     }
 
+    /// Room `ACTR` records (each room's `dzr/room.dzr`) are staged alongside the
+    /// stage's own table (`dStage_actorInit` walks both). `d_s_room.cpp` mounts the
+    /// room tables, so an actor written only into a room - the `Ls1` sister on the
+    /// ship deck - must join the table the demo's `JSGFindObject` searches.
+    pub fn with_room_actors(mut self, actors: &[StageActor]) -> Self {
+        self.actors.extend_from_slice(actors);
+        self
+    }
+
     pub fn placements(&self) -> &[Placement] {
         &self.placements
     }
