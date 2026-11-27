@@ -2264,12 +2264,16 @@ impl DemoStage<'_> {
     /// "same profile name" is checked as "same name-table spelling". That is strictly stronger: an
     /// actor sharing a profile under a different spelling is missed, never mismatched.
     fn search_from_name(&mut self, name: &str) -> Option<usize> {
-        let wanted = self.table.record_for_name(name)?;
-        let spelling = wanted.name().to_owned();
-        let argument = wanted.argument;
+        let wanted = self.table.record_for_name(name);
+        let (spelling, argument) = wanted
+            .map(|row| (row.name().to_owned(), row.argument))
+            .unwrap_or_else(|| (name.to_owned(), 0));
         self.actors.iter().position(|row| {
             let Some(other) = self.table.record_for_name(&row.name) else {
-                return false;
+                // An actor whose spelling is absent from the global ActorDat table
+                // (the ship deck's `Ls1`, for one) still answers retail's
+                // `fopAcM_searchFromName` by its own profile name.
+                return row.name == spelling;
             };
             other.name() == spelling && other.argument == argument
         })
