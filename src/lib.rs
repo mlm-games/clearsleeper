@@ -2818,6 +2818,16 @@ impl App {
         // Vrkumo: cloud layers on a world-space dome, drawn with depth test off the way HD does
         // (`wwhd/wwhd_src/d/d_kankyo_rain_drawVrkumo.cpp:152-166`).
         let vrkumo_count = weather.vrkumo_count.max(0) as usize;
+        if std::env::var_os("CS_CLOUD_DEBUG").is_some() {
+            eprintln!(
+                "CLOUD_DEBUG stage={:?} count={} strength={} status={} first_alpha={}",
+                self.stage_name,
+                vrkumo_count,
+                weather.vrkumo_strength,
+                weather.vrkumo_status,
+                weather.vrkumo.inst.first().map(|c| c.alpha).unwrap_or(-1.0)
+            );
+        }
         if vrkumo_count > 0 {
             for (index, cloud) in weather.vrkumo.inst.iter().take(vrkumo_count).enumerate() {
                 if cloud.alpha <= 0.0 {
