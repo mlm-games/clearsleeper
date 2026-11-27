@@ -133,6 +133,9 @@ impl ItemMenuStage {
     }
 
     pub fn draw_window(world: &mut World) -> Option<crate::ui_menu_item::WindowDraw> {
+        if !world.contains_resource::<crate::ui_menu_item::MenuWindow>() {
+            return None;
+        }
         let mut window = world.resource_mut::<crate::ui_menu_item::MenuWindow>();
         Some(window.draw())
     }

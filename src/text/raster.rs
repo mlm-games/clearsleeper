@@ -97,10 +97,19 @@ impl Canvas {
                     let fx = (x as f32 + 0.5 - min_x) / span_x;
                     let fy = (y as f32 + 0.5 - min_y) / span_y;
                     let (u, v) = sample_uv(quad, fx, fy, tex_w, tex_h);
-                    let Some(&index) = texels.get(
-                        usize::try_from(v).unwrap_or(usize::MAX) * usize::from(page_w)
-                            + usize::try_from(u).unwrap_or(usize::MAX),
-                    ) else {
+                    let Some(row) = usize::try_from(v).ok() else {
+                        continue;
+                    };
+                    let Some(col) = usize::try_from(u).ok() else {
+                        continue;
+                    };
+                    let Some(offset) = row
+                        .checked_mul(usize::from(page_w))
+                        .and_then(|o| o.checked_add(col))
+                    else {
+                        continue;
+                    };
+                    let Some(&index) = texels.get(offset) else {
                         continue;
                     };
                     if index == 0 {
