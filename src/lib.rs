@@ -1773,8 +1773,11 @@ impl App {
             // The retail keeps the sky and its Vrkumo cloud dome alive through the
             // storybook (`dKyw_wether_move_draw2` runs on its own process). Without
             // these the prologue renders a flat blue sky with no clouds.
-            let _ = self.sim.world.run_system(sim::weather::control_draw);
-            let _ = self.sim.world.run_system(sim::weather::control_clouds);
+            let _ = self.sim.world.run_system_cached(sim::weather::control_draw);
+            let _ = self
+                .sim
+                .world
+                .run_system_cached(sim::weather::control_clouds);
         }
         if budget == 0 {
             self.intro_clock = 0.0;
