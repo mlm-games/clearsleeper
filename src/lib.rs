@@ -1547,6 +1547,19 @@ impl App {
     /// moves the panes and reads the pad, and the slot it picks starts the game or loads the
     /// save.
     fn stage_file_select(&mut self) {
+        if std::env::var_os("CS_FS_DEBUG").is_some() {
+            let pad = self.file_select_pad();
+            eprintln!(
+                "CS_FS_DEBUG screen={:?} open_done={} timer={} proc={} trig_a={} trig_start={} hold_a={}",
+                self.menu.screen,
+                self.menu.fs.open_done,
+                self.menu.fs.timer,
+                self.menu.fs.proc,
+                pad.trig_a,
+                pad.trig_start,
+                pad.hold_a
+            );
+        }
         if let Some(action) = self.pending_file_action {
             // Retail slides the panes out before the chosen file starts
             // (tww d_file_select.cpp:294-357, HD d_file_select.cpp:1141-1150).
