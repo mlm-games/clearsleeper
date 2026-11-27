@@ -274,6 +274,7 @@ pub struct App {
     pending_slot: Option<usize>,
     dialogue_canvas: text::raster::Canvas,
     dialogue_live: bool,
+    bridged_msg_code: u32,
     dialogue_image: Cell<Option<repose_core::ImageHandle>>,
     dialogue_uploaded: Cell<u64>,
     dialogue_revision: u64,
@@ -753,6 +754,7 @@ impl App {
             pending_slot: None,
             dialogue_canvas: text::raster::Canvas::new(640, 480),
             dialogue_live: false,
+            bridged_msg_code: 0,
             dialogue_image: Cell::new(None),
             dialogue_uploaded: Cell::new(0),
             dialogue_revision: 0,
@@ -2109,6 +2111,39 @@ impl App {
     }
 
     fn pump_dialogue(&mut self) {
+        // A cutscene's JMSG writes `MsgBox::message_set_code` but never opens a
+        // `MsgProc`, which is what the text driver and its box render from. Bridge
+        // the changed code into the same dispatch a talking NPC uses.
+        let code = self
+            .sim
+            .world
+            .get_resource::<sim::msg::MsgBox>()
+            .map_or(0, |box_| box_.message_code());
+        if code != 0 && code != self.bridged_msg_code {
+            self.bridged_msg_code = code;
+            let clear_count = self
+                .sim
+                .world
+                .get_resource::<text::driver::TextDriver>()
+                .map_or(0, |driver| driver.flags.clear_count);
+            let archives = assets::load_msg_archives();
+            let player_pos = self
+                .sim
+                .world
+                .get_resource::<sim::area::Area>()
+                .map_or(glam::Vec3::ZERO, |area| area.spawn);
+            let mut procs = self.sim.world.resource_mut::<text::msgproc::MsgProcs>();
+            let mut info = self.sim.world.resource_mut::<text::msgproc::MsgGameInfo>();
+            text::msgproc::fop_msgm_message_set(
+                &mut procs,
+                &mut info,
+                &archives,
+                clear_count,
+                code,
+                None,
+                player_pos,
+            );
+        }
         let live = self
             .sim
             .world

@@ -1974,6 +1974,11 @@ pub fn build(
         let actor_table = stage_data::load_actor_table(&root).unwrap_or_default();
         sim.world.insert_resource(actor_table);
     }
+    // `dMesg_c` reads its message archive through `JMessage`'s control, which the port's
+    // text driver resolves from this resource. Without it a cutscene's JMSG code has an
+    // entry but no text to show.
+    sim.world
+        .insert_resource(crate::assets::load_msg_archives());
     sim.world.insert_resource(event::ActiveEvent::default());
     sim.world.insert_resource(event::ItemPartner::default());
     sim.world
