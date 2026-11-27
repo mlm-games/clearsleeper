@@ -2865,7 +2865,7 @@ impl App {
                     color: [0.85, 0.87, 0.92],
                     alpha: cloud.alpha.clamp(0.0, 1.0),
                     page: assets::WeatherPage::vrkumo(index % 3),
-                    textured: true,
+                    textured: false,
                     depth_test: false,
                 });
             }
