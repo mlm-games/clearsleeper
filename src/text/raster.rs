@@ -68,24 +68,16 @@ impl Canvas {
                 let at = quad.tex.data_at;
                 let end = at.saturating_add(quad.tex.data_size as usize);
                 match font.data.get(at..end) {
-                    Some(bytes) if bytes.len() * 2 == cells as usize => {
-                        unswizzle(bytes, usize::from(page_w), usize::from(page_h))
-                    }
-                    _ => Vec::new(),
+                    Some(bytes) => unswizzle_coverage(
+                        bytes,
+                        usize::from(page_w),
+                        usize::from(page_h),
+                        quad.tex.format,
+                    ),
+                    None => Vec::new(),
                 }
             });
             if texels.len() != cells as usize {
-                if std::env::var_os("CS_DLG_DEBUG").is_some() {
-                    eprintln!(
-                        "DLG_TEX at={} size={} cells={} w={} h={} fontlen={}",
-                        quad.tex.data_at,
-                        quad.tex.data_size,
-                        cells,
-                        page_w,
-                        page_h,
-                        font.data.len()
-                    );
-                }
                 continue;
             }
             let tex_w = f32::from(page_w.max(1));
@@ -140,17 +132,27 @@ impl Canvas {
     }
 }
 
-fn unswizzle(page: &[u8], width: usize, height: usize) -> Vec<u8> {
+fn unswizzle_coverage(page: &[u8], width: usize, height: usize, format: u16) -> Vec<u8> {
     const TILE: usize = 8;
     let mut out = vec![0_u8; width * height];
     let mut tile = 0_usize;
     for block_y in 0..height / TILE {
         for block_x in 0..width / TILE {
             for row in 0..TILE {
-                let at = tile * TILE * TILE / 2 + row * (TILE / 2);
                 for col in 0..TILE {
-                    let byte = page.get(at + col / 2).copied().unwrap_or(0);
-                    let value = if col % 2 == 0 { byte >> 4 } else { byte & 0x0F };
+                    let value = match format {
+                        0 => {
+                            let at = tile * TILE * TILE / 2 + row * (TILE / 2) + col / 2;
+                            let byte = page.get(at).copied().unwrap_or(0);
+                            if col % 2 == 0 { byte >> 4 } else { byte & 0x0F }
+                        }
+                        1 | 2 => {
+                            let at = tile * TILE * TILE + row * TILE + col;
+                            let byte = page.get(at).copied().unwrap_or(0);
+                            if format == 1 { byte >> 4 } else { byte & 0x0F }
+                        }
+                        _ => return Vec::new(),
+                    };
                     out[(block_y * TILE + row) * width + block_x * TILE + col] = value;
                 }
             }
