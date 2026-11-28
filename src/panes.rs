@@ -324,6 +324,16 @@ pub fn draw_label(
         let width = text.len() as f32 * size;
         let height = size * 1.4;
         let layout = box_.draw_self(fonts, [x, y, x + width, y + height], x, y, 0xFF);
+        if std::env::var_os("CS_DLG_DEBUG").is_some() {
+            eprintln!(
+                "DLG_LABEL slot={} banks={} quads={} origin={},{}",
+                slot,
+                fonts.len(),
+                layout.quads.len(),
+                x,
+                y
+            );
+        }
         if let Some(font) = fonts.get(slot) {
             canvas.draw_layout(&layout, font, [x, y], 0xFF);
         }
