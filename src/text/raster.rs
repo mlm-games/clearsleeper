@@ -75,6 +75,17 @@ impl Canvas {
                 }
             });
             if texels.len() != cells as usize {
+                if std::env::var_os("CS_DLG_DEBUG").is_some() {
+                    eprintln!(
+                        "DLG_TEX at={} size={} cells={} w={} h={} fontlen={}",
+                        quad.tex.data_at,
+                        quad.tex.data_size,
+                        cells,
+                        page_w,
+                        page_h,
+                        font.data.len()
+                    );
+                }
                 continue;
             }
             let tex_w = f32::from(page_w.max(1));
