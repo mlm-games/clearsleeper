@@ -1952,7 +1952,7 @@ impl App {
                 let mut fonts = self.sim.world.get_resource_mut::<text::font::FontBank>();
                 sky::draw_dialogue(&mut stage.canvas, &mut fonts, self.prologue_line);
                 // Advance every three seconds so the six lines read in order.
-                if tick > 0 && tick % (3 * crate::sim::SIM_HZ as u32) == 0 {
+                if tick > 0 && tick % (3 * crate::SIM_HZ as u32) == 0 {
                     self.prologue_line += 1;
                 }
             }

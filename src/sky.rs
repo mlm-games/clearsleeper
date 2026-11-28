@@ -56,6 +56,9 @@ pub fn draw_dialogue(canvas: &mut Canvas, fonts: &mut FontBank, line: usize) {
         box_bounds[3] - 24.0,
         0,
         0,
+        0.0,
+        0.0,
+        0xFF,
     );
     if let Some(font) = fonts.get(0) {
         canvas.draw_layout(
