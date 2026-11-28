@@ -52,7 +52,7 @@ pub fn draw_dialogue(canvas: &mut Canvas, line: usize) {
 }
 
 fn wrap(text: &str, width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
+    let mut lines: Vec<String> = Vec::new();
     for word in text.split_whitespace() {
         match lines.last_mut() {
             Some(line) if line.len() + 1 + word.len() <= width => {
