@@ -1956,6 +1956,7 @@ impl App {
             }
             if event_running && self.prologue_line < sky::PROLOGUE_LINES.len() {
                 if let Some(mut fonts) = self.sim.world.get_resource_mut::<text::font::FontBank>() {
+                    text::driver::load_fonts(&mut fonts);
                     sky::draw_dialogue(&mut stage.canvas, &mut fonts, self.prologue_line);
                 }
                 // Advance every three seconds so the six lines read in order.
