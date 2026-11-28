@@ -32,11 +32,18 @@ pub fn draw_dialogue(canvas: &mut Canvas, line: usize) {
         }
     }
     let Some(assets) = crate::panes::load() else {
+        if std::env::var_os("CS_DLG_DEBUG").is_some() {
+            eprintln!("DLG_DEBUG no assets");
+        }
         return;
     };
+    let debug = std::env::var_os("CS_DLG_DEBUG").is_some();
     let mut y = box_bounds[1] + 26.0;
     for paragraph in text.split('\n') {
         for chunk in wrap(paragraph, 32) {
+            if debug {
+                eprintln!("DLG_DEBUG draw {:?} at {}", chunk, y);
+            }
             crate::panes::draw_label(
                 canvas,
                 assets,
