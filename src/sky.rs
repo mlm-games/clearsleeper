@@ -1,4 +1,71 @@
+use crate::text::font::FontBank;
+use crate::text::msgbox::TextPrint;
 use crate::text::raster::Canvas;
+
+/// The sister's wake-up dialogue from the retail opening (`zel_00.bmg` 0xBCE-0xBD4),
+/// which the port's cutscene timeline does not carry as JMSG blocks.
+pub const PROLOGUE_LINES: [&str; 6] = [
+    "Big Brother!",
+    "I knew you'd be here!",
+    "Hee hee hee! This is my FAVORITE spot to\ngaze out at the sea. When I play with the\ngulls, I call it \"Aryll's Lookout.\"",
+    "So, do you remember what day it is today?",
+    "...You're still half-asleep, aren't you?",
+    "Did you forget?",
+];
+
+/// Draw one dialogue box with wrapped text onto the shared 640x480 overlay canvas.
+pub fn draw_dialogue(canvas: &mut Canvas, fonts: &mut FontBank, line: usize) {
+    let Some(text) = PROLOGUE_LINES.get(line) else {
+        return;
+    };
+    let box_bounds = [28.0f32, 320.0, 584.0, 140.0];
+    // Cream panel with a dark border, like the retail message box.
+    for y in (box_bounds[1] as usize)..((box_bounds[1] + box_bounds[3]) as usize) {
+        for x in (box_bounds[0] as usize)..((box_bounds[0] + box_bounds[2]) as usize) {
+            let border = x < box_bounds[0] as usize + 4
+                || x >= (box_bounds[0] + box_bounds[2]) as usize - 4
+                || y < box_bounds[1] as usize + 4
+                || y >= (box_bounds[1] + box_bounds[3]) as usize - 4;
+            let c = if border {
+                [0x2a, 0x1c, 0x10, 0xFF]
+            } else {
+                [0xf4, 0xe6, 0xc4, 0xF0]
+            };
+            canvas.blend(x, y, c, 1.0);
+        }
+    }
+    let mut print = TextPrint::default();
+    print.private_initiate(
+        fonts,
+        Some(0),
+        0.0,
+        30.0,
+        0x2a1c10ff,
+        0x2a1c10ff,
+        0,
+        0xFFFF_FFFF,
+        false,
+    );
+    print.set_font_size(22.0, 22.0);
+    let ascent = fonts.get(0).map_or(0.0, |f| f.ascent() as f32);
+    print.locate(box_bounds[0] + 20.0, box_bounds[1] + 12.0 + ascent);
+    let layout = print.print_return(
+        fonts,
+        text.as_bytes(),
+        box_bounds[2] - 40.0,
+        box_bounds[3] - 24.0,
+        0,
+        0,
+    );
+    if let Some(font) = fonts.get(0) {
+        canvas.draw_layout(
+            &layout,
+            font,
+            [box_bounds[0] + 20.0, box_bounds[1] + 12.0 + ascent],
+            0xFF,
+        );
+    }
+}
 
 /// The retail Vrkumo dome (`d_kankyo_rain.cpp`, `d_kankyo_rain_drawVrkumo.cpp`) paints a
 /// ring of soft cloud billboards around the horizon. The port's world-space quads are
