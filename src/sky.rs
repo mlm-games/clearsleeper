@@ -1,5 +1,3 @@
-use crate::text::font::FontBank;
-use crate::text::msgbox::TextPrint;
 use crate::text::raster::Canvas;
 
 /// The sister's wake-up dialogue from the retail opening (`zel_00.bmg` 0xBCE-0xBD4),
@@ -14,12 +12,11 @@ pub const PROLOGUE_LINES: [&str; 6] = [
 ];
 
 /// Draw one dialogue box with wrapped text onto the shared 640x480 overlay canvas.
-pub fn draw_dialogue(canvas: &mut Canvas, fonts: &mut FontBank, line: usize) {
+pub fn draw_dialogue(canvas: &mut Canvas, line: usize) {
     let Some(text) = PROLOGUE_LINES.get(line) else {
         return;
     };
     let box_bounds = [28.0f32, 320.0, 584.0, 140.0];
-    // Cream panel with a dark border, like the retail message box.
     for y in (box_bounds[1] as usize)..((box_bounds[1] + box_bounds[3]) as usize) {
         for x in (box_bounds[0] as usize)..((box_bounds[0] + box_bounds[2]) as usize) {
             let border = x < box_bounds[0] as usize + 4
@@ -34,40 +31,38 @@ pub fn draw_dialogue(canvas: &mut Canvas, fonts: &mut FontBank, line: usize) {
             canvas.blend(x, y, c, 1.0);
         }
     }
-    let mut print = TextPrint::default();
-    print.private_initiate(
-        fonts,
-        Some(0),
-        0.0,
-        30.0,
-        0x2a1c10ff,
-        0x2a1c10ff,
-        0,
-        0xFFFF_FFFF,
-        false,
-    );
-    print.set_font_size(22.0, 22.0);
-    let ascent = fonts.get(0).map_or(0.0, |f| f.ascent() as f32);
-    print.locate(box_bounds[0] + 20.0, box_bounds[1] + 12.0 + ascent);
-    let layout = print.print_return(
-        fonts,
-        text.as_bytes(),
-        box_bounds[2] - 40.0,
-        box_bounds[3] - 24.0,
-        0,
-        0,
-        0.0,
-        0.0,
-        0xFF,
-    );
-    if let Some(font) = fonts.get(0) {
-        canvas.draw_layout(
-            &layout,
-            font,
-            [box_bounds[0] + 20.0, box_bounds[1] + 12.0 + ascent],
-            0xFF,
-        );
+    let Some(assets) = crate::panes::load() else {
+        return;
+    };
+    let mut y = box_bounds[1] + 26.0;
+    for paragraph in text.split('\n') {
+        for chunk in wrap(paragraph, 32) {
+            crate::panes::draw_label(
+                canvas,
+                assets,
+                &chunk,
+                box_bounds[0] + 22.0,
+                y,
+                15.0,
+                0x2a1c10ff,
+            );
+            y += 24.0;
+        }
     }
+}
+
+fn wrap(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for word in text.split_whitespace() {
+        match lines.last_mut() {
+            Some(line) if line.len() + 1 + word.len() <= width => {
+                line.push(' ');
+                line.push_str(word);
+            }
+            _ => lines.push(word.to_string()),
+        }
+    }
+    lines
 }
 
 /// The retail Vrkumo dome (`d_kankyo_rain.cpp`, `d_kankyo_rain_drawVrkumo.cpp`) paints a

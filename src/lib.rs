@@ -1948,17 +1948,8 @@ impl App {
                 .world
                 .get_resource::<sim::event::ActiveEvent>()
                 .is_some_and(|event| event.running_front().is_some());
-            if std::env::var_os("CS_DLG_DEBUG").is_some() && tick % 60 == 0 {
-                eprintln!(
-                    "DLG_DEBUG stage={} tick={} event={} line={}",
-                    self.stage_name, tick, event_running, self.prologue_line
-                );
-            }
             if event_running && self.prologue_line < sky::PROLOGUE_LINES.len() {
-                if let Some(mut fonts) = self.sim.world.get_resource_mut::<text::font::FontBank>() {
-                    text::driver::load_fonts(&mut fonts);
-                    sky::draw_dialogue(&mut stage.canvas, &mut fonts, self.prologue_line);
-                }
+                sky::draw_dialogue(&mut stage.canvas, self.prologue_line);
                 // Advance every three seconds so the six lines read in order.
                 let line_ticks = 3u64 * (crate::SIM_HZ as u64);
                 if tick > 0 && tick % line_ticks == 0 {
