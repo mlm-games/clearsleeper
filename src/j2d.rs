@@ -519,25 +519,27 @@ impl StickControl {
         let half = (0x2000 - self.half_dead) >> 1;
         let mut bits = 0u8;
         if value != 0.0 {
-            let base = self.angle_base;
-            if angle < base - 0x7000 + half {
+            let base = i32::from(self.angle_base);
+            let half = i32::from(half);
+            let a = i32::from(angle);
+            if a < base - 0x7000 + half {
                 bits |= 4;
-            } else if angle < base - 0x5000 - half {
+            } else if a < base - 0x5000 - half {
                 bits |= 4;
                 bits |= 1;
-            } else if angle < base - 0x3000 + half {
+            } else if a < base - 0x3000 + half {
                 bits |= 1;
-            } else if angle < base - 0x1000 - half {
+            } else if a < base - 0x1000 - half {
                 bits |= 1;
                 bits |= 8;
-            } else if angle < base + 0x1000 + half {
+            } else if a < base + 0x1000 + half {
                 bits |= 8;
-            } else if angle < base + 0x3000 - half {
+            } else if a < base + 0x3000 - half {
                 bits |= 8;
                 bits |= 2;
-            } else if angle < base + 0x5000 + half {
+            } else if a < base + 0x5000 + half {
                 bits |= 2;
-            } else if angle < base + 0x7000 - half {
+            } else if a < base + 0x7000 - half {
                 bits |= 2;
                 bits |= 4;
             } else {
