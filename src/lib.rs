@@ -1949,10 +1949,12 @@ impl App {
                 .get_resource::<sim::event::ActiveEvent>()
                 .is_some_and(|event| event.running_front().is_some());
             if event_running && self.prologue_line < sky::PROLOGUE_LINES.len() {
-                let mut fonts = self.sim.world.get_resource_mut::<text::font::FontBank>();
-                sky::draw_dialogue(&mut stage.canvas, &mut fonts, self.prologue_line);
+                if let Some(mut fonts) = self.sim.world.get_resource_mut::<text::font::FontBank>() {
+                    sky::draw_dialogue(&mut stage.canvas, &mut fonts, self.prologue_line);
+                }
                 // Advance every three seconds so the six lines read in order.
-                if tick > 0 && tick % (3 * crate::SIM_HZ as u32) == 0 {
+                let line_ticks = 3u64 * (crate::SIM_HZ as u64);
+                if tick > 0 && tick % line_ticks == 0 {
                     self.prologue_line += 1;
                 }
             }
